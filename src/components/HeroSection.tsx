@@ -1,0 +1,19 @@
+import React from 'react';
+
+export default function HeroSection() {
+  return (
+    <section className="flex flex-col items-center justify-center py-24 text-center bg-background text-foreground">
+      <div className="container px-4 md:px-6">
+        <div className="flex flex-col items-center space-y-4">
+          <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
+            Benvenuto in Magazzino V5.5
+          </h1>
+          <p className="max-w-[700px] text-lg text-muted-foreground md:text-xl">
+            La soluzione completa per la gestione del tuo magazzino.
+            Efficienza, velocità e controllo totale a portata di mano.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
