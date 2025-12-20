@@ -6,8 +6,22 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 
 export default function SettingsProfilePage() {
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -28,11 +42,22 @@ export default function SettingsProfilePage() {
         <CardContent className="space-y-6">
             <div className="flex items-center gap-6">
                 <Avatar className="h-24 w-24">
-                    <AvatarImage src="/placeholder-user.jpg" />
+                    <AvatarImage src={previewImage || "/placeholder-user.jpg"} />
                     <AvatarFallback className="text-lg bg-blue-100 text-blue-700">MR</AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">
-                    <Button variant="outline" size="sm">Carica Nuova Foto</Button>
+                    <Label htmlFor="avatar-upload" className="cursor-pointer">
+                        <div className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+                            Carica Nuova Foto
+                        </div>
+                        <Input 
+                            id="avatar-upload" 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={handleImageUpload}
+                        />
+                    </Label>
                     <p className="text-xs text-muted-foreground">
                         JPG, GIF o PNG. Max 1MB.
                     </p>

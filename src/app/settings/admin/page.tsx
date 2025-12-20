@@ -5,10 +5,62 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { mockUsers } from "@/lib/mock-data";
-import { Shield, ShieldAlert, Trash2, UserCog } from "lucide-react";
+import { mockUsers, User } from "@/lib/mock-data";
+import { Shield, ShieldAlert, Trash2, UserCog, UserPlus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useState } from "react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function SettingsAdminPage() {
+    const [users, setUsers] = useState<User[]>(mockUsers);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+    // Mock form state
+    const [newUser, setNewUser] = useState({ name: "", email: "", role: "user" });
+
+    const handleCreateUser = () => {
+        const id = Math.random().toString(36).substring(7);
+        const user: User = {
+            id,
+            name: newUser.name,
+            email: newUser.email,
+            role: newUser.role as 'admin' | 'user',
+            status: 'active',
+            lastLogin: '-'
+        };
+        setUsers([...users, user]);
+        setIsCreateOpen(false);
+        setNewUser({ name: "", email: "", role: "user" });
+    };
+
+    const handleDeleteUser = () => {
+        if (selectedUser) {
+            setUsers(users.filter(u => u.id !== selectedUser.id));
+            setIsDeleteOpen(false);
+            setSelectedUser(null);
+        }
+    };
+
+    const handleUpdateRole = (role: string) => {
+        if (selectedUser) {
+            setUsers(users.map(u => u.id === selectedUser.id ? { ...u, role: role as 'admin' | 'user' } : u));
+            setIsEditRoleOpen(false);
+            setSelectedUser(null);
+        }
+    };
+
   return (
     <div className="space-y-6">
       <div>
@@ -31,12 +83,15 @@ export default function SettingsAdminPage() {
                         Elenco degli utenti con accesso al sistema.
                     </CardDescription>
                 </div>
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">Invita Utente</Button>
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsCreateOpen(true)}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Crea Utente
+                </Button>
             </div>
         </CardHeader>
         <CardContent>
             <div className="space-y-4">
-                {mockUsers.map((user) => (
+                {users.map((user) => (
                     <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg bg-slate-50">
                         <div className="flex items-center gap-4">
                             <Avatar>
@@ -59,13 +114,24 @@ export default function SettingsAdminPage() {
                             </div>
                             
                             <div className="flex gap-1">
-                                <Button variant="ghost" size="icon" title="Modifica Ruolo">
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    title="Modifica Ruolo"
+                                    onClick={() => { setSelectedUser(user); setIsEditRoleOpen(true); }}
+                                >
                                     <Shield className="h-4 w-4 text-slate-500" />
                                 </Button>
                                 <Button variant="ghost" size="icon" title="Modifica Utente">
                                     <UserCog className="h-4 w-4 text-slate-500" />
                                 </Button>
-                                <Button variant="ghost" size="icon" title="Elimina" className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    title="Elimina" 
+                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => { setSelectedUser(user); setIsDeleteOpen(true); }}
+                                >
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </div>
@@ -75,6 +141,80 @@ export default function SettingsAdminPage() {
             </div>
         </CardContent>
       </Card>
+
+      {/* Create User Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Crea Nuovo Utente</DialogTitle>
+                <DialogDescription>Aggiungi un nuovo utente al sistema.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label htmlFor="name">Nome</Label>
+                    <Input id="name" value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="role">Ruolo</Label>
+                    <Select value={newUser.role} onValueChange={(val) => setNewUser({...newUser, role: val})}>
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="user">Utente Standard</SelectItem>
+                            <SelectItem value="admin">Amministratore</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Annulla</Button>
+                <Button onClick={handleCreateUser} className="bg-blue-600 hover:bg-blue-700">Crea Utente</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Role Dialog */}
+      <Dialog open={isEditRoleOpen} onOpenChange={setIsEditRoleOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Modifica Ruolo</DialogTitle>
+                <DialogDescription>Cambia i permessi per {selectedUser?.name}</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <Select defaultValue={selectedUser?.role} onValueChange={handleUpdateRole}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Seleziona ruolo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="user">Utente Standard</SelectItem>
+                        <SelectItem value="admin">Amministratore</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Elimina Utente</DialogTitle>
+                <DialogDescription>
+                    Sei sicuro di voler eliminare l'utente <strong>{selectedUser?.name}</strong>? 
+                    Questa azione non può essere annullata.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Annulla</Button>
+                <Button variant="destructive" onClick={handleDeleteUser}>Elimina</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

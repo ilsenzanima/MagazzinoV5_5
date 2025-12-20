@@ -3,10 +3,23 @@
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export default function SettingsPage() {
+  const { setTheme, theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // useEffect only runs on the client, so now we can safely show the UI
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -28,7 +41,11 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
                 <div className="space-y-2">
                     <Label>Tema</Label>
-                    <RadioGroup defaultValue="light" className="grid grid-cols-3 gap-4">
+                    <RadioGroup 
+                        defaultValue={theme} 
+                        onValueChange={(value) => setTheme(value)}
+                        className="grid grid-cols-3 gap-4"
+                    >
                         <div>
                             <RadioGroupItem value="light" id="light" className="peer sr-only" />
                             <Label
@@ -69,30 +86,6 @@ export default function SettingsPage() {
                             </Label>
                         </div>
                     </RadioGroup>
-                </div>
-            </CardContent>
-         </Card>
-
-         <Card>
-            <CardHeader>
-                <CardTitle>Lingua e Formati</CardTitle>
-                <CardDescription>
-                    Seleziona la lingua e i formati di data/ora.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="language">Lingua</Label>
-                    <Select defaultValue="it">
-                        <SelectTrigger id="language" className="w-[200px]">
-                            <SelectValue placeholder="Seleziona lingua" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="it">Italiano</SelectItem>
-                            <SelectItem value="en">English</SelectItem>
-                            <SelectItem value="es">Español</SelectItem>
-                        </SelectContent>
-                    </Select>
                 </div>
             </CardContent>
          </Card>
