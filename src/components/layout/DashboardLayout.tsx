@@ -39,6 +39,24 @@ export function Sidebar({ className }: SidebarProps) {
       active: pathname === "/inventory",
     },
     {
+      label: "Cantieri",
+      icon: LayoutDashboard, // Temporary icon, should be changed to something like Building or HardHat if available
+      href: "/sites",
+      active: pathname === "/sites",
+    },
+    {
+      label: "Committenti",
+      icon: Menu, // Temporary generic icon
+      href: "/clients",
+      active: pathname === "/clients",
+    },
+    {
+      label: "Commesse",
+      icon: ClipboardList,
+      href: "/jobs",
+      active: pathname === "/jobs",
+    },
+    {
       label: "Ordini",
       icon: ClipboardList,
       href: "/orders", // Placeholder

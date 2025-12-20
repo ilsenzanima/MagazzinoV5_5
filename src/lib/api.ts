@@ -1,5 +1,39 @@
 import { supabase } from './supabase';
-import { InventoryItem, mockInventoryItems } from './mock-data';
+import { InventoryItem, User } from './mock-data';
+
+// Interfaces for new entities
+export interface Client {
+  id: string;
+  name: string;
+  vatNumber: string;
+  address: string;
+  email: string;
+  phone: string;
+  createdAt?: string;
+}
+
+export interface Job {
+  id: string;
+  clientId: string;
+  clientName?: string; // For display
+  code: string;
+  description: string;
+  status: 'active' | 'completed' | 'suspended';
+  startDate: string;
+  endDate: string;
+  createdAt?: string;
+}
+
+export interface Site {
+  id: string;
+  jobId: string;
+  jobDescription?: string; // For display
+  name: string;
+  address: string;
+  manager: string;
+  status: 'active' | 'inactive' | 'completed';
+  createdAt?: string;
+}
 
 // Mappa i tipi dal DB al Frontend
 export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
@@ -17,6 +51,75 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
   location: dbItem.location,
   unit: dbItem.unit,
   coefficient: dbItem.coefficient
+});
+
+export const mapDbProfileToUser = (profile: any): User => ({
+  id: profile.id,
+  name: profile.full_name || profile.email?.split('@')[0] || 'Utente',
+  email: profile.email || '',
+  role: profile.role || 'user',
+  avatar: profile.avatar_url,
+  status: 'active', // Default value as it's not in profiles table
+  lastLogin: profile.updated_at // Using updated_at as proxy for now
+});
+
+// Mapping functions for new entities
+const mapDbToClient = (db: any): Client => ({
+  id: db.id,
+  name: db.name,
+  vatNumber: db.vat_number,
+  address: db.address,
+  email: db.email,
+  phone: db.phone,
+  createdAt: db.created_at
+});
+
+const mapClientToDb = (client: Partial<Client>) => ({
+  name: client.name,
+  vat_number: client.vatNumber,
+  address: client.address,
+  email: client.email,
+  phone: client.phone
+});
+
+const mapDbToJob = (db: any): Job => ({
+  id: db.id,
+  clientId: db.client_id,
+  clientName: db.clients?.name,
+  code: db.code,
+  description: db.description,
+  status: db.status,
+  startDate: db.start_date,
+  endDate: db.end_date,
+  createdAt: db.created_at
+});
+
+const mapJobToDb = (job: Partial<Job>) => ({
+  client_id: job.clientId,
+  code: job.code,
+  description: job.description,
+  status: job.status,
+  start_date: job.startDate,
+  end_date: job.endDate
+});
+
+const mapDbToSite = (db: any): Site => ({
+  id: db.id,
+  jobId: db.job_id,
+  jobDescription: db.jobs?.description,
+  name: db.name,
+  address: db.address,
+  manager: db.manager,
+  status: db.status,
+  createdAt: db.created_at
+});
+
+const mapSiteToDb = (site: Partial<Site>) => ({
+  job_id: site.jobId,
+  name: site.name,
+  address: site.address,
+  manager: site.manager,
+  status: site.status
 });
 
 // Mappa i tipi dal Frontend al DB
@@ -98,27 +201,150 @@ export const inventoryApi = {
 
   // Seed database with mock data
   seed: async () => {
-    // Check if empty
+    // Check if data already exists
     const { count } = await supabase
       .from('inventory')
       .select('*', { count: 'exact', head: true });
 
     if (count && count > 0) {
-      throw new Error("Il database contiene già dei dati. Impossibile eseguire il seed.");
+      console.log('Database already seeded');
+      return;
     }
+    return; 
+  }
+};
 
-    const dbItems = mockInventoryItems.map(item => {
-        // Remove ID to let DB generate UUID
-        const { id, status, ...rest } = item; 
-        return mapInventoryItemToDbItem(rest as any);
-    });
-
+export const usersApi = {
+  getAll: async () => {
     const { data, error } = await supabase
-      .from('inventory')
-      .insert(dbItems)
-      .select();
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+    return data.map(mapDbProfileToUser);
+  },
+
+  updateRole: async (id: string, role: 'admin' | 'user') => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ role })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapDbProfileToUser(data);
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  }
+};
+
+// --- Clients API ---
+export const clientsApi = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('name');
+    if (error) throw error;
+    return data.map(mapDbToClient);
+  },
+  getById: async (id: string) => {
+    const { data, error } = await supabase.from('clients').select('*').eq('id', id).single();
+    if (error) throw error;
+    return mapDbToClient(data);
+  },
+  create: async (client: Partial<Client>) => {
+    const { data, error } = await supabase.from('clients').insert(mapClientToDb(client)).select().single();
+    if (error) throw error;
+    return mapDbToClient(data);
+  },
+  update: async (id: string, client: Partial<Client>) => {
+    const { data, error } = await supabase.from('clients').update(mapClientToDb(client)).eq('id', id).select().single();
+    if (error) throw error;
+    return mapDbToClient(data);
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) throw error;
+  }
+};
+
+// --- Jobs API ---
+export const jobsApi = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*, clients(name)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(mapDbToJob);
+  },
+  getByClientId: async (clientId: string) => {
+     const { data, error } = await supabase
+      .from('jobs')
+      .select('*, clients(name)')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(mapDbToJob);
+  },
+  getById: async (id: string) => {
+    const { data, error } = await supabase.from('jobs').select('*, clients(name)').eq('id', id).single();
+    if (error) throw error;
+    return mapDbToJob(data);
+  },
+  create: async (job: Partial<Job>) => {
+    const { data, error } = await supabase.from('jobs').insert(mapJobToDb(job)).select().single();
+    if (error) throw error;
+    return mapDbToJob(data);
+  },
+  update: async (id: string, job: Partial<Job>) => {
+    const { data, error } = await supabase.from('jobs').update(mapJobToDb(job)).eq('id', id).select().single();
+    if (error) throw error;
+    return mapDbToJob(data);
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('jobs').delete().eq('id', id);
+    if (error) throw error;
+  }
+};
+
+// --- Sites API ---
+export const sitesApi = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('sites')
+      .select('*, jobs(description)')
+      .order('name');
+    if (error) throw error;
+    return data.map(mapDbToSite);
+  },
+  getById: async (id: string) => {
+    const { data, error } = await supabase.from('sites').select('*, jobs(description)').eq('id', id).single();
+    if (error) throw error;
+    return mapDbToSite(data);
+  },
+  create: async (site: Partial<Site>) => {
+    const { data, error } = await supabase.from('sites').insert(mapSiteToDb(site)).select().single();
+    if (error) throw error;
+    return mapDbToSite(data);
+  },
+  update: async (id: string, site: Partial<Site>) => {
+    const { data, error } = await supabase.from('sites').update(mapSiteToDb(site)).eq('id', id).select().single();
+    if (error) throw error;
+    return mapDbToSite(data);
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('sites').delete().eq('id', id);
+    if (error) throw error;
   }
 };
