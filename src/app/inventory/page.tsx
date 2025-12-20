@@ -10,84 +10,11 @@ import {
   Search, 
   Filter, 
   Plus, 
-  Info,
   ChevronLeft,
   Package
 } from "lucide-react";
 import Link from "next/link";
-
-// Tipi definiti per il mock data (futura tabella DB)
-type Article = {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
-  brand: string;
-  quantity: number;
-  minStock: number;
-  location: string;
-  image: string;
-};
-
-// Dati Mock
-const MOCK_INVENTORY: Article[] = [
-  {
-    id: "1",
-    code: "TRP-12345",
-    name: "Trapano a Percussione 18V",
-    type: "Elettroutensili",
-    brand: "Bosch",
-    quantity: 25,
-    minStock: 10,
-    location: "Corsia 3, Scaffale B",
-    image: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=400&h=400&fit=crop",
-  },
-  {
-    id: "2",
-    code: "MRT-001",
-    name: "Martello da Carpentiere",
-    type: "Utensili Manuali",
-    brand: "Stanley",
-    quantity: 5,
-    minStock: 8, // Basse scorte
-    location: "Corsia 1, Scaffale A",
-    image: "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?w=400&h=400&fit=crop",
-  },
-  {
-    id: "3",
-    code: "VTI-500",
-    name: "Set Viti 500pz",
-    type: "Ferramenta",
-    brand: "Wurth",
-    quantity: 0, // Esaurito
-    minStock: 20,
-    location: "Corsia 2, Cassetto 4",
-    image: "https://images.unsplash.com/photo-1585338676231-6b8026131c03?w=400&h=400&fit=crop",
-  },
-  {
-    id: "4",
-    code: "CSK-99",
-    name: "Casco Protettivo Giallo",
-    type: "DPI",
-    brand: "3M",
-    quantity: 15,
-    minStock: 5,
-    location: "Corsia 5, Scaffale C",
-    image: "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=400&h=400&fit=crop",
-  },
-   {
-    id: "5",
-    code: "FLX-20",
-    name: "Flessibile 115mm",
-    type: "Elettroutensili",
-    brand: "Makita",
-    quantity: 8,
-    minStock: 10, // Basse scorte
-    location: "Corsia 3, Scaffale B",
-    image: "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=400&h=400&fit=crop",
-  },
-];
-
+import { mockInventoryItems } from "@/lib/mock-data";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export default function InventoryPage() {
@@ -95,7 +22,7 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState("all");
 
   // Logica di Filtro
-  const filteredItems = MOCK_INVENTORY.filter((item) => {
+  const filteredItems = mockInventoryItems.filter((item) => {
     // 1. Filtro Ricerca (Cerca su tutti i campi testuali)
     const matchesSearch = 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -161,50 +88,55 @@ export default function InventoryPage() {
           </div>
         ) : (
           filteredItems.map((item) => (
-            <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group">
-              <CardContent className="p-0 flex flex-col h-full">
-                {/* Immagine */}
-                <div className="w-full h-48 bg-slate-200 shrink-0 relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={item.image} 
-                    alt={item.name} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {item.quantity === 0 && (
-                     <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm">
-                       <Badge variant="destructive" className="text-sm font-bold">ESAURITO</Badge>
-                     </div>
-                  )}
-                </div>
+            <Link href={`/inventory/${item.id}`} key={item.id}>
+              <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group h-full">
+                <CardContent className="p-0 flex flex-col h-full">
+                  {/* Immagine */}
+                  <div className="w-full h-48 bg-slate-200 shrink-0 relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={item.image || "/placeholder.svg"} 
+                      alt={item.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/placeholder.svg";
+                      }}
+                    />
+                    {item.quantity === 0 && (
+                       <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm">
+                         <Badge variant="destructive" className="text-sm font-bold">ESAURITO</Badge>
+                       </div>
+                    )}
+                  </div>
 
-                {/* Dettagli */}
-                <div className="flex-1 p-4 flex flex-col gap-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-xs text-slate-500 font-mono mb-1">{item.code}</p>
-                        <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight">{item.name}</h3>
+                  {/* Dettagli */}
+                  <div className="flex-1 p-4 flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                          <p className="text-xs text-slate-500 font-mono mb-1">{item.code}</p>
+                          <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight">{item.name}</h3>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-1 mt-auto pt-2">
+                      <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
+                        {item.brand}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
+                        {item.type}
+                      </Badge>
+                       <Badge variant="outline" className={
+                        item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50 ml-auto" :
+                        item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50 ml-auto" :
+                        "text-slate-600 ml-auto"
+                      }>
+                        {item.quantity} pz.
+                      </Badge>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-wrap gap-1 mt-auto pt-2">
-                    <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
-                      {item.brand}
-                    </Badge>
-                    <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
-                      {item.type}
-                    </Badge>
-                     <Badge variant="outline" className={
-                      item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50 ml-auto" :
-                      item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50 ml-auto" :
-                      "text-slate-600 ml-auto"
-                    }>
-                      {item.quantity} pz.
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           ))
         )}
       </div>
