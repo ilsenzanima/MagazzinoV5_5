@@ -4,16 +4,45 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { 
+  User, 
+  Bell, 
+  Settings, 
+  Shield, 
+  Package
+} from "lucide-react";
 
-interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
-  items: {
-    href: string;
-    title: string;
-    icon: React.ComponentType<{ className?: string }>;
-  }[];
-}
+const sidebarNavItems = [
+  {
+    title: "Generale",
+    href: "/settings",
+    icon: Settings,
+  },
+  {
+    title: "Profilo",
+    href: "/settings/profile",
+    icon: User,
+  },
+  {
+    title: "Notifiche",
+    href: "/settings/notifications",
+    icon: Bell,
+  },
+  {
+    title: "Inventario",
+    href: "/settings/inventory",
+    icon: Package,
+  },
+  {
+    title: "Amministrazione",
+    href: "/settings/admin",
+    icon: Shield,
+  },
+];
 
-export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
+interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {}
+
+export function SidebarNav({ className, ...props }: SidebarNavProps) {
   const pathname = usePathname();
 
   return (
@@ -24,7 +53,7 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
       )}
       {...props}
     >
-      {items.map((item) => (
+      {sidebarNavItems.map((item) => (
         <Link
           key={item.href}
           href={item.href}

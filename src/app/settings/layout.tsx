@@ -1,46 +1,11 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { SidebarNav } from "./components/settings-sidebar";
-import { 
-  User, 
-  Bell, 
-  Settings, 
-  Shield, 
-  Package
-} from "lucide-react";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Impostazioni",
   description: "Gestisci le impostazioni del tuo account e dell'applicazione.",
 };
-
-const sidebarNavItems = [
-  {
-    title: "Generale",
-    href: "/settings",
-    icon: Settings,
-  },
-  {
-    title: "Profilo",
-    href: "/settings/profile",
-    icon: User,
-  },
-  {
-    title: "Notifiche",
-    href: "/settings/notifications",
-    icon: Bell,
-  },
-  {
-    title: "Inventario",
-    href: "/settings/inventory",
-    icon: Package,
-  },
-  {
-    title: "Amministrazione",
-    href: "/settings/admin",
-    icon: Shield,
-  },
-];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -54,7 +19,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         </div>
         <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
           <aside className="-mx-4 lg:w-1/5 px-4 lg:px-0">
-            <SidebarNav items={sidebarNavItems} />
+            <SidebarNav />
           </aside>
           <div className="flex-1 lg:max-w-2xl">{children}</div>
         </div>
