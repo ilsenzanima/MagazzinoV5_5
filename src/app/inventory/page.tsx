@@ -198,9 +198,10 @@ export default function InventoryPage() {
                 </CardContent>
               </Card>
             </Link>
-            ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
+    )}
       
       {/* Floating Action Button (FAB) */}
       <div className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-20">
