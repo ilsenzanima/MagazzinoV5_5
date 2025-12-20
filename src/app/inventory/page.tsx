@@ -11,15 +11,65 @@ import {
   Filter, 
   Plus, 
   ChevronLeft,
-  Package
+  Package,
+  ScanLine
 } from "lucide-react";
 import Link from "next/link";
 import { mockInventoryItems } from "@/lib/mock-data";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { Html5QrcodeScanner } from "html5-qrcode";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useEffect } from "react";
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [isScanning, setIsScanning] = useState(false);
+
+  useEffect(() => {
+    let scanner: Html5QrcodeScanner | null = null;
+
+    if (isScanning) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        try {
+            // Check if element exists
+            if (document.getElementById("reader")) {
+                scanner = new Html5QrcodeScanner(
+                    "reader",
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    false
+                );
+                
+                scanner.render(
+                    (decodedText) => {
+                        setSearchTerm(decodedText);
+                        setIsScanning(false);
+                    },
+                    (errorMessage) => {
+                        // ignore
+                    }
+                );
+            }
+        } catch (err) {
+            console.error("Scanner init error", err);
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+
+    return () => {
+        if (scanner) {
+            scanner.clear().catch(console.error);
+        }
+    };
+  }, [isScanning]);
 
   // Logica di Filtro
   const filteredItems = mockInventoryItems.filter((item) => {
@@ -59,14 +109,19 @@ export default function InventoryPage() {
         </div>
 
         {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Cerca Articoli (Nome, Codice, Marca...)" 
-            className="pl-9 bg-slate-100 border-none"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="Cerca Articoli (Nome, Codice, Marca...)" 
+              className="pl-9 bg-slate-100 border-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR">
+            <ScanLine className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Tabs */}
@@ -147,6 +202,18 @@ export default function InventoryPage() {
           <Plus className="h-8 w-8" />
         </Button>
       </div>
+
+      {/* Scanner Dialog */}
+      <Dialog open={isScanning} onOpenChange={setIsScanning}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scansiona Codice</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-4 bg-slate-50 rounded-lg">
+             <div id="reader" className="w-full"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </DashboardLayout>
   );

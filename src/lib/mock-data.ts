@@ -6,17 +6,46 @@ export interface InventoryItem {
   type: string;
   quantity: number;
   minStock: number;
-  status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  status?: 'in_stock' | 'low_stock' | 'out_of_stock'; // Optional as it can be calculated
   image?: string;
   description?: string;
   price?: number;
-  location?: string; // Kept for backend compatibility, but maybe hidden in UI
+  location?: string;
+  unit: 'PZ' | 'ML' | 'MQ' | 'KG' | 'L';
+  coefficient: number;
 }
+
+export interface Movement {
+  id: string;
+  itemId: string;
+  date: string;
+  type: 'load' | 'unload';
+  quantity: number;
+  reference: string; // Bolla or Order ID
+  notes?: string;
+}
+
+export const mockBrands = [
+  "Makita", "Bosch", "Stanley", "Beta", "Wurth", "3M", "DeWalt", "Hilti", "Usag"
+];
+
+export const mockTypes = [
+  "Elettroutensili", "Utensili Manuali", "Ferramenta", "DPI", "Materiale Elettrico", "Idraulica", "Consumabili"
+];
+
+export const mockUnits = ['PZ', 'ML', 'MQ', 'KG', 'L'];
+
+export const mockMovements: Movement[] = [
+  { id: 'm1', itemId: '1', date: '2023-12-01', type: 'load', quantity: 20, reference: 'BOL-2023-001' },
+  { id: 'm2', itemId: '1', date: '2023-12-10', type: 'unload', quantity: 5, reference: 'ORD-123' },
+  { id: 'm3', itemId: '2', date: '2023-11-20', type: 'load', quantity: 10, reference: 'BOL-2023-002' },
+  { id: 'm4', itemId: '2', date: '2023-12-15', type: 'unload', quantity: 6, reference: 'ORD-125' },
+];
 
 export const mockInventoryItems: InventoryItem[] = [
   {
     id: '1',
-    code: 'ART-001',
+    code: 'PPA-E12X8',
     name: 'Trapano Avvitatore 18V',
     brand: 'Makita',
     type: 'Elettroutensili',
@@ -26,25 +55,28 @@ export const mockInventoryItems: InventoryItem[] = [
     image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=800&q=80',
     description: 'Trapano avvitatore professionale con percussione, 2 batterie incluse.',
     price: 189.99,
-    location: 'A-12-3'
+    location: 'A-12-3',
+    unit: 'PZ',
+    coefficient: 1.0
   },
   {
     id: '2',
-    code: 'ART-002',
+    code: 'PPA-E99Z1',
     name: 'Set Cacciaviti 6pz',
     brand: 'Beta',
     type: 'Utensili Manuali',
     quantity: 4,
     minStock: 10,
     status: 'low_stock',
-    // No image to test placeholder
     description: 'Set di 6 cacciaviti professionali a taglio e croce.',
     price: 24.50,
-    location: 'B-05-1'
+    location: 'B-05-1',
+    unit: 'PZ',
+    coefficient: 1.0
   },
   {
     id: '3',
-    code: 'ART-003',
+    code: 'PPA-E00A2',
     name: 'Nastro Isolante Nero',
     brand: '3M',
     type: 'Materiale Elettrico',
@@ -54,11 +86,13 @@ export const mockInventoryItems: InventoryItem[] = [
     image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&q=80',
     description: 'Nastro isolante in PVC, rotolo da 25m.',
     price: 2.99,
-    location: 'C-01-4'
+    location: 'C-01-4',
+    unit: 'ML',
+    coefficient: 25.0
   },
   {
     id: '4',
-    code: 'ART-004',
+    code: 'PPA-E77K3',
     name: 'Martello da Carpentiere',
     brand: 'Stanley',
     type: 'Utensili Manuali',
@@ -67,11 +101,13 @@ export const mockInventoryItems: InventoryItem[] = [
     status: 'in_stock',
     description: 'Martello con manico in fibra di vetro antivibrazione.',
     price: 18.90,
-    location: 'B-05-2'
+    location: 'B-05-2',
+    unit: 'PZ',
+    coefficient: 1.0
   },
   {
     id: '5',
-    code: 'ART-005',
+    code: 'PPA-E33J4',
     name: 'Smerigliatrice Angolare',
     brand: 'Bosch',
     type: 'Elettroutensili',
@@ -81,6 +117,8 @@ export const mockInventoryItems: InventoryItem[] = [
     image: 'https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=800&q=80',
     description: 'Smerigliatrice 125mm, 900W.',
     price: 89.00,
-    location: 'A-13-1'
+    location: 'A-13-1',
+    unit: 'PZ',
+    coefficient: 1.0
   },
 ];
