@@ -10,7 +10,6 @@ import { ArrowLeft, Loader2, Save } from "lucide-react";
 import Link from "next/link";
 import { clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useToast } from "@/components/ui/use-toast"; // Assuming this exists or I'll use simple alert
 
 export default function NewClientPage() {
   const router = useRouter();
