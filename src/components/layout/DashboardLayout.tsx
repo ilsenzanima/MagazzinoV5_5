@@ -80,7 +80,22 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
       </div>
       <div className="absolute bottom-4 left-0 w-full px-3">
-        <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-slate-800">
+        {user && (
+          <div className="mb-4 px-4 flex items-center space-x-3">
+             <Avatar className="h-8 w-8">
+                <AvatarImage src="" />
+                <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+             </Avatar>
+             <div className="overflow-hidden">
+                <p className="text-sm font-medium text-white truncate">{user.email}</p>
+             </div>
+          </div>
+        )}
+        <Button 
+            variant="ghost" 
+            className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-slate-800"
+            onClick={signOut}
+        >
             <LogOut className="mr-2 h-4 w-4" />
             Esci
         </Button>
@@ -94,6 +109,27 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  const { session, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !session) {
+      router.push("/login");
+    }
+  }, [loading, session, router]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return null;
+  }
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       {/* Sidebar Desktop */}

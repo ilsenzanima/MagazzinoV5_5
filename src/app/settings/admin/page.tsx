@@ -19,6 +19,9 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { inventoryApi } from "@/lib/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
 
 export default function SettingsAdminPage() {
     const [users, setUsers] = useState<User[]>(mockUsers);
@@ -26,9 +29,26 @@ export default function SettingsAdminPage() {
     const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    
+    // Seed State
+    const [seedLoading, setSeedLoading] = useState(false);
+    const [seedResult, setSeedResult] = useState<{success: boolean, message: string} | null>(null);
 
     // Mock form state
     const [newUser, setNewUser] = useState({ name: "", email: "", role: "user" });
+
+    const handleSeedData = async () => {
+        setSeedLoading(true);
+        setSeedResult(null);
+        try {
+            await inventoryApi.seed();
+            setSeedResult({ success: true, message: "Database popolato con successo!" });
+        } catch (error: any) {
+            setSeedResult({ success: false, message: error.message || "Errore durante il popolamento." });
+        } finally {
+            setSeedLoading(false);
+        }
+    };
 
     const handleCreateUser = () => {
         const id = Math.random().toString(36).substring(7);
@@ -73,6 +93,67 @@ export default function SettingsAdminPage() {
         </p>
       </div>
       <Separator />
+
+      {/* Connection Status & Debug Info */}
+      <Card className="mb-6">
+        <CardHeader>
+            <CardTitle className="text-sm font-medium">Stato Connessione</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-2">
+                <div className={`h-3 w-3 rounded-full ${
+                    connectionStatus === 'connected' ? 'bg-green-500' : 
+                    connectionStatus === 'error' ? 'bg-red-500' : 'bg-yellow-500'
+                }`} />
+                <span className="text-sm font-medium">
+                    {connectionStatus === 'connected' ? 'Supabase Connesso' : 
+                     connectionStatus === 'error' ? 'Errore Connessione' : 'Verifica in corso...'}
+                </span>
+            </div>
+            {errorMessage && (
+                <p className="text-xs text-red-500 mt-1">{errorMessage}</p>
+            )}
+            {currentUser && (
+                <div className="mt-2 text-xs text-slate-500">
+                    <p>User ID: {currentUser.id}</p>
+                    <p>Role: {userRole || 'Loading...'}</p>
+                    {userRole === 'user' && (
+                        <p className="text-amber-600 font-bold mt-1">
+                            Attenzione: Sei un utente standard. Non puoi modificare il database.
+                            Chiedi all'amministratore di promuoverti o usa SQL Editor.
+                        </p>
+                    )}
+                </div>
+            )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6 border-amber-200 bg-amber-50">
+        <CardHeader>
+            <CardTitle>Popolamento Database</CardTitle>
+            <CardDescription>
+                Carica dati di esempio nel database. Utile per il primo avvio.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-4">
+                <Button 
+                    variant="outline" 
+                    className="border-amber-600 text-amber-700 hover:bg-amber-100"
+                    onClick={handleSeedData}
+                    disabled={seedLoading}
+                >
+                    {seedLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Popola Dati di Esempio
+                </Button>
+                {seedResult && (
+                    <span className={`text-sm ${seedResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                        {seedResult.message}
+                    </span>
+                )}
+            </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

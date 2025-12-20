@@ -72,7 +72,7 @@ export default function InventoryPage() {
   }, [isScanning]);
 
   // Logica di Filtro
-  const filteredItems = mockInventoryItems.filter((item) => {
+  const filteredItems = items.filter((item) => {
     // 1. Filtro Ricerca (Cerca su tutti i campi testuali)
     const matchesSearch = 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -135,6 +135,12 @@ export default function InventoryPage() {
       </div>
 
       {/* Lista Articoli */}
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="ml-2 text-slate-500">Caricamento inventario...</span>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredItems.length === 0 ? (
           <div className="col-span-full text-center py-10 text-slate-400">
@@ -192,10 +198,10 @@ export default function InventoryPage() {
                 </CardContent>
               </Card>
             </Link>
-          ))
-        )}
-      </div>
-
+            ))}
+        </div>
+      )}
+      
       {/* Floating Action Button (FAB) */}
       <div className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-20">
         <Link href="/inventory/new">

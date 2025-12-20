@@ -1,8 +1,21 @@
-import React from 'react';
+"use client";
+
+import React, { useEffect } from 'react';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/auth-provider";
+import { useRouter } from "next/navigation";
 
 export default function HeroSection() {
+  const { session } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (session) {
+      router.push("/dashboard");
+    }
+  }, [session, router]);
+
   return (
     <section className="flex flex-col items-center justify-center py-24 text-center bg-background text-foreground">
       <div className="container px-4 md:px-6">
