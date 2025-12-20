@@ -15,27 +15,67 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { inventoryApi } from "@/lib/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/auth-provider";
 
 export default function SettingsAdminPage() {
+    const { user: currentUser } = useAuth();
     const [users, setUsers] = useState<User[]>(mockUsers);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     
+    // Connection State
+    const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<string | null>(null);
+
     // Seed State
     const [seedLoading, setSeedLoading] = useState(false);
     const [seedResult, setSeedResult] = useState<{success: boolean, message: string} | null>(null);
 
     // Mock form state
     const [newUser, setNewUser] = useState({ name: "", email: "", role: "user" });
+
+    useEffect(() => {
+        checkConnection();
+    }, [currentUser]);
+
+    const checkConnection = async () => {
+        try {
+            setConnectionStatus('checking');
+            // Check basic connection by querying a public table or just ensuring client is ready
+            // We use inventory count as a simple check
+            const { count, error } = await supabase
+                .from('inventory')
+                .select('*', { count: 'exact', head: true });
+            
+            if (error) throw error;
+            
+            setConnectionStatus('connected');
+            
+            if (currentUser) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', currentUser.id)
+                    .single();
+                setUserRole(profile?.role || 'user');
+            }
+        } catch (err: any) {
+            console.error("Connection error:", err);
+            setConnectionStatus('error');
+            setErrorMessage(err.message || "Impossibile connettersi a Supabase");
+        }
+    };
 
     const handleSeedData = async () => {
         setSeedLoading(true);
