@@ -16,12 +16,12 @@ export default function HeroSection() {
           </p>
           
           <div className="flex flex-col gap-4 min-[400px]:flex-row mt-8">
-            <Link href="/dashboard">
+            <Link href="/login">
               <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
-                Accedi alla Dashboard
+                Accedi
               </Button>
             </Link>
-            <Link href="/dashboard">
+            <Link href="/register">
               <Button size="lg" variant="outline">
                 Registrati
               </Button>
