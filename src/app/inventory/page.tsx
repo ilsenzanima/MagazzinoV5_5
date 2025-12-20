@@ -88,6 +88,8 @@ const MOCK_INVENTORY: Article[] = [
   },
 ];
 
+import DashboardLayout from "@/components/layout/DashboardLayout";
+
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
@@ -113,12 +115,12 @@ export default function InventoryPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <DashboardLayout>
       
       {/* Header Fisso */}
-      <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4">
+      <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard">
+          <Link href="/dashboard" className="md:hidden">
             <Button variant="ghost" size="icon" className="-ml-2">
               <ChevronLeft className="h-6 w-6 text-slate-600" />
             </Button>
@@ -151,60 +153,54 @@ export default function InventoryPage() {
       </div>
 
       {/* Lista Articoli */}
-      <div className="p-4 space-y-4 max-w-md mx-auto md:max-w-4xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredItems.length === 0 ? (
-          <div className="text-center py-10 text-slate-400">
+          <div className="col-span-full text-center py-10 text-slate-400">
             <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
             <p>Nessun articolo trovato</p>
           </div>
         ) : (
           filteredItems.map((item) => (
-            <Card key={item.id} className="overflow-hidden">
-              <CardContent className="p-0 flex">
+            <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group">
+              <CardContent className="p-0 flex flex-col h-full">
                 {/* Immagine */}
-                <div className="w-24 h-24 bg-slate-200 shrink-0">
+                <div className="w-full h-48 bg-slate-200 shrink-0 relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={item.image} 
                     alt={item.name} 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
+                  {item.quantity === 0 && (
+                     <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm">
+                       <Badge variant="destructive" className="text-sm font-bold">ESAURITO</Badge>
+                     </div>
+                  )}
                 </div>
 
                 {/* Dettagli */}
-                <div className="flex-1 p-3 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <div>
-                         <h3 className="font-bold text-slate-900 line-clamp-1">{item.name}</h3>
-                         <p className="text-xs text-slate-500 font-mono">{item.code}</p>
-                      </div>
-                      <Badge variant="outline" className={
-                        item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50" :
-                        item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
-                        "text-slate-600"
-                      }>
-                        {item.quantity} in stock
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal text-slate-600">
-                        {item.brand}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal text-slate-600">
-                        {item.type}
-                      </Badge>
+                <div className="flex-1 p-4 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                        <p className="text-xs text-slate-500 font-mono mb-1">{item.code}</p>
+                        <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight">{item.name}</h3>
                     </div>
                   </div>
-
-                  <div className="flex items-end justify-between mt-2">
-                    <p className="text-xs text-slate-400 flex items-center gap-1">
-                      📍 {item.location}
-                    </p>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                      <Info className="h-5 w-5" />
-                    </Button>
+                  
+                  <div className="flex flex-wrap gap-1 mt-auto pt-2">
+                    <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
+                      {item.brand}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
+                      {item.type}
+                    </Badge>
+                     <Badge variant="outline" className={
+                      item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50 ml-auto" :
+                      item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50 ml-auto" :
+                      "text-slate-600 ml-auto"
+                    }>
+                      {item.quantity} pz.
+                    </Badge>
                   </div>
                 </div>
               </CardContent>
@@ -220,6 +216,6 @@ export default function InventoryPage() {
         </Button>
       </div>
 
-    </div>
+    </DashboardLayout>
   );
 }

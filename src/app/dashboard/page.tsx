@@ -40,22 +40,25 @@ const orderStatusData = [
   { name: 'In Attesa', value: 10, color: '#f59e0b' }, // amber-500
 ];
 
+import DashboardLayout from "@/components/layout/DashboardLayout";
+
 export default function Dashboard() {
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Top Bar */}
-      <div className="bg-white p-4 flex justify-between items-center shadow-sm sticky top-0 z-10">
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard Principale</h1>
-        <Avatar>
-          <AvatarImage src="https://github.com/shadcn.png" />
-          <AvatarFallback><User /></AvatarFallback>
-        </Avatar>
-      </div>
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Top Bar (Mobile Hidden, Desktop Title) */}
+        <div className="flex justify-between items-center mb-6">
+           <h1 className="text-2xl font-bold text-slate-900 hidden md:block">Dashboard Principale</h1>
+           <div className="flex items-center gap-4 ml-auto">
+             <Avatar>
+              <AvatarImage src="https://github.com/shadcn.png" />
+              <AvatarFallback><User /></AvatarFallback>
+            </Avatar>
+           </div>
+        </div>
 
-      <div className="p-4 space-y-6 max-w-md mx-auto md:max-w-4xl">
-        
         {/* KPI Cards Row */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-4 md:gap-6">
           <Card>
             <CardContent className="p-3 flex flex-col items-center justify-center text-center">
               <div className="text-slate-500 text-xs font-medium mb-1">Articoli in Stock</div>
@@ -194,33 +197,6 @@ export default function Dashboard() {
         </div>
 
       </div>
-      
-      {/* Bottom Nav (Mobile Style) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2 flex justify-around items-center md:hidden">
-        <div className="flex flex-col items-center text-blue-600">
-          <div className="p-1 rounded-full bg-blue-50">
-             <div className="h-5 w-5 grid grid-cols-2 gap-0.5">
-               <div className="bg-blue-600 rounded-[1px]"></div>
-               <div className="bg-blue-600 rounded-[1px]"></div>
-               <div className="bg-blue-600 rounded-[1px]"></div>
-               <div className="bg-blue-600 rounded-[1px]"></div>
-             </div>
-          </div>
-          <span className="text-[10px] font-medium mt-1">Dashboard</span>
-        </div>
-        <Link href="/inventory" className="flex flex-col items-center text-slate-400">
-          <Package className="h-6 w-6" />
-          <span className="text-[10px] font-medium mt-1">Inventario</span>
-        </Link>
-         <div className="flex flex-col items-center text-slate-400">
-          <ClipboardList className="h-6 w-6" />
-          <span className="text-[10px] font-medium mt-1">Ordini</span>
-        </div>
-        <div className="flex flex-col items-center text-slate-400">
-          <User className="h-6 w-6" />
-          <span className="text-[10px] font-medium mt-1">Profilo</span>
-        </div>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }

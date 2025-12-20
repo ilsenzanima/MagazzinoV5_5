@@ -1,0 +1,128 @@
+"use client"
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { 
+  LayoutDashboard, 
+  Package, 
+  ClipboardList, 
+  BarChart3, 
+  Settings, 
+  Menu,
+  LogOut
+} from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
+
+export function Sidebar({ className }: SidebarProps) {
+  const pathname = usePathname();
+
+  const routes = [
+    {
+      label: "Dashboard",
+      icon: LayoutDashboard,
+      href: "/dashboard",
+      active: pathname === "/dashboard",
+    },
+    {
+      label: "Inventario",
+      icon: Package,
+      href: "/inventory",
+      active: pathname === "/inventory",
+    },
+    {
+      label: "Ordini",
+      icon: ClipboardList,
+      href: "/orders", // Placeholder
+      active: pathname === "/orders",
+    },
+    {
+      label: "Report",
+      icon: BarChart3,
+      href: "/reports", // Placeholder
+      active: pathname === "/reports",
+    },
+    {
+      label: "Impostazioni",
+      icon: Settings,
+      href: "/settings", // Placeholder
+      active: pathname === "/settings",
+    },
+  ];
+
+  return (
+    <div className={cn("pb-12 h-full bg-slate-900 text-white", className)}>
+      <div className="space-y-4 py-4">
+        <div className="px-3 py-2">
+          <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight text-blue-400">
+            Magazzino V5.5
+          </h2>
+          <div className="space-y-1">
+            {routes.map((route) => (
+              <Link key={route.href} href={route.href}>
+                <Button
+                  variant={route.active ? "secondary" : "ghost"}
+                  className={cn(
+                    "w-full justify-start", 
+                    route.active ? "bg-slate-800 text-white hover:bg-slate-800" : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  )}
+                >
+                  <route.icon className="mr-2 h-4 w-4" />
+                  {route.label}
+                </Button>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="absolute bottom-4 left-0 w-full px-3">
+        <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-slate-800">
+            <LogOut className="mr-2 h-4 w-4" />
+            Esci
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-screen bg-slate-50">
+      {/* Sidebar Desktop */}
+      <div className="hidden md:flex h-screen w-64 flex-col fixed left-0 top-0 border-r border-slate-800 z-50">
+        <Sidebar />
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 md:pl-64 flex flex-col min-h-screen">
+        
+        {/* Mobile Header with Hamburger */}
+        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-white p-4 shadow-sm">
+           <div className="font-bold text-lg text-slate-900">Magazzino V5.5</div>
+           <Sheet>
+             <SheetTrigger asChild>
+               <Button variant="ghost" size="icon">
+                 <Menu className="h-6 w-6" />
+               </Button>
+             </SheetTrigger>
+             <SheetContent side="left" className="p-0 bg-slate-900 border-r-slate-800 text-white w-64">
+               <Sidebar />
+             </SheetContent>
+           </Sheet>
+        </header>
+
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
