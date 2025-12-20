@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,10 +12,12 @@ import {
   Plus, 
   ChevronLeft,
   Package,
-  ScanLine
+  ScanLine,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
-import { mockInventoryItems } from "@/lib/mock-data";
+import { InventoryItem } from "@/lib/mock-data";
+import { inventoryApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import {
@@ -24,12 +26,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useEffect } from "react";
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [isScanning, setIsScanning] = useState(false);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadItems();
+  }, []);
+
+  const loadItems = async () => {
+    try {
+        setLoading(true);
+        const data = await inventoryApi.getAll();
+        setItems(data);
+    } catch (error) {
+        console.error("Failed to load inventory:", error);
+    } finally {
+        setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let scanner: Html5QrcodeScanner | null = null;
