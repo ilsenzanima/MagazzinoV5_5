@@ -47,6 +47,30 @@ export default function InventoryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [movements, setMovements] = useState<Movement[]>([]);
 
+  // Handle Delete
+  const handleDelete = () => {
+    if (confirm("Sei sicuro di voler eliminare questo articolo? Questa azione non può essere annullata.")) {
+      // Simulate API call
+      console.log("Deleting item:", id);
+      // Redirect to inventory
+      router.push("/inventory");
+    }
+  };
+
+  // Handle Image Upload
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (item) {
+            setItem({ ...item, image: reader.result as string });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Load data (simulating API fetch)
   useEffect(() => {
     if (id) {
@@ -114,7 +138,7 @@ export default function InventoryDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="destructive" size="sm">
+            <Button variant="destructive" size="sm" onClick={handleDelete}>
               <Trash2 className="mr-2 h-4 w-4" /> Elimina
             </Button>
             <Button className="bg-blue-600 hover:bg-blue-700">
@@ -139,9 +163,19 @@ export default function InventoryDetailPage() {
                     }}
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Button variant="secondary" size="sm">
-                      <Upload className="mr-2 h-4 w-4" /> Cambia Foto
-                    </Button>
+                     <Label htmlFor="image-upload" className="cursor-pointer">
+                        <div className="bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 rounded-md flex items-center text-sm font-medium shadow-sm">
+                          <Upload className="mr-2 h-4 w-4" /> Cambia Foto
+                        </div>
+                        <Input 
+                            id="image-upload" 
+                            type="file" 
+                            accept="image/*" 
+                            capture="environment"
+                            className="hidden" 
+                            onChange={handleImageUpload}
+                        />
+                     </Label>
                   </div>
                 </div>
                 

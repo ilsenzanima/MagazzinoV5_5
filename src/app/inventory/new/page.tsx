@@ -46,6 +46,21 @@ export default function NewInventoryItemPage() {
     image: ""
   });
 
+  const [previewImage, setPreviewImage] = useState<string>("");
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setPreviewImage(result);
+        setFormData({ ...formData, image: result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleCreate = () => {
     // In a real app, this would send data to the backend
     console.log("Creating new item:", { ...formData, code, quantity: 0 });
@@ -82,14 +97,32 @@ export default function NewInventoryItemPage() {
             <Card>
               <CardContent className="p-4 space-y-4">
                 <div className="aspect-square relative rounded-md overflow-hidden bg-slate-100 border flex items-center justify-center group">
-                  <div className="text-center p-4">
-                    <Upload className="mx-auto h-8 w-8 text-slate-400 mb-2" />
-                    <span className="text-xs text-slate-500">Carica Immagine</span>
-                  </div>
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                    <Button variant="secondary" size="sm">
-                      Scegli File
-                    </Button>
+                  {previewImage ? (
+                    <img
+                      src={previewImage}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center p-4">
+                      <Upload className="mx-auto h-8 w-8 text-slate-400 mb-2" />
+                      <span className="text-xs text-slate-500">Carica Immagine</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Label htmlFor="image-upload-new" className="cursor-pointer">
+                        <div className="bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 rounded-md flex items-center text-sm font-medium shadow-sm">
+                          Scegli File
+                        </div>
+                        <Input 
+                            id="image-upload-new" 
+                            type="file" 
+                            accept="image/*" 
+                            capture="environment"
+                            className="hidden" 
+                            onChange={handleImageUpload}
+                        />
+                    </Label>
                   </div>
                 </div>
                 
