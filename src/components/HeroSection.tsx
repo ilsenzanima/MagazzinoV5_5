@@ -1,4 +1,6 @@
 import React from 'react';
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function HeroSection() {
   return (
@@ -12,6 +14,19 @@ export default function HeroSection() {
             La soluzione completa per la gestione del tuo magazzino.
             Efficienza, velocità e controllo totale a portata di mano.
           </p>
+          
+          <div className="flex flex-col gap-4 min-[400px]:flex-row mt-8">
+            <Link href="/dashboard">
+              <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
+                Accedi alla Dashboard
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button size="lg" variant="outline">
+                Registrati
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     </section>
