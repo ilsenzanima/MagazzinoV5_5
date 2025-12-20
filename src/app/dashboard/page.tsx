@@ -11,6 +11,7 @@ import {
   Zap,
   User
 } from "lucide-react";
+import Link from "next/link";
 import { 
   AreaChart, 
   Area, 
@@ -162,9 +163,11 @@ export default function Dashboard() {
             <Button className="h-14 text-lg bg-blue-600 hover:bg-blue-700 shadow-md">
               <Plus className="mr-2 h-5 w-5" /> Nuovo Ordine
             </Button>
-            <Button variant="secondary" className="h-14 text-lg shadow-sm bg-slate-200 hover:bg-slate-300 text-slate-800">
-              <Zap className="mr-2 h-5 w-5" /> Inventario Rapido
-            </Button>
+            <Link href="/inventory" className="block w-full">
+              <Button variant="secondary" className="w-full h-14 text-lg shadow-sm bg-slate-200 hover:bg-slate-300 text-slate-800">
+                <Zap className="mr-2 h-5 w-5" /> Inventario Rapido
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -205,10 +208,10 @@ export default function Dashboard() {
           </div>
           <span className="text-[10px] font-medium mt-1">Dashboard</span>
         </div>
-        <div className="flex flex-col items-center text-slate-400">
+        <Link href="/inventory" className="flex flex-col items-center text-slate-400">
           <Package className="h-6 w-6" />
           <span className="text-[10px] font-medium mt-1">Inventario</span>
-        </div>
+        </Link>
          <div className="flex flex-col items-center text-slate-400">
           <ClipboardList className="h-6 w-6" />
           <span className="text-[10px] font-medium mt-1">Ordini</span>
