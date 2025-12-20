@@ -42,6 +42,22 @@ export const mockMovements: Movement[] = [
   { id: 'm4', itemId: '2', date: '2023-12-15', type: 'unload', quantity: 6, reference: 'ORD-125' },
 ];
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'user';
+  avatar?: string;
+  status: 'active' | 'inactive';
+  lastLogin?: string;
+}
+
+export const mockUsers: User[] = [
+  { id: '1', name: 'Mario Rossi', email: 'admin@magazzino.it', role: 'admin', status: 'active', lastLogin: '2023-12-20 10:30' },
+  { id: '2', name: 'Luigi Verdi', email: 'magazziniere@magazzino.it', role: 'user', status: 'active', lastLogin: '2023-12-19 14:15' },
+  { id: '3', name: 'Giulia Bianchi', email: 'ufficio@magazzino.it', role: 'user', status: 'inactive', lastLogin: '2023-11-05 09:00' },
+];
+
 export const mockInventoryItems: InventoryItem[] = [
   {
     id: '1',
