@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { 
   suppliersApi, 
   inventoryApi, 
@@ -25,8 +25,11 @@ import {
   PurchaseItem
 } from "@/lib/api";
 
-export default function PurchaseDetailPage({ params }: { params: { id: string } }) {
+export default function PurchaseDetailPage() {
+  const params = useParams();
   const router = useRouter();
+  const id = params?.id as string;
+  
   const [loading, setLoading] = useState(true);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [items, setItems] = useState<PurchaseItem[]>([]);
@@ -50,15 +53,17 @@ export default function PurchaseDetailPage({ params }: { params: { id: string } 
   const [editValues, setEditValues] = useState<{ price: string, quantity: string }>({ price: "", quantity: "" });
 
   useEffect(() => {
-    loadData();
-  }, [params.id]);
+    if (id) {
+        loadData();
+    }
+  }, [id]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       const [purchaseData, itemsData, inventoryData, jobsData] = await Promise.all([
-        purchasesApi.getById(params.id),
-        purchasesApi.getItems(params.id),
+        purchasesApi.getById(id),
+        purchasesApi.getItems(id),
         inventoryApi.getAll(),
         jobsApi.getAll()
       ]);
@@ -91,7 +96,7 @@ export default function PurchaseDetailPage({ params }: { params: { id: string } 
       const priceVal = newItem.price ? parseFloat(newItem.price) : 0;
       
       await purchasesApi.addItem({
-        purchaseId: params.id,
+        purchaseId: id,
         itemId: newItem.itemId,
         quantity: parseFloat(newItem.quantity),
         price: priceVal,
@@ -99,7 +104,7 @@ export default function PurchaseDetailPage({ params }: { params: { id: string } 
       });
 
       // Reload items
-      const updatedItems = await purchasesApi.getItems(params.id);
+      const updatedItems = await purchasesApi.getItems(id);
       setItems(updatedItems);
 
       // Reset form

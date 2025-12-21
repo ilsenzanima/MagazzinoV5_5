@@ -27,7 +27,7 @@ export function AttendanceChart() {
       <CardHeader>
         <CardTitle>Presenze Semestrali per Commessa (Mock)</CardTitle>
       </CardHeader>
-      <CardContent className="h-[320px]">
+      <CardContent className="h-[320px] min-h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
