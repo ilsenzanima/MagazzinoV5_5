@@ -82,22 +82,22 @@ export default function NewMovementPage() {
     // Determine job address
     let jobAddress = "";
     if (selectedJob) {
-        jobAddress = `CANTIERE: ${selectedJob.siteAddress || `${selectedJob.code} - ${selectedJob.description}`}`;
         if (selectedJob.clientName) {
-            jobAddress += `\nCLIENTE: ${selectedJob.clientName}`;
+            jobAddress += `CLIENTE: ${selectedJob.clientName}\n`;
         }
+        jobAddress += `Destinazione: ${selectedJob.siteAddress || `${selectedJob.code} - ${selectedJob.description}`}`;
     }
 
-    const warehouseAddress = "MAGAZZINO OPI FIRESAFE\nVia A. Malignani, 9\n33031 Basiliano (UD)";
+    const warehouseAddress = "OPI FIRESAFE S.R.L. MAGAZZINO\nVia A. Malignani, 9 - 33010 - REANA DEL ROJALE (UD)";
 
     if (activeTab === 'entry') {
         setCausal("Rientro da cantiere");
-        setPickupLocation(jobAddress || "Cantiere");
+        setPickupLocation(jobAddress || "Destinazione");
         setDeliveryLocation(warehouseAddress);
     } else if (activeTab === 'exit') {
         setCausal("Uscita merce per cantiere");
         setPickupLocation(warehouseAddress);
-        setDeliveryLocation(jobAddress || "Cantiere");
+        setDeliveryLocation(jobAddress || "Destinazione");
     } else if (activeTab === 'sale') {
         setCausal("Vendita");
         setPickupLocation(warehouseAddress);
