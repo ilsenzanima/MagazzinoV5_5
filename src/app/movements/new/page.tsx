@@ -237,7 +237,7 @@ export default function NewMovementPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Link href="/movements">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label="Torna indietro">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
@@ -385,8 +385,9 @@ export default function NewMovementPage() {
                                 </div>
                             </div>
                             <div className="w-full sm:w-32 space-y-2">
-                                <Label>Quantità</Label>
+                                <Label htmlFor="qty-input">Quantità</Label>
                                 <Input 
+                                    id="qty-input"
                                     type="number" 
                                     min="0"
                                     step="0.01"
@@ -395,7 +396,7 @@ export default function NewMovementPage() {
                                     onChange={(e) => setCurrentLine({...currentLine, quantity: e.target.value})}
                                 />
                             </div>
-                            <Button onClick={handleAddLine} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+                            <Button onClick={handleAddLine} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700" aria-label="Aggiungi riga">
                                 <Plus className="h-4 w-4" />
                             </Button>
                         </div>
@@ -433,6 +434,7 @@ export default function NewMovementPage() {
                                                         size="sm" 
                                                         onClick={() => handleRemoveLine(line.tempId)}
                                                         className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                        aria-label="Rimuovi riga"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>

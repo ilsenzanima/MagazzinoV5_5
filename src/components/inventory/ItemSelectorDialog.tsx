@@ -4,12 +4,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InventoryItem } from "@/lib/api";
 import { Search, Package, Plus } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useMemo, useDeferredValue } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface ItemSelectorDialogProps {
@@ -21,25 +22,28 @@ interface ItemSelectorDialogProps {
 
 export function ItemSelectorDialog({ open, onOpenChange, onSelect, items }: ItemSelectorDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredItems, setFilteredItems] = useState<InventoryItem[]>(items);
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  useEffect(() => {
-    const term = searchTerm.toLowerCase();
-    setFilteredItems(
-      items.filter(
-        (item) =>
-          item.code.toLowerCase().includes(term) ||
-          item.name.toLowerCase().includes(term) ||
-          item.brand.toLowerCase().includes(term)
-      )
+  const filteredItems = useMemo(() => {
+    const term = deferredSearchTerm.toLowerCase();
+    if (!term) return items;
+    
+    return items.filter(
+      (item) =>
+        item.code.toLowerCase().includes(term) ||
+        item.name.toLowerCase().includes(term) ||
+        item.brand.toLowerCase().includes(term)
     );
-  }, [searchTerm, items]);
+  }, [items, deferredSearchTerm]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Seleziona Articolo</DialogTitle>
+          <DialogDescription>
+            Cerca e seleziona un articolo dall'inventario per aggiungerlo alla bolla.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="relative mb-4">

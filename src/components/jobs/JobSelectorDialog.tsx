@@ -4,12 +4,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Job } from "@/lib/api";
 import { Search, Briefcase, Check } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useMemo, useDeferredValue } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface JobSelectorDialogProps {
@@ -21,25 +22,28 @@ interface JobSelectorDialogProps {
 
 export function JobSelectorDialog({ open, onOpenChange, onSelect, jobs }: JobSelectorDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredJobs, setFilteredJobs] = useState<Job[]>(jobs);
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  useEffect(() => {
-    const term = searchTerm.toLowerCase();
-    setFilteredJobs(
-      jobs.filter(
-        (job) =>
-          job.code.toLowerCase().includes(term) ||
-          job.description.toLowerCase().includes(term) ||
-          job.clientName?.toLowerCase().includes(term)
-      )
+  const filteredJobs = useMemo(() => {
+    const term = deferredSearchTerm.toLowerCase();
+    if (!term) return jobs;
+
+    return jobs.filter(
+      (job) =>
+        job.code.toLowerCase().includes(term) ||
+        job.description.toLowerCase().includes(term) ||
+        job.clientName?.toLowerCase().includes(term)
     );
-  }, [searchTerm, jobs]);
+  }, [jobs, deferredSearchTerm]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Seleziona Commessa</DialogTitle>
+          <DialogDescription>
+            Cerca e seleziona una commessa per associarla al movimento.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="relative mb-4">

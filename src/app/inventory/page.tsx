@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,6 +34,9 @@ export default function InventoryPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Ottimizzazione INP: Defer search term update
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
   useEffect(() => {
     loadItems();
@@ -92,24 +95,28 @@ export default function InventoryPage() {
   }, [isScanning]);
 
   // Logica di Filtro
-  const filteredItems = items.filter((item) => {
-    // 1. Filtro Ricerca (Cerca su tutti i campi testuali)
-    const matchesSearch = 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.type.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredItems = useMemo(() => {
+    const term = deferredSearchTerm.toLowerCase();
+    
+    return items.filter((item) => {
+      // 1. Filtro Ricerca (Cerca su tutti i campi testuali)
+      const matchesSearch = 
+        item.name.toLowerCase().includes(term) ||
+        item.code.toLowerCase().includes(term) ||
+        item.brand.toLowerCase().includes(term) ||
+        item.type.toLowerCase().includes(term);
 
-    // 2. Filtro Tab
-    let matchesTab = true;
-    if (activeTab === "low_stock") {
-      matchesTab = item.quantity > 0 && item.quantity <= item.minStock;
-    } else if (activeTab === "out_of_stock") {
-      matchesTab = item.quantity === 0;
-    }
+      // 2. Filtro Tab
+      let matchesTab = true;
+      if (activeTab === "low_stock") {
+        matchesTab = item.quantity > 0 && item.quantity <= item.minStock;
+      } else if (activeTab === "out_of_stock") {
+        matchesTab = item.quantity === 0;
+      }
 
-    return matchesSearch && matchesTab;
-  });
+      return matchesSearch && matchesTab;
+    });
+  }, [items, deferredSearchTerm, activeTab]);
 
   return (
     <DashboardLayout>
@@ -119,7 +126,7 @@ export default function InventoryPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Link href="/dashboard" className="md:hidden">
-              <Button variant="ghost" size="icon" className="-ml-2">
+              <Button variant="ghost" size="icon" className="-ml-2" aria-label="Torna indietro">
                 <ChevronLeft className="h-6 w-6 text-slate-600 dark:text-slate-400" />
               </Button>
             </Link>
@@ -133,7 +140,7 @@ export default function InventoryPage() {
                   Nuovo Articolo
                 </Button>
              </Link>
-             <Button variant="ghost" size="icon" className="shrink-0">
+             <Button variant="ghost" size="icon" className="shrink-0" aria-label="Filtra">
                 <Filter className="h-5 w-5 text-slate-600 dark:text-slate-400" />
              </Button>
           </div>
@@ -148,9 +155,10 @@ export default function InventoryPage() {
               className="pl-9 bg-slate-100 dark:bg-muted border-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Cerca articoli"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR">
+          <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR" aria-label="Scansiona Barcode/QR">
             <ScanLine className="h-4 w-4" />
           </Button>
         </div>

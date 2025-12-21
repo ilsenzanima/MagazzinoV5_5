@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,9 @@ export default function SitesContent() {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Ottimizzazione INP: Defer search term update
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+
   useEffect(() => {
     loadSites();
   }, [filterJobId]);
@@ -46,14 +49,17 @@ export default function SitesContent() {
     }
   };
 
-  const filteredSites = sites.filter((site) => {
-    return (
-      site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      site.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      site.jobDescription?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      site.manager?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredSites = useMemo(() => {
+    const term = deferredSearchTerm.toLowerCase();
+    if (!term) return sites;
+    
+    return sites.filter((site) => 
+      site.name.toLowerCase().includes(term) ||
+      site.address?.toLowerCase().includes(term) ||
+      site.jobDescription?.toLowerCase().includes(term) ||
+      site.manager?.toLowerCase().includes(term)
     );
-  });
+  }, [sites, deferredSearchTerm]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -84,6 +90,7 @@ export default function SitesContent() {
             className="pl-9 bg-slate-100 border-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Cerca cantiere"
           />
         </div>
       </div>

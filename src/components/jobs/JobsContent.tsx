@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,9 @@ export default function JobsContent() {
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  // Ottimizzazione INP: Defer search term update
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+
   useEffect(() => {
     loadJobs();
   }, [filterClientId]);
@@ -73,16 +76,19 @@ export default function JobsContent() {
     }
   };
 
-  const filteredJobs = jobs.filter((job) => {
-    return (
-      job.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.siteAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.cig?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.cup?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredJobs = useMemo(() => {
+    const term = deferredSearchTerm.toLowerCase();
+    if (!term) return jobs;
+    
+    return jobs.filter((job) => 
+      job.description.toLowerCase().includes(term) ||
+      job.code?.toLowerCase().includes(term) ||
+      job.clientName?.toLowerCase().includes(term) ||
+      job.siteAddress?.toLowerCase().includes(term) ||
+      job.cig?.toLowerCase().includes(term) ||
+      job.cup?.toLowerCase().includes(term)
     );
-  });
+  }, [jobs, deferredSearchTerm]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -149,6 +155,7 @@ export default function JobsContent() {
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Elimina commessa"
                           onClick={(e) => {
                             e.stopPropagation();
                             setJobToDelete(job);
