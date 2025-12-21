@@ -36,8 +36,7 @@ export function RecentMovements() {
           type,
           quantity,
           created_at,
-          inventory (name, unit),
-          profiles:user_id (full_name)
+          inventory (name, unit)
         `)
         .order('created_at', { ascending: false })
         .limit(5);

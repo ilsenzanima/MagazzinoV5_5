@@ -214,7 +214,7 @@ export const purchasesApi = {
   getAll: async () => {
     const { data, error } = await supabase
       .from('purchases')
-      .select('*, suppliers(name), profiles(full_name), purchase_items(price)')
+      .select('*, suppliers(name), purchase_items(price)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data.map(mapDbToPurchase);
@@ -222,7 +222,7 @@ export const purchasesApi = {
   getById: async (id: string) => {
     const { data, error } = await supabase
       .from('purchases')
-      .select('*, suppliers(name), profiles(full_name)')
+      .select('*, suppliers(name)')
       .eq('id', id)
       .single();
     if (error) throw error;
@@ -233,7 +233,7 @@ export const purchasesApi = {
     if (!user) throw new Error("Utente non autenticato");
 
     const dbPurchase = mapPurchaseToDb({ ...purchase, createdBy: user.id });
-    const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name), profiles(full_name)').single();
+    const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name)').single();
     if (error) throw error;
     return mapDbToPurchase(data);
   },

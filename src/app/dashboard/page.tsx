@@ -9,29 +9,15 @@ import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
 import { RecentMovements } from "@/components/dashboard/RecentMovements";
 import { ActiveJobsWidget } from "@/components/dashboard/ActiveJobs";
 import { createClient } from "@/lib/supabase/client";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, LogOut, Settings, CreditCard } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/components/auth-provider";
-import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState("overview");
   const [stats, setStats] = useState({
     totalValue: 0,
     lowStockCount: 0,
     totalItems: 0
   });
   const [loading, setLoading] = useState(true);
-  const { signOut, user } = useAuth();
-  const router = useRouter();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -69,49 +55,15 @@ export default function Dashboard() {
     fetchStats();
   }, []);
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.push('/login');
-  };
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
            <h1 className="text-2xl font-bold text-slate-900 hidden md:block">Dashboard</h1>
-           <div className="flex items-center gap-4 ml-auto">
-             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Avatar className="cursor-pointer hover:opacity-80 transition-opacity">
-                  <AvatarImage src="https://github.com/shadcn.png" />
-                  <AvatarFallback><User /></AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <DropdownMenuLabel>Il mio Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => router.push('/settings/profile')}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profilo</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push('/settings')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Impostazioni</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Disconnetti</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-             </DropdownMenu>
-           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="overview">Panoramica</TabsTrigger>
             <TabsTrigger value="calendar">Calendario Presenze</TabsTrigger>
@@ -136,11 +88,11 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-4">
-            <CalendarView />
+            {activeTab === 'calendar' && <CalendarView />}
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-4">
-            <AttendanceChart />
+            {activeTab === 'analytics' && <AttendanceChart />}
           </TabsContent>
         </Tabs>
       </div>
