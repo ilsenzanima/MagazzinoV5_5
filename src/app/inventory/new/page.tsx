@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Save, Upload } from "lucide-react";
+import { ArrowLeft, Save, Upload, Loader2 } from "lucide-react";
 import { 
   mockBrands, 
   mockTypes, 
@@ -35,6 +35,7 @@ export default function NewInventoryItemPage() {
   };
 
   const [code] = useState(generateCode());
+  const [isLoading, setIsLoading] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -64,11 +65,13 @@ export default function NewInventoryItemPage() {
   };
 
   const handleCreate = () => {
+    setIsLoading(true);
     // In a real app, this would send data to the backend
     console.log("Creating new item:", { ...formData, code, quantity: 0 });
     
     // Simulate API call
     setTimeout(() => {
+      setIsLoading(false);
       router.push("/inventory");
     }, 500);
   };
@@ -259,9 +262,18 @@ export default function NewInventoryItemPage() {
                     <Button 
                         className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
                         onClick={handleCreate}
-                        disabled={!formData.name || !formData.brand || !formData.type}
+                        disabled={!formData.name || !formData.brand || !formData.type || isLoading}
                     >
-                        <Save className="mr-2 h-4 w-4" /> Crea Articolo
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Salvataggio...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" /> Crea Articolo
+                          </>
+                        )}
                     </Button>
                 </div>
               </CardContent>

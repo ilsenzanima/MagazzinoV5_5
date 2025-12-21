@@ -13,19 +13,31 @@ import {
   Calendar,
   Building,
   MapPin,
-  FileText
+  FileText,
+  Trash2
 } from "lucide-react";
 import Link from "next/link";
 import { Job, jobsApi } from "@/lib/api";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function JobsContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const filterClientId = searchParams.get('clientId');
 
   const [searchTerm, setSearchTerm] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     loadJobs();
@@ -45,6 +57,19 @@ export default function JobsContent() {
         console.error("Failed to load jobs:", error);
     } finally {
         setLoading(false);
+    }
+  };
+
+  const handleDeleteJob = async () => {
+    if (!jobToDelete) return;
+    try {
+      await jobsApi.delete(jobToDelete.id);
+      await loadJobs();
+      setIsDeleteDialogOpen(false);
+      setJobToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete job:", error);
+      alert("Errore durante l'eliminazione della commessa");
     }
   };
 
@@ -107,15 +132,32 @@ export default function JobsContent() {
             </div>
           ) : (
             filteredJobs.map((job) => (
-              <Link key={job.id} href={`/jobs/${job.id}`} className="block h-full">
-              <Card className="hover:shadow-md transition-shadow flex flex-col h-full cursor-pointer">
+              <Card 
+                key={job.id} 
+                className="hover:shadow-md transition-shadow flex flex-col h-full cursor-pointer relative group"
+                onClick={() => router.push(`/jobs/${job.id}`)}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                       <div>
                         <div className="text-xs font-mono text-slate-500 mb-1">{job.code}</div>
                         <CardTitle className="text-base leading-tight mb-1">{job.description}</CardTitle>
                       </div>
-                      {getStatusBadge(job.status)}
+                      <div className="flex flex-col items-end gap-2">
+                        {getStatusBadge(job.status)}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setJobToDelete(job);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                   </div>
                 </CardHeader>
                 <CardContent className="text-sm space-y-3 text-slate-600 flex-1">
@@ -156,11 +198,27 @@ export default function JobsContent() {
                   </div>
                 </CardContent>
               </Card>
-              </Link>
             ))
           )}
         </div>
       )}
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Elimina Commessa</DialogTitle>
+            <DialogDescription>
+              Sei sicuro di voler eliminare la commessa <strong>{jobToDelete?.description}</strong>?
+              <br />
+              Questa azione è irreversibile e potrebbe eliminare i dati associati (movimenti, logs, ecc.).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Annulla</Button>
+            <Button variant="destructive" onClick={handleDeleteJob}>Elimina</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

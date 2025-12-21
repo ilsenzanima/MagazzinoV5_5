@@ -1,5 +1,5 @@
--- Fix FKs for movements, job_logs, and job_documents to reference profiles instead of auth.users
--- This allows PostgREST to resolve profiles:user_id relationships
+-- Fix FKs for movements, job_logs, job_documents, and purchases to reference profiles instead of auth.users
+-- This allows PostgREST to resolve profiles relationship for user info
 
 -- 1. Movements
 DO $$
@@ -55,5 +55,24 @@ END $$;
 ALTER TABLE public.job_documents
     ADD CONSTRAINT job_documents_uploaded_by_fkey
     FOREIGN KEY (uploaded_by)
+    REFERENCES public.profiles(id)
+    ON DELETE SET NULL;
+
+-- 4. Purchases
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'purchases_created_by_fkey'
+        AND table_name = 'purchases'
+    ) THEN
+        ALTER TABLE public.purchases DROP CONSTRAINT purchases_created_by_fkey;
+    END IF;
+END $$;
+
+ALTER TABLE public.purchases
+    ADD CONSTRAINT purchases_created_by_fkey
+    FOREIGN KEY (created_by)
     REFERENCES public.profiles(id)
     ON DELETE SET NULL;

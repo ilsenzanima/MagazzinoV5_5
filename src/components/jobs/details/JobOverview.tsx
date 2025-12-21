@@ -1,11 +1,20 @@
 "use client"
 
-import { Job } from "@/lib/api"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Job, jobsApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Building2, Calendar, MapPin, User, Pencil, Archive, Euro, TrendingUp } from "lucide-react"
-import Link from "next/link"
+import { Calendar, Euro, Trash2, Pencil, Building2, MapPin } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface JobOverviewProps {
   job: Job
@@ -13,9 +22,22 @@ interface JobOverviewProps {
 }
 
 export function JobOverview({ job, totalCost }: JobOverviewProps) {
+  const router = useRouter()
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+
   // Mock budget (since we don't track it yet)
   const mockBudget = 0 
   const percentage = mockBudget > 0 ? Math.min(100, Math.round((totalCost / mockBudget) * 100)) : 0
+
+  const handleDelete = async () => {
+    try {
+      await jobsApi.delete(job.id)
+      router.push('/jobs')
+    } catch (error) {
+      console.error("Failed to delete job", error)
+      alert("Errore durante l'eliminazione della commessa")
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -43,9 +65,13 @@ export function JobOverview({ job, totalCost }: JobOverviewProps) {
             <Pencil className="mr-2 h-4 w-4" />
             Modifica
           </Button>
-          <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-            <Archive className="mr-2 h-4 w-4" />
-            Archivia
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Elimina
           </Button>
         </div>
       </div>
@@ -98,21 +124,9 @@ export function JobOverview({ job, totalCost }: JobOverviewProps) {
               {job.endDate ? new Date(job.endDate).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Indefinita'}
             </div>
             <div className="text-xs text-slate-500 mt-1">
-               {job.endDate ? 'Scadenza fissata' : 'Nessuna scadenza'}
+              {job.endDate ? 'Data confermata' : 'Data da definire'}
             </div>
           </CardContent>
-        </Card>
-
-        <Card>
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Stato Avanzamento</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">In Corso</div>
-                <div className="text-xs text-slate-500 mt-1">
-                    Cantiere attivo
-                </div>
-            </CardContent>
         </Card>
       </div>
 
@@ -186,42 +200,28 @@ export function JobOverview({ job, totalCost }: JobOverviewProps) {
                      </a>
                    </div>
                  </div>
-
-                 <div className="flex items-center gap-3">
-                   <User className="h-4 w-4 text-slate-400" />
-                   <div>
-                     <div className="text-xs text-slate-500">Capocantiere</div>
-                     <div className="text-sm font-medium">{job.siteManager || 'N/D'}</div>
-                   </div>
-                 </div>
                </div>
             </CardContent>
           </Card>
-
-          {/* Map Placeholder */}
-          <Card className="overflow-hidden">
-             <div className="h-48 bg-slate-100 relative">
-               <div className="absolute inset-0 flex items-center justify-center">
-                  <MapPin className="h-8 w-8 text-slate-300" />
-               </div>
-               {/* Embed Google Maps if address exists - simplified for now */}
-               {job.siteAddress && (
-                 <iframe 
-                   width="100%" 
-                   height="100%" 
-                   frameBorder="0" 
-                   style={{border:0}} 
-                   src={`https://maps.google.com/maps?q=${encodeURIComponent(job.siteAddress)}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
-                   allowFullScreen
-                 ></iframe>
-               )}
-             </div>
-             <div className="p-3 bg-white border-t">
-               <p className="text-xs text-slate-500 truncate">{job.siteAddress}</p>
-             </div>
-          </Card>
         </div>
       </div>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Elimina Commessa</DialogTitle>
+            <DialogDescription>
+              Sei sicuro di voler eliminare la commessa <strong>{job.description}</strong>?
+              <br />
+              Questa azione è irreversibile e cancellerà tutti i dati associati.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Annulla</Button>
+            <Button variant="destructive" onClick={handleDelete}>Elimina</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

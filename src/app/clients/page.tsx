@@ -11,16 +11,27 @@ import {
   Building2,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Trash2
 } from "lucide-react";
 import Link from "next/link";
 import { Client, clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     loadClients();
@@ -35,6 +46,19 @@ export default function ClientsPage() {
         console.error("Failed to load clients:", error);
     } finally {
         setLoading(false);
+    }
+  };
+
+  const handleDeleteClient = async () => {
+    if (!clientToDelete) return;
+    try {
+      await clientsApi.delete(clientToDelete.id);
+      await loadClients();
+      setIsDeleteDialogOpen(false);
+      setClientToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete client:", error);
+      alert("Errore durante l'eliminazione del committente");
     }
   };
 
@@ -88,6 +112,17 @@ export default function ClientsPage() {
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center justify-between">
                     <span className="truncate">{client.name}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-slate-400 hover:text-red-600 h-8 w-8"
+                      onClick={() => {
+                        setClientToDelete(client);
+                        setIsDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm space-y-2 text-slate-600">
@@ -127,6 +162,23 @@ export default function ClientsPage() {
           )}
         </div>
       )}
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Elimina Committente</DialogTitle>
+            <DialogDescription>
+              Sei sicuro di voler eliminare il committente <strong>{clientToDelete?.name}</strong>?
+              <br />
+              Questa azione eliminerà anche tutte le commesse associate.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Annulla</Button>
+            <Button variant="destructive" onClick={handleDeleteClient}>Elimina</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
