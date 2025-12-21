@@ -37,7 +37,7 @@ export default function Home() {
               className="h-12 px-8 text-base border-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/50 transition-all hover:scale-105 active:scale-95"
             >
               <Link href="/register">
-                Richiedi Demo
+                Registrati
               </Link>
             </Button>
           </div>
