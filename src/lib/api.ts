@@ -518,6 +518,148 @@ export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => ({
   coefficient: item.coefficient
 });
 
+export interface DeliveryNoteItem {
+  id: string;
+  deliveryNoteId: string;
+  inventoryId: string;
+  inventoryName?: string;
+  inventoryCode?: string;
+  inventoryUnit?: string;
+  quantity: number;
+  price?: number;
+}
+
+export interface DeliveryNote {
+  id: string;
+  type: 'entry' | 'exit' | 'sale';
+  number: string;
+  date: string;
+  jobId?: string;
+  jobCode?: string;
+  causal: string;
+  pickupLocation: string;
+  deliveryLocation: string;
+  transportMean?: string;
+  appearance?: string;
+  packagesCount?: number;
+  notes?: string;
+  items?: DeliveryNoteItem[];
+  created_at?: string;
+}
+
+export const deliveryNotesApi = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('delivery_notes')
+      .select('*, jobs(code, description), delivery_note_items(quantity)')
+      .order('date', { ascending: false });
+
+    if (error) {
+        // Table doesn't exist yet, return mock data or empty
+        console.warn("Delivery notes table not found, returning empty");
+        return [];
+    }
+
+    return data.map((d: any) => ({
+      ...d,
+      jobCode: d.jobs?.code,
+      itemCount: d.delivery_note_items?.length || 0,
+      totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+    }));
+  },
+  
+  getById: async (id: string) => {
+    const { data, error } = await supabase
+      .from('delivery_notes')
+      .select(`
+        *,
+        jobs(code, description),
+        delivery_note_items(
+          *,
+          inventory(name, code, unit)
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    
+    return {
+      ...data,
+      jobCode: data.jobs?.code,
+      items: data.delivery_note_items?.map((i: any) => ({
+        ...i,
+        inventoryName: i.inventory?.name,
+        inventoryCode: i.inventory?.code,
+        inventoryUnit: i.inventory?.unit
+      }))
+    };
+  },
+
+  create: async (note: Omit<DeliveryNote, 'id' | 'created_at' | 'items'>, items: Omit<DeliveryNoteItem, 'id' | 'deliveryNoteId'>[]) => {
+    // 1. Create Note
+    const { data: noteData, error: noteError } = await supabase
+      .from('delivery_notes')
+      .insert(note)
+      .select()
+      .single();
+
+    if (noteError) throw noteError;
+
+    // 2. Create Items
+    if (items.length > 0) {
+      const itemsToInsert = items.map(item => ({
+        ...item,
+        delivery_note_id: noteData.id
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('delivery_note_items')
+        .insert(itemsToInsert);
+
+      if (itemsError) throw itemsError;
+    }
+
+    return noteData;
+  },
+
+  update: async (id: string, note: Partial<DeliveryNote>, items?: Omit<DeliveryNoteItem, 'id' | 'deliveryNoteId'>[]) => {
+    // Update Note
+    const { error: noteError } = await supabase
+        .from('delivery_notes')
+        .update(note)
+        .eq('id', id);
+    
+    if (noteError) throw noteError;
+
+    // Update Items (Delete all and recreate - simplest strategy for now)
+    if (items) {
+        // Delete existing
+        await supabase.from('delivery_note_items').delete().eq('delivery_note_id', id);
+        
+        // Insert new
+        const itemsToInsert = items.map(item => ({
+            ...item,
+            delivery_note_id: id
+        }));
+        
+        const { error: itemsError } = await supabase
+            .from('delivery_note_items')
+            .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+    }
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from('delivery_notes')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  }
+};
+
 export const inventoryApi = {
   // Fetch all items
   getAll: async () => {

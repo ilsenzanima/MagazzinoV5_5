@@ -1,0 +1,460 @@
+"use client";
+
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Briefcase } from "lucide-react";
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { 
+  inventoryApi, 
+  jobsApi, 
+  deliveryNotesApi,
+  InventoryItem, 
+  Job 
+} from "@/lib/api";
+
+interface MovementLine {
+  tempId: string;
+  itemId: string;
+  itemName: string;
+  itemCode: string;
+  itemUnit: string;
+  quantity: number;
+}
+
+export default function NewMovementPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // Data Sources
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+
+  // Form State
+  const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale'>('entry');
+  const [numberPart, setNumberPart] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedJobId, setSelectedJobId] = useState<string>("none");
+  const [causal, setCausal] = useState("");
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [deliveryLocation, setDeliveryLocation] = useState("");
+  
+  // Footer fields
+  const [transportMean, setTransportMean] = useState("Mittente");
+  const [appearance, setAppearance] = useState("A VISTA");
+  const [packagesCount, setPackagesCount] = useState<string>("1");
+  const [notes, setNotes] = useState("");
+
+  // Line State
+  const [currentLine, setCurrentLine] = useState({
+    itemId: "",
+    quantity: ""
+  });
+  const [lines, setLines] = useState<MovementLine[]>([]);
+
+  // Computed Suffix
+  const yearSuffix = new Date().getFullYear().toString().slice(-2);
+  const fullNumber = numberPart ? `${numberPart}/PP${yearSuffix}` : `/PP${yearSuffix}`;
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Auto-fill fields when Tab or Job changes
+  useEffect(() => {
+    const job = jobs.find(j => j.id === selectedJobId);
+    const jobAddress = job ? (job.siteAddress || `${job.code} - ${job.description}`) : "";
+    const warehouseAddress = "MAGAZZINO OPI FIRESAFE - Via A. Malignani, 9";
+
+    if (activeTab === 'entry') {
+        setCausal("Rientro da cantiere");
+        setPickupLocation(jobAddress || "Cantiere");
+        setDeliveryLocation(warehouseAddress);
+    } else if (activeTab === 'exit') {
+        setCausal("Uscita merce per cantiere");
+        setPickupLocation(warehouseAddress);
+        setDeliveryLocation(jobAddress || "Cantiere");
+    } else if (activeTab === 'sale') {
+        setCausal("Vendita");
+        setPickupLocation(warehouseAddress);
+        setDeliveryLocation("Cliente");
+    }
+  }, [activeTab, selectedJobId, jobs]);
+
+  const loadData = async () => {
+    try {
+      setInitialLoading(true);
+      const [inventoryData, jobsData] = await Promise.all([
+        inventoryApi.getAll(),
+        jobsApi.getAll()
+      ]);
+      setInventory(inventoryData);
+      setJobs(jobsData.filter(j => j.status === 'active'));
+    } catch (error) {
+      console.error("Failed to load data", error);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  const handleAddLine = () => {
+    if (!currentLine.itemId || !currentLine.quantity) {
+      alert("Seleziona Articolo e Quantità");
+      return;
+    }
+
+    const item = inventory.find(i => i.id === currentLine.itemId);
+    if (!item) return;
+
+    const newLine: MovementLine = {
+      tempId: Math.random().toString(36).substr(2, 9),
+      itemId: item.id,
+      itemName: item.name,
+      itemCode: item.code,
+      itemUnit: item.unit,
+      quantity: Number(currentLine.quantity)
+    };
+
+    setLines([...lines, newLine]);
+    setCurrentLine({ itemId: "", quantity: "" });
+  };
+
+  const handleRemoveLine = (tempId: string) => {
+    setLines(lines.filter(l => l.tempId !== tempId));
+  };
+
+  const handleSave = async () => {
+    if (!numberPart) {
+      alert("Inserisci il numero della bolla");
+      return;
+    }
+    if (lines.length === 0) {
+      alert("Inserisci almeno un articolo");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const noteData = {
+        type: activeTab,
+        number: fullNumber,
+        date: date,
+        jobId: selectedJobId === "none" ? undefined : selectedJobId,
+        causal,
+        pickupLocation,
+        deliveryLocation,
+        transportMean,
+        appearance,
+        packagesCount: parseInt(packagesCount) || 0,
+        notes
+      };
+
+      const itemsData = lines.map(line => ({
+        inventoryId: line.itemId,
+        quantity: line.quantity
+      }));
+
+      await deliveryNotesApi.create(noteData, itemsData);
+      
+      router.push('/movements');
+    } catch (error) {
+      console.error("Error saving movement:", error);
+      alert("Errore durante il salvataggio");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (initialLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex h-full items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="max-w-5xl mx-auto space-y-6 pb-20">
+        
+        {/* Header Actions */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link href="/movements">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold text-slate-900">Nuova Bolla di Movimentazione</h1>
+          </div>
+          <Button onClick={handleSave} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Salva Bolla
+          </Button>
+        </div>
+
+        {/* Type Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 h-14">
+                <TabsTrigger value="entry" className="h-full data-[state=active]:bg-green-100 data-[state=active]:text-green-800 text-lg">
+                    <ArrowDownRight className="mr-2 h-5 w-5" /> Entrata
+                </TabsTrigger>
+                <TabsTrigger value="exit" className="h-full data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800 text-lg">
+                    <ArrowUpRight className="mr-2 h-5 w-5" /> Uscita
+                </TabsTrigger>
+                <TabsTrigger value="sale" className="h-full data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 text-lg">
+                    <ShoppingBag className="mr-2 h-5 w-5" /> Vendita
+                </TabsTrigger>
+            </TabsList>
+        </Tabs>
+
+        {/* Main Form */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Left Column: Header Info */}
+            <div className="lg:col-span-2 space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <Truck className="h-4 w-4" />
+                            Dati Testata Documento
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Numero Bolla</Label>
+                                <div className="flex items-center">
+                                    <Input 
+                                        value={numberPart} 
+                                        onChange={(e) => setNumberPart(e.target.value)} 
+                                        placeholder="Es. 1"
+                                        className="text-right pr-2 rounded-r-none border-r-0"
+                                    />
+                                    <div className="bg-slate-100 border border-l-0 rounded-r-md px-3 py-2 text-slate-500 text-sm font-medium whitespace-nowrap">
+                                        /PP{yearSuffix}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Data Documento</Label>
+                                <Input 
+                                    type="date" 
+                                    value={date} 
+                                    onChange={(e) => setDate(e.target.value)} 
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Collega Commessa (Opzionale)</Label>
+                            <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleziona Commessa..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Nessuna Commessa</SelectItem>
+                                    {jobs.map(job => (
+                                        <SelectItem key={job.id} value={job.id}>
+                                            {job.code} - {job.description}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Causale del Trasporto</Label>
+                            <Input 
+                                value={causal} 
+                                onChange={(e) => setCausal(e.target.value)} 
+                                placeholder="Es. Rientro da cantiere"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                             <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-slate-500">
+                                    <MapPin className="h-3 w-3" /> Luogo di Ritiro
+                                </Label>
+                                <Textarea 
+                                    value={pickupLocation} 
+                                    onChange={(e) => setPickupLocation(e.target.value)} 
+                                    className="h-20 text-xs"
+                                />
+                             </div>
+                             <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-slate-500">
+                                    <MapPin className="h-3 w-3" /> Luogo di Destinazione
+                                </Label>
+                                <Textarea 
+                                    value={deliveryLocation} 
+                                    onChange={(e) => setDeliveryLocation(e.target.value)} 
+                                    className="h-20 text-xs"
+                                />
+                             </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Items Section */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center justify-between">
+                            <span>Articoli in Bolla</span>
+                            <span className="text-sm font-normal text-slate-500">{lines.length} righe inserite</span>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {/* Add Line Form */}
+                        <div className="flex flex-col sm:flex-row gap-3 items-end bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div className="flex-1 space-y-2 w-full">
+                                <Label>Seleziona Articolo</Label>
+                                <Select 
+                                    value={currentLine.itemId} 
+                                    onValueChange={(val) => setCurrentLine({...currentLine, itemId: val})}
+                                >
+                                    <SelectTrigger className="bg-white">
+                                        <SelectValue placeholder="Cerca articolo..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {inventory.map(item => (
+                                            <SelectItem key={item.id} value={item.id}>
+                                                {item.code} - {item.name} ({item.quantity} {item.unit})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="w-full sm:w-32 space-y-2">
+                                <Label>Quantità</Label>
+                                <Input 
+                                    type="number" 
+                                    min="0"
+                                    step="0.01"
+                                    className="bg-white"
+                                    value={currentLine.quantity}
+                                    onChange={(e) => setCurrentLine({...currentLine, quantity: e.target.value})}
+                                />
+                            </div>
+                            <Button onClick={handleAddLine} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+                                <Plus className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        {/* Lines Table */}
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Codice</TableHead>
+                                        <TableHead>Descrizione</TableHead>
+                                        <TableHead className="text-right">Quantità</TableHead>
+                                        <TableHead className="w-[50px]"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {lines.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="text-center py-8 text-slate-400">
+                                                Nessun articolo aggiunto
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        lines.map((line) => (
+                                            <TableRow key={line.tempId}>
+                                                <TableCell className="font-mono text-xs">{line.itemCode}</TableCell>
+                                                <TableCell className="font-medium">{line.itemName}</TableCell>
+                                                <TableCell className="text-right font-bold">
+                                                    {line.quantity} <span className="text-xs font-normal text-slate-500">{line.itemUnit}</span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        onClick={() => handleRemoveLine(line.tempId)}
+                                                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Right Column: Footer Info */}
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Dati Trasporto</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Trasporto a mezzo</Label>
+                            <Input 
+                                value={transportMean} 
+                                onChange={(e) => setTransportMean(e.target.value)} 
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Aspetto Esteriore Beni</Label>
+                            <Input 
+                                value={appearance} 
+                                onChange={(e) => setAppearance(e.target.value)} 
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Numero Colli</Label>
+                            <Input 
+                                type="number" 
+                                min="0"
+                                value={packagesCount} 
+                                onChange={(e) => setPackagesCount(e.target.value)} 
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Annotazioni</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Textarea 
+                            placeholder="Note aggiuntive (es. CIG, Riferimenti...)"
+                            className="min-h-[100px]"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                        />
+                    </CardContent>
+                </Card>
+
+                <div className="text-xs text-slate-400 text-center">
+                    Il salvataggio creerà il documento e aggiornerà automaticamente le giacenze di magazzino.
+                </div>
+            </div>
+
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}

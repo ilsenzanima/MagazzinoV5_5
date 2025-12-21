@@ -13,7 +13,8 @@ import {
   Settings, 
   Menu,
   LogOut,
-  Loader2
+  Loader2,
+  ArrowLeftRight
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -39,6 +40,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
       icon: Package,
       href: "/inventory",
       active: pathname === "/inventory",
+    },
+    {
+      label: "Movimentazione",
+      icon: ArrowLeftRight,
+      href: "/movements",
+      active: pathname === "/movements",
     },
     {
       label: "Committenti",
