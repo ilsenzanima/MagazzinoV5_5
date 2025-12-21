@@ -72,7 +72,7 @@ export default function NewJobPage() {
       ...prev,
       clientId,
       code: newCode || prev.code,
-      siteAddress: useClientAddress && selectedClient ? selectedClient.address : prev.siteAddress
+      siteAddress: useClientAddress && selectedClient ? (selectedClient.address || "") : (prev.siteAddress || "")
     }));
   };
 

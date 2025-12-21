@@ -84,20 +84,50 @@ export const mapDbProfileToUser = (profile: any): User => ({
 });
 
 // Mapping functions for new entities
-const mapDbToClient = (db: any): Client => ({
-  id: db.id,
-  name: db.name,
-  vatNumber: db.vat_number,
-  address: db.address,
-  email: db.email,
-  phone: db.phone,
-  createdAt: db.created_at
-});
+const mapDbToClient = (db: any): Client => {
+  // Try to parse address if it's stored as JSON or composite string, 
+  // but for now we'll handle the flat structure or provide defaults
+  // Assuming the DB still has a single 'address' column for legacy/simplicity 
+  // OR we need to split it.
+  
+  // Since we updated the interface but maybe not the DB schema yet, 
+  // let's be safe.
+  
+  return {
+    id: db.id,
+    name: db.name,
+    vatNumber: db.vat_number,
+    
+    // Map legacy single address field to new fields if needed, 
+    // or just use empty strings if columns don't exist yet.
+    // Ideally, we should update the DB schema to match.
+    // For now, let's assume 'address' in DB maps to 'street' + others or 
+    // we use the single field to populate 'address' (display) and fill others with placeholders
+    street: db.street || db.address || '',
+    streetNumber: db.street_number || '',
+    postalCode: db.postal_code || '',
+    city: db.city || '',
+    province: db.province || '',
+    
+    address: db.address, // Keep original full string if available
+    
+    email: db.email,
+    phone: db.phone,
+    createdAt: db.created_at
+  };
+};
 
 const mapClientToDb = (client: Partial<Client>) => ({
   name: client.name,
   vat_number: client.vatNumber,
-  address: client.address,
+  // If we write back, we might want to combine them into 'address' for backward compatibility
+  // or write to new columns.
+  address: client.address || `${client.street} ${client.streetNumber}, ${client.postalCode} ${client.city} (${client.province})`,
+  
+  // New columns (if they exist in DB, otherwise they'll be ignored by Supabase if strictly typed or cause error)
+  // Let's assume we want to write to the single 'address' column for now to be safe with current schema
+  // unless we are sure about the schema update.
+  
   email: client.email,
   phone: client.phone
 });
