@@ -2,8 +2,15 @@
 create table public.clients (
   id uuid default uuid_generate_v4() primary key,
   name text not null,
+  
+  -- Split address fields
+  street text,
+  street_number text,
+  postal_code text,
+  city text,
+  province text,
+  
   vat_number text,
-  address text,
   email text,
   phone text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -19,18 +26,13 @@ create table public.jobs (
   status text check (status in ('active', 'completed', 'suspended')) default 'active',
   start_date date,
   end_date date,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- Create Sites (Cantieri) table
-create table public.sites (
-  id uuid default uuid_generate_v4() primary key,
-  job_id uuid references public.jobs(id) on delete cascade not null,
-  name text not null,
-  address text,
-  manager text,
-  status text check (status in ('active', 'inactive', 'completed')) default 'active',
+  
+  -- Merged site info
+  site_address text,
+  site_manager text,
+  cig text,
+  cup text,
+  
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -42,7 +44,6 @@ add column job_id uuid references public.jobs(id);
 -- Enable RLS
 alter table public.clients enable row level security;
 alter table public.jobs enable row level security;
-alter table public.sites enable row level security;
 
 -- Policies for Clients
 create policy "Clients are viewable by authenticated users."
@@ -73,21 +74,5 @@ create policy "Authenticated users can create jobs."
 
 create policy "Authenticated users can update jobs."
   on jobs for update
-  to authenticated
-  using ( true );
-
--- Policies for Sites
-create policy "Sites are viewable by authenticated users."
-  on sites for select
-  to authenticated
-  using ( true );
-
-create policy "Authenticated users can create sites."
-  on sites for insert
-  to authenticated
-  with check ( true );
-
-create policy "Authenticated users can update sites."
-  on sites for update
   to authenticated
   using ( true );

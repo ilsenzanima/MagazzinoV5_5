@@ -49,7 +49,7 @@ export default function NewJobPage() {
     if (useClientAddress && formData.clientId) {
       const selectedClient = clients.find(c => c.id === formData.clientId);
       if (selectedClient) {
-        setFormData(prev => ({ ...prev, siteAddress: selectedClient.address }));
+        setFormData(prev => ({ ...prev, siteAddress: selectedClient.address || "" }));
       }
     }
   }, [useClientAddress, formData.clientId, clients]);

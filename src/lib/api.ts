@@ -6,7 +6,15 @@ export interface Client {
   id: string;
   name: string;
   vatNumber: string;
-  address: string;
+  // Address fields
+  street: string;
+  streetNumber: string;
+  postalCode: string;
+  city: string;
+  province: string;
+  // Display helper
+  address?: string; // Constructed full address
+  
   email: string;
   phone: string;
   createdAt?: string;
