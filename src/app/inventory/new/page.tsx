@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Save, Upload, Loader2 } from "lucide-react";
 import { 
-  mockBrands, 
-  mockTypes, 
   mockUnits 
 } from "@/lib/mock-data";
+import { brandsApi, itemTypesApi, Brand, ItemType } from "@/lib/api";
 import {
   Select,
   SelectContent,
@@ -64,16 +63,30 @@ export default function NewInventoryItemPage() {
     }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     setIsLoading(true);
-    // In a real app, this would send data to the backend
-    console.log("Creating new item:", { ...formData, code, quantity: 0 });
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      router.push("/inventory");
-    }, 500);
+    try {
+        const newItem = {
+            code,
+            name: formData.name,
+            brand: formData.brand,
+            type: formData.type,
+            quantity: 0,
+            minStock: parseInt(formData.minStock) || 0,
+            unit: formData.unit as any,
+            coefficient: parseFloat(formData.coefficient) || 1.0,
+            description: formData.description,
+            image: formData.image,
+        };
+        
+        await inventoryApi.create(newItem);
+        router.push("/inventory");
+    } catch (error) {
+        console.error("Failed to create item", error);
+        // Here we should probably show a toast error, but for now console error is fine
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -195,11 +208,11 @@ export default function NewInventoryItemPage() {
                     <Label htmlFor="type">Tipologia</Label>
                     <Select onValueChange={(val) => setFormData({...formData, type: val})}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleziona Tipologia" />
+                        <SelectValue placeholder={loadingData ? "Caricamento..." : "Seleziona Tipologia"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockTypes.map((type) => (
-                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        {types.map((type) => (
+                          <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

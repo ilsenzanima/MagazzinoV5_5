@@ -3,6 +3,21 @@ import { InventoryItem, User } from './mock-data';
 
 export type { InventoryItem, User };
 
+export interface Brand {
+  id: string;
+  name: string;
+}
+
+export interface ItemType {
+  id: string;
+  name: string;
+}
+
+export interface Unit {
+  id: string;
+  name: string;
+}
+
 // Interfaces for new entities
 export interface Client {
   id: string;

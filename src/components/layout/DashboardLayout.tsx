@@ -17,11 +17,13 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  onLinkClick?: () => void;
+}
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, onLinkClick }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut, userRole } = useAuth();
 
@@ -79,7 +81,7 @@ export function Sidebar({ className }: SidebarProps) {
           </h2>
           <div className="space-y-1">
             {routes.map((route) => (
-              <Link key={route.href} href={route.href}>
+              <Link key={route.href} href={route.href} onClick={onLinkClick}>
                 <Button
                   variant={route.active ? "secondary" : "ghost"}
                   className={cn(
@@ -128,6 +130,7 @@ export default function DashboardLayout({
 }) {
   const { session, loading } = useAuth();
   const router = useRouter();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -160,14 +163,14 @@ export default function DashboardLayout({
         {/* Mobile Header with Hamburger */}
         <header className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-white p-4 shadow-sm">
            <div className="font-bold text-lg text-slate-900">Magazzino V5.5</div>
-           <Sheet>
+           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
              <SheetTrigger asChild>
                <Button variant="ghost" size="icon">
                  <Menu className="h-6 w-6" />
                </Button>
              </SheetTrigger>
              <SheetContent side="left" className="p-0 bg-slate-900 border-r-slate-800 text-white w-64">
-               <Sidebar />
+               <Sidebar onLinkClick={() => setIsSheetOpen(false)} />
              </SheetContent>
            </Sheet>
         </header>

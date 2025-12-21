@@ -116,16 +116,27 @@ export default function InventoryPage() {
       
       {/* Header Fisso */}
       <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="md:hidden">
-            <Button variant="ghost" size="icon" className="-ml-2">
-              <ChevronLeft className="h-6 w-6 text-slate-600" />
-            </Button>
-          </Link>
-          <h1 className="text-xl font-bold text-slate-900">Gestione Inventario</h1>
-          <Button variant="ghost" size="icon" className="ml-auto">
-            <Filter className="h-5 w-5 text-slate-600" />
-          </Button>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Link href="/dashboard" className="md:hidden">
+              <Button variant="ghost" size="icon" className="-ml-2">
+                <ChevronLeft className="h-6 w-6 text-slate-600" />
+              </Button>
+            </Link>
+            <h1 className="text-xl font-bold text-slate-900">Gestione Inventario</h1>
+          </div>
+          
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+             <Link href="/inventory/new" className="w-full sm:w-auto">
+                <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuovo Articolo
+                </Button>
+             </Link>
+             <Button variant="ghost" size="icon" className="shrink-0">
+                <Filter className="h-5 w-5 text-slate-600" />
+             </Button>
+          </div>
         </div>
 
         {/* Search Bar */}

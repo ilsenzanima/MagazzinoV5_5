@@ -6,14 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { mockBrands, mockTypes, mockUnits } from "@/lib/mock-data";
-import { Plus, X, Loader2 } from "lucide-react";
+import { mockUnits } from "@/lib/mock-data";
+import { Plus, X, Loader2, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { suppliersApi, Supplier } from "@/lib/api";
+import { suppliersApi, brandsApi, itemTypesApi, Supplier, Brand, ItemType } from "@/lib/api";
 
 export default function SettingsInventoryPage() {
-    const [brands, setBrands] = useState(mockBrands);
-    const [types, setTypes] = useState(mockTypes);
     const [units, setUnits] = useState(mockUnits);
 
     // Suppliers State
@@ -22,8 +20,22 @@ export default function SettingsInventoryPage() {
     const [newSupplierName, setNewSupplierName] = useState("");
     const [addingSupplier, setAddingSupplier] = useState(false);
 
+    // Brands State
+    const [brands, setBrands] = useState<Brand[]>([]);
+    const [loadingBrands, setLoadingBrands] = useState(true);
+    const [newBrandName, setNewBrandName] = useState("");
+    const [addingBrand, setAddingBrand] = useState(false);
+
+    // Types State
+    const [types, setTypes] = useState<ItemType[]>([]);
+    const [loadingTypes, setLoadingTypes] = useState(true);
+    const [newTypeName, setNewTypeName] = useState("");
+    const [addingType, setAddingType] = useState(false);
+
     useEffect(() => {
         loadSuppliers();
+        loadBrands();
+        loadTypes();
     }, []);
 
     const loadSuppliers = async () => {
@@ -35,6 +47,30 @@ export default function SettingsInventoryPage() {
             console.error("Failed to load suppliers", error);
         } finally {
             setLoadingSuppliers(false);
+        }
+    };
+
+    const loadBrands = async () => {
+        try {
+            setLoadingBrands(true);
+            const data = await brandsApi.getAll();
+            setBrands(data);
+        } catch (error) {
+            console.error("Failed to load brands", error);
+        } finally {
+            setLoadingBrands(false);
+        }
+    };
+
+    const loadTypes = async () => {
+        try {
+            setLoadingTypes(true);
+            const data = await itemTypesApi.getAll();
+            setTypes(data);
+        } catch (error) {
+            console.error("Failed to load types", error);
+        } finally {
+            setLoadingTypes(false);
         }
     };
 
@@ -52,6 +88,34 @@ export default function SettingsInventoryPage() {
         }
     };
 
+    const handleAddBrand = async () => {
+        if (!newBrandName.trim()) return;
+        try {
+            setAddingBrand(true);
+            const newBrand = await brandsApi.create(newBrandName);
+            setBrands([...brands, newBrand]);
+            setNewBrandName("");
+        } catch (error) {
+            console.error("Failed to add brand", error);
+        } finally {
+            setAddingBrand(false);
+        }
+    };
+
+    const handleAddType = async () => {
+        if (!newTypeName.trim()) return;
+        try {
+            setAddingType(true);
+            const newType = await itemTypesApi.create(newTypeName);
+            setTypes([...types, newType]);
+            setNewTypeName("");
+        } catch (error) {
+            console.error("Failed to add type", error);
+        } finally {
+            setAddingType(false);
+        }
+    };
+
     const handleDeleteSupplier = async (id: string) => {
         if (!confirm("Sei sicuro di voler eliminare questo fornitore?")) return;
         try {
@@ -59,6 +123,26 @@ export default function SettingsInventoryPage() {
             setSuppliers(suppliers.filter(s => s.id !== id));
         } catch (error) {
              console.error("Failed to delete supplier", error);
+        }
+    };
+
+    const handleDeleteBrand = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questa marca?")) return;
+        try {
+            await brandsApi.delete(id);
+            setBrands(brands.filter(b => b.id !== id));
+        } catch (error) {
+             console.error("Failed to delete brand", error);
+        }
+    };
+
+    const handleDeleteType = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questa tipologia?")) return;
+        try {
+            await itemTypesApi.delete(id);
+            setTypes(types.filter(t => t.id !== id));
+        } catch (error) {
+             console.error("Failed to delete type", error);
         }
     };
 
@@ -164,19 +248,44 @@ export default function SettingsInventoryPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex gap-2">
-                        <Input placeholder="Nuova Tipologia..." className="max-w-sm" />
-                        <Button size="icon" className="bg-blue-600 hover:bg-blue-700"><Plus className="h-4 w-4" /></Button>
+                        <Input 
+                            placeholder="Nuova Tipologia..." 
+                            className="max-w-sm" 
+                            value={newTypeName}
+                            onChange={(e) => setNewTypeName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddType()}
+                        />
+                        <Button 
+                            size="icon" 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={handleAddType}
+                            disabled={addingType || !newTypeName.trim()}
+                        >
+                            {addingType ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        </Button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {types.map(item => (
-                            <Badge key={item} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
-                                {item}
-                                <button className="hover:bg-slate-200 rounded-full p-0.5 transition-colors" onClick={() => setTypes(types.filter(t => t !== item))}>
-                                    <X className="h-3 w-3 text-slate-500" />
-                                </button>
-                            </Badge>
-                        ))}
-                    </div>
+                    {loadingTypes ? (
+                        <div className="flex items-center gap-2 text-slate-500">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento tipologie...
+                        </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {types.map(type => (
+                                <Badge key={type.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                    {type.name}
+                                    <button 
+                                        className="hover:bg-slate-200 rounded-full p-0.5 transition-colors" 
+                                        onClick={() => handleDeleteType(type.id)}
+                                    >
+                                        <X className="h-3 w-3 text-slate-500" />
+                                    </button>
+                                </Badge>
+                            ))}
+                            {types.length === 0 && (
+                                <p className="text-sm text-muted-foreground italic">Nessuna tipologia presente.</p>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </TabsContent>
