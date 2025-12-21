@@ -154,7 +154,7 @@ const mapJobToDb = (job: Partial<Job>) => ({
   description: job.description,
   status: job.status,
   start_date: job.startDate,
-  end_date: job.endDate,
+  end_date: job.endDate || null, // Handle empty string for date
   // New fields
   site_address: job.siteAddress,
   site_manager: job.siteManager,

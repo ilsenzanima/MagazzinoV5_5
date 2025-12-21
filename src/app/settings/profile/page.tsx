@@ -127,7 +127,7 @@ export default function SettingsProfilePage() {
         <CardContent className="space-y-6">
             <div className="flex items-center gap-6">
                 <Avatar className="h-24 w-24">
-                    <AvatarImage src={previewImage || avatarUrl || "/placeholder-user.jpg"} />
+                    <AvatarImage src={previewImage || avatarUrl || ""} />
                     <AvatarFallback className="text-lg bg-primary/10 text-primary">
                       {email.charAt(0).toUpperCase()}
                     </AvatarFallback>
