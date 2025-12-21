@@ -540,6 +540,7 @@ export interface DeliveryNote {
   pickupLocation: string;
   deliveryLocation: string;
   transportMean?: string;
+  transportTime?: string;
   appearance?: string;
   packagesCount?: number;
   notes?: string;

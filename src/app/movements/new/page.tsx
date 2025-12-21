@@ -7,10 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Briefcase } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Briefcase, Search, Clock, Package } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -21,6 +20,8 @@ import {
   InventoryItem, 
   Job 
 } from "@/lib/api";
+import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
+import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 
 interface MovementLine {
   tempId: string;
@@ -40,17 +41,22 @@ export default function NewMovementPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
 
+  // Dialog States
+  const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
+  const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
+
   // Form State
   const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale'>('entry');
   const [numberPart, setNumberPart] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedJobId, setSelectedJobId] = useState<string>("none");
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [causal, setCausal] = useState("");
   const [pickupLocation, setPickupLocation] = useState("");
   const [deliveryLocation, setDeliveryLocation] = useState("");
   
   // Footer fields
   const [transportMean, setTransportMean] = useState("Mittente");
+  const [transportTime, setTransportTime] = useState("");
   const [appearance, setAppearance] = useState("A VISTA");
   const [packagesCount, setPackagesCount] = useState<string>("1");
   const [notes, setNotes] = useState("");
@@ -60,10 +66,11 @@ export default function NewMovementPage() {
     itemId: "",
     quantity: ""
   });
+  const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
   const [lines, setLines] = useState<MovementLine[]>([]);
 
-  // Computed Suffix
-  const yearSuffix = new Date().getFullYear().toString().slice(-2);
+  // Computed Suffix based on selected date
+  const yearSuffix = date ? new Date(date).getFullYear().toString().slice(-2) : new Date().getFullYear().toString().slice(-2);
   const fullNumber = numberPart ? `${numberPart}/PP${yearSuffix}` : `/PP${yearSuffix}`;
 
   useEffect(() => {
@@ -72,9 +79,16 @@ export default function NewMovementPage() {
 
   // Auto-fill fields when Tab or Job changes
   useEffect(() => {
-    const job = jobs.find(j => j.id === selectedJobId);
-    const jobAddress = job ? (job.siteAddress || `${job.code} - ${job.description}`) : "";
-    const warehouseAddress = "MAGAZZINO OPI FIRESAFE - Via A. Malignani, 9";
+    // Determine job address
+    let jobAddress = "";
+    if (selectedJob) {
+        jobAddress = `CANTIERE: ${selectedJob.siteAddress || `${selectedJob.code} - ${selectedJob.description}`}`;
+        if (selectedJob.clientName) {
+            jobAddress += `\nCLIENTE: ${selectedJob.clientName}`;
+        }
+    }
+
+    const warehouseAddress = "MAGAZZINO OPI FIRESAFE\nVia A. Malignani, 9\n33031 Basiliano (UD)";
 
     if (activeTab === 'entry') {
         setCausal("Rientro da cantiere");
@@ -89,7 +103,7 @@ export default function NewMovementPage() {
         setPickupLocation(warehouseAddress);
         setDeliveryLocation("Cliente");
     }
-  }, [activeTab, selectedJobId, jobs]);
+  }, [activeTab, selectedJob]);
 
   const loadData = async () => {
     try {
@@ -107,26 +121,35 @@ export default function NewMovementPage() {
     }
   };
 
+  const handleJobSelect = (job: Job) => {
+    setSelectedJob(job);
+    setIsJobSelectorOpen(false);
+  };
+
+  const handleItemSelect = (item: InventoryItem) => {
+    setSelectedItemForLine(item);
+    setCurrentLine(prev => ({ ...prev, itemId: item.id }));
+    setIsItemSelectorOpen(false);
+  };
+
   const handleAddLine = () => {
-    if (!currentLine.itemId || !currentLine.quantity) {
+    if (!selectedItemForLine || !currentLine.quantity) {
       alert("Seleziona Articolo e Quantità");
       return;
     }
 
-    const item = inventory.find(i => i.id === currentLine.itemId);
-    if (!item) return;
-
     const newLine: MovementLine = {
       tempId: Math.random().toString(36).substr(2, 9),
-      itemId: item.id,
-      itemName: item.name,
-      itemCode: item.code,
-      itemUnit: item.unit,
+      itemId: selectedItemForLine.id,
+      itemName: selectedItemForLine.name,
+      itemCode: selectedItemForLine.code,
+      itemUnit: selectedItemForLine.unit,
       quantity: Number(currentLine.quantity)
     };
 
     setLines([...lines, newLine]);
     setCurrentLine({ itemId: "", quantity: "" });
+    setSelectedItemForLine(null);
   };
 
   const handleRemoveLine = (tempId: string) => {
@@ -150,11 +173,12 @@ export default function NewMovementPage() {
         type: activeTab,
         number: fullNumber,
         date: date,
-        jobId: selectedJobId === "none" ? undefined : selectedJobId,
+        jobId: selectedJob ? selectedJob.id : undefined,
         causal,
         pickupLocation,
         deliveryLocation,
         transportMean,
+        transportTime: transportTime || undefined,
         appearance,
         packagesCount: parseInt(packagesCount) || 0,
         notes
@@ -261,19 +285,22 @@ export default function NewMovementPage() {
 
                         <div className="space-y-2">
                             <Label>Collega Commessa (Opzionale)</Label>
-                            <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleziona Commessa..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">Nessuna Commessa</SelectItem>
-                                    {jobs.map(job => (
-                                        <SelectItem key={job.id} value={job.id}>
-                                            {job.code} - {job.description}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div 
+                                className="flex items-center justify-between border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50"
+                                onClick={() => setIsJobSelectorOpen(true)}
+                            >
+                                {selectedJob ? (
+                                    <div className="flex flex-col">
+                                        <span className="font-medium">{selectedJob.code} - {selectedJob.description}</span>
+                                        {selectedJob.clientName && (
+                                            <span className="text-xs text-slate-500">{selectedJob.clientName}</span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <span className="text-slate-500">Seleziona Commessa...</span>
+                                )}
+                                <Search className="h-4 w-4 text-slate-400" />
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -293,7 +320,7 @@ export default function NewMovementPage() {
                                 <Textarea 
                                     value={pickupLocation} 
                                     onChange={(e) => setPickupLocation(e.target.value)} 
-                                    className="h-20 text-xs"
+                                    className="h-20 text-xs font-mono"
                                 />
                              </div>
                              <div className="space-y-2">
@@ -303,7 +330,7 @@ export default function NewMovementPage() {
                                 <Textarea 
                                     value={deliveryLocation} 
                                     onChange={(e) => setDeliveryLocation(e.target.value)} 
-                                    className="h-20 text-xs"
+                                    className="h-20 text-xs font-mono"
                                 />
                              </div>
                         </div>
@@ -323,21 +350,20 @@ export default function NewMovementPage() {
                         <div className="flex flex-col sm:flex-row gap-3 items-end bg-slate-50 p-3 rounded-lg border border-slate-100">
                             <div className="flex-1 space-y-2 w-full">
                                 <Label>Seleziona Articolo</Label>
-                                <Select 
-                                    value={currentLine.itemId} 
-                                    onValueChange={(val) => setCurrentLine({...currentLine, itemId: val})}
+                                <div 
+                                    className="flex items-center justify-between bg-white border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 h-10"
+                                    onClick={() => setIsItemSelectorOpen(true)}
                                 >
-                                    <SelectTrigger className="bg-white">
-                                        <SelectValue placeholder="Cerca articolo..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {inventory.map(item => (
-                                            <SelectItem key={item.id} value={item.id}>
-                                                {item.code} - {item.name} ({item.quantity} {item.unit})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                    {selectedItemForLine ? (
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            <span className="font-mono text-xs font-bold bg-slate-100 px-1 rounded">{selectedItemForLine.code}</span>
+                                            <span className="text-sm truncate">{selectedItemForLine.name}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-sm text-slate-500">Cerca articolo...</span>
+                                    )}
+                                    <Search className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                                </div>
                             </div>
                             <div className="w-full sm:w-32 space-y-2">
                                 <Label>Quantità</Label>
@@ -370,7 +396,8 @@ export default function NewMovementPage() {
                                     {lines.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={4} className="text-center py-8 text-slate-400">
-                                                Nessun articolo aggiunto
+                                                <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                                                <p>Nessun articolo aggiunto</p>
                                             </TableCell>
                                         </TableRow>
                                     ) : (
@@ -410,10 +437,28 @@ export default function NewMovementPage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label>Trasporto a mezzo</Label>
-                            <Input 
-                                value={transportMean} 
-                                onChange={(e) => setTransportMean(e.target.value)} 
-                            />
+                            <Select value={transportMean} onValueChange={setTransportMean}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Mittente">Mittente</SelectItem>
+                                    <SelectItem value="Destinatario">Destinatario</SelectItem>
+                                    <SelectItem value="Vettore">Vettore</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Inizio Trasporto (Ora)</Label>
+                            <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <Input 
+                                    type="time" 
+                                    className="pl-9"
+                                    value={transportTime} 
+                                    onChange={(e) => setTransportTime(e.target.value)} 
+                                />
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label>Aspetto Esteriore Beni</Label>
@@ -454,6 +499,21 @@ export default function NewMovementPage() {
             </div>
 
         </div>
+
+        {/* Dialogs */}
+        <JobSelectorDialog 
+            open={isJobSelectorOpen} 
+            onOpenChange={setIsJobSelectorOpen} 
+            jobs={jobs}
+            onSelect={handleJobSelect}
+        />
+
+        <ItemSelectorDialog
+            open={isItemSelectorOpen}
+            onOpenChange={setIsItemSelectorOpen}
+            items={inventory}
+            onSelect={handleItemSelect}
+        />
       </div>
     </DashboardLayout>
   );
