@@ -360,6 +360,27 @@ export const movementsApi = {
     if (error) throw error;
     return data.map(mapDbToMovement);
   },
+
+  getByJobId: async (jobId: string) => {
+    const { data, error } = await supabase
+      .from('movements')
+      .select(`
+        *,
+        profiles:user_id(full_name),
+        inventory:item_id(code, name, unit)
+      `)
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    return data.map((db: any) => ({
+      ...mapDbToMovement(db),
+      itemCode: db.inventory?.code,
+      itemName: db.inventory?.name,
+      itemUnit: db.inventory?.unit
+    }));
+  },
   
   create: async (movement: Partial<Movement>) => {
     // 1. Get current user
