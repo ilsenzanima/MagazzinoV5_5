@@ -120,14 +120,13 @@ const mapDbToClient = (db: any): Client => {
 const mapClientToDb = (client: Partial<Client>) => ({
   name: client.name,
   vat_number: client.vatNumber,
-  // If we write back, we might want to combine them into 'address' for backward compatibility
-  // or write to new columns.
-  address: client.address || `${client.street} ${client.streetNumber}, ${client.postalCode} ${client.city} (${client.province})`,
-  
-  // New columns (if they exist in DB, otherwise they'll be ignored by Supabase if strictly typed or cause error)
-  // Let's assume we want to write to the single 'address' column for now to be safe with current schema
-  // unless we are sure about the schema update.
-  
+  street: client.street,
+  street_number: client.streetNumber,
+  postal_code: client.postalCode,
+  city: client.city,
+  province: client.province,
+  // Also populate address for backward compatibility if needed, or remove if not
+  address: client.address || `${client.street || ''} ${client.streetNumber || ''}, ${client.postalCode || ''} ${client.city || ''} ${client.province ? '(' + client.province + ')' : ''}`.trim().replace(/^,/, '').trim(),
   email: client.email,
   phone: client.phone
 });
