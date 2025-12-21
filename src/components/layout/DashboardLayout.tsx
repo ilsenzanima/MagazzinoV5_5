@@ -140,7 +140,7 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
@@ -151,7 +151,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-background">
       {/* Sidebar Desktop */}
       <div className="hidden md:flex h-screen w-64 flex-col fixed left-0 top-0 border-r border-slate-800 z-50">
         <Sidebar />
@@ -161,8 +161,8 @@ export default function DashboardLayout({
       <div className="flex-1 md:pl-64 flex flex-col min-h-screen">
         
         {/* Mobile Header with Hamburger */}
-        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-white p-4 shadow-sm">
-           <div className="font-bold text-lg text-slate-900">Magazzino V5.5</div>
+        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-white dark:bg-slate-900 dark:border-slate-800 p-4 shadow-sm">
+           <div className="font-bold text-lg text-slate-900 dark:text-white">Magazzino V5.5</div>
            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
              <SheetTrigger asChild>
                <Button variant="ghost" size="icon">

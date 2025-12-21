@@ -95,9 +95,9 @@ export default function JobsContent() {
 
   return (
     <>
-      <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
+      <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h1 className="text-xl font-bold text-slate-900">Gestione Commesse</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Commesse</h1>
           <Link href="/jobs/new">
             <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
@@ -110,7 +110,7 @@ export default function JobsContent() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
             placeholder="Cerca Commessa (Codice, Nome, CIG, CUP, Indirizzo...)" 
-            className="pl-9 bg-slate-100 border-none"
+            className="pl-9 bg-slate-100 dark:bg-muted border-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             aria-label="Cerca commessa"
@@ -140,7 +140,7 @@ export default function JobsContent() {
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                       <div>
-                        <div className="text-xs font-mono text-slate-500 mb-1">{job.code}</div>
+                        <div className="text-xs font-mono text-slate-500 dark:text-muted-foreground mb-1">{job.code}</div>
                         <CardTitle className="text-base leading-tight mb-1">{job.description}</CardTitle>
                       </div>
                       <div className="flex flex-col items-end gap-2">
@@ -160,21 +160,21 @@ export default function JobsContent() {
                       </div>
                   </div>
                 </CardHeader>
-                <CardContent className="text-sm space-y-3 text-slate-600 flex-1">
+                <CardContent className="text-sm space-y-3 text-slate-600 dark:text-muted-foreground flex-1">
                   <div className="flex items-center gap-2">
                     <Building className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span className="font-medium text-slate-700">{job.clientName || 'N/A'}</span>
+                    <span className="font-medium text-slate-700 dark:text-foreground">{job.clientName || 'N/A'}</span>
                   </div>
 
                   {(job.cig || job.cup) && (
                       <div className="flex flex-wrap gap-2">
                           {job.cig && (
-                              <Badge variant="outline" className="text-xs font-normal text-slate-500 bg-slate-50">
+                              <Badge variant="outline" className="text-xs font-normal text-slate-500 dark:text-muted-foreground bg-slate-50 dark:bg-muted/50">
                                 CIG: {job.cig}
                               </Badge>
                           )}
                           {job.cup && (
-                              <Badge variant="outline" className="text-xs font-normal text-slate-500 bg-slate-50">
+                              <Badge variant="outline" className="text-xs font-normal text-slate-500 dark:text-muted-foreground bg-slate-50 dark:bg-muted/50">
                                 CUP: {job.cup}
                               </Badge>
                           )}

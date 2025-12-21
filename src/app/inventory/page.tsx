@@ -115,15 +115,15 @@ export default function InventoryPage() {
     <DashboardLayout>
       
       {/* Header Fisso */}
-      <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
+      <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Link href="/dashboard" className="md:hidden">
               <Button variant="ghost" size="icon" className="-ml-2">
-                <ChevronLeft className="h-6 w-6 text-slate-600" />
+                <ChevronLeft className="h-6 w-6 text-slate-600 dark:text-slate-400" />
               </Button>
             </Link>
-            <h1 className="text-xl font-bold text-slate-900">Gestione Inventario</h1>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Inventario</h1>
           </div>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -134,7 +134,7 @@ export default function InventoryPage() {
                 </Button>
              </Link>
              <Button variant="ghost" size="icon" className="shrink-0">
-                <Filter className="h-5 w-5 text-slate-600" />
+                <Filter className="h-5 w-5 text-slate-600 dark:text-slate-400" />
              </Button>
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function InventoryPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input 
               placeholder="Cerca Articoli (Nome, Codice, Marca...)" 
-              className="pl-9 bg-slate-100 border-none"
+              className="pl-9 bg-slate-100 dark:bg-muted border-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -157,7 +157,7 @@ export default function InventoryPage() {
 
         {/* Tabs */}
         <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-100">
+          <TabsList className="grid w-full grid-cols-3 bg-slate-100 dark:bg-muted">
             <TabsTrigger value="all">Tutti</TabsTrigger>
             <TabsTrigger value="low_stock" className="data-[state=active]:text-amber-600">Basse Scorte</TabsTrigger>
             <TabsTrigger value="out_of_stock" className="data-[state=active]:text-red-600">Esauriti</TabsTrigger>

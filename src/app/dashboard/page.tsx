@@ -60,7 +60,7 @@ export default function Dashboard() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-           <h1 className="text-2xl font-bold text-slate-900 hidden md:block">Dashboard</h1>
+           <h1 className="text-2xl font-bold text-slate-900 dark:text-white hidden md:block">Dashboard</h1>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
