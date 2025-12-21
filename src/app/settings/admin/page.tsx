@@ -68,11 +68,30 @@ export default function SettingsAdminPage() {
             setConnectionStatus('connected');
             
             if (currentUser) {
-                const { data: profile } = await supabase
+                const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('role')
                     .eq('id', currentUser.id)
                     .single();
+
+                if (profileError && profileError.code === 'PGRST116') {
+                    // Profile not found, try to create it (Self-repair)
+                    // Since this is the admin page, we assume the first user reaching here might need to be admin
+                    // We try to insert. If RLS allows, it works.
+                    const { error: insertError } = await supabase
+                        .from('profiles')
+                        .insert([{ 
+                            id: currentUser.id, 
+                            role: 'admin',
+                            email: currentUser.email // helpful for debugging
+                        }]);
+                    
+                    if (!insertError) {
+                        setUserRole('admin');
+                        return;
+                    }
+                }
+                
                 setUserRole(profile?.role || 'user');
             }
         } catch (err: any) {
