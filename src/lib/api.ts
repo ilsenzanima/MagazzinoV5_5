@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { InventoryItem, User } from './mock-data';
 
+export type { InventoryItem, User };
+
 // Interfaces for new entities
 export interface Client {
   id: string;

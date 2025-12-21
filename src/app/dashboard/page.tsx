@@ -98,7 +98,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-slate-500">Andamento Scorte (30gg)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px] w-full">
+              <div className="h-[200px] min-h-[200px] min-w-0 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={stockData}>
                     <defs>
