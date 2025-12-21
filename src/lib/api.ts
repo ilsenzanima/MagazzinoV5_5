@@ -42,6 +42,9 @@ export interface Movement {
   jobId?: string;
   jobCode?: string; // For display
   jobDescription?: string; // For display
+  itemName?: string; // For display
+  itemCode?: string; // For display
+  itemUnit?: string; // For display
 }
 
 // Mappa i tipi dal DB al Frontend
@@ -136,6 +139,38 @@ const mapDbToMovement = (db: any): Movement => ({
   jobCode: db.jobs?.code,
   jobDescription: db.jobs?.description
 });
+
+export interface Site {
+  id: string;
+  name: string;
+  address?: string;
+  manager?: string;
+  jobId: string;
+  jobDescription: string;
+  status: string;
+}
+
+const mapJobToSite = (job: Job): Site => ({
+  id: job.id,
+  name: job.description, // Using description as site name for now
+  address: job.siteAddress,
+  manager: job.siteManager,
+  jobId: job.id,
+  jobDescription: job.description,
+  status: job.status
+});
+
+// --- Sites API (Derived from Jobs) ---
+export const sitesApi = {
+  getAll: async () => {
+    const jobs = await jobsApi.getAll();
+    return jobs.map(mapJobToSite);
+  },
+  getById: async (id: string) => {
+    const job = await jobsApi.getById(id);
+    return mapJobToSite(job);
+  }
+};
 
 const mapMovementToDb = (movement: Partial<Movement>) => ({
   item_id: movement.itemId,
