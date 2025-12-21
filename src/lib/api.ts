@@ -123,6 +123,7 @@ export interface Purchase {
   createdBy?: string;
   createdByName?: string;
   createdAt: string;
+  items?: { price: number }[];
 }
 
 export interface PurchaseItem {
@@ -166,7 +167,8 @@ const mapDbToPurchase = (db: any): Purchase => ({
   notes: db.notes,
   createdBy: db.created_by,
   createdByName: db.profiles?.full_name,
-  createdAt: db.created_at
+  createdAt: db.created_at,
+  items: db.purchase_items
 });
 
 const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({

@@ -95,6 +95,13 @@ export default function PurchasesPage() {
                       </Badge>
                     </div>
                     
+                    {purchase.items?.some(item => item.price === 0) && (
+                      <div className="mb-4 flex items-center text-yellow-600 bg-yellow-50 p-2 rounded text-xs font-medium border border-yellow-100">
+                        <AlertTriangle className="h-3 w-3 mr-1.5" />
+                        Prezzi mancanti
+                      </div>
+                    )}
+
                     <div className="space-y-2 text-sm text-slate-600">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-slate-400" />

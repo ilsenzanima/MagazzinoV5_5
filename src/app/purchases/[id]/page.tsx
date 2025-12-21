@@ -280,6 +280,7 @@ export default function PurchaseDetailPage() {
                                                     type="number" 
                                                     className="w-24 ml-auto text-right h-8" 
                                                     value={editValues.price}
+                                                    step="0.00001"
                                                     onChange={(e) => setEditValues({...editValues, price: e.target.value})}
                                                 />
                                             </TableCell>
@@ -294,14 +295,14 @@ export default function PurchaseDetailPage() {
                                                         MANCANTE
                                                     </span>
                                                 ) : (
-                                                    `€ ${item.price.toFixed(2)}`
+                                                    `€ ${item.price.toFixed(5)}`
                                                 )}
                                             </TableCell>
                                         </>
                                     )}
 
                                     <TableCell className="text-right font-medium">
-                                        € {(item.quantity * item.price).toFixed(2)}
+                                        € {(item.quantity * item.price).toFixed(5)}
                                     </TableCell>
                                     
                                     <TableCell>

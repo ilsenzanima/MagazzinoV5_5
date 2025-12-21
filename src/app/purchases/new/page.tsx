@@ -282,10 +282,10 @@ export default function NewPurchasePage() {
                                 <Input 
                                     type="number" 
                                     min="0"
-                                    step="0.01"
+                                    step="0.00001"
                                     value={currentLine.price}
                                     onChange={(e) => setCurrentLine({...currentLine, price: e.target.value})}
-                                    placeholder="0.00"
+                                    placeholder="0.00000"
                                 />
                             </div>
                             <div className="md:col-span-4 flex items-center gap-2 pb-2">
@@ -346,7 +346,7 @@ export default function NewPurchasePage() {
                                         <TableRow key={line.tempId}>
                                             <TableCell className="font-medium">{line.itemName}</TableCell>
                                             <TableCell className="text-right">{line.quantity}</TableCell>
-                                            <TableCell className="text-right">€ {line.price.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">€ {line.price.toFixed(5)}</TableCell>
                                             <TableCell>
                                                 {line.isJob ? (
                                                     <span className="text-blue-600 font-medium">
