@@ -14,7 +14,9 @@ import {
   Menu,
   LogOut,
   Loader2,
-  ArrowLeftRight
+  ShoppingCart,
+  Truck,
+  Users
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -28,85 +30,117 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut, userRole } = useAuth();
 
-  const routes = [
+  const routeGroups = [
     {
-      label: "Dashboard",
-      icon: LayoutDashboard,
-      href: "/dashboard",
-      active: pathname === "/dashboard",
+      items: [
+        {
+          label: "Dashboard",
+          icon: LayoutDashboard,
+          href: "/dashboard",
+          active: pathname === "/dashboard",
+        },
+      ]
     },
     {
-      label: "Inventario",
-      icon: Package,
-      href: "/inventory",
-      active: pathname === "/inventory",
+      items: [
+        {
+          label: "Inventario",
+          icon: Package,
+          href: "/inventory",
+          active: pathname === "/inventory" || pathname.startsWith("/inventory/"),
+        },
+        {
+          label: "Acquisti",
+          icon: ShoppingCart,
+          href: "/purchases",
+          active: pathname === "/purchases" || pathname.startsWith("/purchases/"),
+        },
+        {
+          label: "Movimentazione",
+          icon: Truck,
+          href: "/movements",
+          active: pathname === "/movements" || pathname.startsWith("/movements/"),
+        },
+      ]
     },
     {
-      label: "Movimentazione",
-      icon: ArrowLeftRight,
-      href: "/movements",
-      active: pathname === "/movements",
+      items: [
+        {
+          label: "Commesse",
+          icon: ClipboardList,
+          href: "/jobs",
+          active: pathname === "/jobs" || pathname.startsWith("/jobs/"),
+        },
+        {
+          label: "Committenti",
+          icon: Users,
+          href: "/clients",
+          active: pathname === "/clients" || pathname.startsWith("/clients/"),
+        },
+      ]
     },
     {
-      label: "Committenti",
-      icon: Menu, // Temporary generic icon
-      href: "/clients",
-      active: pathname === "/clients",
-    },
-    {
-      label: "Commesse",
-      icon: ClipboardList,
-      href: "/jobs",
-      active: pathname === "/jobs",
-    },
-    {
-      label: "Acquisti",
-      icon: ClipboardList,
-      href: "/purchases",
-      active: pathname === "/purchases",
-    },
-    {
-      label: "Report",
-      icon: BarChart3,
-      href: "/reports", // Placeholder
-      active: pathname === "/reports",
-    },
-    {
-      label: "Impostazioni",
-      icon: Settings,
-      href: "/settings", // Placeholder
-      active: pathname === "/settings",
-    },
+      items: [
+        {
+          label: "Report",
+          icon: BarChart3,
+          href: "/reports",
+          active: pathname === "/reports",
+        },
+      ]
+    }
   ];
 
   return (
-    <div className={cn("pb-12 h-full bg-slate-900 text-white", className)}>
-      <div className="space-y-4 py-4">
+    <div className={cn("pb-12 h-full bg-slate-900 text-white flex flex-col", className)}>
+      <div className="space-y-4 py-4 flex-1 overflow-y-auto">
         <div className="px-3 py-2">
-          <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight text-blue-400">
+          <h2 className="mb-6 px-4 text-lg font-semibold tracking-tight text-blue-400">
             Magazzino V5.5
           </h2>
-          <div className="space-y-1">
-            {routes.map((route) => (
-              <Link key={route.href} href={route.href} onClick={onLinkClick}>
-                <Button
-                  variant={route.active ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start", 
-                    route.active ? "bg-slate-800 text-white hover:bg-slate-800" : "text-slate-400 hover:text-white hover:bg-slate-800"
-                  )}
-                >
-                  <route.icon className="mr-2 h-4 w-4" />
-                  {route.label}
-                </Button>
-              </Link>
+          
+          <div className="space-y-4">
+            {routeGroups.map((group, groupIndex) => (
+              <div key={groupIndex} className="space-y-1">
+                {group.items.map((route) => (
+                  <Link key={route.href} href={route.href} onClick={onLinkClick}>
+                    <Button
+                      variant={route.active ? "secondary" : "ghost"}
+                      className={cn(
+                        "w-full justify-start", 
+                        route.active ? "bg-slate-800 text-white hover:bg-slate-800" : "text-slate-400 hover:text-white hover:bg-slate-800"
+                      )}
+                    >
+                      <route.icon className="mr-2 h-4 w-4" />
+                      {route.label}
+                    </Button>
+                  </Link>
+                ))}
+                {groupIndex < routeGroups.length - 1 && (
+                  <div className="my-2 border-t border-slate-800 mx-2" />
+                )}
+              </div>
             ))}
           </div>
         </div>
       </div>
-      <div className="absolute bottom-4 left-0 w-full px-3">
+      
+      <div className="p-4 bg-slate-900 border-t border-slate-800">
+        <Link href="/settings" onClick={onLinkClick}>
+            <Button
+              variant={pathname === "/settings" ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start mb-2", 
+                pathname === "/settings" ? "bg-slate-800 text-white hover:bg-slate-800" : "text-slate-400 hover:text-white hover:bg-slate-800"
+              )}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Impostazioni
+            </Button>
+        </Link>
+        
         {user && (
-          <div className="mb-4 px-4 flex items-center space-x-3">
+          <div className="mb-4 px-2 flex items-center space-x-3 bg-slate-800/50 p-2 rounded-md">
              <Avatar className="h-8 w-8">
                 <AvatarImage src={`/avatars/${userRole || 'user'}.png`} />
                 <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
