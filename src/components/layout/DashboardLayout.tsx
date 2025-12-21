@@ -99,11 +99,12 @@ export function Sidebar({ className }: SidebarProps) {
         {user && (
           <div className="mb-4 px-4 flex items-center space-x-3">
              <Avatar className="h-8 w-8">
-                <AvatarImage src="" />
+                <AvatarImage src={`/avatars/${userRole || 'user'}.png`} />
                 <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
              </Avatar>
              <div className="overflow-hidden">
                 <p className="text-sm font-medium text-white truncate">{user.email}</p>
+                <p className="text-xs text-slate-400 capitalize">{userRole || 'User'}</p>
              </div>
           </div>
         )}

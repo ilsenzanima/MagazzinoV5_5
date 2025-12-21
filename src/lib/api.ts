@@ -73,16 +73,24 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
   coefficient: dbItem.coefficient
 });
 
-export const mapDbProfileToUser = (profile: any): User => ({
-  id: profile.id,
-  name: profile.full_name || profile.email?.split('@')[0] || 'Utente',
-  email: profile.email || '',
-  role: profile.role || 'user',
-  // Use role-based avatar instead of user uploaded one
-  avatar: `/avatars/${profile.role || 'user'}.png`, 
-  status: 'active', // Default value as it's not in profiles table
-  lastLogin: profile.updated_at // Using updated_at as proxy for now
-});
+export const mapDbProfileToUser = (profile: any): User => {
+  const role = (profile.role || 'user') as 'admin' | 'user' | 'operativo';
+  let avatarFile = 'user.png';
+  
+  if (role === 'admin') avatarFile = 'admin.png';
+  else if (role === 'operativo') avatarFile = 'operativo.png';
+  
+  return {
+    id: profile.id,
+    name: profile.full_name || profile.email?.split('@')[0] || 'Utente',
+    email: profile.email || '',
+    role: role,
+    // Use role-based avatar instead of user uploaded one
+    avatar: `/avatars/${avatarFile}`, 
+    status: 'active', // Default value as it's not in profiles table
+    lastLogin: profile.updated_at // Using updated_at as proxy for now
+  };
+};
 
 // Mapping functions for new entities
 const mapDbToClient = (db: any): Client => {

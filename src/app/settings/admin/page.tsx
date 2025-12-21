@@ -308,14 +308,15 @@ export default function SettingsAdminPage() {
                             </Label>
                             <Select 
                                 value={newRole} 
-                                onValueChange={(value: 'admin' | 'user') => setNewRole(value)}
+                                onValueChange={(value: 'admin' | 'user' | 'operativo') => setNewRole(value)}
                             >
                                 <SelectTrigger className="col-span-3">
                                     <SelectValue placeholder="Seleziona un ruolo" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="user">User</SelectItem>
-                                    <SelectItem value="admin">Admin</SelectItem>
+                                    <SelectItem value="user">User Standard (Sola Lettura)</SelectItem>
+                                    <SelectItem value="operativo">Utente Operativo (Lettura/Scrittura Limitata)</SelectItem>
+                                    <SelectItem value="admin">Admin (Controllo Completo)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

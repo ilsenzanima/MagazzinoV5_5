@@ -25,8 +25,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => createClient());
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'user' | 'operativo' | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const fetchUserRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      
+      if (data) {
+        setUserRole(data.role as 'admin' | 'user' | 'operativo');
+      } else {
+        setUserRole('user');
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      setUserRole('user');
+    }
+  };
 
   useEffect(() => {
     const checkUser = async () => {
@@ -34,6 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchUserRole(session.user.id);
+        } else {
+            setUserRole(null);
+        }
       } catch (error) {
         console.error("Error checking session:", error);
       } finally {
@@ -47,6 +72,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        if (session?.user) {
+             // Don't set loading false immediately if we need to fetch role? 
+             // Actually, usually we want to show UI updates fast.
+             await fetchUserRole(session.user.id);
+        } else {
+            setUserRole(null);
+        }
+
         setLoading(false);
         
         if (event === 'SIGNED_IN') {
@@ -66,10 +100,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUserRole(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, userRole, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

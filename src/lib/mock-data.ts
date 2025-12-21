@@ -46,7 +46,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'operativo';
   avatar?: string;
   status: 'active' | 'inactive';
   lastLogin?: string;

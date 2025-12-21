@@ -22,9 +22,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
+import { useAuth } from "@/components/auth-provider";
 
 export default function NewInventoryItemPage() {
   const router = useRouter();
+  const { user } = useAuth();
   
   // Generate a random mock code
   const generateCode = () => {
@@ -233,8 +235,12 @@ export default function NewInventoryItemPage() {
                         step="0.01" 
                         value={formData.coefficient}
                         onChange={(e) => setFormData({...formData, coefficient: e.target.value})}
+                        disabled={userRole !== 'admin'}
+                        className={userRole !== 'admin' ? "opacity-50" : ""}
                     />
-                    <p className="text-[10px] text-slate-400">Visibile solo admin</p>
+                    <p className="text-[10px] text-slate-400">
+                        {userRole === 'admin' ? "Visibile solo admin" : "Modificabile solo da Admin"}
+                    </p>
                   </div>
                 </div>
 
