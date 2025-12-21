@@ -605,30 +605,39 @@ export const deliveryNotesApi = {
   },
 
   create: async (note: Omit<DeliveryNote, 'id' | 'created_at' | 'items'>, items: Omit<DeliveryNoteItem, 'id' | 'deliveryNoteId'>[]) => {
-    // 1. Create Note
-    const { data: noteData, error: noteError } = await supabase
-      .from('delivery_notes')
-      .insert(note)
-      .select()
-      .single();
+    console.time('deliveryNotesApi.create');
+    try {
+      // 1. Create Note
+      console.time('insert_note');
+      const { data: noteData, error: noteError } = await supabase
+        .from('delivery_notes')
+        .insert(note)
+        .select()
+        .single();
+      console.timeEnd('insert_note');
 
-    if (noteError) throw noteError;
+      if (noteError) throw noteError;
 
-    // 2. Create Items
-    if (items.length > 0) {
-      const itemsToInsert = items.map(item => ({
-        ...item,
-        delivery_note_id: noteData.id
-      }));
+      // 2. Create Items
+      if (items.length > 0) {
+        console.time('insert_items');
+        const itemsToInsert = items.map(item => ({
+          ...item,
+          delivery_note_id: noteData.id
+        }));
 
-      const { error: itemsError } = await supabase
-        .from('delivery_note_items')
-        .insert(itemsToInsert);
+        const { error: itemsError } = await supabase
+          .from('delivery_note_items')
+          .insert(itemsToInsert);
+        console.timeEnd('insert_items');
 
-      if (itemsError) throw itemsError;
+        if (itemsError) throw itemsError;
+      }
+
+      return noteData;
+    } finally {
+      console.timeEnd('deliveryNotesApi.create');
     }
-
-    return noteData;
   },
 
   update: async (id: string, note: Partial<DeliveryNote>, items?: Omit<DeliveryNoteItem, 'id' | 'deliveryNoteId'>[]) => {

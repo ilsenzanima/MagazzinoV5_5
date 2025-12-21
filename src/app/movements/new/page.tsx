@@ -187,6 +187,7 @@ export default function NewMovementPage() {
 
     try {
       setLoading(true);
+      console.time('handleSave');
       
       const noteData = {
         type: activeTab,
@@ -208,9 +209,14 @@ export default function NewMovementPage() {
         quantity: line.quantity
       }));
 
+      console.time('api_call');
       await deliveryNotesApi.create(noteData, itemsData);
+      console.timeEnd('api_call');
       
+      console.time('redirect');
       router.push('/movements');
+      console.timeEnd('redirect');
+      console.timeEnd('handleSave');
     } catch (error) {
       console.error("Error saving movement:", error);
       alert("Errore durante il salvataggio");
