@@ -85,6 +85,176 @@ export interface JobDocument {
 }
 
 // Mappa i tipi dal DB al Frontend
+export interface Supplier {
+  id: string;
+  name: string;
+  vatNumber?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  createdAt: string;
+}
+
+export interface Purchase {
+  id: string;
+  supplierId: string;
+  supplierName?: string;
+  deliveryNoteNumber: string;
+  deliveryNoteDate: string;
+  status: 'draft' | 'completed';
+  notes?: string;
+  createdBy?: string;
+  createdByName?: string;
+  createdAt: string;
+}
+
+export interface PurchaseItem {
+  id: string;
+  purchaseId: string;
+  itemId: string;
+  itemName?: string; // Display
+  itemCode?: string; // Display
+  quantity: number;
+  price: number;
+  jobId?: string;
+  jobCode?: string; // Display
+  createdAt: string;
+}
+
+const mapDbToSupplier = (db: any): Supplier => ({
+  id: db.id,
+  name: db.name,
+  vatNumber: db.vat_number,
+  email: db.email,
+  phone: db.phone,
+  address: db.address,
+  createdAt: db.created_at
+});
+
+const mapSupplierToDb = (supplier: Partial<Supplier>) => ({
+  name: supplier.name,
+  vat_number: supplier.vatNumber,
+  email: supplier.email,
+  phone: supplier.phone,
+  address: supplier.address
+});
+
+const mapDbToPurchase = (db: any): Purchase => ({
+  id: db.id,
+  supplierId: db.supplier_id,
+  supplierName: db.suppliers?.name,
+  deliveryNoteNumber: db.delivery_note_number,
+  deliveryNoteDate: db.delivery_note_date,
+  status: db.status,
+  notes: db.notes,
+  createdBy: db.created_by,
+  createdByName: db.profiles?.full_name,
+  createdAt: db.created_at
+});
+
+const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
+  supplier_id: purchase.supplierId,
+  delivery_note_number: purchase.deliveryNoteNumber,
+  delivery_note_date: purchase.deliveryNoteDate,
+  status: purchase.status,
+  notes: purchase.notes,
+  created_by: purchase.createdBy
+});
+
+// --- Suppliers API ---
+export const suppliersApi = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('suppliers')
+      .select('*')
+      .order('name');
+    if (error) throw error;
+    return data.map(mapDbToSupplier);
+  },
+  getById: async (id: string) => {
+    const { data, error } = await supabase.from('suppliers').select('*').eq('id', id).single();
+    if (error) throw error;
+    return mapDbToSupplier(data);
+  },
+  create: async (supplier: Partial<Supplier>) => {
+    const { data, error } = await supabase.from('suppliers').insert(mapSupplierToDb(supplier)).select().single();
+    if (error) throw error;
+    return mapDbToSupplier(data);
+  },
+  update: async (id: string, supplier: Partial<Supplier>) => {
+    const { data, error } = await supabase.from('suppliers').update(mapSupplierToDb(supplier)).eq('id', id).select().single();
+    if (error) throw error;
+    return mapDbToSupplier(data);
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('suppliers').delete().eq('id', id);
+    if (error) throw error;
+  }
+};
+
+// --- Purchases API ---
+export const purchasesApi = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('purchases')
+      .select('*, suppliers(name), profiles(full_name)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(mapDbToPurchase);
+  },
+  getById: async (id: string) => {
+    const { data, error } = await supabase
+      .from('purchases')
+      .select('*, suppliers(name), profiles(full_name)')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return mapDbToPurchase(data);
+  },
+  create: async (purchase: Partial<Purchase>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Utente non autenticato");
+
+    const dbPurchase = mapPurchaseToDb({ ...purchase, createdBy: user.id });
+    const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name), profiles(full_name)').single();
+    if (error) throw error;
+    return mapDbToPurchase(data);
+  },
+  // Items management
+  getItems: async (purchaseId: string) => {
+    const { data, error } = await supabase
+      .from('purchase_items')
+      .select('*, inventory(name, code), jobs(code)')
+      .eq('purchase_id', purchaseId);
+      
+    if (error) throw error;
+    return data.map((item: any) => ({
+      id: item.id,
+      purchaseId: item.purchase_id,
+      itemId: item.item_id,
+      itemName: item.inventory?.name,
+      itemCode: item.inventory?.code,
+      quantity: item.quantity,
+      price: item.price,
+      jobId: item.job_id,
+      jobCode: item.jobs?.code,
+      createdAt: item.created_at
+    }));
+  },
+  addItem: async (item: Partial<PurchaseItem>) => {
+    const dbItem = {
+      purchase_id: item.purchaseId,
+      item_id: item.itemId,
+      quantity: item.quantity,
+      price: item.price,
+      job_id: item.jobId
+    };
+    const { data, error } = await supabase.from('purchase_items').insert(dbItem).select().single();
+    if (error) throw error;
+    return data;
+  }
+};
+
 export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
   id: dbItem.id,
   code: dbItem.code,

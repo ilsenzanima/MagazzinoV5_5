@@ -51,10 +51,10 @@ export function Sidebar({ className }: SidebarProps) {
       active: pathname === "/jobs",
     },
     {
-      label: "Ordini",
+      label: "Acquisti",
       icon: ClipboardList,
-      href: "/orders", // Placeholder
-      active: pathname === "/orders",
+      href: "/purchases",
+      active: pathname === "/purchases",
     },
     {
       label: "Report",

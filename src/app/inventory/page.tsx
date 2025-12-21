@@ -25,6 +25,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 
 export default function InventoryPage() {
@@ -236,6 +237,9 @@ export default function InventoryPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Scansiona Codice</DialogTitle>
+            <DialogDescription>
+              Inquadra il codice a barre o il QR code per cercare l&apos;articolo.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center p-4 bg-slate-50 rounded-lg">
              <div id="reader" className="w-full"></div>

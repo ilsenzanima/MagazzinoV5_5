@@ -89,6 +89,9 @@ export function JobJournal({ jobId }: JobJournalProps) {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Aggiungi Voce al Giornale</DialogTitle>
+                <DialogDescription>
+                  Inserisci i dettagli delle attività svolte e le condizioni meteo.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">

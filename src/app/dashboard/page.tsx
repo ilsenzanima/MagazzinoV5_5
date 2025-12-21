@@ -124,7 +124,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-slate-500">Stato Ordini</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px] w-full flex items-center justify-center relative">
+              <div className="h-[200px] min-h-[200px] min-w-0 w-full flex items-center justify-center relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
