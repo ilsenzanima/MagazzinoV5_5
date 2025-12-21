@@ -11,7 +11,9 @@ import {
   Loader2,
   Briefcase,
   Calendar,
-  Building
+  Building,
+  MapPin,
+  FileText
 } from "lucide-react";
 import Link from "next/link";
 import { Job, jobsApi } from "@/lib/api";
@@ -50,7 +52,10 @@ export default function JobsContent() {
     return (
       job.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
+      job.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.siteAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.cig?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.cup?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
@@ -79,7 +84,7 @@ export default function JobsContent() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
-            placeholder="Cerca Commessa (Codice, Descrizione, Committente...)" 
+            placeholder="Cerca Commessa (Codice, Nome, CIG, CUP, Indirizzo...)" 
             className="pl-9 bg-slate-100 border-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -101,7 +106,7 @@ export default function JobsContent() {
             </div>
           ) : (
             filteredJobs.map((job) => (
-              <Card key={job.id} className="hover:shadow-md transition-shadow">
+              <Card key={job.id} className="hover:shadow-md transition-shadow flex flex-col">
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                       <div>
@@ -111,25 +116,41 @@ export default function JobsContent() {
                       {getStatusBadge(job.status)}
                   </div>
                 </CardHeader>
-                <CardContent className="text-sm space-y-3 text-slate-600">
+                <CardContent className="text-sm space-y-3 text-slate-600 flex-1">
                   <div className="flex items-center gap-2">
                     <Building className="h-4 w-4 shrink-0 text-slate-400" />
                     <span className="font-medium text-slate-700">{job.clientName || 'N/A'}</span>
                   </div>
+
+                  {(job.cig || job.cup) && (
+                      <div className="flex flex-wrap gap-2">
+                          {job.cig && (
+                              <Badge variant="outline" className="text-xs font-normal text-slate-500 bg-slate-50">
+                                CIG: {job.cig}
+                              </Badge>
+                          )}
+                          {job.cup && (
+                              <Badge variant="outline" className="text-xs font-normal text-slate-500 bg-slate-50">
+                                CUP: {job.cup}
+                              </Badge>
+                          )}
+                      </div>
+                  )}
+
+                  {job.siteAddress && (
+                    <div className="flex items-start gap-2 text-xs">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400" />
+                        <span>{job.siteAddress}</span>
+                    </div>
+                  )}
                   
-                  <div className="flex items-center gap-2 text-xs">
-                    <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  <div className="flex items-center gap-2 text-xs pt-2 mt-auto border-t">
+                    <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                     <span>
                         {job.startDate ? new Date(job.startDate).toLocaleDateString() : 'N/D'} 
                         {' - '} 
                         {job.endDate ? new Date(job.endDate).toLocaleDateString() : 'In corso'}
                     </span>
-                  </div>
-
-                  <div className="pt-2 mt-2 border-t flex justify-end">
-                     <Link href={`/sites?jobId=${job.id}`}>
-                        <Button variant="outline" size="sm">Vedi Cantieri</Button>
-                     </Link>
                   </div>
                 </CardContent>
               </Card>

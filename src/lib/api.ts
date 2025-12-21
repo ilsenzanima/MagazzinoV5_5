@@ -22,17 +22,11 @@ export interface Job {
   startDate: string;
   endDate: string;
   createdAt?: string;
-}
-
-export interface Site {
-  id: string;
-  jobId: string;
-  jobDescription?: string; // For display
-  name: string;
-  address: string;
-  manager: string;
-  status: 'active' | 'inactive' | 'completed';
-  createdAt?: string;
+  // New fields
+  siteAddress?: string;
+  siteManager?: string;
+  cig?: string;
+  cup?: string;
 }
 
 // Mappa i tipi dal DB al Frontend
@@ -91,7 +85,12 @@ const mapDbToJob = (db: any): Job => ({
   status: db.status,
   startDate: db.start_date,
   endDate: db.end_date,
-  createdAt: db.created_at
+  createdAt: db.created_at,
+  // New fields
+  siteAddress: db.site_address,
+  siteManager: db.site_manager,
+  cig: db.cig,
+  cup: db.cup
 });
 
 const mapJobToDb = (job: Partial<Job>) => ({
@@ -100,26 +99,12 @@ const mapJobToDb = (job: Partial<Job>) => ({
   description: job.description,
   status: job.status,
   start_date: job.startDate,
-  end_date: job.endDate
-});
-
-const mapDbToSite = (db: any): Site => ({
-  id: db.id,
-  jobId: db.job_id,
-  jobDescription: db.jobs?.description,
-  name: db.name,
-  address: db.address,
-  manager: db.manager,
-  status: db.status,
-  createdAt: db.created_at
-});
-
-const mapSiteToDb = (site: Partial<Site>) => ({
-  job_id: site.jobId,
-  name: site.name,
-  address: site.address,
-  manager: site.manager,
-  status: site.status
+  end_date: job.endDate,
+  // New fields
+  site_address: job.siteAddress,
+  site_manager: job.siteManager,
+  cig: job.cig,
+  cup: job.cup
 });
 
 // Mappa i tipi dal Frontend al DB
@@ -314,37 +299,6 @@ export const jobsApi = {
   },
   delete: async (id: string) => {
     const { error } = await supabase.from('jobs').delete().eq('id', id);
-    if (error) throw error;
-  }
-};
-
-// --- Sites API ---
-export const sitesApi = {
-  getAll: async () => {
-    const { data, error } = await supabase
-      .from('sites')
-      .select('*, jobs(description)')
-      .order('name');
-    if (error) throw error;
-    return data.map(mapDbToSite);
-  },
-  getById: async (id: string) => {
-    const { data, error } = await supabase.from('sites').select('*, jobs(description)').eq('id', id).single();
-    if (error) throw error;
-    return mapDbToSite(data);
-  },
-  create: async (site: Partial<Site>) => {
-    const { data, error } = await supabase.from('sites').insert(mapSiteToDb(site)).select().single();
-    if (error) throw error;
-    return mapDbToSite(data);
-  },
-  update: async (id: string, site: Partial<Site>) => {
-    const { data, error } = await supabase.from('sites').update(mapSiteToDb(site)).eq('id', id).select().single();
-    if (error) throw error;
-    return mapDbToSite(data);
-  },
-  delete: async (id: string) => {
-    const { error } = await supabase.from('sites').delete().eq('id', id);
     if (error) throw error;
   }
 };
