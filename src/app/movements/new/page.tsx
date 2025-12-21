@@ -83,21 +83,40 @@ export default function NewMovementPage() {
     let jobAddress = "";
     if (selectedJob) {
         if (selectedJob.clientName) {
-            jobAddress += `CLIENTE: ${selectedJob.clientName}\n`;
+            jobAddress += `CLIENTE: ${selectedJob.clientName}`;
+            if (selectedJob.clientAddress) {
+                jobAddress += ` - ${selectedJob.clientAddress}`;
+            }
+            jobAddress += `\n`;
         }
-        jobAddress += `Destinazione: ${selectedJob.siteAddress || `${selectedJob.code} - ${selectedJob.description}`}`;
+        
+        // Determine destination text
+        let destinationText = "";
+        const siteAddr = selectedJob.siteAddress || "";
+        const clientAddr = selectedJob.clientAddress || "";
+        
+        // Simple string comparison for "Stessa" check
+        const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+        
+        if (siteAddr && clientAddr && normalize(siteAddr) === normalize(clientAddr)) {
+            destinationText = "Stessa";
+        } else {
+            destinationText = selectedJob.siteAddress || `${selectedJob.code} - ${selectedJob.description}`;
+        }
+        
+        jobAddress += `DESTINAZIONE: ${destinationText}`;
     }
 
     const warehouseAddress = "OPI FIRESAFE S.R.L. MAGAZZINO\nVia A. Malignani, 9 - 33010 - REANA DEL ROJALE (UD)";
 
     if (activeTab === 'entry') {
         setCausal("Rientro da cantiere");
-        setPickupLocation(jobAddress || "Destinazione");
+        setPickupLocation(jobAddress || "DESTINAZIONE");
         setDeliveryLocation(warehouseAddress);
     } else if (activeTab === 'exit') {
         setCausal("Uscita merce per cantiere");
         setPickupLocation(warehouseAddress);
-        setDeliveryLocation(jobAddress || "Destinazione");
+        setDeliveryLocation(jobAddress || "DESTINAZIONE");
     } else if (activeTab === 'sale') {
         setCausal("Vendita");
         setPickupLocation(warehouseAddress);

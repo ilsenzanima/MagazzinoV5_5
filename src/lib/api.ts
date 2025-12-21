@@ -41,6 +41,7 @@ export interface Job {
   id: string;
   clientId: string;
   clientName?: string; // For display
+  clientAddress?: string; // For display
   code: string;
   description: string;
   status: 'active' | 'completed' | 'suspended';
@@ -376,6 +377,12 @@ const mapDbToJob = (db: any): Job => ({
   id: db.id,
   clientId: db.client_id,
   clientName: db.clients?.name,
+  clientAddress: db.clients?.address || [
+      db.clients?.street ? `${db.clients.street} ${db.clients.street_number || ''}` : '',
+      db.clients?.postal_code,
+      db.clients?.city,
+      db.clients?.province ? `(${db.clients.province})` : ''
+  ].filter(Boolean).join(' - '),
   code: db.code,
   description: db.description,
   status: db.status,
@@ -857,7 +864,7 @@ export const jobsApi = {
   getAll: async () => {
     const { data, error } = await supabase
       .from('jobs')
-      .select('*, clients(name)')
+      .select('*, clients(*)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data.map(mapDbToJob);
@@ -865,14 +872,14 @@ export const jobsApi = {
   getByClientId: async (clientId: string) => {
      const { data, error } = await supabase
       .from('jobs')
-      .select('*, clients(name)')
+      .select('*, clients(*)')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data.map(mapDbToJob);
   },
   getById: async (id: string) => {
-    const { data, error } = await supabase.from('jobs').select('*, clients(name)').eq('id', id).single();
+    const { data, error } = await supabase.from('jobs').select('*, clients(*)').eq('id', id).single();
     if (error) throw error;
     return mapDbToJob(data);
   },
