@@ -9,10 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Save, Upload, Loader2 } from "lucide-react";
-import { 
-  mockUnits 
-} from "@/lib/mock-data";
-import { brandsApi, itemTypesApi, Brand, ItemType } from "@/lib/api";
+import { brandsApi, itemTypesApi, inventoryApi, unitsApi, Brand, ItemType, Unit } from "@/lib/api";
 import {
   Select,
   SelectContent,
@@ -35,6 +32,30 @@ export default function NewInventoryItemPage() {
 
   const [code] = useState(generateCode());
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [types, setTypes] = useState<ItemType[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [brandsData, typesData, unitsData] = await Promise.all([
+          brandsApi.getAll(),
+          itemTypesApi.getAll(),
+          unitsApi.getAll()
+        ]);
+        setBrands(brandsData);
+        setTypes(typesData);
+        setUnits(unitsData);
+      } catch (error) {
+        console.error("Failed to load data", error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    loadData();
+  }, []);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -182,11 +203,11 @@ export default function NewInventoryItemPage() {
                     <Label htmlFor="brand">Marca</Label>
                     <Select onValueChange={(val) => setFormData({...formData, brand: val})}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleziona Marca" />
+                        <SelectValue placeholder={loadingData ? "Caricamento..." : "Seleziona Marca"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockBrands.map((brand) => (
-                          <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                        {brands.map((brand) => (
+                          <SelectItem key={brand.id} value={brand.name}>{brand.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -234,11 +255,11 @@ export default function NewInventoryItemPage() {
                     <Label htmlFor="unit">Unità di Misura</Label>
                     <Select defaultValue="PZ" onValueChange={(val) => setFormData({...formData, unit: val})}>
                       <SelectTrigger>
-                        <SelectValue placeholder="U.M." />
+                        <SelectValue placeholder={loadingData ? "Caricamento..." : "U.M."} />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockUnits.map((u) => (
-                          <SelectItem key={u} value={u}>{u}</SelectItem>
+                        {units.map((u) => (
+                          <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

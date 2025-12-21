@@ -11,7 +11,7 @@ export interface InventoryItem {
   description?: string;
   price?: number;
   location?: string;
-  unit: 'PZ' | 'ML' | 'MQ' | 'KG' | 'L';
+  unit: string;
   coefficient: number;
 }
 
@@ -25,14 +25,17 @@ export interface Movement {
   notes?: string;
 }
 
+// Deprecated: Use brandsApi.getAll()
 export const mockBrands = [
   "Makita", "Bosch", "Stanley", "Beta", "Wurth", "3M", "DeWalt", "Hilti", "Usag"
 ];
 
+// Deprecated: Use itemTypesApi.getAll()
 export const mockTypes = [
   "Elettroutensili", "Utensili Manuali", "Ferramenta", "DPI", "Materiale Elettrico", "Idraulica", "Consumabili"
 ];
 
+// Deprecated: Use unitsApi.getAll()
 export const mockUnits = ['PZ', 'ML', 'MQ', 'KG', 'L'];
 
 export const mockMovements: Movement[] = [

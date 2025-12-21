@@ -6,13 +6,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { mockUnits } from "@/lib/mock-data";
 import { Plus, X, Loader2, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { suppliersApi, brandsApi, itemTypesApi, Supplier, Brand, ItemType } from "@/lib/api";
+import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemType, Unit } from "@/lib/api";
 
 export default function SettingsInventoryPage() {
-    const [units, setUnits] = useState(mockUnits);
+    // Units State
+    const [units, setUnits] = useState<Unit[]>([]);
+    const [loadingUnits, setLoadingUnits] = useState(true);
+    const [newUnitName, setNewUnitName] = useState("");
+    const [addingUnit, setAddingUnit] = useState(false);
 
     // Suppliers State
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -36,6 +39,7 @@ export default function SettingsInventoryPage() {
         loadSuppliers();
         loadBrands();
         loadTypes();
+        loadUnits();
     }, []);
 
     const loadSuppliers = async () => {
@@ -71,6 +75,18 @@ export default function SettingsInventoryPage() {
             console.error("Failed to load types", error);
         } finally {
             setLoadingTypes(false);
+        }
+    };
+
+    const loadUnits = async () => {
+        try {
+            setLoadingUnits(true);
+            const data = await unitsApi.getAll();
+            setUnits(data);
+        } catch (error) {
+            console.error("Failed to load units", error);
+        } finally {
+            setLoadingUnits(false);
         }
     };
 
@@ -143,6 +159,30 @@ export default function SettingsInventoryPage() {
             setTypes(types.filter(t => t.id !== id));
         } catch (error) {
              console.error("Failed to delete type", error);
+        }
+    };
+
+    const handleAddUnit = async () => {
+        if (!newUnitName.trim()) return;
+        try {
+            setAddingUnit(true);
+            const newUnit = await unitsApi.create(newUnitName);
+            setUnits([...units, newUnit]);
+            setNewUnitName("");
+        } catch (error) {
+            console.error("Failed to add unit", error);
+        } finally {
+            setAddingUnit(false);
+        }
+    };
+
+    const handleDeleteUnit = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questa unità?")) return;
+        try {
+            await unitsApi.delete(id);
+            setUnits(units.filter(u => u.id !== id));
+        } catch (error) {
+             console.error("Failed to delete unit", error);
         }
     };
 
@@ -223,19 +263,44 @@ export default function SettingsInventoryPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex gap-2">
-                        <Input placeholder="Nuova Marca..." className="max-w-sm" />
-                        <Button size="icon" className="bg-blue-600 hover:bg-blue-700"><Plus className="h-4 w-4" /></Button>
+                        <Input 
+                            placeholder="Nuova Marca..." 
+                            className="max-w-sm" 
+                            value={newBrandName}
+                            onChange={(e) => setNewBrandName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()}
+                        />
+                        <Button 
+                            size="icon" 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={handleAddBrand}
+                            disabled={addingBrand || !newBrandName.trim()}
+                        >
+                            {addingBrand ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        </Button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {brands.map(brand => (
-                            <Badge key={brand} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
-                                {brand}
-                                <button className="hover:bg-slate-200 rounded-full p-0.5 transition-colors" onClick={() => setBrands(brands.filter(b => b !== brand))}>
-                                    <X className="h-3 w-3 text-slate-500" />
-                                </button>
-                            </Badge>
-                        ))}
-                    </div>
+                    {loadingBrands ? (
+                        <div className="flex items-center gap-2 text-slate-500">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento marche...
+                        </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {brands.map(brand => (
+                                <Badge key={brand.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                    {brand.name}
+                                    <button 
+                                        className="hover:bg-slate-200 rounded-full p-0.5 transition-colors" 
+                                        onClick={() => handleDeleteBrand(brand.id)}
+                                    >
+                                        <X className="h-3 w-3 text-slate-500" />
+                                    </button>
+                                </Badge>
+                            ))}
+                            {brands.length === 0 && (
+                                <p className="text-sm text-muted-foreground italic">Nessuna marca presente.</p>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </TabsContent>
@@ -298,19 +363,44 @@ export default function SettingsInventoryPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex gap-2">
-                        <Input placeholder="Nuova Unità..." className="max-w-sm" />
-                        <Button size="icon" className="bg-blue-600 hover:bg-blue-700"><Plus className="h-4 w-4" /></Button>
+                        <Input 
+                            placeholder="Nuova Unità..." 
+                            className="max-w-sm" 
+                            value={newUnitName}
+                            onChange={(e) => setNewUnitName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddUnit()}
+                        />
+                        <Button 
+                            size="icon" 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={handleAddUnit}
+                            disabled={addingUnit || !newUnitName.trim()}
+                        >
+                            {addingUnit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        </Button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {units.map(item => (
-                            <Badge key={item} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
-                                {item}
-                                <button className="hover:bg-slate-100 rounded-full p-0.5 transition-colors" onClick={() => setUnits(units.filter(u => u !== item))}>
-                                    <X className="h-3 w-3 text-slate-500" />
-                                </button>
-                            </Badge>
-                        ))}
-                    </div>
+                    {loadingUnits ? (
+                        <div className="flex items-center gap-2 text-slate-500">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento unità...
+                        </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {units.map(unit => (
+                                <Badge key={unit.id} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                    {unit.name}
+                                    <button 
+                                        className="hover:bg-slate-100 rounded-full p-0.5 transition-colors" 
+                                        onClick={() => handleDeleteUnit(unit.id)}
+                                    >
+                                        <X className="h-3 w-3 text-slate-500" />
+                                    </button>
+                                </Badge>
+                            ))}
+                            {units.length === 0 && (
+                                <p className="text-sm text-muted-foreground italic">Nessuna unità presente.</p>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </TabsContent>

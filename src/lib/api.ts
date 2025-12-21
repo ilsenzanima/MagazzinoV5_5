@@ -611,6 +611,57 @@ export const usersApi = {
   }
 };
 
+export const brandsApi = {
+  getAll: async () => {
+    const { data, error } = await supabase.from('brands').select('*').order('name');
+    if (error) throw error;
+    return data as Brand[];
+  },
+  create: async (name: string) => {
+    const { data, error } = await supabase.from('brands').insert({ name }).select().single();
+    if (error) throw error;
+    return data as Brand;
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('brands').delete().eq('id', id);
+    if (error) throw error;
+  }
+};
+
+export const itemTypesApi = {
+  getAll: async () => {
+    const { data, error } = await supabase.from('item_types').select('*').order('name');
+    if (error) throw error;
+    return data as ItemType[];
+  },
+  create: async (name: string) => {
+    const { data, error } = await supabase.from('item_types').insert({ name }).select().single();
+    if (error) throw error;
+    return data as ItemType;
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('item_types').delete().eq('id', id);
+    if (error) throw error;
+  }
+};
+
+export const unitsApi = {
+  getAll: async () => {
+    const { data, error } = await supabase.from('units').select('*').order('name');
+    if (error) throw error;
+    return data as Unit[];
+  },
+  create: async (name: string) => {
+    const { data, error } = await supabase.from('units').insert({ name }).select().single();
+    if (error) throw error;
+    return data as Unit;
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('units').delete().eq('id', id);
+    if (error) throw error;
+  }
+};
+
 // --- Clients API ---
 export const clientsApi = {
   getAll: async () => {

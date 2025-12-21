@@ -10,10 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText } from "lucide-react";
 import { 
-  InventoryItem, 
-  mockBrands, 
-  mockTypes, 
-  mockUnits
+  InventoryItem 
 } from "@/lib/mock-data";
 import { 
   inventoryApi, 
