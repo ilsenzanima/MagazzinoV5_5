@@ -284,13 +284,51 @@ export default function SettingsAdminPage() {
                     </Card>
                 </>
             ) : (
-                <Alert>
-                    <ShieldAlert className="h-4 w-4" />
-                    <AlertTitle>Accesso Limitato</AlertTitle>
-                    <AlertDescription>
-                        Non hai i permessi di amministratore per visualizzare questa sezione.
-                    </AlertDescription>
-                </Alert>
+                <div className="space-y-4">
+                    <Alert>
+                        <ShieldAlert className="h-4 w-4" />
+                        <AlertTitle>Accesso Limitato</AlertTitle>
+                        <AlertDescription>
+                            Non hai i permessi di amministratore per visualizzare questa sezione.
+                        </AlertDescription>
+                    </Alert>
+                    
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Recupero Accesso Amministratore</CardTitle>
+                            <CardDescription>
+                                Se sei l'unico utente o il proprietario del sistema e hai perso l'accesso admin, 
+                                puoi provare a forzare l'aggiornamento del tuo ruolo.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button 
+                                variant="destructive" 
+                                onClick={async () => {
+                                    if (!currentUser) return;
+                                    try {
+                                        // Attempt to update own role to admin
+                                        const { error } = await supabase
+                                            .from('profiles')
+                                            .update({ role: 'admin' })
+                                            .eq('id', currentUser.id);
+                                            
+                                        if (error) throw error;
+                                        
+                                        alert("Ruolo aggiornato con successo! Ricarica la pagina.");
+                                        window.location.reload();
+                                    } catch (err: any) {
+                                        console.error("Error promoting to admin:", err);
+                                        alert("Impossibile aggiornare il ruolo: " + (err.message || "Errore sconosciuto"));
+                                    }
+                                }}
+                            >
+                                <Shield className="mr-2 h-4 w-4" />
+                                Rivendica Ruolo Admin
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
             )}
 
             <Dialog open={isEditRoleOpen} onOpenChange={setIsEditRoleOpen}>
