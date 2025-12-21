@@ -29,6 +29,21 @@ export interface Job {
   cup?: string;
 }
 
+export interface Movement {
+  id: string;
+  itemId: string;
+  userId?: string;
+  userName?: string; // For display
+  type: 'load' | 'unload';
+  quantity: number;
+  reference: string;
+  notes?: string;
+  date: string;
+  jobId?: string;
+  jobCode?: string; // For display
+  jobDescription?: string; // For display
+}
+
 // Mappa i tipi dal DB al Frontend
 export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
   id: dbItem.id,
@@ -105,6 +120,31 @@ const mapJobToDb = (job: Partial<Job>) => ({
   site_manager: job.siteManager,
   cig: job.cig,
   cup: job.cup
+});
+
+const mapDbToMovement = (db: any): Movement => ({
+  id: db.id,
+  itemId: db.item_id,
+  userId: db.user_id,
+  userName: db.profiles?.full_name || 'Utente',
+  type: db.type,
+  quantity: db.quantity,
+  reference: db.reference,
+  notes: db.notes,
+  date: db.created_at,
+  jobId: db.job_id,
+  jobCode: db.jobs?.code,
+  jobDescription: db.jobs?.description
+});
+
+const mapMovementToDb = (movement: Partial<Movement>) => ({
+  item_id: movement.itemId,
+  user_id: movement.userId,
+  type: movement.type,
+  quantity: movement.quantity,
+  reference: movement.reference,
+  notes: movement.notes,
+  job_id: movement.jobId
 });
 
 // Mappa i tipi dal Frontend al DB
@@ -300,5 +340,46 @@ export const jobsApi = {
   delete: async (id: string) => {
     const { error } = await supabase.from('jobs').delete().eq('id', id);
     if (error) throw error;
+  }
+};
+
+// --- Movements API ---
+export const movementsApi = {
+  getByItemId: async (itemId: string) => {
+    // Join with profiles to get user name and jobs to get job info
+    const { data, error } = await supabase
+      .from('movements')
+      .select(`
+        *,
+        profiles:user_id(full_name),
+        jobs:job_id(code, description)
+      `)
+      .eq('item_id', itemId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data.map(mapDbToMovement);
+  },
+  
+  create: async (movement: Partial<Movement>) => {
+    // 1. Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Utente non autenticato");
+    
+    // 2. Prepare movement data
+    const dbMovement = mapMovementToDb({
+      ...movement,
+      userId: user.id
+    });
+    
+    // 3. Insert movement
+    const { data, error } = await supabase
+      .from('movements')
+      .insert(dbMovement)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return mapDbToMovement(data);
   }
 };
