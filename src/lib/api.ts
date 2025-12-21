@@ -53,6 +53,35 @@ export interface Movement {
   itemName?: string; // For display
   itemCode?: string; // For display
   itemUnit?: string; // For display
+  itemPrice?: number; // For display
+}
+
+export interface JobLog {
+  id: string;
+  jobId: string;
+  userId: string;
+  userName?: string;
+  date: string;
+  content: string;
+  weatherInfo?: {
+    condition: string;
+    tempMax: string;
+    tempMin: string;
+  };
+  tags: string[];
+  createdAt: string;
+}
+
+export interface JobDocument {
+  id: string;
+  jobId: string;
+  name: string;
+  fileUrl: string;
+  fileType: string;
+  category: string;
+  uploadedBy: string;
+  uploadedByName?: string;
+  createdAt: string;
 }
 
 // Mappa i tipi dal DB al Frontend
@@ -169,6 +198,48 @@ const mapJobToDb = (job: Partial<Job>) => ({
   site_manager: job.siteManager,
   cig: job.cig,
   cup: job.cup
+});
+
+const mapDbToJobLog = (db: any): JobLog => ({
+  id: db.id,
+  jobId: db.job_id,
+  userId: db.user_id,
+  userName: db.profiles?.full_name,
+  date: db.date,
+  content: db.content,
+  weatherInfo: db.weather_info,
+  tags: db.tags || [],
+  createdAt: db.created_at
+});
+
+const mapJobLogToDb = (log: Partial<JobLog>) => ({
+  job_id: log.jobId,
+  user_id: log.userId,
+  date: log.date,
+  content: log.content,
+  weather_info: log.weatherInfo,
+  tags: log.tags
+});
+
+const mapDbToJobDocument = (db: any): JobDocument => ({
+  id: db.id,
+  jobId: db.job_id,
+  name: db.name,
+  fileUrl: db.file_url,
+  fileType: db.file_type,
+  category: db.category,
+  uploadedBy: db.uploaded_by,
+  uploadedByName: db.profiles?.full_name,
+  createdAt: db.created_at
+});
+
+const mapJobDocumentToDb = (doc: Partial<JobDocument>) => ({
+  job_id: doc.jobId,
+  name: doc.name,
+  file_url: doc.fileUrl,
+  file_type: doc.fileType,
+  category: doc.category,
+  uploaded_by: doc.uploadedBy
 });
 
 const mapDbToMovement = (db: any): Movement => ({
@@ -331,7 +402,7 @@ export const usersApi = {
     return data.map(mapDbProfileToUser);
   },
 
-  updateRole: async (id: string, role: 'admin' | 'user') => {
+  updateRole: async (id: string, role: 'admin' | 'user' | 'operativo') => {
     const { data, error } = await supabase
       .from('profiles')
       .update({ role })
@@ -424,6 +495,56 @@ export const jobsApi = {
   }
 };
 
+// --- Job Logs API ---
+export const jobLogsApi = {
+  getByJobId: async (jobId: string) => {
+    const { data, error } = await supabase
+      .from('job_logs')
+      .select('*, profiles:user_id(full_name)')
+      .eq('job_id', jobId)
+      .order('date', { ascending: false });
+    if (error) throw error;
+    return data.map(mapDbToJobLog);
+  },
+  create: async (log: Partial<JobLog>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Utente non autenticato");
+
+    const { data, error } = await supabase
+      .from('job_logs')
+      .insert(mapJobLogToDb({ ...log, userId: user.id }))
+      .select('*, profiles:user_id(full_name)')
+      .single();
+    if (error) throw error;
+    return mapDbToJobLog(data);
+  }
+};
+
+// --- Job Documents API ---
+export const jobDocumentsApi = {
+  getByJobId: async (jobId: string) => {
+    const { data, error } = await supabase
+      .from('job_documents')
+      .select('*, profiles:uploaded_by(full_name)')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(mapDbToJobDocument);
+  },
+  create: async (doc: Partial<JobDocument>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Utente non autenticato");
+
+    const { data, error } = await supabase
+      .from('job_documents')
+      .insert(mapJobDocumentToDb({ ...doc, uploadedBy: user.id }))
+      .select('*, profiles:uploaded_by(full_name)')
+      .single();
+    if (error) throw error;
+    return mapDbToJobDocument(data);
+  }
+};
+
 // --- Movements API ---
 export const movementsApi = {
   getByItemId: async (itemId: string) => {
@@ -448,18 +569,19 @@ export const movementsApi = {
       .select(`
         *,
         profiles:user_id(full_name),
-        inventory:item_id(code, name, unit)
+        inventory:item_id(code, name, unit, price)
       `)
       .eq('job_id', jobId)
       .order('created_at', { ascending: false });
-      
+
     if (error) throw error;
-    
+
     return data.map((db: any) => ({
       ...mapDbToMovement(db),
       itemCode: db.inventory?.code,
       itemName: db.inventory?.name,
-      itemUnit: db.inventory?.unit
+      itemUnit: db.inventory?.unit,
+      itemPrice: db.inventory?.price || 0
     }));
   },
   

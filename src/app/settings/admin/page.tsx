@@ -32,7 +32,7 @@ export default function SettingsAdminPage() {
     
     const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
-    const [newRole, setNewRole] = useState<'admin' | 'user'>('user');
+    const [newRole, setNewRole] = useState<'admin' | 'user' | 'operativo'>('user');
     
     // Connection State
     const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
@@ -233,7 +233,7 @@ export default function SettingsAdminPage() {
                                                     size="sm"
                                                     onClick={() => {
                                                         setSelectedUser(user);
-                                                        setNewRole(user.role);
+                                                        setNewRole(user.role as 'admin' | 'user' | 'operativo');
                                                         setIsEditRoleOpen(true);
                                                     }}
                                                 >

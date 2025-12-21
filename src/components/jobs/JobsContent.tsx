@@ -88,6 +88,7 @@ export default function JobsContent() {
             className="pl-9 bg-slate-100 border-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Cerca commessa"
           />
         </div>
       </div>
@@ -106,7 +107,8 @@ export default function JobsContent() {
             </div>
           ) : (
             filteredJobs.map((job) => (
-              <Card key={job.id} className="hover:shadow-md transition-shadow flex flex-col">
+              <Link key={job.id} href={`/jobs/${job.id}`} className="block h-full">
+              <Card className="hover:shadow-md transition-shadow flex flex-col h-full cursor-pointer">
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                       <div>
@@ -154,6 +156,7 @@ export default function JobsContent() {
                   </div>
                 </CardContent>
               </Card>
+              </Link>
             ))
           )}
         </div>

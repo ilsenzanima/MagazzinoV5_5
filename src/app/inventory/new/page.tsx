@@ -26,7 +26,7 @@ import { useAuth } from "@/components/auth-provider";
 
 export default function NewInventoryItemPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   
   // Generate a random mock code
   const generateCode = () => {
