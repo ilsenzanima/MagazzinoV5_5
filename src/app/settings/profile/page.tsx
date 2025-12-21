@@ -52,10 +52,12 @@ export default function SettingsProfilePage() {
       if (profile) {
         setFullName(profile.full_name || "");
         setRole(profile.role || "user");
-        setAvatarUrl(profile.avatar_url);
+        // Always set avatar based on role
+        setAvatarUrl(`/avatars/${profile.role || 'user'}.png`);
       } else {
         // Fallback if no profile exists yet (shouldn't happen with our trigger)
         setRole("user");
+        setAvatarUrl('/avatars/user.png');
       }
     } catch (error) {
       console.error("Unexpected error:", error);
@@ -64,17 +66,7 @@ export default function SettingsProfilePage() {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      // TODO: Implement actual upload to Supabase Storage here
-    }
-  };
+  // Removed handleImageUpload as it's no longer allowed
 
   const handleSave = async () => {
     if (!user) return;
@@ -121,32 +113,21 @@ export default function SettingsProfilePage() {
         <CardHeader>
             <CardTitle>Informazioni Utente</CardTitle>
             <CardDescription>
-                Aggiorna la tua foto profilo e i dettagli personali.
+                Visualizza la tua foto profilo (basata sul ruolo) e aggiorna i dettagli personali.
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
             <div className="flex items-center gap-6">
                 <Avatar className="h-24 w-24">
-                    <AvatarImage src={previewImage || avatarUrl || ""} />
+                    <AvatarImage src={avatarUrl || ""} />
                     <AvatarFallback className="text-lg bg-primary/10 text-primary">
                       {email.charAt(0).toUpperCase()}
                     </AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">
-                    <Label htmlFor="avatar-upload" className="cursor-pointer">
-                        <div className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
-                            Carica Nuova Foto
-                        </div>
-                        <Input 
-                            id="avatar-upload" 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={handleImageUpload}
-                        />
-                    </Label>
+                    <div className="text-sm font-medium">Immagine Profilo</div>
                     <p className="text-xs text-muted-foreground">
-                        JPG, GIF o PNG. Max 1MB.
+                        L'immagine del profilo è assegnata automaticamente in base al tuo ruolo ({role}).
                     </p>
                 </div>
             </div>

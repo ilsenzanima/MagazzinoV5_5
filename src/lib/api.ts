@@ -78,7 +78,8 @@ export const mapDbProfileToUser = (profile: any): User => ({
   name: profile.full_name || profile.email?.split('@')[0] || 'Utente',
   email: profile.email || '',
   role: profile.role || 'user',
-  avatar: profile.avatar_url,
+  // Use role-based avatar instead of user uploaded one
+  avatar: `/avatars/${profile.role || 'user'}.png`, 
   status: 'active', // Default value as it's not in profiles table
   lastLogin: profile.updated_at // Using updated_at as proxy for now
 });
