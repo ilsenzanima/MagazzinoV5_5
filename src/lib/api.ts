@@ -214,7 +214,7 @@ export const purchasesApi = {
   getAll: async () => {
     const { data, error } = await supabase
       .from('purchases')
-      .select('*, suppliers(name), profiles(full_name)')
+      .select('*, suppliers(name), profiles(full_name), purchase_items(price)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data.map(mapDbToPurchase);
@@ -269,6 +269,20 @@ export const purchasesApi = {
     const { data, error } = await supabase.from('purchase_items').insert(dbItem).select().single();
     if (error) throw error;
     return data;
+  },
+  updateItem: async (id: string, item: Partial<PurchaseItem>) => {
+    const dbItem: any = {};
+    if (item.quantity !== undefined) dbItem.quantity = item.quantity;
+    if (item.price !== undefined) dbItem.price = item.price;
+    if (item.jobId !== undefined) dbItem.job_id = item.jobId;
+    
+    const { data, error } = await supabase.from('purchase_items').update(dbItem).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
+  deleteItem: async (id: string) => {
+    const { error } = await supabase.from('purchase_items').delete().eq('id', id);
+    if (error) throw error;
   }
 };
 

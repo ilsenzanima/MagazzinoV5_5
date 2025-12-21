@@ -285,7 +285,7 @@ export default function NewPurchasePage() {
                                     step="0.01"
                                     value={currentLine.price}
                                     onChange={(e) => setCurrentLine({...currentLine, price: e.target.value})}
-                                    placeholder="€ 0.00"
+                                    placeholder="0.00"
                                 />
                             </div>
                             <div className="md:col-span-4 flex items-center gap-2 pb-2">

@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, Calendar, User } from "lucide-react";
+import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { purchasesApi, Purchase } from "@/lib/api";
