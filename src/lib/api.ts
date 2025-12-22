@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { InventoryItem, User } from './mock-data';
 
 // Helper for timeouts
-const fetchWithTimeout = async <T>(promise: Promise<T>, ms: number = 5000): Promise<T> => {
+const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 5000): Promise<T> => {
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
             reject(new Error("Request timed out"));
