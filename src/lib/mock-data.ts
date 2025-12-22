@@ -13,6 +13,7 @@ export interface InventoryItem {
   location?: string;
   unit: string;
   coefficient: number;
+  supplierCode?: string;
 }
 
 export interface Movement {

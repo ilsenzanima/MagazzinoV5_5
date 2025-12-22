@@ -74,7 +74,7 @@ export default function InventoryDetailPage() {
       setLoading(true);
       const [itemData, movementsData] = await Promise.all([
         inventoryApi.getById(id),
-        movementsApi.getByItemId(id)
+        inventoryApi.getHistory(id)
       ]);
       setItem(itemData);
       setMovements(movementsData);
@@ -322,6 +322,13 @@ export default function InventoryDetailPage() {
                   </div>
                 </div>
 
+                {item.supplierCode && (
+                  <div className="space-y-2">
+                    <Label htmlFor="supplierCode">Codice Fornitore</Label>
+                    <Input id="supplierCode" value={item.supplierCode} readOnly className="bg-slate-50" />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome Prodotto</Label>
                   <Input id="name" value={item.name} readOnly className="bg-slate-50" />
@@ -462,43 +469,67 @@ export default function InventoryDetailPage() {
                     <TableRow>
                       <TableHead>Data</TableHead>
                       <TableHead>Tipo</TableHead>
-                      <TableHead>Commessa / Rif.</TableHead>
+                      <TableHead>Riferimento</TableHead>
+                      <TableHead>Pezzi</TableHead>
                       <TableHead className="text-right">Quantità</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {movements.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-slate-400 py-6">
+                        <TableCell colSpan={5} className="text-center text-slate-400 py-6">
                           Nessun movimento registrato
                         </TableCell>
                       </TableRow>
                     ) : (
-                      movements.map((move) => (
-                        <TableRow key={move.id}>
-                          <TableCell className="font-mono text-xs">
-                            {new Date(move.date).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={move.type === 'load' ? 'default' : 'secondary'} className={move.type === 'load' ? 'bg-green-600' : ''}>
-                              {move.type === 'load' ? 'Carico' : 'Scarico'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <div className="flex flex-col">
-                                {move.jobCode && (
-                                    <span className="font-bold text-slate-700 flex items-center gap-1">
-                                        <FileText className="h-3 w-3" /> {move.jobCode}
+                      movements.map((move) => {
+                        const isPositive = move.quantity > 0;
+                        let typeLabel = move.type;
+                        let typeColor = "bg-slate-500";
+                        
+                        switch(move.type) {
+                            case 'purchase': typeLabel = "Acquisto"; typeColor = "bg-blue-600"; break;
+                            case 'entry': typeLabel = "Entrata"; typeColor = "bg-green-600"; break;
+                            case 'load': typeLabel = "Carico"; typeColor = "bg-green-600"; break;
+                            case 'exit': typeLabel = "Uscita"; typeColor = "bg-red-600"; break;
+                            case 'unload': typeLabel = "Scarico"; typeColor = "bg-red-600"; break;
+                            case 'sale': typeLabel = "Vendita"; typeColor = "bg-orange-600"; break;
+                        }
+
+                        return (
+                            <TableRow key={move.id}>
+                              <TableCell className="font-mono text-xs">
+                                {new Date(move.date).toLocaleDateString()}
+                                <div className="text-[10px] text-slate-400">{new Date(move.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={`${typeColor} hover:${typeColor}`}>
+                                    {typeLabel}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                   <span className="font-medium">{move.reference || "-"}</span>
+                                   {move.userName && <span className="text-[10px] text-slate-400">Utente: {move.userName}</span>}
+                                   {move.notes && <span className="text-xs text-slate-500 truncate max-w-[200px]">{move.notes}</span>}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {move.pieces ? (
+                                    <span className="text-xs font-mono">
+                                        {move.pieces} pz 
+                                        {move.coefficient && move.coefficient !== 1 && (
+                                            <span className="text-slate-400"> (x{move.coefficient})</span>
+                                        )}
                                     </span>
-                                )}
-                                <span className="text-slate-500">{move.reference || '-'}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-bold">
-                            {move.type === 'load' ? '+' : '-'}{move.quantity}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                                ) : "-"}
+                              </TableCell>
+                              <TableCell className={`text-right font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                {isPositive ? '+' : ''}{move.quantity} {item.unit}
+                              </TableCell>
+                            </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

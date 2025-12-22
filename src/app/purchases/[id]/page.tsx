@@ -43,6 +43,8 @@ export default function PurchaseDetailPage() {
   const [newItem, setNewItem] = useState({
     itemId: "",
     quantity: "",
+    pieces: "",
+    coefficient: 1,
     price: "",
     isJob: false,
     jobId: ""
@@ -50,7 +52,7 @@ export default function PurchaseDetailPage() {
 
   // Edit Item State
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{ price: string, quantity: string }>({ price: "", quantity: "" });
+  const [editValues, setEditValues] = useState<{ price: string, quantity: string, pieces: string }>({ price: "", quantity: "", pieces: "" });
 
   useEffect(() => {
     if (id) {
@@ -94,11 +96,14 @@ export default function PurchaseDetailPage() {
     try {
       setAddingItem(true);
       const priceVal = newItem.price ? parseFloat(newItem.price) : 0;
+      const piecesVal = newItem.pieces ? parseFloat(newItem.pieces) : undefined;
       
       await purchasesApi.addItem({
         purchaseId: id,
         itemId: newItem.itemId,
         quantity: parseFloat(newItem.quantity),
+        pieces: piecesVal,
+        coefficient: newItem.coefficient,
         price: priceVal,
         jobId: newItem.isJob ? newItem.jobId : undefined
       });
@@ -111,6 +116,8 @@ export default function PurchaseDetailPage() {
       setNewItem({
         itemId: "",
         quantity: "",
+        pieces: "",
+        coefficient: 1,
         price: "",
         isJob: false,
         jobId: ""
@@ -139,19 +146,27 @@ export default function PurchaseDetailPage() {
     setEditingItemId(item.id);
     setEditValues({
       price: item.price.toString(),
-      quantity: item.quantity.toString()
+      quantity: item.quantity.toString(),
+      pieces: item.pieces?.toString() || ""
     });
   };
 
-  const saveEdit = async (itemId: string) => {
+  const saveEdit = async (itemId: string, itemCoefficient: number = 1) => {
     try {
         const newPrice = parseFloat(editValues.price);
-        const newQty = parseFloat(editValues.quantity);
+        let newQty = parseFloat(editValues.quantity);
+        const newPieces = editValues.pieces ? parseFloat(editValues.pieces) : undefined;
 
         if (isNaN(newPrice) || newPrice < 0) {
             alert("Prezzo non valido");
             return;
         }
+        
+        // Recalculate quantity if pieces changed and coeff > 1
+        if (newPieces && itemCoefficient !== 1) {
+            newQty = parseFloat((newPieces * itemCoefficient).toFixed(2));
+        }
+
         if (isNaN(newQty) || newQty <= 0) {
             alert("Quantità non valida");
             return;
@@ -159,11 +174,12 @@ export default function PurchaseDetailPage() {
 
         await purchasesApi.updateItem(itemId, {
             price: newPrice,
-            quantity: newQty
+            quantity: newQty,
+            pieces: newPieces
         });
 
         // Update local state
-        setItems(items.map(i => i.id === itemId ? { ...i, price: newPrice, quantity: newQty } : i));
+        setItems(items.map(i => i.id === itemId ? { ...i, price: newPrice, quantity: newQty, pieces: newPieces } : i));
         setEditingItemId(null);
     } catch (error) {
         console.error("Failed to update item", error);
@@ -191,7 +207,7 @@ export default function PurchaseDetailPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto pb-10">
+      <div className="max-w-6xl mx-auto pb-10">
         <div className="mb-6">
           <Link href="/purchases" className="flex items-center text-slate-500 hover:text-slate-900 mb-2">
             <ArrowLeft className="h-4 w-4 mr-1" />
@@ -249,7 +265,9 @@ export default function PurchaseDetailPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Materiale</TableHead>
-                                <TableHead className="text-right">Q.tà</TableHead>
+                                <TableHead className="text-right">Pezzi</TableHead>
+                                <TableHead className="text-right">Coeff.</TableHead>
+                                <TableHead className="text-right">Q.tà Tot.</TableHead>
                                 <TableHead className="text-right">Prezzo Unit.</TableHead>
                                 <TableHead className="text-right">Totale Riga</TableHead>
                                 <TableHead>Destinazione</TableHead>
@@ -268,10 +286,31 @@ export default function PurchaseDetailPage() {
                                     {editingItemId === item.id ? (
                                         <>
                                             <TableCell className="text-right">
+                                                {item.coefficient && item.coefficient !== 1 ? (
+                                                    <Input 
+                                                        type="number" 
+                                                        className="w-20 ml-auto text-right h-8" 
+                                                        value={editValues.pieces}
+                                                        onChange={(e) => {
+                                                            const p = e.target.value;
+                                                            const c = item.coefficient || 1;
+                                                            const q = p ? (parseFloat(p) * c).toFixed(2) : "";
+                                                            setEditValues({...editValues, pieces: p, quantity: q});
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right text-slate-500">
+                                                {item.coefficient !== 1 ? item.coefficient : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-right">
                                                 <Input 
                                                     type="number" 
                                                     className="w-20 ml-auto text-right h-8" 
                                                     value={editValues.quantity}
+                                                    readOnly={item.coefficient !== 1} // Read only if calculated
                                                     onChange={(e) => setEditValues({...editValues, quantity: e.target.value})}
                                                 />
                                             </TableCell>
@@ -287,6 +326,12 @@ export default function PurchaseDetailPage() {
                                         </>
                                     ) : (
                                         <>
+                                            <TableCell className="text-right">
+                                                {item.pieces || (item.coefficient === 1 ? '-' : '')}
+                                            </TableCell>
+                                            <TableCell className="text-right text-slate-500">
+                                                {item.coefficient !== 1 ? item.coefficient : '-'}
+                                            </TableCell>
                                             <TableCell className="text-right">{item.quantity}</TableCell>
                                             <TableCell className="text-right">
                                                 {item.price === 0 ? (
@@ -302,7 +347,7 @@ export default function PurchaseDetailPage() {
                                     )}
 
                                     <TableCell className="text-right font-medium">
-                                        € {(item.quantity * item.price).toFixed(5)}
+                                        € {(item.quantity * item.price).toFixed(2)}
                                     </TableCell>
                                     
                                     <TableCell>
@@ -320,7 +365,7 @@ export default function PurchaseDetailPage() {
                                     <TableCell className="text-right">
                                         {editingItemId === item.id ? (
                                             <div className="flex justify-end gap-1">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveEdit(item.id)}>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveEdit(item.id, item.coefficient)}>
                                                     <Save className="h-4 w-4" />
                                                 </Button>
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500" onClick={cancelEdit}>
@@ -350,7 +395,7 @@ export default function PurchaseDetailPage() {
                                 </TableRow>
                             ))}
                             <TableRow className="bg-slate-50 font-bold text-lg">
-                                <TableCell colSpan={3} className="text-right">TOTALE BOLLA</TableCell>
+                                <TableCell colSpan={5} className="text-right">TOTALE BOLLA</TableCell>
                                 <TableCell className="text-right">
                                     € {items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}
                                 </TableCell>
@@ -374,7 +419,11 @@ export default function PurchaseDetailPage() {
                                 <Label>Materiale</Label>
                                 <Select 
                                     value={newItem.itemId} 
-                                    onValueChange={(v) => setNewItem({...newItem, itemId: v})}
+                                    onValueChange={(v) => {
+                                        const selectedItem = inventory.find(i => i.id === v);
+                                        const coeff = selectedItem?.coefficient || 1;
+                                        setNewItem({...newItem, itemId: v, coefficient: coeff, pieces: "", quantity: ""});
+                                    }}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Cerca materiale..." />
@@ -388,13 +437,34 @@ export default function PurchaseDetailPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                            
+                            {newItem.coefficient !== 1 && (
+                                <div className="md:col-span-2 space-y-2">
+                                    <Label>Pezzi</Label>
+                                    <Input 
+                                        type="number" 
+                                        min="0"
+                                        step="1"
+                                        value={newItem.pieces}
+                                        onChange={(e) => {
+                                            const p = e.target.value;
+                                            const q = p ? (parseFloat(p) * newItem.coefficient).toFixed(2) : "";
+                                            setNewItem({...newItem, pieces: p, quantity: q});
+                                        }}
+                                        placeholder="0"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Coeff: {newItem.coefficient}</p>
+                                </div>
+                            )}
+
                             <div className="md:col-span-2 space-y-2">
-                                <Label>Quantità</Label>
+                                <Label>Quantità {newItem.coefficient !== 1 ? '(Calc.)' : ''}</Label>
                                 <Input 
                                     type="number" 
                                     min="0"
                                     step="0.01"
                                     value={newItem.quantity}
+                                    readOnly={newItem.coefficient !== 1}
                                     onChange={(e) => setNewItem({...newItem, quantity: e.target.value})}
                                     placeholder="0.00"
                                 />

@@ -104,7 +104,8 @@ export default function InventoryPage() {
         item.name.toLowerCase().includes(term) ||
         item.code.toLowerCase().includes(term) ||
         item.brand.toLowerCase().includes(term) ||
-        item.type.toLowerCase().includes(term);
+        item.type.toLowerCase().includes(term) ||
+        (item.supplierCode?.toLowerCase().includes(term) ?? false);
 
       // 2. Filtro Tab
       let matchesTab = true;

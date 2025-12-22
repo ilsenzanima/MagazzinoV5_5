@@ -74,6 +74,20 @@ export interface Movement {
   itemPrice?: number; // For display
 }
 
+export interface StockMovement {
+  id: string;
+  date: string;
+  type: 'purchase' | 'entry' | 'exit' | 'sale';
+  quantity: number;
+  reference: string;
+  itemId: string;
+  userId?: string;
+  userName?: string;
+  pieces?: number;
+  coefficient?: number;
+  notes?: string;
+}
+
 export interface JobLog {
   id: string;
   jobId: string;
@@ -134,6 +148,8 @@ export interface PurchaseItem {
   itemName?: string; // Display
   itemCode?: string; // Display
   quantity: number;
+  pieces?: number;
+  coefficient?: number;
   price: number;
   jobId?: string;
   jobCode?: string; // Display
@@ -255,6 +271,8 @@ export const purchasesApi = {
       itemName: item.inventory?.name,
       itemCode: item.inventory?.code,
       quantity: item.quantity,
+      pieces: item.pieces,
+      coefficient: item.coefficient,
       price: item.price,
       jobId: item.job_id,
       jobCode: item.jobs?.code,
@@ -266,6 +284,8 @@ export const purchasesApi = {
       purchase_id: item.purchaseId,
       item_id: item.itemId,
       quantity: item.quantity,
+      pieces: item.pieces,
+      coefficient: item.coefficient,
       price: item.price,
       job_id: item.jobId
     };
@@ -276,6 +296,7 @@ export const purchasesApi = {
   updateItem: async (id: string, item: Partial<PurchaseItem>) => {
     const dbItem: any = {};
     if (item.quantity !== undefined) dbItem.quantity = item.quantity;
+    if (item.pieces !== undefined) dbItem.pieces = item.pieces;
     if (item.price !== undefined) dbItem.price = item.price;
     if (item.jobId !== undefined) dbItem.job_id = item.jobId;
     
@@ -303,7 +324,8 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
   price: dbItem.price,
   location: dbItem.location,
   unit: dbItem.unit,
-  coefficient: dbItem.coefficient
+  coefficient: dbItem.coefficient,
+  supplierCode: dbItem.supplier_code
 });
 
 export const mapDbProfileToUser = (profile: any): User => {
@@ -533,7 +555,10 @@ export interface DeliveryNoteItem {
   inventoryCode?: string;
   inventoryUnit?: string;
   quantity: number;
+  pieces?: number;
+  coefficient?: number;
   price?: number;
+  purchaseItemId?: string; // Link to origin purchase
 }
 
 export interface DeliveryNote {
@@ -623,7 +648,8 @@ export const deliveryNotesApi = {
         console.time('insert_items');
         const itemsToInsert = items.map(item => ({
           ...item,
-          delivery_note_id: noteData.id
+          delivery_note_id: noteData.id,
+          purchase_item_id: item.purchaseItemId // Ensure this is mapped
         }));
 
         const { error: itemsError } = await supabase
@@ -736,6 +762,64 @@ export const inventoryApi = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  getHistory: async (itemId: string) => {
+    const { data, error } = await supabase
+      .from('stock_movements_view')
+      .select('*, profiles:user_id(full_name)')
+      .eq('item_id', itemId)
+      .order('date', { ascending: false });
+      
+    if (error) throw error;
+    
+    return data.map((m: any) => ({
+      id: m.id,
+      date: m.date,
+      type: m.type,
+      quantity: m.quantity,
+      reference: m.reference,
+      itemId: m.item_id,
+      userId: m.user_id,
+      userName: m.profiles?.full_name,
+      pieces: m.pieces,
+      coefficient: m.coefficient,
+      notes: m.notes
+    }));
+  },
+
+  // Get available purchase batches for an item (for FIFO/Traceability)
+  getAvailableBatches: async (itemId: string) => {
+    const { data, error } = await supabase
+      .from('purchase_batch_availability')
+      .select('*')
+      .eq('item_id', itemId)
+      .order('purchase_date', { ascending: true }); // FIFO by default
+      
+    if (error) throw error;
+    return data.map((b: any) => ({
+        id: b.purchase_item_id,
+        purchaseRef: b.purchase_ref,
+        date: b.purchase_date,
+        originalQty: b.original_quantity,
+        remainingQty: b.remaining_quantity
+    }));
+  },
+
+  // Get items currently at a specific job site (for Returns)
+  getJobInventory: async (jobId: string) => {
+    const { data, error } = await supabase
+        .from('job_inventory')
+        .select('*, inventory(*)')
+        .eq('job_id', jobId)
+        .gt('quantity', 0); // Only show items actually there
+
+    if (error) throw error;
+    return data.map((i: any) => ({
+        itemId: i.item_id,
+        quantity: i.quantity,
+        item: mapDbItemToInventoryItem(i.inventory)
+    }));
   },
 
   // Seed database with mock data

@@ -215,6 +215,16 @@ export default function NewInventoryItemPage() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="supplierCode">Codice Fornitore / Originale</Label>
+                  <Input 
+                    id="supplierCode" 
+                    placeholder="Es. Codice catalogo fornitore"
+                    value={formData.supplierCode}
+                    onChange={(e) => setFormData({...formData, supplierCode: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="name">Nome Prodotto</Label>
                   <Input 
                     id="name" 

@@ -30,6 +30,10 @@ interface MovementLine {
   itemCode: string;
   itemUnit: string;
   quantity: number;
+  pieces?: number;
+  coefficient?: number;
+  purchaseItemId?: string; // Add this
+  purchaseRef?: string; // For display
 }
 
 export default function NewMovementPage() {
@@ -64,9 +68,15 @@ export default function NewMovementPage() {
   // Line State
   const [currentLine, setCurrentLine] = useState({
     itemId: "",
-    quantity: ""
+    quantity: "",
+    pieces: "",
+    coefficient: 1,
+    unit: "PZ",
+    purchaseItemId: ""
   });
   const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
+  const [availableBatches, setAvailableBatches] = useState<any[]>([]); // For Exit
+  const [jobInventory, setJobInventory] = useState<any[]>([]); // For Entry
   const [lines, setLines] = useState<MovementLine[]>([]);
 
   // Computed Suffix based on selected date
@@ -140,14 +150,46 @@ export default function NewMovementPage() {
     }
   };
 
+  useEffect(() => {
+    // If Job Changes and we are in ENTRY mode, fetch Job Inventory
+    if (activeTab === 'entry' && selectedJob) {
+        inventoryApi.getJobInventory(selectedJob.id).then(data => {
+            setJobInventory(data);
+        }).catch(err => console.error("Failed to load job inventory", err));
+    } else {
+        setJobInventory([]);
+    }
+  }, [activeTab, selectedJob]);
+
   const handleJobSelect = (job: Job) => {
     setSelectedJob(job);
     setIsJobSelectorOpen(false);
   };
 
-  const handleItemSelect = (item: InventoryItem) => {
+  const handleItemSelect = async (item: InventoryItem) => {
     setSelectedItemForLine(item);
-    setCurrentLine(prev => ({ ...prev, itemId: item.id }));
+    
+    // Reset line
+    setCurrentLine({ 
+        itemId: item.id, 
+        quantity: "", 
+        pieces: "", 
+        coefficient: item.coefficient || 1, 
+        unit: item.unit,
+        purchaseItemId: ""
+    });
+
+    // If EXIT/SALE, load available batches
+    if (activeTab === 'exit' || activeTab === 'sale') {
+        try {
+            const batches = await inventoryApi.getAvailableBatches(item.id);
+            setAvailableBatches(batches);
+        } catch (err) {
+            console.error("Failed to load batches", err);
+            setAvailableBatches([]);
+        }
+    }
+    
     setIsItemSelectorOpen(false);
   };
 
@@ -157,18 +199,42 @@ export default function NewMovementPage() {
       return;
     }
 
+    // Validation: Check Purchase Selection for Exits
+    if ((activeTab === 'exit' || activeTab === 'sale') && !currentLine.purchaseItemId) {
+        alert("Devi selezionare un lotto di acquisto da cui prelevare la merce.");
+        return;
+    }
+
+    // Validation: Check Quantity against Batch
+    if ((activeTab === 'exit' || activeTab === 'sale') && currentLine.purchaseItemId) {
+        const batch = availableBatches.find(b => b.id === currentLine.purchaseItemId);
+        if (batch && Number(currentLine.quantity) > batch.remainingQty) {
+            alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty}`);
+            return;
+        }
+    }
+
+    // Validation: Check Quantity against Job Inventory (for Entry)
+    if (activeTab === 'entry' && selectedJob) {
+         // Logic to check if we are returning more than available at job
+         // (Handled by backend trigger, but good to have UI warning if we had full data)
+    }
+
     const newLine: MovementLine = {
       tempId: Math.random().toString(36).substr(2, 9),
       itemId: selectedItemForLine.id,
       itemName: selectedItemForLine.name,
       itemCode: selectedItemForLine.code,
       itemUnit: selectedItemForLine.unit,
-      quantity: Number(currentLine.quantity)
+      quantity: Number(currentLine.quantity),
+      purchaseItemId: currentLine.purchaseItemId,
+      purchaseRef: availableBatches.find(b => b.id === currentLine.purchaseItemId)?.purchaseRef
     };
 
     setLines([...lines, newLine]);
-    setCurrentLine({ itemId: "", quantity: "" });
+    setCurrentLine({ itemId: "", quantity: "", pieces: "", coefficient: 1, unit: "PZ", purchaseItemId: "" });
     setSelectedItemForLine(null);
+    setAvailableBatches([]);
   };
 
   const handleRemoveLine = (tempId: string) => {
@@ -391,13 +457,59 @@ export default function NewMovementPage() {
                                 </div>
                             </div>
                             <div className="w-full sm:w-32 space-y-2">
-                                <Label htmlFor="qty-input">Quantità</Label>
+                                {(activeTab === 'exit' || activeTab === 'sale') && availableBatches.length > 0 && (
+                                    <div className="mb-2 w-full">
+                                        <Label htmlFor="batch-select" className="text-red-600 font-bold">Lotto Acquisto *</Label>
+                                        <Select 
+                                            value={currentLine.purchaseItemId} 
+                                            onValueChange={(v) => setCurrentLine({...currentLine, purchaseItemId: v})}
+                                        >
+                                            <SelectTrigger id="batch-select" className="w-full sm:w-[200px]">
+                                                <SelectValue placeholder="Seleziona..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {availableBatches.map(batch => (
+                                                    <SelectItem key={batch.id} value={batch.id}>
+                                                        {batch.purchaseRef} ({new Date(batch.date).toLocaleDateString()}) - Disp: {batch.remainingQty}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                {currentLine.coefficient !== 1 && (
+                                    <div className="mb-2">
+                                        <Label htmlFor="pieces-input">Pezzi</Label>
+                                        <Input 
+                                            id="pieces-input"
+                                            type="number" 
+                                            min="0"
+                                            step="1"
+                                            className="bg-white"
+                                            value={currentLine.pieces}
+                                            onChange={(e) => {
+                                                const p = e.target.value;
+                                                const q = p ? (parseFloat(p) * currentLine.coefficient).toFixed(2) : "";
+                                                setCurrentLine({
+                                                    ...currentLine, 
+                                                    pieces: p,
+                                                    quantity: q
+                                                });
+                                            }}
+                                            placeholder="Pezzi"
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">Coeff: {currentLine.coefficient}</p>
+                                    </div>
+                                )}
+                                <Label htmlFor="qty-input">Quantità ({currentLine.unit})</Label>
                                 <Input 
                                     id="qty-input"
                                     type="number" 
                                     min="0"
                                     step="0.01"
-                                    className="bg-white"
+                                    className={`bg-white ${currentLine.coefficient !== 1 ? 'bg-slate-100' : ''}`}
+                                    readOnly={currentLine.coefficient !== 1}
                                     value={currentLine.quantity}
                                     onChange={(e) => setCurrentLine({...currentLine, quantity: e.target.value})}
                                 />
@@ -429,7 +541,14 @@ export default function NewMovementPage() {
                                     ) : (
                                         lines.map((line) => (
                                             <TableRow key={line.tempId}>
-                                                <TableCell className="font-mono text-xs">{line.itemCode}</TableCell>
+                                                <TableCell className="font-mono text-xs">
+                                                    {line.itemCode}
+                                                    {line.purchaseRef && (
+                                                        <div className="text-[10px] text-blue-600 mt-1">
+                                                            Lotto: {line.purchaseRef}
+                                                        </div>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="font-medium">{line.itemName}</TableCell>
                                                 <TableCell className="text-right font-bold">
                                                     {line.quantity} <span className="text-xs font-normal text-slate-500">{line.itemUnit}</span>
@@ -538,7 +657,7 @@ export default function NewMovementPage() {
         <ItemSelectorDialog
             open={isItemSelectorOpen}
             onOpenChange={setIsItemSelectorOpen}
-            items={inventory}
+            items={activeTab === 'entry' && selectedJob ? jobInventory.map(j => j.item) : inventory}
             onSelect={handleItemSelect}
         />
       </div>

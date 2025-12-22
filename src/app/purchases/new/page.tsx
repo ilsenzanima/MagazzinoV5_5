@@ -28,6 +28,9 @@ interface PurchaseLine {
   itemId: string;
   itemName: string;
   quantity: number;
+  pieces?: number;
+  coefficient?: number;
+  unit?: string;
   price: number;
   isJob: boolean;
   jobId?: string;
@@ -55,6 +58,9 @@ export default function NewPurchasePage() {
   const [currentLine, setCurrentLine] = useState({
     itemId: "",
     quantity: "",
+    pieces: "",
+    coefficient: 1,
+    unit: "PZ",
     price: "",
     isJob: false,
     jobId: ""
@@ -104,6 +110,9 @@ export default function NewPurchasePage() {
       itemId: currentLine.itemId,
       itemName: selectedItem?.name || "Articolo sconosciuto",
       quantity: parseFloat(currentLine.quantity),
+      pieces: currentLine.pieces ? parseFloat(currentLine.pieces) : undefined,
+      coefficient: currentLine.coefficient,
+      unit: currentLine.unit,
       price: parseFloat(currentLine.price),
       isJob: currentLine.isJob,
       jobId: currentLine.isJob ? currentLine.jobId : undefined,
@@ -116,6 +125,9 @@ export default function NewPurchasePage() {
     setCurrentLine({
       itemId: "",
       quantity: "",
+      pieces: "",
+      coefficient: 1,
+      unit: "PZ",
       price: "",
       isJob: false,
       jobId: ""
@@ -252,7 +264,19 @@ export default function NewPurchasePage() {
                                 <Label>Materiale</Label>
                                 <Select 
                                     value={currentLine.itemId} 
-                                    onValueChange={(v) => setCurrentLine({...currentLine, itemId: v})}
+                                    onValueChange={(v) => {
+                                        const item = inventory.find(i => i.id === v);
+                                        const coeff = item?.coefficient || 1;
+                                        // Reset pieces/quantity when item changes
+                                        setCurrentLine({
+                                            ...currentLine, 
+                                            itemId: v,
+                                            coefficient: coeff,
+                                            unit: item?.unit || 'PZ',
+                                            pieces: "",
+                                            quantity: "" 
+                                        });
+                                    }}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Cerca materiale..." />
@@ -266,13 +290,40 @@ export default function NewPurchasePage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                            
+                            {/* Logic for Pieces/Quantity */}
+                            {currentLine.coefficient !== 1 && (
+                                <div className="md:col-span-2 space-y-2">
+                                    <Label>Pezzi</Label>
+                                    <Input 
+                                        type="number" 
+                                        min="0"
+                                        step="1"
+                                        value={currentLine.pieces}
+                                        onChange={(e) => {
+                                            const p = e.target.value;
+                                            const q = p ? (parseFloat(p) * currentLine.coefficient).toFixed(2) : "";
+                                            setCurrentLine({
+                                                ...currentLine, 
+                                                pieces: p,
+                                                quantity: q
+                                            });
+                                        }}
+                                        placeholder="Pezzi"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Coeff: {currentLine.coefficient}</p>
+                                </div>
+                            )}
+
                             <div className="md:col-span-2 space-y-2">
-                                <Label>Quantità</Label>
+                                <Label>Quantità ({currentLine.unit})</Label>
                                 <Input 
                                     type="number" 
                                     min="0"
                                     step="0.01"
                                     value={currentLine.quantity}
+                                    readOnly={currentLine.coefficient !== 1} // Read only if calculated
+                                    className={currentLine.coefficient !== 1 ? "bg-slate-100" : ""}
                                     onChange={(e) => setCurrentLine({...currentLine, quantity: e.target.value})}
                                     placeholder="0.00"
                                 />
