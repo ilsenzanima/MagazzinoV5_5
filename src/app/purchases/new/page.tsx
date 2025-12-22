@@ -144,7 +144,7 @@ export default function NewPurchasePage() {
       itemId: currentLine.itemId,
       itemName: selectedItem?.name || "Articolo sconosciuto",
       itemBrand: selectedItem?.brand,
-      itemCategory: selectedItem?.category,
+      itemCategory: selectedItem?.type,
       itemDescription: selectedItem?.description,
       quantity: parseFloat(currentLine.quantity),
       pieces: currentLine.pieces ? parseFloat(currentLine.pieces) : undefined,
