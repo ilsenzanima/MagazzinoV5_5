@@ -14,6 +14,7 @@ export interface InventoryItem {
   unit: string;
   coefficient: number;
   supplierCode?: string;
+  realQuantity?: number | null;
 }
 
 export interface Movement {

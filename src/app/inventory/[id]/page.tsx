@@ -47,10 +47,12 @@ import { Badge } from "@/components/ui/badge";
 import QRCode from "react-qr-code";
 import Barcode from "react-barcode";
 import Link from "next/link";
+import { useAuth } from "@/components/auth-provider";
 
 export default function InventoryDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { userRole } = useAuth();
   const id = params?.id as string;
 
   const [item, setItem] = useState<InventoryItem | null>(null);
@@ -66,6 +68,7 @@ export default function InventoryDetailPage() {
   const [movementJob, setMovementJob] = useState("");
   const [activeJobs, setActiveJobs] = useState<Job[]>([]);
   const [submittingMovement, setSubmittingMovement] = useState(false);
+  const [realQtyInput, setRealQtyInput] = useState<string>("");
 
   // Load data
   const loadData = async () => {
@@ -77,6 +80,7 @@ export default function InventoryDetailPage() {
         inventoryApi.getHistory(id)
       ]);
       setItem(itemData);
+      setRealQtyInput(itemData.realQuantity?.toString() || "");
       setMovements(movementsData);
       
       // Load active jobs for dropdown
@@ -120,6 +124,21 @@ export default function InventoryDetailPage() {
         }
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle Update Real Quantity
+  const handleUpdateRealQty = async () => {
+    if (!item) return;
+    try {
+        const val = realQtyInput === "" ? null : parseFloat(realQtyInput);
+        await inventoryApi.update(item.id, { realQuantity: val });
+        // Refresh item locally
+        setItem({ ...item, realQuantity: val });
+        // alert("Quantità reale aggiornata"); // Optional feedback
+    } catch (error) {
+        console.error("Failed to update real quantity", error);
+        alert("Errore durante l'aggiornamento");
     }
   };
 
@@ -274,15 +293,60 @@ export default function InventoryDetailPage() {
                 </div>
 
                 {/* Quantity Read-Only */}
-                <div className="space-y-2">
-                  <Label>Quantità Attuale</Label>
-                  <Input 
-                    type="number" 
-                    value={item.quantity} 
-                    readOnly
-                    className="text-lg font-bold bg-slate-50 text-slate-600"
-                  />
-                  <p className="text-xs text-slate-400">Aggiornato dai movimenti</p>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Quantità Teorica (Sistema)</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="p-3 bg-slate-50 border rounded-md text-center">
+                            <div className="text-lg font-bold text-slate-900">{item.quantity}</div>
+                            <div className="text-xs text-slate-500 font-medium">{item.unit}</div>
+                        </div>
+                        {item.coefficient !== 1 && (
+                            <div className="p-3 bg-slate-50 border rounded-md text-center">
+                                <div className="text-lg font-bold text-slate-900">
+                                    {(item.quantity * item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })}
+                                </div>
+                                <div className="text-xs text-slate-500 font-medium">Moltiplicato (x{item.coefficient})</div>
+                            </div>
+                        )}
+                    </div>
+                  </div>
+
+                  {/* Audit Section - Visible only to admin/operativo */}
+                  {(userRole === 'admin' || userRole === 'operativo') && (
+                      <div className="pt-4 border-t space-y-3">
+                          <Label className="text-blue-600 font-semibold">Verifica Inventario (Reale)</Label>
+                          <div className="flex gap-2">
+                              <Input 
+                                type="number" 
+                                value={realQtyInput}
+                                onChange={(e) => setRealQtyInput(e.target.value)}
+                                placeholder="Q.tà fisica"
+                                className="bg-white"
+                              />
+                              <Button size="icon" variant="outline" onClick={handleUpdateRealQty} title="Salva quantità reale">
+                                  <Save className="h-4 w-4" />
+                              </Button>
+                          </div>
+                          
+                          {item.realQuantity !== null && item.realQuantity !== undefined && (
+                              <div className={`text-sm p-2 rounded-md flex justify-between items-center ${
+                                  (item.realQuantity - item.quantity) === 0 
+                                    ? "bg-green-50 text-green-700 border border-green-200" 
+                                    : "bg-red-50 text-red-700 border border-red-200"
+                              }`}>
+                                  <span className="font-medium">Differenza:</span>
+                                  <span className="font-bold">
+                                      {item.realQuantity - item.quantity > 0 ? "+" : ""}
+                                      {(item.realQuantity - item.quantity).toFixed(2).replace(/[.,]00$/, "")} {item.unit}
+                                  </span>
+                              </div>
+                          )}
+                          <p className="text-[10px] text-slate-400">
+                              Visibile solo a Admin e Operativi. Indica discrepanze tra sistema e realtà.
+                          </p>
+                      </div>
+                  )}
                 </div>
 
                 {/* QR Code & Barcode */}

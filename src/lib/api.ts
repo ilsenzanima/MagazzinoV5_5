@@ -19,6 +19,10 @@ const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 5000): 
             }
         );
     });
+  delete: async (id: string) => {
+    const { error } = await supabase.from('delivery_notes').delete().eq('id', id);
+    if (error) throw error;
+  }
 };
 
 export type { InventoryItem, User };
@@ -566,7 +570,9 @@ export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => ({
   price: item.price,
   location: item.location,
   unit: item.unit,
-  coefficient: item.coefficient
+  coefficient: item.coefficient,
+  supplier_code: item.supplierCode,
+  real_quantity: item.realQuantity
 });
 
 export interface DeliveryNoteItem {
@@ -581,6 +587,7 @@ export interface DeliveryNoteItem {
   coefficient?: number;
   price?: number;
   purchaseItemId?: string; // Link to origin purchase
+  isFictitious?: boolean; // If true, only affects job inventory, not main inventory
 }
 
 export interface DeliveryNote {
@@ -635,6 +642,9 @@ const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
   created_at: db.created_at,
   items: db.delivery_note_items?.map((i: any) => ({
     ...i,
+    inventoryId: i.inventory_id,
+    purchaseItemId: i.purchase_item_id,
+    isFictitious: i.is_fictitious,
     inventoryName: i.inventory?.name,
     inventoryCode: i.inventory?.code,
     inventoryUnit: i.inventory?.unit
@@ -714,7 +724,8 @@ export const deliveryNotesApi = {
           pieces: item.pieces,
           coefficient: item.coefficient,
           price: item.price,
-          purchase_item_id: item.purchaseItemId
+          purchase_item_id: item.purchaseItemId,
+          is_fictitious: item.isFictitious || false
         }));
 
         const { error: itemsError } = await supabase
@@ -753,7 +764,8 @@ export const deliveryNotesApi = {
             pieces: item.pieces,
             coefficient: item.coefficient,
             price: item.price,
-            purchase_item_id: item.purchaseItemId
+            purchase_item_id: item.purchaseItemId,
+            is_fictitious: item.isFictitious || false
         }));
         
         const { error: itemsError } = await supabase
