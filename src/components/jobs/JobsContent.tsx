@@ -36,6 +36,7 @@ export default function JobsContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -49,6 +50,7 @@ export default function JobsContent() {
   const loadJobs = async () => {
     try {
         setLoading(true);
+        setError(null);
         let data;
         if (filterClientId) {
             data = await jobsApi.getByClientId(filterClientId);
@@ -56,8 +58,9 @@ export default function JobsContent() {
             data = await jobsApi.getAll();
         }
         setJobs(data);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to load jobs:", error);
+        setError(error.message || "Errore sconosciuto durante il caricamento commesse");
     } finally {
         setLoading(false);
     }
