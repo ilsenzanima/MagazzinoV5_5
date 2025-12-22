@@ -21,23 +21,30 @@ export function ActiveJobsWidget() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('status');
+      try {
+        const supabase = createClient();
+        const { data, error } = await fetchWithTimeout(
+          supabase
+            .from('jobs')
+            .select('status')
+        );
 
-      if (!error && data) {
-        const newStats = data.reduce((acc, job) => {
-          acc[job.status as keyof Omit<JobStats, 'total'>] = (acc[job.status as keyof Omit<JobStats, 'total'>] || 0) + 1;
-          return acc;
-        }, { active: 0, completed: 0, suspended: 0 } as Omit<JobStats, 'total'>);
-        
-        setStats({
-          ...newStats,
-          total: data.length
-        });
+        if (!error && data) {
+          const newStats = data.reduce((acc, job) => {
+            acc[job.status as keyof Omit<JobStats, 'total'>] = (acc[job.status as keyof Omit<JobStats, 'total'>] || 0) + 1;
+            return acc;
+          }, { active: 0, completed: 0, suspended: 0 } as Omit<JobStats, 'total'>);
+          
+          setStats({
+            ...newStats,
+            total: data.length
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching job stats:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchStats();

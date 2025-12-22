@@ -33,11 +33,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserRole = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single();
+      const { data, error } = await fetchWithTimeout(
+        supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .single()
+      );
       
       if (data) {
         setUserRole(data.role as 'admin' | 'user' | 'operativo');

@@ -24,9 +24,11 @@ export default function Dashboard() {
       try {
         const supabase = createClient();
         
-        const { data: inventory, error } = await supabase
-          .from('inventory')
-          .select('quantity, price, min_stock');
+        const { data: inventory, error } = await fetchWithTimeout(
+          supabase
+            .from('inventory')
+            .select('quantity, price, min_stock')
+        );
 
         if (error) throw error;
 

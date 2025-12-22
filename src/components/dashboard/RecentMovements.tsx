@@ -28,23 +28,31 @@ export function RecentMovements() {
 
   useEffect(() => {
     const fetchMovements = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('movements')
-        .select(`
-          id,
-          type,
-          quantity,
-          created_at,
-          inventory (name, unit)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      try {
+        const supabase = createClient();
+        const { data, error } = await fetchWithTimeout(
+          supabase
+            .from('movements')
+            .select(`
+              id,
+              type,
+              quantity,
+              created_at,
+              inventory (name, unit),
+              profiles:user_id (full_name)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(5)
+        );
 
-      if (!error && data) {
-        setMovements(data as any);
+        if (!error && data) {
+          setMovements(data as any);
+        }
+      } catch (error) {
+        console.error("Error fetching recent movements:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchMovements();
