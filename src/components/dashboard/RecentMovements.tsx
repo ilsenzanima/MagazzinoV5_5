@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import { fetchWithTimeout } from "@/lib/api";
 import { ArrowDownRight, ArrowUpRight, Clock, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
