@@ -30,6 +30,7 @@ export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -40,10 +41,12 @@ export default function ClientsPage() {
   const loadClients = async () => {
     try {
         setLoading(true);
+        setError(null);
         const data = await clientsApi.getAll();
         setClients(data);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to load clients:", error);
+        setError(error.message || "Errore sconosciuto durante il caricamento");
     } finally {
         setLoading(false);
     }
