@@ -1,3 +1,5 @@
+DROP VIEW IF EXISTS public.stock_movements_view;
+
 CREATE OR REPLACE VIEW public.stock_movements_view AS
 SELECT
     pi.id,
