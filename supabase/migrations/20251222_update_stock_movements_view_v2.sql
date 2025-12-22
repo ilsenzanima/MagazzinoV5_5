@@ -1,6 +1,6 @@
 DROP VIEW IF EXISTS public.stock_movements_view;
 
-CREATE OR REPLACE VIEW public.stock_movements_view AS
+CREATE OR REPLACE VIEW public.stock_movements_view WITH (security_invoker = true) AS
 SELECT
     pi.id,
     pi.created_at as date,

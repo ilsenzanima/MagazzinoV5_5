@@ -2,7 +2,8 @@
 
 -- 1. Fix SECURITY DEFINER View (stock_movements_view)
 -- Ensure the view runs with the privileges of the user calling it, enforcing RLS.
-ALTER VIEW public.stock_movements_view SET (security_invoker = true);
+-- HANDLED IN DEFINITION FILE: 20251222_update_stock_movements_view_v2.sql
+-- ALTER VIEW public.stock_movements_view SET (security_invoker = true);
 
 -- 2. Fix SECURITY DEFINER View (purchase_batch_availability)
 ALTER VIEW public.purchase_batch_availability SET (security_invoker = true);
