@@ -645,7 +645,7 @@ export const deliveryNotesApi = {
   getAll: async () => {
     console.time('deliveryNotesApi.getAll');
     try {
-      const { data, error } = await fetchWithTimeout(
+      const { data, error } = await fetchWithTimeout<any>(
         supabase
           .from('delivery_notes')
           .select('*, jobs(code, description), delivery_note_items(quantity)')
