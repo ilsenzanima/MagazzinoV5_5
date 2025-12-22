@@ -17,31 +17,34 @@ export function JobStock({ movements }: JobStockProps) {
     code: string, 
     qty: number, 
     unit: string,
-    avgPrice: number 
+    avgPrice: number,
+    isFictitious: boolean
   }>()
 
   movements.forEach(m => {
     // Inventory Unload = Site Load (IN)
     // Inventory Load = Site Unload (OUT)
-    // However, currently we mostly have Unload (Warehouse -> Site)
+    // Handle both legacy types (load/unload) and new view types (entry/exit)
     
-    // Note: m.type is from Warehouse perspective
-    // 'unload' -> Warehouse decreases -> Site increases
-    // 'load' -> Warehouse increases -> Site decreases (Return)
+    // 'unload' or 'exit' -> Warehouse decreases -> Site increases
+    // 'load' or 'entry' -> Warehouse increases -> Site decreases (Return)
 
-    const isSiteIn = m.type === 'unload'
+    const isSiteIn = m.type === 'unload' || m.type === 'exit'
     const qtyChange = isSiteIn ? m.quantity : -m.quantity
     
-    const current = stockMap.get(m.itemCode || '')
+    const key = `${m.itemCode}-${!!m.isFictitious}`
+    const current = stockMap.get(key)
+
     if (current) {
       current.qty += qtyChange
     } else if (m.itemCode) {
-      stockMap.set(m.itemCode, {
+      stockMap.set(key, {
         name: m.itemName || 'Sconosciuto',
         code: m.itemCode,
         qty: qtyChange,
         unit: m.itemUnit || 'PZ',
-        avgPrice: m.itemPrice || 0
+        avgPrice: m.itemPrice || 0,
+        isFictitious: !!m.isFictitious
       })
     }
   })
@@ -83,9 +86,16 @@ export function JobStock({ movements }: JobStockProps) {
                     </TableRow>
                 ) : (
                     currentStock.map((item) => (
-                        <TableRow key={item.code}>
+                        <TableRow key={`${item.code}-${item.isFictitious}`}>
                         <TableCell className="font-mono text-xs">{item.code}</TableCell>
-                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {item.name}
+                          {item.isFictitious && (
+                            <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5 px-1.5">
+                              Fittizio
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-bold text-slate-700">
                             {item.qty} {item.unit}
                         </TableCell>
@@ -141,7 +151,14 @@ export function JobStock({ movements }: JobStockProps) {
                         </TableCell>
                         <TableCell>
                             <div className="flex flex-col">
-                            <span className="font-medium text-slate-900">{move.itemName || 'Articolo Cancellato'}</span>
+                            <span className="font-medium text-slate-900 flex items-center gap-2">
+                              {move.itemName || 'Articolo Cancellato'}
+                              {move.isFictitious && (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5 px-1.5">
+                                  Fittizio
+                                </Badge>
+                              )}
+                            </span>
                             <span className="text-xs text-slate-500 font-mono">{move.itemCode}</span>
                             </div>
                         </TableCell>

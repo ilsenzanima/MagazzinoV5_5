@@ -94,6 +94,7 @@ export interface Movement {
   itemPrice?: number; // For display
   pieces?: number;
   coefficient?: number;
+  isFictitious?: boolean;
 }
 
 export interface StockMovement {
@@ -865,23 +866,6 @@ export const inventoryApi = {
       
     if (error) throw error;
 
-    // Fetch user names manually to avoid view relationship issues
-    const userIds = [...new Set(data.map((m: any) => m.user_id).filter(Boolean))];
-    let userMap: Record<string, string> = {};
-
-    if (userIds.length > 0) {
-        const { data: users } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .in('id', userIds);
-        
-        if (users) {
-            users.forEach((u: any) => {
-                userMap[u.id] = u.full_name;
-            });
-        }
-    }
-  
     return data.map((m: any) => ({
       id: m.id,
       date: m.date,
@@ -890,10 +874,11 @@ export const inventoryApi = {
       reference: m.reference,
       itemId: m.item_id,
       userId: m.user_id,
-      userName: userMap[m.user_id],
+      userName: m.user_name,
       pieces: m.pieces,
       coefficient: m.coefficient,
-      notes: m.notes
+      notes: m.notes,
+      isFictitious: m.is_fictitious
     }));
   },
 
@@ -1194,24 +1179,30 @@ export const movementsApi = {
   getByJobId: async (jobId: string) => {
     const { data, error } = await fetchWithTimeout(
       supabase
-        .from('movements')
-        .select(`
-          *,
-          profiles:user_id(full_name),
-          inventory:item_id(code, name, unit, price)
-        `)
+        .from('stock_movements_view')
+        .select('*')
         .eq('job_id', jobId)
-        .order('created_at', { ascending: false })
+        .order('date', { ascending: false })
     );
 
     if (error) throw error;
 
     return data.map((db: any) => ({
-      ...mapDbToMovement(db),
-      itemCode: db.inventory?.code,
-      itemName: db.inventory?.name,
-      itemUnit: db.inventory?.unit,
-      itemPrice: db.inventory?.price || 0
+      id: db.id,
+      itemId: db.item_id,
+      userId: db.user_id,
+      userName: db.user_name,
+      type: db.type,
+      quantity: db.quantity,
+      reference: db.reference,
+      notes: db.notes,
+      date: db.date,
+      jobId: db.job_id,
+      itemName: db.item_name,
+      itemCode: db.item_code,
+      itemUnit: db.item_unit,
+      itemPrice: db.item_price || 0,
+      isFictitious: db.is_fictitious
     }));
   },
   
