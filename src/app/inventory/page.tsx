@@ -180,6 +180,17 @@ export default function InventoryPage() {
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             <span className="ml-2 text-slate-500">Caricamento inventario...</span>
         </div>
+      ) : error ? (
+        <div className="flex flex-col justify-center items-center py-12 text-center">
+            <div className="bg-red-50 text-red-600 p-4 rounded-full mb-4">
+                <Package className="h-8 w-8" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Errore di Caricamento</h3>
+            <p className="text-slate-500 mb-6 max-w-md">{error}</p>
+            <Button onClick={loadItems} variant="outline">
+                Riprova
+            </Button>
+        </div>
       ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredItems.length === 0 ? (

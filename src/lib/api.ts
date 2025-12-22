@@ -623,22 +623,29 @@ const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
 
 export const deliveryNotesApi = {
   getAll: async () => {
-    const { data, error } = await supabase
-      .from('delivery_notes')
-      .select('*, jobs(code, description), delivery_note_items(quantity)')
-      .order('date', { ascending: false });
+    console.time('deliveryNotesApi.getAll');
+    try {
+      const { data, error } = await fetchWithTimeout(
+        supabase
+          .from('delivery_notes')
+          .select('*, jobs(code, description), delivery_note_items(quantity)')
+          .order('date', { ascending: false })
+      );
 
-    if (error) {
-        // Table doesn't exist yet, return mock data or empty
-        console.warn("Delivery notes table not found, returning empty");
-        return [];
+      if (error) {
+          // Table doesn't exist yet, return mock data or empty
+          console.warn("Delivery notes table not found, returning empty");
+          return [];
+      }
+
+      return data.map((d: any) => ({
+        ...mapDbToDeliveryNote(d),
+        itemCount: d.delivery_note_items?.length || 0,
+        totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+      }));
+    } finally {
+      console.timeEnd('deliveryNotesApi.getAll');
     }
-
-    return data.map((d: any) => ({
-      ...mapDbToDeliveryNote(d),
-      itemCount: d.delivery_note_items?.length || 0,
-      totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
-    }));
   },
   
   getById: async (id: string) => {
@@ -1006,13 +1013,21 @@ export const jobsApi = {
     return data.map(mapDbToJob);
   },
   getByClientId: async (clientId: string) => {
-     const { data, error } = await supabase
-      .from('jobs')
-      .select('*, clients(*)')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data.map(mapDbToJob);
+    console.time('jobsApi.getByClientId');
+    try {
+      const { data, error } = await fetchWithTimeout(
+        supabase
+          .from('jobs')
+          .select('*, clients(name, address, street, street_number, postal_code, city, province)')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
+      );
+
+      if (error) throw error;
+      return data.map(mapDbToJob);
+    } finally {
+      console.timeEnd('jobsApi.getByClientId');
+    }
   },
   getById: async (id: string) => {
     const { data, error } = await supabase.from('jobs').select('*, clients(*)').eq('id', id).single();
