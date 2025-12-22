@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Package, ArrowUpRight, ArrowDownLeft } from "lucide-react"
+import Link from "next/link"
 
 interface JobStockProps {
   movements: Movement[]
@@ -28,9 +29,17 @@ export function JobStock({ movements }: JobStockProps) {
     
     // 'unload' or 'exit' -> Warehouse decreases -> Site increases
     // 'load' or 'entry' -> Warehouse increases -> Site decreases (Return)
+    // 'purchase' -> Site increases
 
-    const isSiteIn = m.type === 'unload' || m.type === 'exit'
-    const qtyChange = isSiteIn ? m.quantity : -m.quantity
+    let qtyChange = 0
+    if (m.type === 'purchase') {
+      qtyChange = m.quantity
+    } else {
+      // For warehouse movements, the quantity is relative to warehouse.
+      // Warehouse Out (negative) = Job In (positive).
+      // Warehouse In (positive) = Job Out (negative).
+      qtyChange = -m.quantity
+    }
     
     const key = `${m.itemCode}-${!!m.isFictitious}`
     const current = stockMap.get(key)

@@ -1202,7 +1202,12 @@ export const movementsApi = {
       itemCode: db.item_code,
       itemUnit: db.item_unit,
       itemPrice: db.item_price || 0,
-      isFictitious: db.is_fictitious
+      isFictitious: db.is_fictitious,
+      supplierName: db.supplier_name,
+      purchaseDate: db.purchase_date,
+      purchaseNumber: db.purchase_number,
+      purchaseId: db.purchase_id,
+      deliveryNoteId: db.delivery_note_id
     }));
   },
   
