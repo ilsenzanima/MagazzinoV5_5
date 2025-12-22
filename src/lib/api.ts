@@ -594,6 +594,9 @@ export interface DeliveryNoteItem {
   inventoryName?: string;
   inventoryCode?: string;
   inventoryUnit?: string;
+  inventoryBrand?: string;
+  inventoryCategory?: string;
+  inventoryDescription?: string;
   quantity: number;
   pieces?: number;
   coefficient?: number;
@@ -659,7 +662,10 @@ const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
     isFictitious: i.is_fictitious,
     inventoryName: i.inventory?.name,
     inventoryCode: i.inventory?.code,
-    inventoryUnit: i.inventory?.unit
+    inventoryUnit: i.inventory?.unit,
+    inventoryBrand: i.inventory?.brand,
+    inventoryCategory: i.inventory?.category,
+    inventoryDescription: i.inventory?.description
   }))
 });
 
@@ -698,7 +704,7 @@ export const deliveryNotesApi = {
         jobs(code, description),
         delivery_note_items(
           *,
-          inventory(name, code, unit)
+          inventory(name, code, unit, brand, category, description)
         )
       `)
       .eq('id', id)

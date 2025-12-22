@@ -271,11 +271,11 @@ export default function MovementDetailPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead>Tipologia</TableHead>
+                                <TableHead>Marca</TableHead>
                                 <TableHead>Articolo</TableHead>
-                                <TableHead className="text-right">Pezzi</TableHead>
-                                <TableHead className="text-right">Coeff.</TableHead>
+                                <TableHead>Descrizione</TableHead>
                                 <TableHead className="text-right">Quantità</TableHead>
-                                <TableHead className="text-right">Prezzo</TableHead>
                                 <TableHead className="text-right"></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -283,20 +283,31 @@ export default function MovementDetailPage() {
                             {items.map((item) => (
                                 <TableRow key={item.id}>
                                     <TableCell>
-                                        <div className="font-medium">{item.inventoryName}</div>
-                                        <div className="text-xs text-slate-500">{item.inventoryCode}</div>
+                                        <Badge variant="outline" className="font-normal text-slate-600">
+                                            {item.inventoryCategory || '-'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className="text-slate-700 font-medium">{item.inventoryBrand || '-'}</span>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="font-bold text-slate-800">{item.inventoryName}</div>
+                                        <div className="text-xs text-slate-500 font-mono">{item.inventoryCode}</div>
+                                    </TableCell>
+                                    <TableCell className="max-w-[200px]">
+                                        <div className="truncate text-sm text-slate-600" title={item.inventoryDescription}>
+                                            {item.inventoryDescription || '-'}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {item.pieces || (item.coefficient === 1 ? '-' : '')}
-                                    </TableCell>
-                                    <TableCell className="text-right text-slate-500">
-                                        {item.coefficient !== 1 ? item.coefficient : '-'}
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold">
-                                        {item.quantity} {item.inventoryUnit}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {item.price ? `€ ${item.price.toFixed(2)}` : '-'}
+                                        <div className="font-bold text-slate-900 text-lg">
+                                            {item.quantity} <span className="text-sm font-normal text-slate-500">{item.inventoryUnit}</span>
+                                        </div>
+                                        {item.coefficient && item.coefficient !== 1 && (
+                                            <div className="text-xs text-slate-500">
+                                                ({item.pieces || 0} pz x {item.coefficient})
+                                            </div>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Button 

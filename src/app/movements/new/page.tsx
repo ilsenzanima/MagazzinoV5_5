@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Briefcase, Search, Clock, Package } from "lucide-react";
@@ -29,6 +30,9 @@ interface MovementLine {
   itemName: string;
   itemCode: string;
   itemUnit: string;
+  itemBrand?: string;
+  itemCategory?: string;
+  itemDescription?: string;
   quantity: number;
   pieces?: number;
   coefficient?: number;
@@ -238,6 +242,9 @@ export default function NewMovementPage() {
       itemName: selectedItemForLine.name,
       itemCode: selectedItemForLine.code,
       itemUnit: selectedItemForLine.unit,
+      itemBrand: selectedItemForLine.brand,
+      itemCategory: selectedItemForLine.type, // Map type to category
+      itemDescription: selectedItemForLine.description,
       quantity: Number(currentLine.quantity),
       purchaseItemId: isFictitious ? undefined : currentLine.purchaseItemId,
       purchaseRef: isFictitious ? "Lotto Fittizio" : availableBatches.find(b => b.id === currentLine.purchaseItemId)?.purchaseRef,
@@ -542,7 +549,9 @@ export default function NewMovementPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Codice</TableHead>
+                                        <TableHead>Tipologia</TableHead>
+                                        <TableHead>Marca</TableHead>
+                                        <TableHead>Articolo</TableHead>
                                         <TableHead>Descrizione</TableHead>
                                         <TableHead className="text-right">Quantità</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
@@ -551,7 +560,7 @@ export default function NewMovementPage() {
                                 <TableBody>
                                     {lines.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8 text-slate-400">
+                                            <TableCell colSpan={6} className="text-center py-8 text-slate-400">
                                                 <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
                                                 <p>Nessun articolo aggiunto</p>
                                             </TableCell>
@@ -559,17 +568,37 @@ export default function NewMovementPage() {
                                     ) : (
                                         lines.map((line) => (
                                             <TableRow key={line.tempId}>
-                                                <TableCell className="font-mono text-xs">
-                                                    {line.itemCode}
-                                                    {line.purchaseRef && (
-                                                        <div className="text-[10px] text-blue-600 mt-1">
-                                                            Lotto: {line.purchaseRef}
+                                                <TableCell>
+                                                    <Badge variant="outline" className="font-normal text-slate-600">
+                                                        {line.itemCategory || '-'}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-slate-700 font-medium">{line.itemBrand || '-'}</span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-bold text-slate-800">{line.itemName}</div>
+                                                    <div className="text-xs text-slate-500 font-mono">
+                                                        {line.itemCode}
+                                                        {line.purchaseRef && (
+                                                            <span className="text-blue-600 ml-2">
+                                                                Lotto: {line.purchaseRef}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="max-w-[200px]">
+                                                    <div className="truncate text-sm text-slate-600" title={line.itemDescription}>
+                                                        {line.itemDescription || '-'}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right font-bold">
+                                                    <div>{line.quantity} <span className="text-xs font-normal text-slate-500">{line.itemUnit}</span></div>
+                                                    {line.coefficient && line.coefficient !== 1 && (
+                                                        <div className="text-xs text-slate-500 font-normal">
+                                                            ({line.pieces} pz x {line.coefficient})
                                                         </div>
                                                     )}
-                                                </TableCell>
-                                                <TableCell className="font-medium">{line.itemName}</TableCell>
-                                                <TableCell className="text-right font-bold">
-                                                    {line.quantity} <span className="text-xs font-normal text-slate-500">{line.itemUnit}</span>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Button 

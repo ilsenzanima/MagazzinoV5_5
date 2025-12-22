@@ -16,8 +16,14 @@ import {
   inventoryApi, 
   movementsApi, 
   jobsApi, 
+  brandsApi,
+  itemTypesApi,
+  unitsApi,
   Movement, 
-  Job 
+  Job,
+  Brand,
+  ItemType,
+  Unit
 } from "@/lib/api";
 import {
   Select,
@@ -48,6 +54,7 @@ import QRCode from "react-qr-code";
 import Barcode from "react-barcode";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
+import { Loader2, Pencil, X } from "lucide-react";
 
 export default function InventoryDetailPage() {
   const params = useParams();
@@ -60,6 +67,14 @@ export default function InventoryDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   
+  // Edit Mode State
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [types, setTypes] = useState<ItemType[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [editForm, setEditForm] = useState<Partial<InventoryItem>>({});
+
   // Movement Form State
   const [isMovementOpen, setIsMovementOpen] = useState(false);
   const [movementType, setMovementType] = useState<'load' | 'unload' | 'purchase' | 'entry' | 'exit' | 'sale'>('load');
@@ -88,14 +103,20 @@ export default function InventoryDetailPage() {
         throw new Error(err.message || "Impossibile caricare l'articolo");
       }
 
-      // 2. Load History & Jobs (Non-critical)
+      // 2. Load History & Jobs & Aux Data (Non-critical)
       try {
-        const [movementsData, jobsData] = await Promise.all([
+        const [movementsData, jobsData, brandsData, typesData, unitsData] = await Promise.all([
           inventoryApi.getHistory(id),
-          jobsApi.getAll()
+          jobsApi.getAll(),
+          brandsApi.getAll(),
+          itemTypesApi.getAll(),
+          unitsApi.getAll()
         ]);
         setMovements(movementsData);
         setActiveJobs(jobsData.filter(j => j.status === 'active'));
+        setBrands(brandsData);
+        setTypes(typesData);
+        setUnits(unitsData);
       } catch (err) {
         console.warn("Error loading auxiliary data:", err);
         // Don't block the page if history fails
@@ -112,6 +133,51 @@ export default function InventoryDetailPage() {
   useEffect(() => {
     loadData();
   }, [id]);
+
+  const handleEdit = () => {
+    if (item) {
+        setEditForm({
+            name: item.name,
+            brand: item.brand,
+            type: item.type,
+            supplierCode: item.supplierCode,
+            minStock: item.minStock,
+            unit: item.unit,
+            coefficient: item.coefficient,
+            description: item.description
+        });
+        setIsEditing(true);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditForm({});
+  };
+
+  const handleSaveEdit = async () => {
+    if (!item) return;
+    setIsSaving(true);
+    try {
+        // Validate
+        if (!editForm.name || !editForm.brand || !editForm.type) {
+            alert("Compila i campi obbligatori (Nome, Marca, Tipo)");
+            return;
+        }
+
+        await inventoryApi.update(item.id, editForm);
+        
+        // Refresh
+        const updatedItem = { ...item, ...editForm };
+        setItem(updatedItem as InventoryItem);
+        setIsEditing(false);
+    } catch (error) {
+        console.error("Failed to update item", error);
+        alert("Errore durante il salvataggio");
+    } finally {
+        setIsSaving(false);
+    }
+  };
 
   // Handle Delete Item
   const handleDelete = async () => {
@@ -274,9 +340,26 @@ export default function InventoryDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Trash2 className="mr-2 h-4 w-4" /> Elimina
-            </Button>
+            {isEditing ? (
+                <>
+                    <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={isSaving}>
+                        <X className="mr-2 h-4 w-4" /> Annulla
+                    </Button>
+                    <Button variant="default" size="sm" onClick={handleSaveEdit} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Salva
+                    </Button>
+                </>
+            ) : (
+                <>
+                  <Button variant="default" size="sm" onClick={handleEdit}>
+                      <Pencil className="mr-2 h-4 w-4" /> Modifica
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={handleDelete}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Elimina
+                  </Button>
+                </>
+            )}
             {/* Note: Save button logic would go here if we had editable fields outside of movements */}
           </div>
         </div>
@@ -411,52 +494,154 @@ export default function InventoryDetailPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="brand">Marca</Label>
-                    <Input id="brand" value={item.brand} readOnly className="bg-slate-50" />
+                    {isEditing ? (
+                        <Select 
+                            value={editForm.brand} 
+                            onValueChange={(val) => setEditForm({...editForm, brand: val})}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleziona marca" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {brands.map((b) => (
+                                    <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <Input id="brand" value={item.brand} readOnly className="bg-slate-50" />
+                    )}
                   </div>
                 </div>
 
-                {item.supplierCode && (
-                  <div className="space-y-2">
-                    <Label htmlFor="supplierCode">Codice Fornitore</Label>
-                    <Input id="supplierCode" value={item.supplierCode} readOnly className="bg-slate-50" />
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="supplierCode">Codice Fornitore</Label>
+                  {isEditing ? (
+                      <Input 
+                          id="supplierCode" 
+                          value={editForm.supplierCode || ""} 
+                          onChange={(e) => setEditForm({...editForm, supplierCode: e.target.value})} 
+                          placeholder="Codice Fornitore (Opzionale)"
+                      />
+                  ) : (
+                      item.supplierCode ? (
+                          <Input id="supplierCode" value={item.supplierCode} readOnly className="bg-slate-50" />
+                      ) : (
+                          <p className="text-sm text-slate-400 italic py-2">Nessun codice fornitore specificato</p>
+                      )
+                  )}
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome Prodotto</Label>
-                  <Input id="name" value={item.name} readOnly className="bg-slate-50" />
+                  {isEditing ? (
+                      <Input 
+                          id="name" 
+                          value={editForm.name || ""} 
+                          onChange={(e) => setEditForm({...editForm, name: e.target.value})} 
+                      />
+                  ) : (
+                      <Input id="name" value={item.name} readOnly className="bg-slate-50" />
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="type">Tipologia</Label>
-                    <Input id="type" value={item.type} readOnly className="bg-slate-50" />
+                    {isEditing ? (
+                        <Select 
+                            value={editForm.type} 
+                            onValueChange={(val) => setEditForm({...editForm, type: val})}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleziona tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {types.map((t) => (
+                                    <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <Input id="type" value={item.type} readOnly className="bg-slate-50" />
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="minStock">Scorta Minima</Label>
-                    <Input id="minStock" type="number" value={item.minStock} readOnly className="bg-slate-50" />
+                    {isEditing ? (
+                        <Input 
+                            id="minStock" 
+                            type="number" 
+                            value={editForm.minStock || 0} 
+                            onChange={(e) => setEditForm({...editForm, minStock: parseFloat(e.target.value)})} 
+                        />
+                    ) : (
+                        <Input id="minStock" type="number" value={item.minStock} readOnly className="bg-slate-50" />
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div className="space-y-2">
                     <Label htmlFor="unit">Unità di Misura</Label>
-                    <Input id="unit" value={item.unit} readOnly className="bg-slate-50" />
+                    {isEditing ? (
+                        <Select 
+                            value={editForm.unit} 
+                            onValueChange={(val) => setEditForm({...editForm, unit: val})}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleziona unità" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {units.map((u) => (
+                                    <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <Input id="unit" value={item.unit} readOnly className="bg-slate-50" />
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="coefficient">Coeff. Moltiplicazione</Label>
-                    <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50" />
+                    {isEditing ? (
+                        <div className="space-y-1">
+                            <Input 
+                                id="coefficient" 
+                                type="number" 
+                                step="0.01" 
+                                value={editForm.coefficient || 1} 
+                                onChange={(e) => setEditForm({...editForm, coefficient: parseFloat(e.target.value)})} 
+                                disabled={userRole !== 'admin'}
+                                className={userRole !== 'admin' ? "bg-slate-100" : ""}
+                            />
+                            {userRole !== 'admin' && (
+                                <p className="text-[10px] text-red-400">Modificabile solo da Admin</p>
+                            )}
+                        </div>
+                    ) : (
+                        <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50" />
+                    )}
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Descrizione</Label>
-                  <Textarea 
-                    id="description" 
-                    value={item.description} 
-                    readOnly
-                    className="min-h-[100px] bg-slate-50"
-                  />
+                  {isEditing ? (
+                      <Textarea 
+                        id="description" 
+                        value={editForm.description || ""} 
+                        onChange={(e) => setEditForm({...editForm, description: e.target.value})} 
+                        className="min-h-[100px]"
+                      />
+                  ) : (
+                      <Textarea 
+                        id="description" 
+                        value={item.description} 
+                        readOnly
+                        className="min-h-[100px] bg-slate-50"
+                      />
+                  )}
                 </div>
               </CardContent>
             </Card>

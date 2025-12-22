@@ -4,7 +4,7 @@ import { Movement } from "@/lib/api"
 import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Package, ArrowUpRight, ArrowDownLeft } from "lucide-react"
+import { Package, ArrowUpRight, ArrowDownLeft, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 
 interface JobStockProps {
@@ -12,13 +12,26 @@ interface JobStockProps {
 }
 
 export function JobStock({ movements }: JobStockProps) {
+  // 1. Find Last Purchase Price per Item Code
+  // We use this for fictitious items: value of the last purchase made for that item
+  const lastPurchasePriceMap = new Map<string, number>()
+
+  // movements are sorted by date desc, so the first purchase we find is the last one
+  for (const m of movements) {
+    if (m.itemCode && m.type === 'purchase' && m.itemPrice && m.itemPrice > 0) {
+       if (!lastPurchasePriceMap.has(m.itemCode)) {
+           lastPurchasePriceMap.set(m.itemCode, m.itemPrice)
+       }
+    }
+  }
+
   // Calculate Current Stock at Site
   const stockMap = new Map<string, { 
     name: string, 
     code: string, 
     qty: number, 
     unit: string,
-    avgPrice: number,
+    price: number, // Specific or Average
     isFictitious: boolean,
     reference: string,
     purchaseId?: string,
@@ -52,12 +65,20 @@ export function JobStock({ movements }: JobStockProps) {
     if (current) {
       current.qty += qtyChange
     } else if (m.itemCode) {
+      // Determine price
+      let price = 0
+      if (m.isFictitious) {
+        price = lastPurchasePriceMap.get(m.itemCode) || 0
+      } else {
+        price = m.itemPrice || 0
+      }
+
       stockMap.set(key, {
         name: m.itemName || 'Sconosciuto',
         code: m.itemCode,
         qty: qtyChange,
         unit: m.itemUnit || 'PZ',
-        avgPrice: m.itemPrice || 0,
+        price: price,
         isFictitious: !!m.isFictitious,
         reference: m.reference || '',
         purchaseId: m.purchaseId,
@@ -151,7 +172,17 @@ export function JobStock({ movements }: JobStockProps) {
                             {item.qty} {item.unit}
                         </TableCell>
                         <TableCell className="text-right text-slate-500">
-                            € {(item.qty * item.avgPrice).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                            <div className="flex items-center justify-end gap-2">
+                                {(!item.price || item.price === 0) && (
+                                    <div className="group relative">
+                                        <AlertTriangle className="h-4 w-4 text-amber-500 cursor-help" />
+                                        <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-32 bg-slate-800 text-white text-xs rounded p-1 text-center z-10">
+                                            Prezzo mancante
+                                        </span>
+                                    </div>
+                                )}
+                                € {(item.qty * item.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                            </div>
                         </TableCell>
                         </TableRow>
                     ))
