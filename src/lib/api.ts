@@ -643,7 +643,10 @@ export const deliveryNotesApi = {
         .single();
       console.timeEnd('insert_note');
 
-      if (noteError) throw noteError;
+      if (noteError) {
+        console.error("Error creating delivery note:", noteError);
+        throw noteError;
+    }
 
       // 2. Create Items
       if (items.length > 0) {

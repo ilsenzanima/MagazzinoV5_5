@@ -283,9 +283,9 @@ export default function NewMovementPage() {
       router.push('/movements');
       console.timeEnd('redirect');
       console.timeEnd('handleSave');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving movement:", error);
-      alert("Errore durante il salvataggio");
+      alert(`Errore durante il salvataggio: ${error.message || "Errore sconosciuto"}`);
     } finally {
       setLoading(false);
     }
