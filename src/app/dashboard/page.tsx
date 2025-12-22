@@ -9,6 +9,7 @@ import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
 import { RecentMovements } from "@/components/dashboard/RecentMovements";
 import { ActiveJobsWidget } from "@/components/dashboard/ActiveJobs";
 import { createClient } from "@/lib/supabase/client";
+import { fetchWithTimeout } from "@/lib/api";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
