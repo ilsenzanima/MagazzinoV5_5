@@ -22,15 +22,21 @@ import {
   InventoryItem, 
   Job 
 } from "@/lib/api";
+import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
+import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
+import { Search } from "lucide-react";
 
 interface PurchaseLine {
   tempId: string;
   itemId: string;
   itemName: string;
+  itemBrand?: string;
+  itemCategory?: string;
+  itemDescription?: string;
   quantity: number;
   pieces?: number;
-  coefficient?: number;
-  unit?: string;
+  coefficient: number;
+  unit: string;
   price: number;
   isJob: boolean;
   jobId?: string;
@@ -69,6 +75,12 @@ export default function NewPurchasePage() {
   // Form State - Lines List
   const [lines, setLines] = useState<PurchaseLine[]>([]);
 
+  // Dialog States
+  const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
+  const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
+  const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
+  const [selectedJobForLine, setSelectedJobForLine] = useState<Job | null>(null);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -91,6 +103,28 @@ export default function NewPurchasePage() {
     }
   };
 
+  const handleItemSelect = (item: InventoryItem) => {
+    setSelectedItemForLine(item);
+    setCurrentLine({
+        ...currentLine, 
+        itemId: item.id,
+        coefficient: item.coefficient || 1,
+        unit: item.unit || 'PZ',
+        pieces: "",
+        quantity: "" 
+    });
+    setIsItemSelectorOpen(false);
+  };
+
+  const handleJobSelect = (job: Job) => {
+    setSelectedJobForLine(job);
+    setCurrentLine({
+        ...currentLine,
+        jobId: job.id
+    });
+    setIsJobSelectorOpen(false);
+  };
+
   const handleAddLine = () => {
     if (!currentLine.itemId || !currentLine.quantity || !currentLine.price) {
       alert("Compila tutti i campi obbligatori (Articolo, Quantità, Prezzo)");
@@ -109,6 +143,9 @@ export default function NewPurchasePage() {
       tempId: Math.random().toString(36).substr(2, 9),
       itemId: currentLine.itemId,
       itemName: selectedItem?.name || "Articolo sconosciuto",
+      itemBrand: selectedItem?.brand,
+      itemCategory: selectedItem?.category,
+      itemDescription: selectedItem?.description,
       quantity: parseFloat(currentLine.quantity),
       pieces: currentLine.pieces ? parseFloat(currentLine.pieces) : undefined,
       coefficient: currentLine.coefficient,
@@ -132,6 +169,62 @@ export default function NewPurchasePage() {
       isJob: false,
       jobId: ""
     });
+    setSelectedItemForLine(null);
+    setSelectedJobForLine(null);
+  };
+
+  const updateLine = (tempId: string, updates: Partial<PurchaseLine>) => {
+    setLines(lines.map(line => {
+      if (line.tempId === tempId) {
+        return { ...line, ...updates };
+      }
+      return line;
+    }));
+  };
+
+  const handleLineQuantityChange = (tempId: string, quantityStr: string) => {
+    const quantity = parseFloat(quantityStr);
+    if (isNaN(quantity)) {
+      updateLine(tempId, { quantity: 0 });
+      return;
+    }
+
+    const line = lines.find(l => l.tempId === tempId);
+    if (!line) return;
+
+    let updates: Partial<PurchaseLine> = { quantity };
+    
+    // Reverse calculation: if coefficient exists and > 0, calculate pieces
+    if (line.coefficient && line.coefficient !== 1) {
+      updates.pieces = parseFloat((quantity / line.coefficient).toFixed(2));
+    } else {
+        // If coeff is 1, pieces might be same as quantity or ignored. 
+        // Based on user request "se modifico la quantita e inserisce i pezzi", let's update pieces too if applicable.
+        updates.pieces = quantity; 
+    }
+
+    updateLine(tempId, updates);
+  };
+
+  const handleLinePiecesChange = (tempId: string, piecesStr: string) => {
+    const pieces = parseFloat(piecesStr);
+    if (isNaN(pieces)) {
+        updateLine(tempId, { pieces: 0, quantity: 0 });
+        return;
+    }
+
+    const line = lines.find(l => l.tempId === tempId);
+    if (!line) return;
+
+    const quantity = parseFloat((pieces * line.coefficient).toFixed(2));
+    updateLine(tempId, { pieces, quantity });
+  };
+
+  const handleLinePriceChange = (tempId: string, priceStr: string) => {
+    const price = parseFloat(priceStr);
+    if (!isNaN(price)) {
+      updateLine(tempId, { price });
+    }
   };
 
   const removeLine = (tempId: string) => {
@@ -262,33 +355,20 @@ export default function NewPurchasePage() {
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                             <div className="md:col-span-4 space-y-2">
                                 <Label>Materiale</Label>
-                                <Select 
-                                    value={currentLine.itemId} 
-                                    onValueChange={(v) => {
-                                        const item = inventory.find(i => i.id === v);
-                                        const coeff = item?.coefficient || 1;
-                                        // Reset pieces/quantity when item changes
-                                        setCurrentLine({
-                                            ...currentLine, 
-                                            itemId: v,
-                                            coefficient: coeff,
-                                            unit: item?.unit || 'PZ',
-                                            pieces: "",
-                                            quantity: "" 
-                                        });
-                                    }}
+                                <div 
+                                    className="flex items-center justify-between bg-white border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 h-10"
+                                    onClick={() => setIsItemSelectorOpen(true)}
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Cerca materiale..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {inventory.map((item) => (
-                                            <SelectItem key={item.id} value={item.id}>
-                                                {item.name} ({item.code})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                    {selectedItemForLine ? (
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            <span className="font-mono text-xs font-bold bg-slate-100 px-1 rounded">{selectedItemForLine.code}</span>
+                                            <span className="text-sm truncate">{selectedItemForLine.name}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-sm text-slate-500">Cerca articolo...</span>
+                                    )}
+                                    <Search className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                                </div>
                             </div>
                             
                             {/* Logic for Pieces/Quantity */}
@@ -355,21 +435,22 @@ export default function NewPurchasePage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
                                 <div className="space-y-2">
                                     <Label>Seleziona Commessa</Label>
-                                    <Select 
-                                        value={currentLine.jobId} 
-                                        onValueChange={(v) => setCurrentLine({...currentLine, jobId: v})}
+                                    <div 
+                                        className="flex items-center justify-between border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 bg-white"
+                                        onClick={() => setIsJobSelectorOpen(true)}
                                     >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Scegli cantiere..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {jobs.map((job) => (
-                                                <SelectItem key={job.id} value={job.id}>
-                                                    {job.code} - {job.description}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        {selectedJobForLine ? (
+                                            <div className="flex flex-col">
+                                                <span className="font-medium">{selectedJobForLine.code} - {selectedJobForLine.description}</span>
+                                                {selectedJobForLine.clientName && (
+                                                    <span className="text-xs text-slate-500">{selectedJobForLine.clientName}</span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-slate-500">Seleziona Commessa...</span>
+                                        )}
+                                        <Search className="h-4 w-4 text-slate-400" />
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -381,30 +462,81 @@ export default function NewPurchasePage() {
 
                     {/* Lines Table */}
                     {lines.length > 0 && (
-                        <div className="rounded-md border">
+                        <div className="rounded-md border overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Materiale</TableHead>
-                                        <TableHead className="text-right">Q.tà</TableHead>
-                                        <TableHead className="text-right">Prezzo</TableHead>
-                                        <TableHead>Destinazione</TableHead>
-                                        <TableHead></TableHead>
+                                        <TableHead className="w-[250px]">Materiale</TableHead>
+                                        <TableHead className="w-[100px] text-center">Pezzi</TableHead>
+                                        <TableHead className="w-[80px] text-center">Coeff.</TableHead>
+                                        <TableHead className="w-[120px] text-right">Q.tà Tot.</TableHead>
+                                        <TableHead className="w-[120px] text-right">Prezzo Unit.</TableHead>
+                                        <TableHead className="w-[120px] text-right">Totale Riga</TableHead>
+                                        <TableHead className="w-[150px]">Destinazione</TableHead>
+                                        <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {lines.map((line) => (
                                         <TableRow key={line.tempId}>
-                                            <TableCell className="font-medium">{line.itemName}</TableCell>
-                                            <TableCell className="text-right">{line.quantity}</TableCell>
-                                            <TableCell className="text-right">€ {line.price.toFixed(5)}</TableCell>
+                                            <TableCell>
+                                                <div className="font-medium">{line.itemName}</div>
+                                                <div className="text-xs text-slate-500">{line.itemCategory} - {line.itemBrand}</div>
+                                                {line.itemDescription && <div className="text-xs text-slate-400 truncate max-w-[200px]">{line.itemDescription}</div>}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                {line.coefficient !== 1 ? (
+                                                    <Input 
+                                                        type="number" 
+                                                        min="0"
+                                                        step="1"
+                                                        className="h-8 w-20 mx-auto text-center"
+                                                        value={line.pieces || ""}
+                                                        onChange={(e) => handleLinePiecesChange(line.tempId, e.target.value)}
+                                                    />
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-center text-sm text-slate-500">
+                                                {line.coefficient !== 1 ? line.coefficient : "-"}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Input 
+                                                        type="number" 
+                                                        min="0"
+                                                        step="0.01"
+                                                        className="h-8 w-24 text-right"
+                                                        value={line.quantity}
+                                                        onChange={(e) => handleLineQuantityChange(line.tempId, e.target.value)}
+                                                    />
+                                                    <span className="text-xs text-slate-500 w-6">{line.unit}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <span className="text-xs text-slate-400">€</span>
+                                                    <Input 
+                                                        type="number" 
+                                                        min="0"
+                                                        step="0.00001"
+                                                        className="h-8 w-24 text-right"
+                                                        value={line.price}
+                                                        onChange={(e) => handleLinePriceChange(line.tempId, e.target.value)}
+                                                    />
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-medium">
+                                                € {(line.quantity * line.price).toFixed(2)}
+                                            </TableCell>
                                             <TableCell>
                                                 {line.isJob ? (
-                                                    <span className="text-blue-600 font-medium">
-                                                        Commessa: {line.jobCode || 'N/D'}
+                                                    <span className="text-blue-600 font-medium text-sm block truncate max-w-[140px]" title={line.jobCode}>
+                                                        {line.jobCode}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-green-600 font-medium">
+                                                    <span className="text-green-600 font-medium text-sm">
                                                         Magazzino
                                                     </span>
                                                 )}
@@ -414,21 +546,19 @@ export default function NewPurchasePage() {
                                                     variant="ghost" 
                                                     size="icon" 
                                                     onClick={() => removeLine(line.tempId)}
-                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
-                                    <TableRow className="bg-slate-50 font-medium">
-                                        <TableCell>TOTALE</TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell className="text-right">
+                                    <TableRow className="bg-slate-50 font-bold">
+                                        <TableCell colSpan={5} className="text-right pr-4 text-lg">TOTALE BOLLA</TableCell>
+                                        <TableCell className="text-right text-lg">
                                             € {lines.reduce((acc, l) => acc + (l.quantity * l.price), 0).toFixed(2)}
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        <TableCell colSpan={2}></TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>
@@ -447,6 +577,20 @@ export default function NewPurchasePage() {
             </div>
         </form>
       </div>
+
+      <ItemSelectorDialog 
+        open={isItemSelectorOpen}
+        onOpenChange={setIsItemSelectorOpen}
+        onSelect={handleItemSelect}
+        items={inventory}
+      />
+
+      <JobSelectorDialog 
+        open={isJobSelectorOpen}
+        onOpenChange={setIsJobSelectorOpen}
+        onSelect={handleJobSelect}
+        jobs={jobs}
+      />
     </DashboardLayout>
   );
 }
