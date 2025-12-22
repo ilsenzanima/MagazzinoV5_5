@@ -19,10 +19,6 @@ const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 5000): 
             }
         );
     });
-  delete: async (id: string) => {
-    const { error } = await supabase.from('delivery_notes').delete().eq('id', id);
-    if (error) throw error;
-  }
 };
 
 export type { InventoryItem, User };
