@@ -95,6 +95,11 @@ export interface Movement {
   pieces?: number;
   coefficient?: number;
   isFictitious?: boolean;
+  purchaseId?: string;
+  purchaseNumber?: string;
+  purchaseDate?: string;
+  supplierName?: string;
+  deliveryNoteId?: string;
 }
 
 export interface StockMovement {
