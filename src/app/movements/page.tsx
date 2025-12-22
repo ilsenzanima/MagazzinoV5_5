@@ -15,6 +15,7 @@ import { it } from "date-fns/locale";
 export default function MovementsPage() {
   const [movements, setMovements] = useState<DeliveryNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -24,10 +25,12 @@ export default function MovementsPage() {
   const loadMovements = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await deliveryNotesApi.getAll();
       setMovements(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load movements", error);
+      setError(error.message || "Errore durante il caricamento dei movimenti");
     } finally {
       setLoading(false);
     }
