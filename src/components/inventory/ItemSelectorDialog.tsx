@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InventoryItem } from "@/lib/api";
 import { Search, Package, Plus } from "lucide-react";
-import { useState, useMemo, useDeferredValue } from "react";
+import { useState, useMemo, useDeferredValue, memo } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface ItemSelectorDialogProps {
@@ -20,7 +20,7 @@ interface ItemSelectorDialogProps {
   items: InventoryItem[];
 }
 
-export function ItemSelectorDialog({ open, onOpenChange, onSelect, items }: ItemSelectorDialogProps) {
+export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpenChange, onSelect, items }: ItemSelectorDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
@@ -105,4 +105,4 @@ export function ItemSelectorDialog({ open, onOpenChange, onSelect, items }: Item
       </DialogContent>
     </Dialog>
   );
-}
+});

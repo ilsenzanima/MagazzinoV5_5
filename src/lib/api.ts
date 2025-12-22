@@ -681,9 +681,13 @@ export const deliveryNotesApi = {
       if (items.length > 0) {
         console.time('insert_items');
         const itemsToInsert = items.map(item => ({
-          ...item,
           delivery_note_id: noteData.id,
-          purchase_item_id: item.purchaseItemId // Ensure this is mapped
+          inventory_id: item.inventoryId,
+          quantity: item.quantity,
+          pieces: item.pieces,
+          coefficient: item.coefficient,
+          price: item.price,
+          purchase_item_id: item.purchaseItemId
         }));
 
         const { error: itemsError } = await supabase
@@ -716,8 +720,13 @@ export const deliveryNotesApi = {
         
         // Insert new
         const itemsToInsert = items.map(item => ({
-            ...item,
-            delivery_note_id: id
+            delivery_note_id: id,
+            inventory_id: item.inventoryId,
+            quantity: item.quantity,
+            pieces: item.pieces,
+            coefficient: item.coefficient,
+            price: item.price,
+            purchase_item_id: item.purchaseItemId
         }));
         
         const { error: itemsError } = await supabase

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Job } from "@/lib/api";
 import { Search, Briefcase, Check } from "lucide-react";
-import { useState, useMemo, useDeferredValue } from "react";
+import { useState, useMemo, useDeferredValue, memo } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface JobSelectorDialogProps {
@@ -20,7 +20,7 @@ interface JobSelectorDialogProps {
   jobs: Job[];
 }
 
-export function JobSelectorDialog({ open, onOpenChange, onSelect, jobs }: JobSelectorDialogProps) {
+export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenChange, onSelect, jobs }: JobSelectorDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
@@ -101,4 +101,4 @@ export function JobSelectorDialog({ open, onOpenChange, onSelect, jobs }: JobSel
       </DialogContent>
     </Dialog>
   );
-}
+});

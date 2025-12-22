@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Briefcase, Search, Clock, Package } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { 
   inventoryApi, 
@@ -82,6 +82,13 @@ export default function NewMovementPage() {
   // Computed Suffix based on selected date
   const yearSuffix = date ? new Date(date).getFullYear().toString().slice(-2) : new Date().getFullYear().toString().slice(-2);
   const fullNumber = numberPart ? `${numberPart}/PP${yearSuffix}` : `/PP${yearSuffix}`;
+  
+  // Memoized items for dialog to prevent re-renders
+  const dialogItems = useMemo(() => {
+    return activeTab === 'entry' && selectedJob 
+      ? jobInventory.map(j => j.item) 
+      : inventory;
+  }, [activeTab, selectedJob, jobInventory, inventory]);
 
   useEffect(() => {
     loadData();
@@ -657,7 +664,7 @@ export default function NewMovementPage() {
         <ItemSelectorDialog
             open={isItemSelectorOpen}
             onOpenChange={setIsItemSelectorOpen}
-            items={activeTab === 'entry' && selectedJob ? jobInventory.map(j => j.item) : inventory}
+            items={dialogItems}
             onSelect={handleItemSelect}
         />
       </div>
