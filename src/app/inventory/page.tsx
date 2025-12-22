@@ -34,6 +34,7 @@ export default function InventoryPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Ottimizzazione INP: Defer search term update
   const deferredSearchTerm = useDeferredValue(searchTerm);
@@ -45,10 +46,12 @@ export default function InventoryPage() {
   const loadItems = async () => {
     try {
         setLoading(true);
+        setError(null);
         const data = await inventoryApi.getAll();
         setItems(data);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to load inventory:", error);
+        setError(error.message || "Errore sconosciuto durante il caricamento inventario");
     } finally {
         setLoading(false);
     }
