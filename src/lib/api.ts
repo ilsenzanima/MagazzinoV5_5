@@ -582,6 +582,45 @@ export interface DeliveryNote {
   created_at?: string;
 }
 
+const mapDeliveryNoteToDb = (note: Partial<DeliveryNote>) => ({
+  type: note.type,
+  number: note.number,
+  date: note.date,
+  job_id: note.jobId,
+  causal: note.causal,
+  pickup_location: note.pickupLocation,
+  delivery_location: note.deliveryLocation,
+  transport_mean: note.transportMean,
+  transport_time: note.transportTime,
+  appearance: note.appearance,
+  packages_count: note.packagesCount,
+  notes: note.notes
+});
+
+const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
+  id: db.id,
+  type: db.type,
+  number: db.number,
+  date: db.date,
+  jobId: db.job_id,
+  jobCode: db.jobs?.code,
+  causal: db.causal,
+  pickupLocation: db.pickup_location,
+  deliveryLocation: db.delivery_location,
+  transportMean: db.transport_mean,
+  transportTime: db.transport_time,
+  appearance: db.appearance,
+  packagesCount: db.packages_count,
+  notes: db.notes,
+  created_at: db.created_at,
+  items: db.delivery_note_items?.map((i: any) => ({
+    ...i,
+    inventoryName: i.inventory?.name,
+    inventoryCode: i.inventory?.code,
+    inventoryUnit: i.inventory?.unit
+  }))
+});
+
 export const deliveryNotesApi = {
   getAll: async () => {
     const { data, error } = await supabase
@@ -596,8 +635,7 @@ export const deliveryNotesApi = {
     }
 
     return data.map((d: any) => ({
-      ...d,
-      jobCode: d.jobs?.code,
+      ...mapDbToDeliveryNote(d),
       itemCount: d.delivery_note_items?.length || 0,
       totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
     }));
@@ -619,16 +657,7 @@ export const deliveryNotesApi = {
 
     if (error) throw error;
     
-    return {
-      ...data,
-      jobCode: data.jobs?.code,
-      items: data.delivery_note_items?.map((i: any) => ({
-        ...i,
-        inventoryName: i.inventory?.name,
-        inventoryCode: i.inventory?.code,
-        inventoryUnit: i.inventory?.unit
-      }))
-    };
+    return mapDbToDeliveryNote(data);
   },
 
   create: async (note: Omit<DeliveryNote, 'id' | 'created_at' | 'items'>, items: Omit<DeliveryNoteItem, 'id' | 'deliveryNoteId'>[]) => {
@@ -638,7 +667,7 @@ export const deliveryNotesApi = {
       console.time('insert_note');
       const { data: noteData, error: noteError } = await supabase
         .from('delivery_notes')
-        .insert(note)
+        .insert(mapDeliveryNoteToDb(note))
         .select()
         .single();
       console.timeEnd('insert_note');
@@ -665,7 +694,7 @@ export const deliveryNotesApi = {
         if (itemsError) throw itemsError;
       }
 
-      return noteData;
+      return mapDbToDeliveryNote(noteData);
     } finally {
       console.timeEnd('deliveryNotesApi.create');
     }
@@ -675,7 +704,7 @@ export const deliveryNotesApi = {
     // Update Note
     const { error: noteError } = await supabase
         .from('delivery_notes')
-        .update(note)
+        .update(mapDeliveryNoteToDb(note))
         .eq('id', id);
     
     if (noteError) throw noteError;
