@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Briefcase, Search, Clock, Package } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { 
   inventoryApi, 
   jobsApi, 
@@ -37,7 +37,9 @@ interface MovementLine {
   isFictitious?: boolean;
 }
 
-export default function NewMovementPage() {
+export default function EditMovementPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -145,14 +147,54 @@ export default function NewMovementPage() {
   const loadData = async () => {
     try {
       setInitialLoading(true);
-      const [inventoryData, jobsData] = await Promise.all([
+      const [inventoryData, jobsData, noteData] = await Promise.all([
         inventoryApi.getAll(),
-        jobsApi.getAll()
+        jobsApi.getAll(),
+        deliveryNotesApi.getById(id)
       ]);
       setInventory(inventoryData);
       setJobs(jobsData.filter(j => j.status === 'active'));
+      
+      // Populate Form
+      setActiveTab(noteData.type);
+      setNumberPart(noteData.number.split('/')[0]); // Extract number part
+      setDate(noteData.date.split('T')[0]);
+      
+      if (noteData.jobId) {
+          const job = jobsData.find(j => j.id === noteData.jobId);
+          if (job) setSelectedJob(job);
+      }
+      
+      setCausal(noteData.causal);
+      setPickupLocation(noteData.pickupLocation);
+      setDeliveryLocation(noteData.deliveryLocation);
+      setTransportMean(noteData.transportMean || "Mittente");
+      setTransportTime(noteData.transportTime || "");
+      setAppearance(noteData.appearance || "A VISTA");
+      setPackagesCount(noteData.packagesCount?.toString() || "1");
+      setNotes(noteData.notes || "");
+      
+      // Populate Lines
+      if (noteData.items) {
+          setLines(noteData.items.map(item => ({
+              tempId: item.id || Math.random().toString(36).substr(2, 9),
+              itemId: item.inventoryId,
+              itemName: item.inventoryName || "",
+              itemCode: item.inventoryCode || "",
+              itemUnit: item.inventoryUnit || "PZ",
+              quantity: item.quantity,
+              pieces: item.pieces,
+              coefficient: item.coefficient || 1,
+              purchaseItemId: item.purchaseItemId,
+              purchaseRef: item.purchaseItemId ? "Caricamento..." : undefined, // Ideally fetch ref
+              isFictitious: item.isFictitious
+          })));
+      }
+
     } catch (error) {
       console.error("Failed to load data", error);
+      alert("Errore nel caricamento della bolla");
+      router.push('/movements');
     } finally {
       setInitialLoading(false);
     }
@@ -286,12 +328,14 @@ export default function NewMovementPage() {
       const itemsData = lines.map(line => ({
         inventoryId: line.itemId,
         quantity: line.quantity,
+        pieces: line.pieces,
+        coefficient: line.coefficient,
         purchaseItemId: line.purchaseItemId,
         isFictitious: line.isFictitious
       }));
 
       console.time('api_call');
-      await deliveryNotesApi.create(noteData, itemsData);
+      await deliveryNotesApi.update(id, noteData, itemsData);
       console.timeEnd('api_call');
       
       console.time('redirect');
@@ -328,11 +372,11 @@ export default function NewMovementPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold text-slate-900">Nuova Bolla di Movimentazione</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Modifica Bolla di Movimentazione</h1>
           </div>
           <Button onClick={handleSave} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Salva Bolla
+            Salva Modifiche
           </Button>
         </div>
 

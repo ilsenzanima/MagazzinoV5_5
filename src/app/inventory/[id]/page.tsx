@@ -57,6 +57,7 @@ export default function InventoryDetailPage() {
 
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   
   // Movement Form State
@@ -70,25 +71,39 @@ export default function InventoryDetailPage() {
   const [submittingMovement, setSubmittingMovement] = useState(false);
   const [realQtyInput, setRealQtyInput] = useState<string>("");
 
-  // Load data
+    // Load data
   const loadData = async () => {
     if (!id) return;
     try {
       setLoading(true);
-      const [itemData, movementsData] = await Promise.all([
-        inventoryApi.getById(id),
-        inventoryApi.getHistory(id)
-      ]);
-      setItem(itemData);
-      setRealQtyInput(itemData.realQuantity?.toString() || "");
-      setMovements(movementsData);
+      setError(null);
       
-      // Load active jobs for dropdown
-      const jobsData = await jobsApi.getAll();
-      setActiveJobs(jobsData.filter(j => j.status === 'active'));
+      // 1. Load Item (Critical)
+      try {
+        const itemData = await inventoryApi.getById(id);
+        setItem(itemData);
+        setRealQtyInput(itemData.realQuantity?.toString() || "");
+      } catch (err: any) {
+        console.error("Error loading item:", err);
+        throw new Error(err.message || "Impossibile caricare l'articolo");
+      }
+
+      // 2. Load History & Jobs (Non-critical)
+      try {
+        const [movementsData, jobsData] = await Promise.all([
+          inventoryApi.getHistory(id),
+          jobsApi.getAll()
+        ]);
+        setMovements(movementsData);
+        setActiveJobs(jobsData.filter(j => j.status === 'active'));
+      } catch (err) {
+        console.warn("Error loading auxiliary data:", err);
+        // Don't block the page if history fails
+      }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading data:", error);
+      setError(error.message || "Errore durante il caricamento dei dati");
     } finally {
       setLoading(false);
     }
@@ -206,12 +221,26 @@ export default function InventoryDetailPage() {
     return (
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
-          <h2 className="text-2xl font-bold text-slate-900">Articolo non trovato</h2>
-          <Link href="/inventory">
-            <Button variant="outline">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Torna all'Inventario
-            </Button>
-          </Link>
+          <h2 className="text-2xl font-bold text-slate-900">
+            {error ? "Errore di Caricamento" : "Articolo non trovato"}
+          </h2>
+          {error && (
+            <p className="text-red-600 bg-red-50 px-4 py-2 rounded-md max-w-md text-center">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-4">
+            <Link href="/inventory">
+              <Button variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Torna all'Inventario
+              </Button>
+            </Link>
+            {error && (
+                <Button onClick={loadData}>
+                    Riprova
+                </Button>
+            )}
+          </div>
         </div>
       </DashboardLayout>
     );

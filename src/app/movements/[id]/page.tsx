@@ -86,6 +86,21 @@ export default function MovementDetailPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm("Sei sicuro di voler eliminare questa bolla? Questa azione è irreversibile.")) return;
+    
+    try {
+        setLoading(true);
+        await deliveryNotesApi.delete(id);
+        alert("Bolla eliminata con successo");
+        router.push('/movements');
+    } catch (error) {
+        console.error("Failed to delete movement", error);
+        alert("Errore durante l'eliminazione");
+        setLoading(false);
+    }
+  };
+
   const handleAddItem = () => {
     if (!newItem.inventoryId || !newItem.quantity) {
       alert("Seleziona materiale e quantità");
@@ -186,12 +201,24 @@ export default function MovementDetailPage() {
                     Bolla n. {movement.number} del {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
                 </p>
             </div>
-            {isEditing && (
+            <div className="flex gap-2">
+                <Button onClick={handleDelete} variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Elimina
+                </Button>
+                <Link href={`/movements/${id}/edit`}>
+                    <Button variant="outline">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Modifica
+                    </Button>
+                </Link>
+                {isEditing && (
                 <Button onClick={handleSaveChanges} className="bg-green-600 hover:bg-green-700">
                     <Save className="mr-2 h-4 w-4" />
-                    Salva Modifiche
+                    Salva Modifiche Rapide
                 </Button>
-            )}
+                )}
+            </div>
           </div>
         </div>
 

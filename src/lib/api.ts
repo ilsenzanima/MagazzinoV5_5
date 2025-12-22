@@ -222,15 +222,19 @@ const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
 // --- Suppliers API ---
 export const suppliersApi = {
   getAll: async () => {
-    const { data, error } = await supabase
-      .from('suppliers')
-      .select('*')
-      .order('name');
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('suppliers')
+        .select('*')
+        .order('name')
+    );
     if (error) throw error;
     return data.map(mapDbToSupplier);
   },
   getById: async (id: string) => {
-    const { data, error } = await supabase.from('suppliers').select('*').eq('id', id).single();
+    const { data, error } = await fetchWithTimeout(
+      supabase.from('suppliers').select('*').eq('id', id).single()
+    );
     if (error) throw error;
     return mapDbToSupplier(data);
   },
@@ -253,19 +257,23 @@ export const suppliersApi = {
 // --- Purchases API ---
 export const purchasesApi = {
   getAll: async () => {
-    const { data, error } = await supabase
-      .from('purchases')
-      .select('*, suppliers(name), purchase_items(price)')
-      .order('created_at', { ascending: false });
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('purchases')
+        .select('*, suppliers(name), purchase_items(price)')
+        .order('created_at', { ascending: false })
+    );
     if (error) throw error;
     return data.map(mapDbToPurchase);
   },
   getById: async (id: string) => {
-    const { data, error } = await supabase
-      .from('purchases')
-      .select('*, suppliers(name)')
-      .eq('id', id)
-      .single();
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('purchases')
+        .select('*, suppliers(name)')
+        .eq('id', id)
+        .single()
+    );
     if (error) throw error;
     return mapDbToPurchase(data);
   },
@@ -280,10 +288,12 @@ export const purchasesApi = {
   },
   // Items management
   getItems: async (purchaseId: string) => {
-    const { data, error } = await supabase
-      .from('purchase_items')
-      .select('*, inventory(name, code), jobs(code)')
-      .eq('purchase_id', purchaseId);
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('purchase_items')
+        .select('*, inventory(name, code), jobs(code)')
+        .eq('purchase_id', purchaseId)
+    );
       
     if (error) throw error;
     return data.map((item: any) => ({
@@ -795,11 +805,13 @@ export const inventoryApi = {
 
   // Get single item
   getById: async (id: string) => {
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('inventory')
+        .select('*')
+        .eq('id', id)
+        .single()
+    );
 
     if (error) throw error;
     return mapDbItemToInventoryItem(data);
@@ -843,14 +855,33 @@ export const inventoryApi = {
   },
 
   getHistory: async (itemId: string) => {
-    const { data, error } = await supabase
-      .from('stock_movements_view')
-      .select('*, profiles:user_id(full_name)')
-      .eq('item_id', itemId)
-      .order('date', { ascending: false });
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('stock_movements_view')
+        .select('*')
+        .eq('item_id', itemId)
+        .order('date', { ascending: false })
+    );
       
     if (error) throw error;
-    
+
+    // Fetch user names manually to avoid view relationship issues
+    const userIds = [...new Set(data.map((m: any) => m.user_id).filter(Boolean))];
+    let userMap: Record<string, string> = {};
+
+    if (userIds.length > 0) {
+        const { data: users } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', userIds);
+        
+        if (users) {
+            users.forEach((u: any) => {
+                userMap[u.id] = u.full_name;
+            });
+        }
+    }
+  
     return data.map((m: any) => ({
       id: m.id,
       date: m.date,
@@ -859,7 +890,7 @@ export const inventoryApi = {
       reference: m.reference,
       itemId: m.item_id,
       userId: m.user_id,
-      userName: m.profiles?.full_name,
+      userName: userMap[m.user_id],
       pieces: m.pieces,
       coefficient: m.coefficient,
       notes: m.notes
@@ -1002,15 +1033,19 @@ export const unitsApi = {
 // --- Clients API ---
 export const clientsApi = {
   getAll: async () => {
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
-      .order('name');
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('clients')
+        .select('*')
+        .order('name')
+    );
     if (error) throw error;
     return data.map(mapDbToClient);
   },
   getById: async (id: string) => {
-    const { data, error } = await supabase.from('clients').select('*').eq('id', id).single();
+    const { data, error } = await fetchWithTimeout(
+      supabase.from('clients').select('*').eq('id', id).single()
+    );
     if (error) throw error;
     return mapDbToClient(data);
   },
@@ -1033,10 +1068,12 @@ export const clientsApi = {
 // --- Jobs API ---
 export const jobsApi = {
   getAll: async () => {
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('*, clients(*)')
-      .order('created_at', { ascending: false });
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('jobs')
+        .select('*, clients(*)')
+        .order('created_at', { ascending: false })
+    );
     if (error) throw error;
     return data.map(mapDbToJob);
   },
@@ -1058,7 +1095,9 @@ export const jobsApi = {
     }
   },
   getById: async (id: string) => {
-    const { data, error } = await supabase.from('jobs').select('*, clients(*)').eq('id', id).single();
+    const { data, error } = await fetchWithTimeout(
+      supabase.from('jobs').select('*, clients(*)').eq('id', id).single()
+    );
     if (error) throw error;
     return mapDbToJob(data);
   },
@@ -1081,11 +1120,13 @@ export const jobsApi = {
 // --- Job Logs API ---
 export const jobLogsApi = {
   getByJobId: async (jobId: string) => {
-    const { data, error } = await supabase
-      .from('job_logs')
-      .select('*, profiles:user_id(full_name)')
-      .eq('job_id', jobId)
-      .order('date', { ascending: false });
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('job_logs')
+        .select('*, profiles:user_id(full_name)')
+        .eq('job_id', jobId)
+        .order('date', { ascending: false })
+    );
     if (error) throw error;
     return data.map(mapDbToJobLog);
   },
@@ -1106,11 +1147,13 @@ export const jobLogsApi = {
 // --- Job Documents API ---
 export const jobDocumentsApi = {
   getByJobId: async (jobId: string) => {
-    const { data, error } = await supabase
-      .from('job_documents')
-      .select('*, profiles:uploaded_by(full_name)')
-      .eq('job_id', jobId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('job_documents')
+        .select('*, profiles:uploaded_by(full_name)')
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: false })
+    );
     if (error) throw error;
     return data.map(mapDbToJobDocument);
   },
@@ -1132,30 +1175,34 @@ export const jobDocumentsApi = {
 export const movementsApi = {
   getByItemId: async (itemId: string) => {
     // Join with profiles to get user name and jobs to get job info
-    const { data, error } = await supabase
-      .from('movements')
-      .select(`
-        *,
-        profiles:user_id(full_name),
-        jobs:job_id(code, description)
-      `)
-      .eq('item_id', itemId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('movements')
+        .select(`
+          *,
+          profiles:user_id(full_name),
+          jobs:job_id(code, description)
+        `)
+        .eq('item_id', itemId)
+        .order('created_at', { ascending: false })
+    );
       
     if (error) throw error;
     return data.map(mapDbToMovement);
   },
 
   getByJobId: async (jobId: string) => {
-    const { data, error } = await supabase
-      .from('movements')
-      .select(`
-        *,
-        profiles:user_id(full_name),
-        inventory:item_id(code, name, unit, price)
-      `)
-      .eq('job_id', jobId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('movements')
+        .select(`
+          *,
+          profiles:user_id(full_name),
+          inventory:item_id(code, name, unit, price)
+        `)
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: false })
+    );
 
     if (error) throw error;
 
