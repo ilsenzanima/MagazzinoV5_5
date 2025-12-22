@@ -611,21 +611,43 @@ export default function InventoryDetailPage() {
                                 break;
                         }
 
+                        if (move.isFictitious) {
+                           typeColor = "bg-orange-500";
+                        }
+
                         return (
-                            <TableRow key={move.id}>
-                              <TableCell className="font-mono text-xs">
-                                {new Date(move.date).toLocaleDateString()}
-                                <div className="text-[10px] text-slate-400">{new Date(move.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            <TableRow key={move.id} className={move.isFictitious ? "bg-orange-50/50" : ""}>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                    <span className="font-medium">
+                                        {new Date(move.date).toLocaleDateString('it-IT')}
+                                    </span>
+                                    <span className="text-xs text-slate-400">
+                                        {new Date(move.date).toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}
+                                    </span>
+                                </div>
                               </TableCell>
                               <TableCell>
-                                <Badge className={`${typeColor} hover:${typeColor}`}>
-                                    {typeLabel}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                    <Badge className={`${typeColor} hover:${typeColor}`}>
+                                        {typeLabel}
+                                    </Badge>
+                                    {move.isFictitious && (
+                                        <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50 text-[10px]">
+                                            FITTIZIO
+                                        </Badge>
+                                    )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-col">
-                                   <span className="font-medium">{move.reference || "-"}</span>
+                                   <span className="font-medium text-slate-700">{move.reference || "-"}</span>
                                    {move.userName && <span className="text-[10px] text-slate-400">Utente: {move.userName}</span>}
+                                   {move.isFictitious && (
+                                        <span className="text-[10px] text-orange-500 italic">
+                                            Non movimenta il magazzino
+                                        </span>
+                                   )}
                                    {move.notes && <span className="text-xs text-slate-500 truncate max-w-[200px]">{move.notes}</span>}
                                 </div>
                               </TableCell>
