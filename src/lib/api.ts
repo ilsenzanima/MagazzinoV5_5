@@ -60,7 +60,7 @@ export interface Movement {
   itemId: string;
   userId?: string;
   userName?: string; // For display
-  type: 'load' | 'unload';
+  type: 'load' | 'unload' | 'purchase' | 'entry' | 'exit' | 'sale';
   quantity: number;
   reference: string;
   notes?: string;
@@ -72,6 +72,8 @@ export interface Movement {
   itemCode?: string; // For display
   itemUnit?: string; // For display
   itemPrice?: number; // For display
+  pieces?: number;
+  coefficient?: number;
 }
 
 export interface StockMovement {

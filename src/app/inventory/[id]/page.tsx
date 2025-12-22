@@ -59,7 +59,7 @@ export default function InventoryDetailPage() {
   
   // Movement Form State
   const [isMovementOpen, setIsMovementOpen] = useState(false);
-  const [movementType, setMovementType] = useState<'load' | 'unload'>('load');
+  const [movementType, setMovementType] = useState<'load' | 'unload' | 'purchase' | 'entry' | 'exit' | 'sale'>('load');
   const [movementQty, setMovementQty] = useState(1);
   const [movementRef, setMovementRef] = useState("");
   const [movementNotes, setMovementNotes] = useState("");
@@ -484,16 +484,38 @@ export default function InventoryDetailPage() {
                     ) : (
                       movements.map((move) => {
                         const isPositive = move.quantity > 0;
-                        let typeLabel = move.type;
-                        let typeColor = "bg-slate-500";
+                        let typeLabel: string = move.type;
+                        let typeColor: string = "bg-slate-500";
                         
                         switch(move.type) {
-                            case 'purchase': typeLabel = "Acquisto"; typeColor = "bg-blue-600"; break;
-                            case 'entry': typeLabel = "Entrata"; typeColor = "bg-green-600"; break;
-                            case 'load': typeLabel = "Carico"; typeColor = "bg-green-600"; break;
-                            case 'exit': typeLabel = "Uscita"; typeColor = "bg-red-600"; break;
-                            case 'unload': typeLabel = "Scarico"; typeColor = "bg-red-600"; break;
-                            case 'sale': typeLabel = "Vendita"; typeColor = "bg-orange-600"; break;
+                            case 'purchase': 
+                                typeLabel = "Acquisto"; 
+                                typeColor = "bg-blue-600"; 
+                                break;
+                            case 'entry': 
+                                typeLabel = "Entrata"; 
+                                typeColor = "bg-green-600"; 
+                                break;
+                            case 'load': 
+                                typeLabel = "Carico"; 
+                                typeColor = "bg-green-600"; 
+                                break;
+                            case 'exit': 
+                                typeLabel = "Uscita"; 
+                                typeColor = "bg-red-600"; 
+                                break;
+                            case 'unload': 
+                                typeLabel = "Scarico"; 
+                                typeColor = "bg-red-600"; 
+                                break;
+                            case 'sale': 
+                                typeLabel = "Vendita"; 
+                                typeColor = "bg-red-600"; 
+                                break;
+                            default: 
+                                typeLabel = move.type; 
+                                typeColor = "bg-slate-500"; 
+                                break;
                         }
 
                         return (
