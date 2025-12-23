@@ -293,20 +293,14 @@ export const purchasesApi = {
     if (!user) throw new Error("Utente non autenticato");
 
     const dbPurchase = mapPurchaseToDb({ ...purchase, createdBy: user.id });
-    // Remove job_id if it's not in the schema yet to avoid errors
-    // @ts-ignore
-    delete dbPurchase.job_id;
-
+    
     const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name)').single();
     if (error) throw error;
     return mapDbToPurchase(data);
   },
   update: async (id: string, purchase: Partial<Purchase>) => {
     const dbPurchase = mapPurchaseToDb(purchase);
-    // Remove job_id if it's not in the schema yet
-    // @ts-ignore
-    delete dbPurchase.job_id;
-
+    
     const { data, error } = await supabase.from('purchases').update(dbPurchase).eq('id', id).select('*, suppliers(name)').single();
     if (error) throw error;
     return mapDbToPurchase(data);
