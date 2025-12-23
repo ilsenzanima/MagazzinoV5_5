@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Save, Plus, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Loader2, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -58,6 +58,7 @@ export default function NewPurchasePage() {
     supplierId: "",
     deliveryNoteNumber: "",
     deliveryNoteDate: new Date().toISOString().split('T')[0],
+    jobId: ""
   });
 
   // Form State - Current Line
@@ -77,9 +78,11 @@ export default function NewPurchasePage() {
 
   // Dialog States
   const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
+  const [isHeaderJobSelectorOpen, setIsHeaderJobSelectorOpen] = useState(false);
   const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
   const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
   const [selectedJobForLine, setSelectedJobForLine] = useState<Job | null>(null);
+  const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
 
   useEffect(() => {
     loadData();
@@ -123,6 +126,22 @@ export default function NewPurchasePage() {
         jobId: job.id
     });
     setIsJobSelectorOpen(false);
+  };
+
+  const handleHeaderJobSelect = (job: Job) => {
+    setSelectedHeaderJob(job);
+    setFormData({
+        ...formData,
+        jobId: job.id
+    });
+    // Update current line to match header job if it's not set or if we want to enforce it
+    setCurrentLine(prev => ({
+        ...prev,
+        isJob: true,
+        jobId: job.id
+    }));
+    setSelectedJobForLine(job);
+    setIsHeaderJobSelectorOpen(false);
   };
 
   const handleCurrentLineQuantityChange = (quantityStr: string) => {
@@ -197,7 +216,7 @@ export default function NewPurchasePage() {
 
     setLines([...lines, newLine]);
     
-    // Reset current line but keep job selection if desired (resetting for now)
+    // Reset current line but keep job selection if header job is set
     setCurrentLine({
       itemId: "",
       quantity: "",
@@ -205,11 +224,13 @@ export default function NewPurchasePage() {
       coefficient: 1,
       unit: "PZ",
       price: "",
-      isJob: false,
-      jobId: ""
+      isJob: !!formData.jobId,
+      jobId: formData.jobId || ""
     });
     setSelectedItemForLine(null);
-    setSelectedJobForLine(null);
+    if (!formData.jobId) {
+        setSelectedJobForLine(null);
+    }
   };
 
   const updateLine = (tempId: string, updates: Partial<PurchaseLine>) => {
@@ -291,7 +312,9 @@ export default function NewPurchasePage() {
         supplierId: formData.supplierId,
         deliveryNoteNumber: formData.deliveryNoteNumber,
         deliveryNoteDate: formData.deliveryNoteDate,
-        status: 'completed' // Or 'draft', assuming completed for now as per requirement implied
+        status: 'draft',
+        notes: '',
+        jobId: formData.jobId || undefined
       });
 
       // 2. Create Purchase Lines
@@ -347,7 +370,7 @@ export default function NewPurchasePage() {
                 <CardHeader>
                     <CardTitle>Dati Bolla</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="supplier">Fornitore *</Label>
                         <Select 
@@ -381,6 +404,45 @@ export default function NewPurchasePage() {
                             value={formData.deliveryNoteDate}
                             onChange={(e) => setFormData({...formData, deliveryNoteDate: e.target.value})}
                         />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Commessa (Generale)</Label>
+                        <div 
+                            className="flex items-center justify-between border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 bg-white h-10"
+                            onClick={() => setIsHeaderJobSelectorOpen(true)}
+                        >
+                            {selectedHeaderJob ? (
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="font-medium text-sm truncate">{selectedHeaderJob.code}</span>
+                                    {selectedHeaderJob.clientName && (
+                                        <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.clientName}</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="text-sm text-slate-500 truncate">Seleziona per intero acquisto...</span>
+                            )}
+                            {selectedHeaderJob ? (
+                                <X 
+                                    className="h-4 w-4 text-slate-400 hover:text-red-500 flex-shrink-0 ml-1" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedHeaderJob(null);
+                                        setFormData({...formData, jobId: ""});
+                                        // Reset line job if it matches header
+                                        setCurrentLine(prev => ({
+                                            ...prev,
+                                            isJob: false,
+                                            jobId: ""
+                                        }));
+                                        if (selectedJobForLine?.id === selectedHeaderJob.id) {
+                                            setSelectedJobForLine(null);
+                                        }
+                                    }}
+                                />
+                            ) : (
+                                <Search className="h-4 w-4 text-slate-400 flex-shrink-0 ml-1" />
+                            )}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -614,6 +676,13 @@ export default function NewPurchasePage() {
         open={isJobSelectorOpen}
         onOpenChange={setIsJobSelectorOpen}
         onSelect={handleJobSelect}
+        jobs={jobs}
+      />
+
+      <JobSelectorDialog 
+        open={isHeaderJobSelectorOpen}
+        onOpenChange={setIsHeaderJobSelectorOpen}
+        onSelect={handleHeaderJobSelect}
         jobs={jobs}
       />
     </DashboardLayout>

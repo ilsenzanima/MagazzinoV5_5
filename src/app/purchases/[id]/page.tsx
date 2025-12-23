@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -54,9 +54,11 @@ export default function PurchaseDetailPage() {
 
   // Dialog States
   const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
+  const [isHeaderJobSelectorOpen, setIsHeaderJobSelectorOpen] = useState(false);
   const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
   const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
   const [selectedJobForLine, setSelectedJobForLine] = useState<Job | null>(null);
+  const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
 
   // Edit Item State
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -82,11 +84,72 @@ export default function PurchaseDetailPage() {
       setItems(itemsData);
       setInventory(inventoryData);
       setJobs(jobsData.filter(j => j.status === 'active'));
+
+      if (purchaseData.jobId) {
+          const job = jobsData.find(j => j.id === purchaseData.jobId);
+          if (job) {
+              setSelectedHeaderJob(job);
+              // Set default for new item
+              setNewItem(prev => ({
+                  ...prev,
+                  isJob: true,
+                  jobId: job.id
+              }));
+              setSelectedJobForLine(job);
+          }
+      }
     } catch (error) {
       console.error("Failed to load purchase details", error);
       alert("Errore nel caricamento dell'acquisto");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleJobSelect = (job: Job) => {
+    setSelectedJobForLine(job);
+    setNewItem(prev => ({
+        ...prev,
+        jobId: job.id
+    }));
+    setIsJobSelectorOpen(false);
+  };
+
+  const handleHeaderJobSelect = async (job: Job) => {
+    try {
+        await purchasesApi.update(id, { jobId: job.id });
+        setSelectedHeaderJob(job);
+        // Update current line default
+        setNewItem(prev => ({
+            ...prev,
+            isJob: true,
+            jobId: job.id
+        }));
+        setSelectedJobForLine(job);
+        
+        // Also update local purchase state
+        if (purchase) {
+            setPurchase({...purchase, jobId: job.id, jobCode: job.code});
+        }
+    } catch (error) {
+        console.error("Failed to update purchase job", error);
+        alert("Errore nell'aggiornamento della commessa");
+    }
+    setIsHeaderJobSelectorOpen(false);
+  };
+
+  const handleClearHeaderJob = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Rimuovere la commessa dall'intestazione?")) return;
+    
+    try {
+        await purchasesApi.update(id, { jobId: "" });
+        setSelectedHeaderJob(null);
+        if (purchase) {
+             setPurchase({...purchase, jobId: undefined, jobCode: undefined});
+        }
+    } catch (error) {
+        console.error("Failed to clear purchase job", error);
     }
   };
 
@@ -166,9 +229,15 @@ export default function PurchaseDetailPage() {
         pieces: "",
         coefficient: 1,
         price: "",
-        isJob: false,
-        jobId: ""
+        isJob: !!selectedHeaderJob,
+        jobId: selectedHeaderJob?.id || ""
       });
+      // Keep selected job for line if header job is set
+      if (!selectedHeaderJob) {
+          setSelectedJobForLine(null);
+      } else {
+          setSelectedJobForLine(selectedHeaderJob);
+      }
     } catch (error) {
       console.error("Failed to add item", error);
       alert("Errore durante l'aggiunta dell'articolo");
@@ -369,6 +438,34 @@ export default function PurchaseDetailPage() {
                     <div>
                         <Label className="text-slate-500">Data Bolla</Label>
                         <div className="font-medium">{new Date(purchase.deliveryNoteDate).toLocaleDateString()}</div>
+                    </div>
+                    <div className="md:col-span-2 border-t pt-4 mt-2">
+                        <Label className="text-slate-500 mb-1 block">Commessa (Generale)</Label>
+                        <div 
+                            className="flex items-center justify-between border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 bg-white max-w-md"
+                            onClick={() => setIsHeaderJobSelectorOpen(true)}
+                        >
+                            {selectedHeaderJob ? (
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="font-medium text-sm truncate">{selectedHeaderJob.code}</span>
+                                    {selectedHeaderJob.clientName && (
+                                        <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.clientName}</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="text-sm text-slate-500 truncate">Seleziona per applicare a nuovi articoli...</span>
+                            )}
+                            {selectedHeaderJob ? (
+                                <div 
+                                    className="p-1 hover:bg-red-100 rounded-full"
+                                    onClick={handleClearHeaderJob}
+                                >
+                                    <X className="h-4 w-4 text-slate-400 hover:text-red-500 flex-shrink-0" />
+                                </div>
+                            ) : (
+                                <Search className="h-4 w-4 text-slate-400 flex-shrink-0 ml-1" />
+                            )}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -660,11 +757,14 @@ export default function PurchaseDetailPage() {
                 open={isJobSelectorOpen}
                 onOpenChange={setIsJobSelectorOpen}
                 jobs={jobs}
-                onSelect={(job) => {
-                    setSelectedJobForLine(job);
-                    setNewItem(prev => ({ ...prev, jobId: job.id }));
-                    setIsJobSelectorOpen(false);
-                }}
+                onSelect={handleJobSelect}
+            />
+
+            <JobSelectorDialog
+                open={isHeaderJobSelectorOpen}
+                onOpenChange={setIsHeaderJobSelectorOpen}
+                jobs={jobs}
+                onSelect={handleHeaderJobSelect}
             />
         </div>
       </div>

@@ -167,6 +167,8 @@ export interface Purchase {
   createdByName?: string;
   createdAt: string;
   items?: { price: number }[];
+  jobId?: string;
+  jobCode?: string; // Display
 }
 
 export interface PurchaseItem {
@@ -213,7 +215,9 @@ const mapDbToPurchase = (db: any): Purchase => ({
   createdBy: db.created_by,
   createdByName: db.profiles?.full_name,
   createdAt: db.created_at,
-  items: db.purchase_items
+  items: db.purchase_items,
+  jobId: db.job_id,
+  jobCode: db.jobs?.code
 });
 
 const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
@@ -222,7 +226,8 @@ const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
   delivery_note_date: purchase.deliveryNoteDate,
   status: purchase.status,
   notes: purchase.notes,
-  created_by: purchase.createdBy
+  created_by: purchase.createdBy,
+  job_id: purchase.jobId || null
 });
 
 // --- Suppliers API ---
@@ -266,7 +271,7 @@ export const purchasesApi = {
     const { data, error } = await fetchWithTimeout(
       supabase
         .from('purchases')
-        .select('*, suppliers(name), purchase_items(price)')
+        .select('*, suppliers(name), purchase_items(price), jobs(code)')
         .order('created_at', { ascending: false })
     );
     if (error) throw error;
@@ -276,7 +281,7 @@ export const purchasesApi = {
     const { data, error } = await fetchWithTimeout(
       supabase
         .from('purchases')
-        .select('*, suppliers(name)')
+        .select('*, suppliers(name), jobs(code)')
         .eq('id', id)
         .single()
     );
@@ -288,7 +293,13 @@ export const purchasesApi = {
     if (!user) throw new Error("Utente non autenticato");
 
     const dbPurchase = mapPurchaseToDb({ ...purchase, createdBy: user.id });
-    const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name)').single();
+    const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name), jobs(code)').single();
+    if (error) throw error;
+    return mapDbToPurchase(data);
+  },
+  update: async (id: string, purchase: Partial<Purchase>) => {
+    const dbPurchase = mapPurchaseToDb(purchase);
+    const { data, error } = await supabase.from('purchases').update(dbPurchase).eq('id', id).select('*, suppliers(name), jobs(code)').single();
     if (error) throw error;
     return mapDbToPurchase(data);
   },

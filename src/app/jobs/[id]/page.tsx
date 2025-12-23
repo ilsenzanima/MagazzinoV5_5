@@ -77,10 +77,39 @@ export default function JobDetailsPage() {
   }
 
   // Calculate Total Cost
-  // Logic: Unload (To Site) = Cost (+), Load (Return) = Refund (-)
+  // Logic: 
+  // - Purchase/Unload/Exit = Cost (+)
+  // - Load/Entry = Refund (-)
+  // For Fictitious items, we try to use the Last Purchase Price found in the history
+  
+  // 1. Find Last Purchase Price per Item Code
+  const lastPurchasePriceMap = new Map<string, number>()
+  for (const m of movements) {
+    if (m.itemCode && m.type === 'purchase' && m.itemPrice && m.itemPrice > 0) {
+       if (!lastPurchasePriceMap.has(m.itemCode)) {
+           lastPurchasePriceMap.set(m.itemCode, m.itemPrice)
+       }
+    }
+  }
+
   const totalCost = movements.reduce((acc, m) => {
-    const cost = m.quantity * (m.itemPrice || 0);
-    return acc + (m.type === 'unload' ? cost : -cost);
+    // Determine direction
+    // In to Site (Cost +): purchase, unload (wh->site), exit (wh->site)
+    const isCostPositive = ['purchase', 'unload', 'exit'].includes(m.type);
+    
+    // Determine Price
+    let price = m.itemPrice || 0;
+    
+    // If fictitious, try to use last purchase price
+    if (m.isFictitious && m.itemCode) {
+        const lastPrice = lastPurchasePriceMap.get(m.itemCode);
+        if (lastPrice) {
+            price = lastPrice;
+        }
+    }
+
+    const cost = Math.abs(m.quantity) * price;
+    return acc + (isCostPositive ? cost : -cost);
   }, 0);
 
   return (
