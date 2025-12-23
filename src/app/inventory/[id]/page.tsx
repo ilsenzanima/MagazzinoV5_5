@@ -253,7 +253,8 @@ export default function InventoryDetailPage() {
   const handleMovementSubmit = async () => {
     if (!item) return;
     
-    if (movementQty <= 0) {
+    const qtyCheck = parseFloat(movementQty);
+    if (isNaN(qtyCheck) || qtyCheck <= 0) {
         alert("La quantità deve essere maggiore di 0");
         return;
     }
@@ -265,7 +266,7 @@ export default function InventoryDetailPage() {
             return;
         }
         // Fallback to quantity check
-        if (movementQty > item.quantity) {
+        if (qtyCheck > item.quantity) {
             alert("Non puoi scaricare più quantità di quella disponibile!");
             return;
         }
@@ -275,7 +276,7 @@ export default function InventoryDetailPage() {
         setSubmittingMovement(true);
         
         const piecesVal = parseFloat(movementPieces);
-        const qtyVal = Number(movementQty);
+        const qtyVal = qtyCheck;
 
         if (isNaN(qtyVal) || qtyVal <= 0) {
             alert("Inserire una quantità valida");

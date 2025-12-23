@@ -30,6 +30,7 @@ export function JobStock({ movements }: JobStockProps) {
     name: string, 
     code: string, 
     qty: number, 
+    pieces: number,
     unit: string,
     price: number, // Specific or Average
     isFictitious: boolean,
@@ -88,6 +89,7 @@ export function JobStock({ movements }: JobStockProps) {
         name: m.itemName || 'Sconosciuto',
         code: m.itemCode,
         qty: qtyChange,
+        pieces: piecesChange,
         unit: m.itemUnit || 'PZ',
         price: price,
         isFictitious: !!m.isFictitious,
