@@ -334,9 +334,9 @@ export default function NewPurchasePage() {
       }
 
       router.push('/purchases');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save purchase", error);
-      alert("Errore durante il salvataggio");
+      alert(`Errore durante il salvataggio: ${error.message || error.toString()}`);
     } finally {
       setLoading(false);
     }
