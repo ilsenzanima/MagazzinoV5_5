@@ -191,18 +191,24 @@ export default function NewMovementPage() {
         purchaseItemId: ""
     });
 
-    // If EXIT/SALE, load available batches
-    if (activeTab === 'exit' || activeTab === 'sale') {
+    // If EXIT/SALE/ENTRY, load available batches
+    if (activeTab === 'exit' || activeTab === 'sale' || activeTab === 'entry') {
         try {
             const batches = await inventoryApi.getAvailableBatches(item.id);
-            // Filter exhausted batches (check pieces first, then qty)
-            const validBatches = batches.filter((b: any) => {
-                if (b.remainingPieces !== undefined && b.remainingPieces !== null) {
-                    return b.remainingPieces > 0.001;
-                }
-                return b.remainingQty > 0.001;
-            });
-            setAvailableBatches(validBatches);
+            
+            if (activeTab === 'entry') {
+                // For Entry, show all batches (even exhausted ones) so we can return goods to them
+                setAvailableBatches(batches);
+            } else {
+                // For Exit/Sale, Filter exhausted batches (check pieces first, then qty)
+                const validBatches = batches.filter((b: any) => {
+                    if (b.remainingPieces !== undefined && b.remainingPieces !== null) {
+                        return b.remainingPieces > 0.001;
+                    }
+                    return b.remainingQty > 0.001;
+                });
+                setAvailableBatches(validBatches);
+            }
         } catch (err) {
             console.error("Failed to load batches", err);
             setAvailableBatches([]);
@@ -496,13 +502,16 @@ export default function NewMovementPage() {
                                 </div>
                             </div>
                             <div className="w-full sm:w-32 space-y-2">
-                                {(activeTab === 'exit' || activeTab === 'sale') && availableBatches.length > 0 && (
-                                    <div className="mb-2 w-full">
-                                        <Label htmlFor="batch-select" className="text-red-600 font-bold">Lotto Acquisto *</Label>
-                                        <Select 
-                                            value={currentLine.purchaseItemId} 
-                                            onValueChange={(v) => setCurrentLine({...currentLine, purchaseItemId: v})}
-                                        >
+                                {/* Batch Selection - Visible for Exit/Sale AND Entry */}
+                            {(activeTab === 'exit' || activeTab === 'sale' || activeTab === 'entry') && availableBatches.length > 0 && (
+                                <div className="mb-2 w-full">
+                                    <Label htmlFor="batch-select" className={activeTab === 'entry' ? "text-blue-600 font-bold" : "text-red-600 font-bold"}>
+                                        {activeTab === 'entry' ? "Lotto di Rientro (Opzionale)" : "Lotto Acquisto *"}
+                                    </Label>
+                                    <Select 
+                                        value={currentLine.purchaseItemId} 
+                                        onValueChange={(v) => setCurrentLine({...currentLine, purchaseItemId: v})}
+                                    >
                                             <SelectTrigger id="batch-select" className="w-full sm:w-[200px]">
                                                 <SelectValue placeholder="Seleziona..." />
                                             </SelectTrigger>
