@@ -833,6 +833,39 @@ export const inventoryApi = {
     return data.map(mapDbItemToInventoryItem);
   },
 
+  getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string }) => {
+    let query = supabase.from('inventory').select('*', { count: 'exact' });
+
+    // Filter by search term
+    if (options.search) {
+      const term = options.search;
+      query = query.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,supplier_code.ilike.%${term}%`);
+    }
+
+    // Filter by tab
+    if (options.tab === 'out_of_stock') {
+        query = query.eq('quantity', 0);
+    } 
+    // Note: 'low_stock' filtering (quantity <= min_stock) is complex in PostgREST without a view or RPC.
+    // For now, we only handle 'out_of_stock' server-side. 'low_stock' might need client-side filtering or specific endpoint.
+
+    // Sort by name for paginated view (usually preferred over created_at)
+    query = query.order('name');
+
+    // Pagination
+    const from = (options.page - 1) * options.limit;
+    const to = from + options.limit - 1;
+    query = query.range(from, to);
+
+    const { data, error, count } = await fetchWithTimeout(query);
+    if (error) throw error;
+
+    return {
+      items: data.map(mapDbItemToInventoryItem),
+      total: count || 0
+    };
+  },
+
   // Get single item
   getById: async (id: string) => {
     const { data, error } = await fetchWithTimeout(

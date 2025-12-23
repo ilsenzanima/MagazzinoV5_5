@@ -88,6 +88,14 @@ export default function NewInventoryItemPage() {
   const handleCreate = async () => {
     setIsLoading(true);
     try {
+        const coeff = parseFloat(formData.coefficient);
+        if (isNaN(coeff) || coeff <= 0) {
+            // Show simple alert or better UI feedback (using alert for now as requested for simplicity)
+            alert("Il coefficiente deve essere maggiore di 0");
+            setIsLoading(false);
+            return;
+        }
+
         const newItem = {
             code,
             name: formData.name,
@@ -97,7 +105,7 @@ export default function NewInventoryItemPage() {
             quantity: 0,
             minStock: parseInt(formData.minStock) || 0,
             unit: formData.unit as any,
-            coefficient: parseFloat(formData.coefficient) || 1.0,
+            coefficient: coeff,
             description: formData.description,
             image: formData.image,
         };
@@ -283,6 +291,7 @@ export default function NewInventoryItemPage() {
                         id="coefficient" 
                         type="number" 
                         step="0.01" 
+                        min="0.01"
                         value={formData.coefficient}
                         onChange={(e) => setFormData({...formData, coefficient: e.target.value})}
                         disabled={userRole !== 'admin'}

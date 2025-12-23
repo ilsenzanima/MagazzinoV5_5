@@ -1,16 +1,17 @@
 "use client"
 
-import { useState, useEffect, useMemo, useDeferredValue } from "react";
+import { useState, useEffect, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { 
   Search, 
   Filter, 
   Plus, 
   ChevronLeft,
+  ChevronRight,
   Package,
   ScanLine,
   Loader2
@@ -30,25 +31,76 @@ import {
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Ottimizzazione INP: Defer search term update
-  const deferredSearchTerm = useDeferredValue(searchTerm);
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit] = useState(12); // Grid layout: 1, 2, 3, 4 cols
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+        setDebouncedSearchTerm(searchTerm);
+        setPage(1); // Reset to first page on new search
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Load items when dependencies change
   useEffect(() => {
     loadItems();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearchTerm, activeTab]);
 
   const loadItems = async () => {
     try {
         setLoading(true);
         setError(null);
-        const data = await inventoryApi.getAll();
-        setItems(data);
+
+        // Handle 'low_stock' separately because server-side filtering for column comparison is complex
+        if (activeTab === 'low_stock') {
+             // Client-side filtering for low stock
+             const allData = await inventoryApi.getAll();
+             let filtered = allData.filter(i => i.quantity > 0 && i.quantity <= i.minStock);
+             
+             // Client-side search
+             if (debouncedSearchTerm) {
+                 const term = debouncedSearchTerm.toLowerCase();
+                 filtered = filtered.filter(item => 
+                    item.name.toLowerCase().includes(term) ||
+                    item.code.toLowerCase().includes(term) ||
+                    item.brand.toLowerCase().includes(term) ||
+                    item.type.toLowerCase().includes(term) ||
+                    (item.supplierCode?.toLowerCase().includes(term) ?? false)
+                 );
+             }
+             
+             // Client-side pagination
+             setTotalItems(filtered.length);
+             setTotalPages(Math.ceil(filtered.length / limit) || 1);
+             
+             const from = (page - 1) * limit;
+             const to = from + limit;
+             setItems(filtered.slice(from, to));
+        } else {
+            // Server-side pagination for 'all' and 'out_of_stock'
+            const { items: paginatedItems, total } = await inventoryApi.getPaginated({
+                page,
+                limit,
+                search: debouncedSearchTerm,
+                tab: activeTab
+            });
+            setItems(paginatedItems);
+            setTotalItems(total);
+            setTotalPages(Math.ceil(total / limit) || 1);
+        }
     } catch (error: any) {
         console.error("Failed to load inventory:", error);
         setError(error.message || "Errore sconosciuto durante il caricamento inventario");
@@ -97,31 +149,6 @@ export default function InventoryPage() {
     };
   }, [isScanning]);
 
-  // Logica di Filtro
-  const filteredItems = useMemo(() => {
-    const term = deferredSearchTerm.toLowerCase();
-    
-    return items.filter((item) => {
-      // 1. Filtro Ricerca (Cerca su tutti i campi testuali)
-      const matchesSearch = 
-        item.name.toLowerCase().includes(term) ||
-        item.code.toLowerCase().includes(term) ||
-        item.brand.toLowerCase().includes(term) ||
-        item.type.toLowerCase().includes(term) ||
-        (item.supplierCode?.toLowerCase().includes(term) ?? false);
-
-      // 2. Filtro Tab
-      let matchesTab = true;
-      if (activeTab === "low_stock") {
-        matchesTab = item.quantity > 0 && item.quantity <= item.minStock;
-      } else if (activeTab === "out_of_stock") {
-        matchesTab = item.quantity === 0;
-      }
-
-      return matchesSearch && matchesTab;
-    });
-  }, [items, deferredSearchTerm, activeTab]);
-
   return (
     <DashboardLayout>
       
@@ -168,7 +195,7 @@ export default function InventoryPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }} className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-slate-100 dark:bg-muted">
             <TabsTrigger value="all">Tutti</TabsTrigger>
             <TabsTrigger value="low_stock" className="data-[state=active]:text-amber-600">Basse Scorte</TabsTrigger>
@@ -195,83 +222,114 @@ export default function InventoryPage() {
             </Button>
         </div>
       ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredItems.length === 0 ? (
-          <div className="col-span-full text-center py-10 text-slate-400">
-            <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <p>Nessun articolo trovato</p>
-          </div>
-        ) : (
-          filteredItems.map((item) => (
-            <Link href={`/inventory/${item.id}`} key={item.id}>
-              <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group h-full">
-                <CardContent className="p-0 flex flex-col h-full">
-                  {/* Immagine */}
-                  <div className="w-full h-48 bg-slate-200 shrink-0 relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={item.image || "/placeholder.svg"} 
-                      alt={item.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/placeholder.svg";
-                      }}
-                    />
-                    {item.quantity === 0 && (
-                       <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm">
-                         <Badge variant="destructive" className="text-sm font-bold">ESAURITO</Badge>
-                       </div>
-                    )}
-                  </div>
-
-                  {/* Dettagli */}
-                  <div className="flex-1 p-4 flex flex-col gap-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                          <p className="text-xs text-slate-500 font-mono mb-1">{item.code}</p>
-                          <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight">{item.name}</h3>
-                      </div>
+      <>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {items.length === 0 ? (
+            <div className="col-span-full text-center py-10 text-slate-400">
+                <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                <p>Nessun articolo trovato</p>
+            </div>
+            ) : (
+            items.map((item) => (
+                <Link href={`/inventory/${item.id}`} key={item.id}>
+                <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group h-full">
+                    <CardContent className="p-0 flex flex-col h-full">
+                    {/* Immagine */}
+                    <div className="w-full h-48 bg-slate-200 shrink-0 relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                        src={item.image || "/placeholder.svg"} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/placeholder.svg";
+                        }}
+                        />
+                        {item.quantity === 0 && (
+                        <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm">
+                            <Badge variant="destructive" className="text-sm font-bold">ESAURITO</Badge>
+                        </div>
+                        )}
                     </div>
-                    
-                    <div className="flex flex-wrap gap-1 mt-auto pt-2">
-                      <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
-                        {item.brand}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
-                        {item.type}
-                      </Badge>
-                       <div className="ml-auto text-right flex flex-col items-end">
-                         {item.coefficient !== 1 ? (
-                             <>
-                                 <span className="text-[10px] text-slate-500 font-medium mb-1 mr-1">
-                                     {(item.pieces ?? (item.quantity / item.coefficient)).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz =
-                                 </span>
-                                 <Badge variant="outline" className={
+
+                    {/* Dettagli */}
+                    <div className="flex-1 p-4 flex flex-col gap-2">
+                        <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-xs text-slate-500 font-mono mb-1">{item.code}</p>
+                            <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight">{item.name}</h3>
+                        </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-1 mt-auto pt-2">
+                        <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
+                            {item.brand}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
+                            {item.type}
+                        </Badge>
+                        <div className="ml-auto text-right flex flex-col items-end">
+                            {item.coefficient !== 1 ? (
+                                <>
+                                    <span className="text-[10px] text-slate-500 font-medium mb-1 mr-1">
+                                        {(item.pieces ?? (item.quantity / item.coefficient)).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz =
+                                    </span>
+                                    <Badge variant="outline" className={
+                                        item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50" :
+                                        item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
+                                        "text-slate-600"
+                                    }>
+                                        {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                    </Badge>
+                                </>
+                            ) : (
+                                <Badge variant="outline" className={
                                     item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50" :
                                     item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
                                     "text-slate-600"
-                                  }>
-                                     {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
-                                 </Badge>
-                             </>
-                         ) : (
-                             <Badge variant="outline" className={
-                                item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50" :
-                                item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
-                                "text-slate-600"
-                              }>
-                                {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
-                              </Badge>
-                         )}
-                       </div>
+                                }>
+                                    {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                </Badge>
+                            )}
+                        </div>
+                        </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))
+                    </CardContent>
+                </Card>
+                </Link>
+            ))
+            )}
+        </div>
+        
+        {/* Pagination Controls */}
+        {items.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between mt-8 border-t pt-4 dark:border-border gap-4">
+                <div className="text-sm text-slate-500 order-2 sm:order-1">
+                    Pagina {page} di {totalPages} ({totalItems} articoli)
+                </div>
+                <div className="flex gap-2 order-1 sm:order-2">
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                    >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Precedente
+                    </Button>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                    >
+                        Successiva
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                </div>
+            </div>
         )}
-      </div>
+      </>
     )}
       
       {/* Floating Action Button (FAB) */}
@@ -297,7 +355,6 @@ export default function InventoryPage() {
           </div>
         </DialogContent>
       </Dialog>
-
     </DashboardLayout>
   );
 }

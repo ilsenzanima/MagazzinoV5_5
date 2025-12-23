@@ -191,7 +191,15 @@ export default function InventoryDetailPage() {
             return;
         }
 
-        await inventoryApi.update(item.id, editForm);
+        if (editForm.coefficient !== undefined && editForm.coefficient <= 0) {
+            alert("Il coefficiente deve essere maggiore di 0");
+            return;
+        }
+
+        await inventoryApi.update(item.id, {
+            ...editForm,
+            updated_at: new Date().toISOString()
+        });
         
         // Refresh
         const updatedItem = { ...item, ...editForm };
@@ -209,11 +217,16 @@ export default function InventoryDetailPage() {
   const handleDelete = async () => {
     if (confirm("Sei sicuro di voler eliminare questo articolo? Questa azione non può essere annullata.")) {
       try {
-        await inventoryApi.delete(id);
-        router.push("/inventory");
-      } catch (error) {
-        console.error("Error deleting item:", error);
-        alert("Errore durante l'eliminazione");
+        await inventoryApi.delete(item.id);
+        router.push('/inventory');
+      } catch (error: any) {
+        console.error("Failed to delete item", error);
+        // Check for foreign key constraint violation (Postgres code 23503)
+        if (error?.code === '23503' || error?.message?.includes('foreign key constraint')) {
+            alert("Impossibile eliminare: articolo utilizzato in movimenti");
+        } else {
+            alert("Errore durante l'eliminazione");
+        }
       }
     }
   };
