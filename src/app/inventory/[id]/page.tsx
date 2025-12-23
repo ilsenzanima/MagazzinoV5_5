@@ -849,7 +849,10 @@ export default function InventoryDetailPage() {
                                 ) : "-"}
                               </TableCell>
                               <TableCell className={`text-right font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                {isPositive ? '+' : ''}{move.quantity} {item.unit}
+                                {isPositive ? '+' : ''}
+                                {move.pieces && move.coefficient && move.coefficient !== 1 
+                                    ? (move.pieces * move.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })
+                                    : move.quantity} {item.unit}
                               </TableCell>
                             </TableRow>
                         );
