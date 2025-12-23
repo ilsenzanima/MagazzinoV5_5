@@ -147,7 +147,7 @@ export default function NewPurchasePage() {
       itemCategory: selectedItem?.type,
       itemDescription: selectedItem?.description,
       quantity: parseFloat(currentLine.quantity),
-      pieces: currentLine.pieces ? parseFloat(currentLine.pieces) : undefined,
+      pieces: currentLine.pieces ? parseFloat(currentLine.pieces) : (currentLine.coefficient === 1 ? parseFloat(currentLine.quantity) : undefined),
       coefficient: currentLine.coefficient,
       unit: currentLine.unit,
       price: parseFloat(currentLine.price),
@@ -372,28 +372,31 @@ export default function NewPurchasePage() {
                             </div>
                             
                             {/* Logic for Pieces/Quantity */}
-                            {currentLine.coefficient !== 1 && (
-                                <div className="md:col-span-2 space-y-2">
-                                    <Label>Pezzi</Label>
-                                    <Input 
-                                        type="number" 
-                                        min="0"
-                                        step="1"
-                                        value={currentLine.pieces}
-                                        onChange={(e) => {
-                                            const p = e.target.value;
-                                            const q = p ? (parseFloat(p) * currentLine.coefficient).toFixed(2) : "";
-                                            setCurrentLine({
-                                                ...currentLine, 
-                                                pieces: p,
-                                                quantity: q
-                                            });
-                                        }}
-                                        placeholder="Pezzi"
-                                    />
-                                    <p className="text-xs text-muted-foreground">Coeff: {currentLine.coefficient}</p>
-                                </div>
-                            )}
+                            <div className="md:col-span-2 space-y-2">
+                                <Label>Pezzi</Label>
+                                <Input 
+                                    type="number" 
+                                    min="0"
+                                    step="1"
+                                    value={currentLine.pieces}
+                                    onChange={(e) => {
+                                        const p = e.target.value;
+                                        // If p is empty, q is kept or empty? Let's just update p.
+                                        // If p is valid number, update q based on coefficient.
+                                        let q = currentLine.quantity;
+                                        if (p && !isNaN(parseFloat(p))) {
+                                            q = (parseFloat(p) * currentLine.coefficient).toFixed(2);
+                                        }
+                                        setCurrentLine({
+                                            ...currentLine, 
+                                            pieces: p,
+                                            quantity: q
+                                        });
+                                    }}
+                                    placeholder="Pezzi"
+                                />
+                                <p className="text-xs text-muted-foreground">Coeff: {currentLine.coefficient}</p>
+                            </div>
 
                             <div className="md:col-span-2 space-y-2">
                                 <Label>Quantità ({currentLine.unit})</Label>
@@ -402,9 +405,16 @@ export default function NewPurchasePage() {
                                     min="0"
                                     step="0.01"
                                     value={currentLine.quantity}
-                                    readOnly={currentLine.coefficient !== 1} // Read only if calculated
-                                    className={currentLine.coefficient !== 1 ? "bg-slate-100" : ""}
-                                    onChange={(e) => setCurrentLine({...currentLine, quantity: e.target.value})}
+                                    onChange={(e) => {
+                                        const q = e.target.value;
+                                        let p = currentLine.pieces;
+                                        if (q && !isNaN(parseFloat(q)) && currentLine.coefficient !== 1) {
+                                            p = (parseFloat(q) / currentLine.coefficient).toFixed(2);
+                                        } else if (q && !isNaN(parseFloat(q)) && currentLine.coefficient === 1) {
+                                            p = q;
+                                        }
+                                        setCurrentLine({...currentLine, quantity: q, pieces: p});
+                                    }}
                                     placeholder="0.00"
                                 />
                             </div>
@@ -485,21 +495,17 @@ export default function NewPurchasePage() {
                                                 {line.itemDescription && <div className="text-xs text-slate-400 truncate max-w-[200px]">{line.itemDescription}</div>}
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                {line.coefficient !== 1 ? (
-                                                    <Input 
-                                                        type="number" 
-                                                        min="0"
-                                                        step="1"
-                                                        className="h-8 w-20 mx-auto text-center"
-                                                        value={line.pieces || ""}
-                                                        onChange={(e) => handleLinePiecesChange(line.tempId, e.target.value)}
-                                                    />
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
+                                                <Input 
+                                                    type="number" 
+                                                    min="0"
+                                                    step="1"
+                                                    className="h-8 w-20 mx-auto text-center"
+                                                    value={line.pieces || ""}
+                                                    onChange={(e) => handleLinePiecesChange(line.tempId, e.target.value)}
+                                                />
                                             </TableCell>
                                             <TableCell className="text-center text-sm text-slate-500">
-                                                {line.coefficient !== 1 ? line.coefficient : "-"}
+                                                {line.coefficient}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">

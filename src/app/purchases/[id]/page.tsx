@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -24,6 +24,8 @@ import {
   Purchase,
   PurchaseItem
 } from "@/lib/api";
+import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
+import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 
 export default function PurchaseDetailPage() {
   const params = useParams();
@@ -49,6 +51,12 @@ export default function PurchaseDetailPage() {
     isJob: false,
     jobId: ""
   });
+
+  // Dialog States
+  const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
+  const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
+  const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
+  const [selectedJobForLine, setSelectedJobForLine] = useState<Job | null>(null);
 
   // Edit Item State
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -80,6 +88,45 @@ export default function PurchaseDetailPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleNewItemQuantityChange = (quantityStr: string) => {
+    const quantity = parseFloat(quantityStr);
+    
+    if (isNaN(quantity)) {
+        setNewItem(prev => ({ ...prev, quantity: quantityStr, pieces: "" }));
+        return;
+    }
+
+    let piecesStr = newItem.pieces;
+    if (newItem.coefficient && newItem.coefficient !== 1) {
+        piecesStr = (quantity / newItem.coefficient).toFixed(2);
+    } else {
+        // If coefficient is 1, pieces = quantity
+        piecesStr = quantity.toString();
+    }
+
+    setNewItem(prev => ({ 
+        ...prev, 
+        quantity: quantityStr, 
+        pieces: piecesStr 
+    }));
+  };
+
+  const handleNewItemPiecesChange = (piecesStr: string) => {
+    const pieces = parseFloat(piecesStr);
+    
+    if (isNaN(pieces)) {
+        setNewItem(prev => ({ ...prev, pieces: piecesStr, quantity: "" }));
+        return;
+    }
+
+    const quantity = (pieces * newItem.coefficient).toFixed(2);
+    setNewItem(prev => ({ 
+        ...prev, 
+        pieces: piecesStr, 
+        quantity: quantity 
+    }));
   };
 
   const handleAddItem = async () => {
@@ -151,10 +198,46 @@ export default function PurchaseDetailPage() {
     });
   };
 
+  const handleEditPiecesChange = (piecesStr: string, coefficient: number) => {
+    const pieces = parseFloat(piecesStr);
+    let quantityStr = editValues.quantity;
+
+    if (!isNaN(pieces)) {
+        quantityStr = (pieces * coefficient).toFixed(2);
+    }
+    
+    setEditValues({
+        ...editValues,
+        pieces: piecesStr,
+        quantity: quantityStr
+    });
+  };
+
+  const handleEditQuantityChange = (quantityStr: string, coefficient: number) => {
+    const quantity = parseFloat(quantityStr);
+    let piecesStr = editValues.pieces;
+
+    if (!isNaN(quantity)) {
+        if (coefficient && coefficient !== 1) {
+            piecesStr = (quantity / coefficient).toFixed(2);
+        } else {
+             // If coefficient is 1, usually pieces = quantity, but let's keep pieces empty or same as qty?
+             // In current logic, if coeff=1, pieces is hidden or '-' in some views, but let's set it.
+             piecesStr = quantity.toString();
+        }
+    }
+    
+    setEditValues({
+        ...editValues,
+        quantity: quantityStr,
+        pieces: piecesStr
+    });
+  };
+
   const saveEdit = async (itemId: string, itemCoefficient: number = 1) => {
     try {
         const newPrice = parseFloat(editValues.price);
-        let newQty = parseFloat(editValues.quantity);
+        const newQty = parseFloat(editValues.quantity);
         const newPieces = editValues.pieces ? parseFloat(editValues.pieces) : undefined;
 
         if (isNaN(newPrice) || newPrice < 0) {
@@ -162,11 +245,6 @@ export default function PurchaseDetailPage() {
             return;
         }
         
-        // Recalculate quantity if pieces changed and coeff > 1
-        if (newPieces && itemCoefficient !== 1) {
-            newQty = parseFloat((newPieces * itemCoefficient).toFixed(2));
-        }
-
         if (isNaN(newQty) || newQty <= 0) {
             alert("Quantità non valida");
             return;
@@ -286,32 +364,22 @@ export default function PurchaseDetailPage() {
                                     {editingItemId === item.id ? (
                                         <>
                                             <TableCell className="text-right">
-                                                {item.coefficient && item.coefficient !== 1 ? (
-                                                    <Input 
-                                                        type="number" 
-                                                        className="w-20 ml-auto text-right h-8" 
-                                                        value={editValues.pieces}
-                                                        onChange={(e) => {
-                                                            const p = e.target.value;
-                                                            const c = item.coefficient || 1;
-                                                            const q = p ? (parseFloat(p) * c).toFixed(2) : "";
-                                                            setEditValues({...editValues, pieces: p, quantity: q});
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
+                                                <Input 
+                                                    type="number" 
+                                                    className="w-20 ml-auto text-right h-8" 
+                                                    value={editValues.pieces}
+                                                    onChange={(e) => handleEditPiecesChange(e.target.value, item.coefficient || 1)}
+                                                />
                                             </TableCell>
                                             <TableCell className="text-right text-slate-500">
-                                                {item.coefficient !== 1 ? item.coefficient : '-'}
+                                                {item.coefficient || 1}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <Input 
                                                     type="number" 
                                                     className="w-20 ml-auto text-right h-8" 
                                                     value={editValues.quantity}
-                                                    readOnly={item.coefficient !== 1} // Read only if calculated
-                                                    onChange={(e) => setEditValues({...editValues, quantity: e.target.value})}
+                                                    onChange={(e) => handleEditQuantityChange(e.target.value, item.coefficient || 1)}
                                                 />
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -327,10 +395,10 @@ export default function PurchaseDetailPage() {
                                     ) : (
                                         <>
                                             <TableCell className="text-right">
-                                                {item.pieces || (item.coefficient === 1 ? '-' : '')}
+                                                {item.pieces || (item.coefficient === 1 || !item.coefficient ? item.quantity : '-')}
                                             </TableCell>
                                             <TableCell className="text-right text-slate-500">
-                                                {item.coefficient !== 1 ? item.coefficient : '-'}
+                                                {item.coefficient || 1}
                                             </TableCell>
                                             <TableCell className="text-right">{item.quantity}</TableCell>
                                             <TableCell className="text-right">
@@ -417,45 +485,34 @@ export default function PurchaseDetailPage() {
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                             <div className="md:col-span-4 space-y-2">
                                 <Label>Materiale</Label>
-                                <Select 
-                                    value={newItem.itemId} 
-                                    onValueChange={(v) => {
-                                        const selectedItem = inventory.find(i => i.id === v);
-                                        const coeff = selectedItem?.coefficient || 1;
-                                        setNewItem({...newItem, itemId: v, coefficient: coeff, pieces: "", quantity: ""});
-                                    }}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Cerca materiale..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {inventory.map((item) => (
-                                            <SelectItem key={item.id} value={item.id}>
-                                                {item.name} ({item.code})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        className="w-full justify-start text-left font-normal"
+                                        onClick={() => setIsItemSelectorOpen(true)}
+                                    >
+                                        <Search className="mr-2 h-4 w-4" />
+                                        {selectedItemForLine ? (
+                                            <span>{selectedItemForLine.name} ({selectedItemForLine.code})</span>
+                                        ) : (
+                                            <span className="text-muted-foreground">Cerca materiale...</span>
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
                             
-                            {newItem.coefficient !== 1 && (
-                                <div className="md:col-span-2 space-y-2">
-                                    <Label>Pezzi</Label>
-                                    <Input 
-                                        type="number" 
-                                        min="0"
-                                        step="1"
-                                        value={newItem.pieces}
-                                        onChange={(e) => {
-                                            const p = e.target.value;
-                                            const q = p ? (parseFloat(p) * newItem.coefficient).toFixed(2) : "";
-                                            setNewItem({...newItem, pieces: p, quantity: q});
-                                        }}
-                                        placeholder="0"
-                                    />
-                                    <p className="text-xs text-muted-foreground">Coeff: {newItem.coefficient}</p>
-                                </div>
-                            )}
+                            <div className="md:col-span-2 space-y-2">
+                                <Label>Pezzi</Label>
+                                <Input 
+                                    type="number" 
+                                    min="0"
+                                    step="1"
+                                    value={newItem.pieces}
+                                    onChange={(e) => handleNewItemPiecesChange(e.target.value)}
+                                    placeholder="0"
+                                />
+                                <p className="text-xs text-muted-foreground">Coeff: {newItem.coefficient || 1}</p>
+                            </div>
 
                             <div className="md:col-span-2 space-y-2">
                                 <Label>Quantità {newItem.coefficient !== 1 ? '(Calc.)' : ''}</Label>
@@ -464,8 +521,7 @@ export default function PurchaseDetailPage() {
                                     min="0"
                                     step="0.01"
                                     value={newItem.quantity}
-                                    readOnly={newItem.coefficient !== 1}
-                                    onChange={(e) => setNewItem({...newItem, quantity: e.target.value})}
+                                    onChange={(e) => handleNewItemQuantityChange(e.target.value)}
                                     placeholder="0.00"
                                 />
                             </div>
@@ -480,7 +536,7 @@ export default function PurchaseDetailPage() {
                                     placeholder="0.00"
                                 />
                             </div>
-                            <div className="md:col-span-4 flex items-center gap-2 pb-2">
+                            <div className="md:col-span-2 flex items-center gap-2 pb-2">
                                 <div className="flex items-center space-x-2">
                                     <Checkbox 
                                         id="isJobNew" 
@@ -496,21 +552,18 @@ export default function PurchaseDetailPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
                                 <div className="space-y-2">
                                     <Label>Seleziona Commessa</Label>
-                                    <Select 
-                                        value={newItem.jobId} 
-                                        onValueChange={(v) => setNewItem({...newItem, jobId: v})}
+                                    <Button
+                                        variant="outline"
+                                        className="w-full justify-start text-left font-normal"
+                                        onClick={() => setIsJobSelectorOpen(true)}
                                     >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Scegli cantiere..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {jobs.map((job) => (
-                                                <SelectItem key={job.id} value={job.id}>
-                                                    {job.code} - {job.description}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        <Search className="mr-2 h-4 w-4" />
+                                        {selectedJobForLine ? (
+                                            <span>{selectedJobForLine.code} - {selectedJobForLine.description}</span>
+                                        ) : (
+                                            <span className="text-muted-foreground">Scegli cantiere...</span>
+                                        )}
+                                    </Button>
                                 </div>
                             </div>
                         )}
@@ -527,6 +580,33 @@ export default function PurchaseDetailPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <ItemSelectorDialog
+                open={isItemSelectorOpen}
+                onOpenChange={setIsItemSelectorOpen}
+                onSelect={(item) => {
+                    setSelectedItemForLine(item);
+                    setNewItem(prev => ({
+                        ...prev,
+                        itemId: item.id,
+                        coefficient: item.coefficient || 1,
+                        pieces: "",
+                        quantity: "",
+                        price: item.price ? item.price.toString() : ""
+                    }));
+                    setIsItemSelectorOpen(false);
+                }}
+            />
+
+            <JobSelectorDialog
+                open={isJobSelectorOpen}
+                onOpenChange={setIsJobSelectorOpen}
+                onSelect={(job) => {
+                    setSelectedJobForLine(job);
+                    setNewItem(prev => ({ ...prev, jobId: job.id }));
+                    setIsJobSelectorOpen(false);
+                }}
+            />
         </div>
       </div>
     </DashboardLayout>
