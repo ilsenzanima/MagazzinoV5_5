@@ -418,7 +418,7 @@ export default function NewPurchasePage() {
                                 <Input 
                                     type="number" 
                                     min="0"
-                                    step="1"
+                                    step="0.01"
                                     value={currentLine.pieces}
                                     onChange={(e) => handleCurrentLinePiecesChange(e.target.value)}
                                     placeholder="Pezzi"
@@ -517,7 +517,7 @@ export default function NewPurchasePage() {
                                                 <Input 
                                                     type="number" 
                                                     min="0"
-                                                    step="1"
+                                                    step="0.01"
                                                     className="h-8 w-20 mx-auto text-center"
                                                     value={line.pieces || ""}
                                                     onChange={(e) => handleLinePiecesChange(line.tempId, e.target.value)}

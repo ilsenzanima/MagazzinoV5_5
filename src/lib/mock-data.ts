@@ -13,6 +13,7 @@ export interface InventoryItem {
   location?: string;
   unit: string;
   coefficient: number;
+  pieces?: number;
   supplierCode?: string;
   realQuantity?: number | null;
 }

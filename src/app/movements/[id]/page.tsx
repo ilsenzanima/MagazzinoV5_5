@@ -370,7 +370,7 @@ export default function MovementDetailPage() {
                                     <Input 
                                         type="number" 
                                         min="0"
-                                        step="1"
+                                        step="0.01"
                                         value={newItem.pieces}
                                         onChange={(e) => {
                                             const p = e.target.value;

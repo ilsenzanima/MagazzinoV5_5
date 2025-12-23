@@ -255,6 +255,7 @@ export default function NewInventoryItemPage() {
                     <Input 
                         id="minStock" 
                         type="number" 
+                        step="0.01"
                         value={formData.minStock}
                         onChange={(e) => setFormData({...formData, minStock: e.target.value})}
                     />

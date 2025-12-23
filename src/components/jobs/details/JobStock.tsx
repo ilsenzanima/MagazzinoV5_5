@@ -55,6 +55,16 @@ export function JobStock({ movements }: JobStockProps) {
     // We use Math.abs to ignore the sign coming from the View (which is Warehouse-centric)
     const qtyChange = isSiteIn ? Math.abs(m.quantity) : -Math.abs(m.quantity)
     
+    // Calculate pieces change
+    let piecesChange = 0;
+    if (m.pieces !== undefined && m.pieces !== null) {
+        piecesChange = isSiteIn ? Math.abs(m.pieces) : -Math.abs(m.pieces);
+    } else if (m.coefficient && m.coefficient !== 0) {
+        // Fallback if pieces is missing but we have coefficient
+        const p = m.quantity / m.coefficient;
+        piecesChange = isSiteIn ? Math.abs(p) : -Math.abs(p);
+    }
+
     // Group by Item + Fictitious + Source (Purchase/Bolla)
     // Use Reference/PurchaseId to separate batches
     const sourceKey = m.purchaseId || m.reference || 'unknown'
@@ -64,6 +74,7 @@ export function JobStock({ movements }: JobStockProps) {
 
     if (current) {
       current.qty += qtyChange
+      current.pieces += piecesChange
     } else if (m.itemCode) {
       // Determine price
       let price = 0
@@ -168,8 +179,11 @@ export function JobStock({ movements }: JobStockProps) {
                                 <span className="text-slate-400 italic">Magazzino</span>
                              )}
                         </TableCell>
+                        <TableCell className="text-right font-mono text-slate-600">
+                            {Math.abs(item.pieces) > 0.01 ? item.pieces.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : '-'}
+                        </TableCell>
                         <TableCell className="text-right font-bold text-slate-700">
-                            {item.qty} {item.unit}
+                            {item.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
                         </TableCell>
                         <TableCell className="text-right text-slate-500">
                             <div className="flex items-center justify-end gap-2">

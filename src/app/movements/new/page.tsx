@@ -195,8 +195,13 @@ export default function NewMovementPage() {
     if (activeTab === 'exit' || activeTab === 'sale') {
         try {
             const batches = await inventoryApi.getAvailableBatches(item.id);
-            // Filter exhausted batches (just in case view doesn't catch them or floating point issues)
-            const validBatches = batches.filter((b: any) => b.remainingQty > 0.001);
+            // Filter exhausted batches (check pieces first, then qty)
+            const validBatches = batches.filter((b: any) => {
+                if (b.remainingPieces !== undefined && b.remainingPieces !== null) {
+                    return b.remainingPieces > 0.001;
+                }
+                return b.remainingQty > 0.001;
+            });
             setAvailableBatches(validBatches);
         } catch (err) {
             console.error("Failed to load batches", err);
@@ -224,9 +229,19 @@ export default function NewMovementPage() {
     // Validation: Check Quantity against Batch (Skip if Fictitious)
     if ((activeTab === 'exit' || activeTab === 'sale') && currentLine.purchaseItemId && !isFictitious) {
         const batch = availableBatches.find(b => b.id === currentLine.purchaseItemId);
-        if (batch && Number(currentLine.quantity) > batch.remainingQty) {
-            alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty}`);
-            return;
+        if (batch) {
+            // Check pieces if available (source of truth)
+            if (currentLine.pieces && batch.remainingPieces !== undefined) {
+                if (Number(currentLine.pieces) > batch.remainingPieces) {
+                     alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
+                     return;
+                }
+            } 
+            // Fallback to quantity check
+            else if (Number(currentLine.quantity) > batch.remainingQty) {
+                alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty}`);
+                return;
+            }
         }
     }
 
@@ -293,6 +308,8 @@ export default function NewMovementPage() {
       const itemsData = lines.map(line => ({
         inventoryId: line.itemId,
         quantity: line.quantity,
+        pieces: line.pieces,
+        coefficient: line.coefficient,
         purchaseItemId: line.purchaseItemId,
         isFictitious: line.isFictitious
       }));
@@ -495,7 +512,8 @@ export default function NewMovementPage() {
                                                 </SelectItem>
                                                 {availableBatches.map(batch => (
                                                     <SelectItem key={batch.id} value={batch.id}>
-                                                        {batch.purchaseRef} ({new Date(batch.date).toLocaleDateString()}) - Disp: {batch.remainingQty}
+                                                        {batch.purchaseRef} ({new Date(batch.date).toLocaleDateString()}) - 
+                                                        Disp: {batch.remainingPieces !== undefined ? `${batch.remainingPieces} pz` : `${batch.remainingQty}`}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -510,34 +528,53 @@ export default function NewMovementPage() {
                                             id="pieces-input"
                                             type="number" 
                                             min="0"
-                                            step="1"
+                                            step="0.01"
                                             className="bg-white"
                                             value={currentLine.pieces}
-                                            onChange={(e) => {
-                                                const p = e.target.value;
-                                                const q = p ? (parseFloat(p) * currentLine.coefficient).toFixed(2) : "";
-                                                setCurrentLine({
-                                                    ...currentLine, 
-                                                    pieces: p,
-                                                    quantity: q
-                                                });
-                                            }}
-                                            placeholder="Pezzi"
-                                        />
-                                        <p className="text-xs text-muted-foreground mt-1">Coeff: {currentLine.coefficient}</p>
-                                    </div>
-                                )}
-                                <Label htmlFor="qty-input">Quantità ({currentLine.unit})</Label>
-                                <Input 
-                                    id="qty-input"
-                                    type="number" 
-                                    min="0"
-                                    step="0.01"
-                                    className={`bg-white ${currentLine.coefficient !== 1 ? 'bg-slate-100' : ''}`}
-                                    readOnly={currentLine.coefficient !== 1}
-                                    value={currentLine.quantity}
-                                    onChange={(e) => setCurrentLine({...currentLine, quantity: e.target.value})}
+                                    onChange={(e) => {
+                                        const p = e.target.value;
+                                        // Calculate Quantity from Pieces
+                                        // If p is empty, q is empty
+                                        const q = p ? (parseFloat(p) * currentLine.coefficient).toFixed(2) : "";
+                                        setCurrentLine({
+                                            ...currentLine, 
+                                            pieces: p,
+                                            quantity: q
+                                        });
+                                    }}
+                                    placeholder="Pezzi"
                                 />
+                                <p className="text-xs text-muted-foreground mt-1">Coeff: {currentLine.coefficient}</p>
+                            </div>
+                        )}
+                        <Label htmlFor="qty-input">Quantità ({currentLine.unit})</Label>
+                        <Input 
+                            id="qty-input"
+                            type="number" 
+                            min="0"
+                            step="0.01"
+                            className="bg-white"
+                            value={currentLine.quantity}
+                            onChange={(e) => {
+                                const q = e.target.value;
+                                let p = currentLine.pieces;
+                                
+                                // Reverse Calculate Pieces from Quantity
+                                if (q && currentLine.coefficient && currentLine.coefficient !== 1) {
+                                    p = (parseFloat(q) / currentLine.coefficient).toFixed(2);
+                                } else if (q && (!currentLine.coefficient || currentLine.coefficient === 1)) {
+                                    p = q;
+                                } else {
+                                    p = "";
+                                }
+
+                                setCurrentLine({
+                                    ...currentLine, 
+                                    quantity: q,
+                                    pieces: p
+                                });
+                            }}
+                        />
                             </div>
                             <Button onClick={handleAddLine} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700" aria-label="Aggiungi riga">
                                 <Plus className="h-4 w-4" />

@@ -384,6 +384,7 @@ export default function PurchaseDetailPage() {
                                             <TableCell className="text-right">
                                                 <Input 
                                                     type="number" 
+                                                    step="0.01"
                                                     className="w-20 ml-auto text-right h-8" 
                                                     value={editValues.pieces}
                                                     onChange={(e) => {
@@ -402,6 +403,7 @@ export default function PurchaseDetailPage() {
                                             <TableCell className="text-right">
                                                 <Input 
                                                     type="number" 
+                                                    step="0.01"
                                                     className="w-20 ml-auto text-right h-8" 
                                                     value={editValues.quantity}
                                                     onChange={(e) => {
@@ -539,7 +541,7 @@ export default function PurchaseDetailPage() {
                                 <Input 
                                     type="number" 
                                     min="0"
-                                    step="1"
+                                    step="0.01"
                                     value={newItem.pieces}
                                     onChange={(e) => handleNewItemPiecesChange(e.target.value)}
                                     placeholder="0"

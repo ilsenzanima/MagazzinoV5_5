@@ -363,6 +363,7 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
   location: dbItem.location,
   unit: dbItem.unit,
   coefficient: dbItem.coefficient,
+  pieces: dbItem.pieces,
   supplierCode: dbItem.supplier_code
 });
 
@@ -907,7 +908,9 @@ export const inventoryApi = {
         purchaseRef: b.purchase_ref,
         date: b.purchase_date,
         originalQty: b.original_quantity,
-        remainingQty: b.remaining_quantity
+        remainingQty: b.remaining_quantity,
+        originalPieces: b.original_pieces,
+        remainingPieces: b.remaining_pieces
     }));
   },
 

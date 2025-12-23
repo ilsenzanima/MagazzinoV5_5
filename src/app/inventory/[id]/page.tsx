@@ -78,13 +78,39 @@ export default function InventoryDetailPage() {
   // Movement Form State
   const [isMovementOpen, setIsMovementOpen] = useState(false);
   const [movementType, setMovementType] = useState<'load' | 'unload' | 'purchase' | 'entry' | 'exit' | 'sale'>('load');
-  const [movementQty, setMovementQty] = useState(1);
+  const [movementQty, setMovementQty] = useState<string>("");
+  const [movementPieces, setMovementPieces] = useState<string>("");
   const [movementRef, setMovementRef] = useState("");
   const [movementNotes, setMovementNotes] = useState("");
   const [movementJob, setMovementJob] = useState("");
   const [activeJobs, setActiveJobs] = useState<Job[]>([]);
   const [submittingMovement, setSubmittingMovement] = useState(false);
   const [realQtyInput, setRealQtyInput] = useState<string>("");
+
+  // Helper to handle pieces/quantity change
+  const handleMovementPiecesChange = (val: string) => {
+      setMovementPieces(val);
+      if (!val) {
+          setMovementQty("");
+          return;
+      }
+      const p = parseFloat(val);
+      if (!isNaN(p) && item) {
+          setMovementQty((p * item.coefficient).toFixed(2));
+      }
+  };
+
+  const handleMovementQtyChange = (val: string) => {
+      setMovementQty(val);
+      if (!val) {
+          setMovementPieces("");
+          return;
+      }
+      const q = parseFloat(val);
+      if (!isNaN(q) && item && item.coefficient) {
+          setMovementPieces((q / item.coefficient).toFixed(2));
+      }
+  };
 
     // Load data
   const loadData = async () => {
@@ -232,38 +258,52 @@ export default function InventoryDetailPage() {
         return;
     }
     
-    if (movementType === 'unload' && movementQty > item.quantity) {
-        alert("Non puoi scaricare più quantità di quella disponibile!");
-        return;
+    if (movementType === 'unload') {
+        // Check pieces first (source of truth)
+        if (movementPieces && item.pieces !== undefined && parseFloat(movementPieces) > item.pieces) {
+            alert(`Non puoi scaricare più pezzi di quelli disponibili (${item.pieces})!`);
+            return;
+        }
+        // Fallback to quantity check
+        if (movementQty > item.quantity) {
+            alert("Non puoi scaricare più quantità di quella disponibile!");
+            return;
+        }
     }
 
     try {
         setSubmittingMovement(true);
         
-        // 1. Create movement
+        const piecesVal = parseFloat(movementPieces);
+        const qtyVal = Number(movementQty);
+
+        if (isNaN(qtyVal) || qtyVal <= 0) {
+            alert("Inserire una quantità valida");
+            return;
+        }
+
+        // 1. Create movement record
         await movementsApi.create({
             itemId: item.id,
             type: movementType,
-            quantity: movementQty,
-            reference: movementRef,
+            quantity: qtyVal,
+            pieces: isNaN(piecesVal) ? undefined : piecesVal,
+            coefficient: item.coefficient,
+            reference: movementRef || "Manuale",
             notes: movementNotes,
-            jobId: movementType === 'unload' ? movementJob : undefined // Link job only on unload usually
+            jobId: movementType === 'unload' ? movementJob : undefined
         });
 
-        // 2. Update item quantity locally and in DB
-        const newQty = movementType === 'load' 
-            ? item.quantity + movementQty 
-            : item.quantity - movementQty;
-            
-        await inventoryApi.update(item.id, { ...item, quantity: newQty });
-
-        // 3. Reset form and reload
+        // 2. Reload data (Trigger will update stock)
         setIsMovementOpen(false);
-        setMovementQty(1);
+        setMovementQty("");
+        setMovementPieces("");
         setMovementRef("");
         setMovementNotes("");
         setMovementJob("");
-        loadData(); // Reload all data to ensure sync
+        
+        // Wait a bit for trigger
+        setTimeout(() => loadData(), 500);
 
     } catch (error) {
         console.error("Error creating movement:", error);
@@ -410,17 +450,17 @@ export default function InventoryDetailPage() {
                     <Label>Quantità Teorica (Sistema)</Label>
                     <div className="grid grid-cols-2 gap-2">
                         <div className="p-3 bg-slate-50 border rounded-md text-center">
-                            <div className="text-lg font-bold text-slate-900">{item.quantity}</div>
+                            <div className="text-lg font-bold text-slate-900">{item.pieces ?? item.quantity}</div>
                             <div className="text-xs text-slate-500 font-medium">
-                                {item.coefficient !== 1 ? "Unità fisiche" : item.unit}
+                                {item.coefficient !== 1 ? "Pezzi (Unità fisiche)" : item.unit}
                             </div>
                         </div>
                         {item.coefficient !== 1 && (
                             <div className="p-3 bg-slate-50 border rounded-md text-center">
                                 <div className="text-lg font-bold text-slate-900">
-                                    {(item.quantity * item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })}
+                                    {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })}
                                 </div>
-                                <div className="text-xs text-slate-500 font-medium">{item.unit}</div>
+                                <div className="text-xs text-slate-500 font-medium">{item.unit} (Calc)</div>
                             </div>
                         )}
                     </div>
@@ -574,11 +614,12 @@ export default function InventoryDetailPage() {
                         <Input 
                             id="minStock" 
                             type="number" 
+                            step="0.01"
                             value={editForm.minStock || 0} 
                             onChange={(e) => setEditForm({...editForm, minStock: parseFloat(e.target.value)})} 
                         />
                     ) : (
-                        <Input id="minStock" type="number" value={item.minStock} readOnly className="bg-slate-50" />
+                        <Input id="minStock" type="number" step="0.01" value={item.minStock} readOnly className="bg-slate-50" />
                     )}
                   </div>
                 </div>
@@ -685,15 +726,32 @@ export default function InventoryDetailPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="qty">Quantità ({item.unit})</Label>
-                                <Input 
-                                    id="qty" 
-                                    type="number" 
-                                    min="1" 
-                                    value={movementQty}
-                                    onChange={(e) => setMovementQty(parseInt(e.target.value) || 0)}
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="pieces">Pezzi</Label>
+                                    <Input 
+                                        id="pieces" 
+                                        type="number" 
+                                        min="0"
+                                        step="0.01"
+                                        value={movementPieces}
+                                        onChange={(e) => handleMovementPiecesChange(e.target.value)}
+                                        placeholder="Pezzi"
+                                    />
+                                    {item.coefficient !== 1 && <span className="text-xs text-muted-foreground">Coeff: {item.coefficient}</span>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="qty">Quantità ({item.unit})</Label>
+                                    <Input 
+                                        id="qty" 
+                                        type="number" 
+                                        min="0"
+                                        step="0.01" 
+                                        value={movementQty}
+                                        onChange={(e) => handleMovementQtyChange(e.target.value)}
+                                        placeholder="Quantità"
+                                    />
+                                </div>
                             </div>
 
                             <div className="space-y-2">

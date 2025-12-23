@@ -240,8 +240,13 @@ export default function EditMovementPage() {
     if (activeTab === 'exit' || activeTab === 'sale') {
         try {
             const batches = await inventoryApi.getAvailableBatches(item.id);
-            // Filter exhausted batches (just in case view doesn't catch them or floating point issues)
-            const validBatches = batches.filter((b: any) => b.remainingQty > 0.001);
+            // Filter exhausted batches (check pieces first, then qty)
+            const validBatches = batches.filter((b: any) => {
+                if (b.remainingPieces !== undefined && b.remainingPieces !== null) {
+                    return b.remainingPieces > 0.001;
+                }
+                return b.remainingQty > 0.001;
+            });
             setAvailableBatches(validBatches);
         } catch (err) {
             console.error("Failed to load batches", err);
@@ -269,9 +274,19 @@ export default function EditMovementPage() {
     // Validation: Check Quantity against Batch (Skip if Fictitious)
     if ((activeTab === 'exit' || activeTab === 'sale') && currentLine.purchaseItemId && !isFictitious) {
         const batch = availableBatches.find(b => b.id === currentLine.purchaseItemId);
-        if (batch && Number(currentLine.quantity) > batch.remainingQty) {
-            alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty}`);
-            return;
+        if (batch) {
+            // Check pieces if available (source of truth)
+            if (currentLine.pieces && batch.remainingPieces !== undefined) {
+                if (Number(currentLine.pieces) > batch.remainingPieces) {
+                     alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
+                     return;
+                }
+            } 
+            // Fallback to quantity check
+            else if (Number(currentLine.quantity) > batch.remainingQty) {
+                alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty}`);
+                return;
+            }
         }
     }
 
@@ -542,7 +557,8 @@ export default function EditMovementPage() {
                                                 </SelectItem>
                                                 {availableBatches.map(batch => (
                                                     <SelectItem key={batch.id} value={batch.id}>
-                                                        {batch.purchaseRef} ({new Date(batch.date).toLocaleDateString()}) - Disp: {batch.remainingQty}
+                                                        {batch.purchaseRef} ({new Date(batch.date).toLocaleDateString()}) - 
+                                                        Disp: {batch.remainingPieces !== undefined ? `${batch.remainingPieces} pz` : `${batch.remainingQty}`}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -557,12 +573,15 @@ export default function EditMovementPage() {
                                             id="pieces-input"
                                             type="number" 
                                             min="0"
-                                            step="1"
+                                            step="0.01"
                                             className="bg-white"
                                             value={currentLine.pieces}
                                             onChange={(e) => {
                                                 const p = e.target.value;
+                                                // Se abbiamo i pezzi, calcoliamo la quantità
+                                                // Se il campo è vuoto, lasciamo vuoto anche quantità
                                                 const q = p ? (parseFloat(p) * currentLine.coefficient).toFixed(2) : "";
+                                                
                                                 setCurrentLine({
                                                     ...currentLine, 
                                                     pieces: p,
