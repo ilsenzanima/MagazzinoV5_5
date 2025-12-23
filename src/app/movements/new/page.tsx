@@ -261,7 +261,7 @@ export default function NewMovementPage() {
       itemCategory: selectedItemForLine.type, // Map type to category
       itemDescription: selectedItemForLine.description,
       quantity: Number(currentLine.quantity),
-      purchaseItemId: isFictitious ? undefined : currentLine.purchaseItemId,
+      purchaseItemId: isFictitious ? undefined : (currentLine.purchaseItemId || undefined),
       purchaseRef: isFictitious ? "Lotto Fittizio" : availableBatches.find(b => b.id === currentLine.purchaseItemId)?.purchaseRef,
       isFictitious: isFictitious
     };
@@ -310,7 +310,7 @@ export default function NewMovementPage() {
         quantity: line.quantity,
         pieces: line.pieces,
         coefficient: line.coefficient,
-        purchaseItemId: line.purchaseItemId,
+        purchaseItemId: line.purchaseItemId || undefined,
         isFictitious: line.isFictitious
       }));
 

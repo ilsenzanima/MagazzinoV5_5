@@ -760,7 +760,7 @@ export const deliveryNotesApi = {
           pieces: item.pieces,
           coefficient: item.coefficient,
           price: item.price,
-          purchase_item_id: item.purchaseItemId,
+          purchase_item_id: item.purchaseItemId || null,
           is_fictitious: item.isFictitious || false
         }));
 
@@ -800,7 +800,7 @@ export const deliveryNotesApi = {
             pieces: item.pieces,
             coefficient: item.coefficient,
             price: item.price,
-            purchase_item_id: item.purchaseItemId,
+            purchase_item_id: item.purchaseItemId || null,
             is_fictitious: item.isFictitious || false
         }));
         
