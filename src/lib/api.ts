@@ -271,7 +271,7 @@ export const purchasesApi = {
     const { data, error } = await fetchWithTimeout(
       supabase
         .from('purchases')
-        .select('*, suppliers(name), purchase_items(price), jobs(code)')
+        .select('*, suppliers(name), purchase_items(price)')
         .order('created_at', { ascending: false })
     );
     if (error) throw error;
@@ -281,7 +281,7 @@ export const purchasesApi = {
     const { data, error } = await fetchWithTimeout(
       supabase
         .from('purchases')
-        .select('*, suppliers(name), jobs(code)')
+        .select('*, suppliers(name)')
         .eq('id', id)
         .single()
     );
@@ -293,13 +293,21 @@ export const purchasesApi = {
     if (!user) throw new Error("Utente non autenticato");
 
     const dbPurchase = mapPurchaseToDb({ ...purchase, createdBy: user.id });
-    const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name), jobs(code)').single();
+    // Remove job_id if it's not in the schema yet to avoid errors
+    // @ts-ignore
+    delete dbPurchase.job_id;
+
+    const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name)').single();
     if (error) throw error;
     return mapDbToPurchase(data);
   },
   update: async (id: string, purchase: Partial<Purchase>) => {
     const dbPurchase = mapPurchaseToDb(purchase);
-    const { data, error } = await supabase.from('purchases').update(dbPurchase).eq('id', id).select('*, suppliers(name), jobs(code)').single();
+    // Remove job_id if it's not in the schema yet
+    // @ts-ignore
+    delete dbPurchase.job_id;
+
+    const { data, error } = await supabase.from('purchases').update(dbPurchase).eq('id', id).select('*, suppliers(name)').single();
     if (error) throw error;
     return mapDbToPurchase(data);
   },
