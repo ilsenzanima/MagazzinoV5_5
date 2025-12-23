@@ -411,14 +411,16 @@ export default function InventoryDetailPage() {
                     <div className="grid grid-cols-2 gap-2">
                         <div className="p-3 bg-slate-50 border rounded-md text-center">
                             <div className="text-lg font-bold text-slate-900">{item.quantity}</div>
-                            <div className="text-xs text-slate-500 font-medium">{item.unit}</div>
+                            <div className="text-xs text-slate-500 font-medium">
+                                {item.coefficient !== 1 ? "Unità fisiche" : item.unit}
+                            </div>
                         </div>
                         {item.coefficient !== 1 && (
                             <div className="p-3 bg-slate-50 border rounded-md text-center">
                                 <div className="text-lg font-bold text-slate-900">
                                     {(item.quantity * item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })}
                                 </div>
-                                <div className="text-xs text-slate-500 font-medium">Moltiplicato (x{item.coefficient})</div>
+                                <div className="text-xs text-slate-500 font-medium">{item.unit}</div>
                             </div>
                         )}
                     </div>
