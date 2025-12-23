@@ -81,7 +81,8 @@ export default function NewMovementPage() {
   });
   const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
   const [availableBatches, setAvailableBatches] = useState<any[]>([]); // For Exit
-  const [jobInventory, setJobInventory] = useState<any[]>([]); // For Entry
+  const [jobInventory, setJobInventory] = useState<any[]>([]); // For Entry (Legacy/Simple)
+  const [jobBatchAvailability, setJobBatchAvailability] = useState<any[]>([]); // For Entry (Detailed)
   const [lines, setLines] = useState<MovementLine[]>([]);
 
   // Computed Suffix based on selected date
@@ -165,13 +166,59 @@ export default function NewMovementPage() {
   useEffect(() => {
     // If Job Changes and we are in ENTRY mode, fetch Job Inventory
     if (activeTab === 'entry' && selectedJob) {
+        // Fetch detailed batch availability
+        inventoryApi.getJobBatchAvailability(selectedJob.id).then(data => {
+            setJobBatchAvailability(data);
+        }).catch(err => console.error("Failed to load job batches", err));
+
+        // Keep fetching legacy job inventory just in case (optional, maybe used for dialogItems)
         inventoryApi.getJobInventory(selectedJob.id).then(data => {
             setJobInventory(data);
         }).catch(err => console.error("Failed to load job inventory", err));
     } else {
         setJobInventory([]);
+        setJobBatchAvailability([]);
     }
   }, [activeTab, selectedJob]);
+
+  const handleSelectReturnBatch = (batch: any) => {
+    // Construct a temporary InventoryItem
+     const item: InventoryItem = {
+         id: batch.itemId,
+         code: batch.itemCode,
+         name: batch.itemName,
+         unit: batch.itemUnit,
+         brand: batch.itemBrand,
+         type: batch.itemCategory,
+         quantity: 0, // Not relevant here
+         minStock: 0,
+         description: "",
+         coefficient: batch.coefficient,
+         supplierCode: "",
+         price: 0
+     };
+    
+    setSelectedItemForLine(item);
+    
+    // Set current line with batch info
+    setCurrentLine({
+        itemId: item.id,
+        quantity: "",
+        pieces: "",
+        coefficient: batch.coefficient || 1,
+        unit: item.unit,
+        purchaseItemId: batch.purchaseItemId
+    });
+
+    // Mock availableBatches so validation and UI display works
+    setAvailableBatches([{
+        id: batch.purchaseItemId,
+        purchaseRef: batch.purchaseRef,
+        remainingQty: batch.quantity,
+        remainingPieces: batch.pieces,
+        date: new Date().toISOString()
+    }]);
+  };
 
   const handleJobSelect = (job: Job) => {
     setSelectedJob(job);
@@ -482,6 +529,66 @@ export default function NewMovementPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        
+                        {/* Job Return Selection Table (Entry Only) */}
+                        {activeTab === 'entry' && selectedJob && (
+                            <div className="mb-4 border rounded-md overflow-hidden">
+                                <div className="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
+                                    <h3 className="font-semibold text-sm text-slate-700">Materiale in Cantiere (Seleziona per Rientro)</h3>
+                                    <Badge variant="secondary">{jobBatchAvailability.length} lotti</Badge>
+                                </div>
+                                <div className="max-h-60 overflow-y-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Articolo</TableHead>
+                                                <TableHead>Lotto / Rif.</TableHead>
+                                                <TableHead className="text-right">Disponibile</TableHead>
+                                                <TableHead className="w-[50px]"></TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {jobBatchAvailability.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                                                        Nessun materiale tracciato trovato in questo cantiere.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                jobBatchAvailability.map((batch, idx) => (
+                                                    <TableRow 
+                                                        key={idx} 
+                                                        className="hover:bg-slate-50 cursor-pointer" 
+                                                        onClick={() => handleSelectReturnBatch(batch)}
+                                                    >
+                                                        <TableCell>
+                                                            <div className="font-medium text-slate-900">{batch.itemName}</div>
+                                                            <div className="text-xs text-slate-500">{batch.itemCode}</div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className="bg-white">{batch.purchaseRef}</Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono text-slate-700">
+                                                            {batch.pieces ? (
+                                                                <span>{batch.pieces} pz <span className="text-slate-400">({batch.quantity} {batch.itemUnit})</span></span>
+                                                            ) : (
+                                                                <span>{batch.quantity} {batch.itemUnit}</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600">
+                                                                <ArrowDownRight className="h-4 w-4" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Add Line Form */}
                         <div className="flex flex-col sm:flex-row gap-3 items-end bg-slate-50 p-3 rounded-lg border border-slate-100">
                             <div className="flex-1 space-y-2 w-full">

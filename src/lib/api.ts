@@ -947,6 +947,30 @@ export const inventoryApi = {
     }));
   },
 
+  // Get job inventory broken down by purchase batch (for Returns with traceability)
+  getJobBatchAvailability: async (jobId: string) => {
+    const { data, error } = await supabase
+        .from('job_batch_availability')
+        .select('*')
+        .eq('job_id', jobId)
+        .order('item_name', { ascending: true });
+
+    if (error) throw error;
+    return data.map((b: any) => ({
+        itemId: b.item_id,
+        purchaseItemId: b.purchase_item_id,
+        purchaseRef: b.purchase_ref,
+        itemName: b.item_name,
+        itemCode: b.item_code,
+        itemUnit: b.item_unit,
+        itemBrand: b.item_brand,
+        itemCategory: b.item_category,
+        quantity: b.quantity,
+        pieces: b.pieces,
+        coefficient: b.coefficient
+    }));
+  },
+
   // Seed database with mock data
   seed: async () => {
     // Check if data already exists
