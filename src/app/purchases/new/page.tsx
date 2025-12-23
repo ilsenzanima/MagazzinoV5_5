@@ -24,7 +24,6 @@ import {
 } from "@/lib/api";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
-import { Search } from "lucide-react";
 
 interface PurchaseLine {
   tempId: string;
