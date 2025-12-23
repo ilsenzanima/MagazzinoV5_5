@@ -602,6 +602,7 @@ export default function PurchaseDetailPage() {
             <JobSelectorDialog
                 open={isJobSelectorOpen}
                 onOpenChange={setIsJobSelectorOpen}
+                jobs={jobs}
                 onSelect={(job) => {
                     setSelectedJobForLine(job);
                     setNewItem(prev => ({ ...prev, jobId: job.id }));
