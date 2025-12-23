@@ -12,7 +12,7 @@ SELECT
     i.code as item_code,
     i.unit as item_unit,
     i.brand as item_brand,
-    i.type as item_category,
+    i.category as item_category,
     
     -- Quantity Calculation: Exits (sent to job) - Entries (returned from job)
     SUM(CASE WHEN dn.type = 'exit' THEN dni.quantity ELSE 0 END) -
@@ -41,7 +41,7 @@ GROUP BY
     i.code, 
     i.unit,
     i.brand,
-    i.type,
+    i.category,
     dni.coefficient
 HAVING 
     (SUM(CASE WHEN dn.type = 'exit' THEN dni.quantity ELSE 0 END) - 
