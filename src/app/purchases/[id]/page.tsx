@@ -189,6 +189,18 @@ export default function PurchaseDetailPage() {
     }
   };
 
+  const handleDeletePurchase = async () => {
+    if (!confirm("Sei sicuro di voler eliminare l'intero acquisto? Questa azione non può essere annullata.")) return;
+    
+    try {
+        await purchasesApi.delete(id);
+        router.push('/purchases');
+    } catch (error) {
+        console.error("Failed to delete purchase", error);
+        alert("Errore durante l'eliminazione dell'acquisto");
+    }
+  };
+
   const startEditing = (item: PurchaseItem) => {
     setEditingItemId(item.id);
     
@@ -316,12 +328,22 @@ export default function PurchaseDetailPage() {
                     Bolla n. {purchase.deliveryNoteNumber} del {new Date(purchase.deliveryNoteDate).toLocaleDateString()}
                 </p>
             </div>
-            {hasMissingPrices && (
-                <div className="bg-yellow-50 text-yellow-800 px-4 py-2 rounded-md border border-yellow-200 flex items-center shadow-sm animate-pulse">
-                    <AlertTriangle className="h-5 w-5 mr-2" />
-                    <span className="font-medium">Attenzione: Ci sono articoli con prezzo mancante (0.00)</span>
-                </div>
-            )}
+            <div className="flex items-center gap-2">
+                {hasMissingPrices && (
+                    <div className="bg-yellow-50 text-yellow-800 px-4 py-2 rounded-md border border-yellow-200 flex items-center shadow-sm animate-pulse">
+                        <AlertTriangle className="h-5 w-5 mr-2" />
+                        <span className="font-medium">Attenzione: Ci sono articoli con prezzo mancante (0.00)</span>
+                    </div>
+                )}
+                <Button 
+                    variant="destructive" 
+                    onClick={handleDeletePurchase}
+                    className="flex items-center gap-2"
+                >
+                    <Trash2 className="h-4 w-4" />
+                    Elimina Acquisto
+                </Button>
+            </div>
           </div>
         </div>
 

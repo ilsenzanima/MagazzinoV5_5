@@ -292,6 +292,10 @@ export const purchasesApi = {
     if (error) throw error;
     return mapDbToPurchase(data);
   },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('purchases').delete().eq('id', id);
+    if (error) throw error;
+  },
   // Items management
   getItems: async (purchaseId: string) => {
     const { data, error } = await fetchWithTimeout(

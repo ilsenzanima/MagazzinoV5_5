@@ -25,19 +25,41 @@ export default function Dashboard() {
       try {
         const supabase = createClient();
         
-        const { data: inventory, error } = await fetchWithTimeout(
+        // 1. Fetch Inventory for Counts
+        const { data: inventory, error: invError } = await fetchWithTimeout(
           supabase
             .from('inventory')
-            .select('quantity, price, min_stock')
+            .select('quantity, min_stock')
         );
 
-        if (error) throw error;
+        if (invError) throw invError;
+
+        // 2. Fetch Batches for Value Calculation (FIFO/Batch Specific Cost)
+        const { data: batches, error: batchError } = await fetchWithTimeout(
+            supabase
+                .from('purchase_batch_availability')
+                .select('remaining_pieces, coefficient, unit_price')
+        );
+
+        if (batchError) throw batchError;
 
         let totalVal = 0;
         let lowStock = 0;
 
+        // Calculate Value from Batches (Pieces * Coeff * Price)
+        batches?.forEach(batch => {
+            const pieces = batch.remaining_pieces || 0;
+            const coeff = batch.coefficient || 1; // Default to 1 if missing
+            const price = batch.unit_price || 0;
+            
+            // Formula: Value = (Pieces * Coeff) * Price
+            if (pieces > 0) {
+                totalVal += (pieces * coeff) * price;
+            }
+        });
+
+        // Calculate Low Stock from Inventory Items
         inventory?.forEach(item => {
-          totalVal += (item.quantity || 0) * (item.price || 0);
           if ((item.quantity || 0) <= (item.min_stock || 0)) {
             lowStock++;
           }

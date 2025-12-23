@@ -8,6 +8,10 @@ SELECT
     p.delivery_note_number as purchase_ref,
     p.created_at as purchase_date,
     
+    -- Cost Info
+    pi.price as unit_price,
+    pi.coefficient as coefficient,
+
     -- Quantity
     pi.quantity as original_quantity,
     pi.quantity - COALESCE((
