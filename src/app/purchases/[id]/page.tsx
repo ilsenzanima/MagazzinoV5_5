@@ -191,10 +191,21 @@ export default function PurchaseDetailPage() {
 
   const startEditing = (item: PurchaseItem) => {
     setEditingItemId(item.id);
+    
+    // Use coefficient from inventory if available, otherwise fallback to item's saved coefficient
+    const inventoryItem = inventory.find(i => i.id === item.itemId);
+    const coefficient = inventoryItem?.coefficient || item.coefficient || 1;
+    
+    // If pieces are missing but quantity exists and coeff > 1, try to calculate pieces
+    let piecesStr = item.pieces?.toString() || "";
+    if (!piecesStr && item.quantity && coefficient > 1) {
+        piecesStr = (item.quantity / coefficient).toString();
+    }
+
     setEditValues({
       price: item.price.toString(),
       quantity: item.quantity.toString(),
-      pieces: item.pieces?.toString() || ""
+      pieces: piecesStr
     });
   };
 
@@ -253,11 +264,18 @@ export default function PurchaseDetailPage() {
         await purchasesApi.updateItem(itemId, {
             price: newPrice,
             quantity: newQty,
-            pieces: newPieces
+            pieces: newPieces,
+            coefficient: itemCoefficient
         });
 
         // Update local state
-        setItems(items.map(i => i.id === itemId ? { ...i, price: newPrice, quantity: newQty, pieces: newPieces } : i));
+        setItems(items.map(i => i.id === itemId ? { 
+            ...i, 
+            price: newPrice, 
+            quantity: newQty, 
+            pieces: newPieces,
+            coefficient: itemCoefficient 
+        } : i));
         setEditingItemId(null);
     } catch (error) {
         console.error("Failed to update item", error);
@@ -368,18 +386,29 @@ export default function PurchaseDetailPage() {
                                                     type="number" 
                                                     className="w-20 ml-auto text-right h-8" 
                                                     value={editValues.pieces}
-                                                    onChange={(e) => handleEditPiecesChange(e.target.value, item.coefficient || 1)}
+                                                    onChange={(e) => {
+                                                        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                        const coeff = inventoryItem?.coefficient || item.coefficient || 1;
+                                                        handleEditPiecesChange(e.target.value, coeff);
+                                                    }}
                                                 />
                                             </TableCell>
                                             <TableCell className="text-right text-slate-500">
-                                                {item.coefficient || 1}
+                                                {(() => {
+                                                    const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                    return inventoryItem?.coefficient || item.coefficient || 1;
+                                                })()}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <Input 
                                                     type="number" 
                                                     className="w-20 ml-auto text-right h-8" 
                                                     value={editValues.quantity}
-                                                    onChange={(e) => handleEditQuantityChange(e.target.value, item.coefficient || 1)}
+                                                    onChange={(e) => {
+                                                        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                        const coeff = inventoryItem?.coefficient || item.coefficient || 1;
+                                                        handleEditQuantityChange(e.target.value, coeff);
+                                                    }}
                                                 />
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -433,7 +462,11 @@ export default function PurchaseDetailPage() {
                                     <TableCell className="text-right">
                                         {editingItemId === item.id ? (
                                             <div className="flex justify-end gap-1">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveEdit(item.id, item.coefficient)}>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => {
+                                                    const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                    const coeff = inventoryItem?.coefficient || item.coefficient || 1;
+                                                    saveEdit(item.id, coeff);
+                                                }}>
                                                     <Save className="h-4 w-4" />
                                                 </Button>
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500" onClick={cancelEdit}>

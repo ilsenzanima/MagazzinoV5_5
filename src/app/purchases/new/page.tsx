@@ -125,6 +125,45 @@ export default function NewPurchasePage() {
     setIsJobSelectorOpen(false);
   };
 
+  const handleCurrentLineQuantityChange = (quantityStr: string) => {
+    const quantity = parseFloat(quantityStr);
+    
+    if (isNaN(quantity)) {
+        setCurrentLine(prev => ({ ...prev, quantity: quantityStr, pieces: "" }));
+        return;
+    }
+
+    let piecesStr = currentLine.pieces;
+    if (currentLine.coefficient && currentLine.coefficient !== 1) {
+        piecesStr = (quantity / currentLine.coefficient).toFixed(2);
+    } else {
+        // If coefficient is 1, default pieces to quantity
+        piecesStr = quantity.toString();
+    }
+
+    setCurrentLine(prev => ({ 
+        ...prev, 
+        quantity: quantityStr, 
+        pieces: piecesStr 
+    }));
+  };
+
+  const handleCurrentLinePiecesChange = (piecesStr: string) => {
+    const pieces = parseFloat(piecesStr);
+    
+    if (isNaN(pieces)) {
+        setCurrentLine(prev => ({ ...prev, pieces: piecesStr, quantity: "" }));
+        return;
+    }
+
+    const quantity = (pieces * currentLine.coefficient).toFixed(2);
+    setCurrentLine(prev => ({ 
+        ...prev, 
+        pieces: piecesStr, 
+        quantity: quantity 
+    }));
+  };
+
   const handleAddLine = () => {
     if (!currentLine.itemId || !currentLine.quantity || !currentLine.price) {
       alert("Compila tutti i campi obbligatori (Articolo, Quantità, Prezzo)");
@@ -261,6 +300,8 @@ export default function NewPurchasePage() {
           purchaseId: purchase.id,
           itemId: line.itemId,
           quantity: line.quantity,
+          pieces: line.pieces,
+          coefficient: line.coefficient,
           price: line.price,
           jobId: line.jobId
         });
@@ -379,20 +420,7 @@ export default function NewPurchasePage() {
                                     min="0"
                                     step="1"
                                     value={currentLine.pieces}
-                                    onChange={(e) => {
-                                        const p = e.target.value;
-                                        // If p is empty, q is kept or empty? Let's just update p.
-                                        // If p is valid number, update q based on coefficient.
-                                        let q = currentLine.quantity;
-                                        if (p && !isNaN(parseFloat(p))) {
-                                            q = (parseFloat(p) * currentLine.coefficient).toFixed(2);
-                                        }
-                                        setCurrentLine({
-                                            ...currentLine, 
-                                            pieces: p,
-                                            quantity: q
-                                        });
-                                    }}
+                                    onChange={(e) => handleCurrentLinePiecesChange(e.target.value)}
                                     placeholder="Pezzi"
                                 />
                                 <p className="text-xs text-muted-foreground">Coeff: {currentLine.coefficient}</p>
@@ -405,16 +433,7 @@ export default function NewPurchasePage() {
                                     min="0"
                                     step="0.01"
                                     value={currentLine.quantity}
-                                    onChange={(e) => {
-                                        const q = e.target.value;
-                                        let p = currentLine.pieces;
-                                        if (q && !isNaN(parseFloat(q)) && currentLine.coefficient !== 1) {
-                                            p = (parseFloat(q) / currentLine.coefficient).toFixed(2);
-                                        } else if (q && !isNaN(parseFloat(q)) && currentLine.coefficient === 1) {
-                                            p = q;
-                                        }
-                                        setCurrentLine({...currentLine, quantity: q, pieces: p});
-                                    }}
+                                    onChange={(e) => handleCurrentLineQuantityChange(e.target.value)}
                                     placeholder="0.00"
                                 />
                             </div>
