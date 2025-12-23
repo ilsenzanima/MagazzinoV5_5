@@ -584,6 +584,7 @@ export default function PurchaseDetailPage() {
             <ItemSelectorDialog
                 open={isItemSelectorOpen}
                 onOpenChange={setIsItemSelectorOpen}
+                items={inventory}
                 onSelect={(item) => {
                     setSelectedItemForLine(item);
                     setNewItem(prev => ({
