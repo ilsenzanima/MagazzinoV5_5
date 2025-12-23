@@ -243,12 +243,16 @@ export default function InventoryPage() {
                        <div className="ml-auto text-right flex flex-col items-end">
                          {item.coefficient !== 1 ? (
                              <>
-                                 <span className="font-bold text-slate-700">
-                                     {(item.pieces ?? (item.quantity / item.coefficient)).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz
+                                 <span className="text-[10px] text-slate-500 font-medium mb-1 mr-1">
+                                     {(item.pieces ?? (item.quantity / item.coefficient)).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz =
                                  </span>
-                                 <span className="text-[10px] text-slate-500">
-                                     = {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
-                                 </span>
+                                 <Badge variant="outline" className={
+                                    item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50" :
+                                    item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
+                                    "text-slate-600"
+                                  }>
+                                     {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                 </Badge>
                              </>
                          ) : (
                              <Badge variant="outline" className={
