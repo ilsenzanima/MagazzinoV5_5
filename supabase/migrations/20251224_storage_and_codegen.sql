@@ -5,6 +5,12 @@ on conflict (id) do nothing;
 
 -- Set up security policies for the 'images' bucket
 
+-- Drop existing policies to avoid conflicts
+drop policy if exists "Public Access" on storage.objects;
+drop policy if exists "Authenticated users can upload images" on storage.objects;
+drop policy if exists "Authenticated users can update images" on storage.objects;
+drop policy if exists "Authenticated users can delete images" on storage.objects;
+
 -- Allow public read access to images
 create policy "Public Access"
   on storage.objects for select
