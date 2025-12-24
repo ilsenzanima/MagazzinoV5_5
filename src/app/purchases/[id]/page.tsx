@@ -26,6 +26,7 @@ import {
 } from "@/lib/api";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
+import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocuments";
 
 export default function PurchaseDetailPage() {
   const params = useParams();
@@ -469,6 +470,16 @@ export default function PurchaseDetailPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2">
+                     <PurchaseDocuments 
+                        purchaseId={id} 
+                        documentUrl={purchase.documentUrl} 
+                        onUpdate={loadData} 
+                    />
+                </div>
+            </div>
 
             {/* Items List */}
             <Card>

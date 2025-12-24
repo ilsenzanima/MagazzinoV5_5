@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
+import { User, Session, AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/api";
@@ -10,7 +10,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<{ error: AuthError | null }>;
   userRole: 'admin' | 'user' | 'operativo' | null;
   realRole: 'admin' | 'user' | 'operativo' | null; // The actual role from DB
   simulatedRole: 'admin' | 'user' | 'operativo' | null; // The role being simulated
@@ -21,7 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
-  signOut: async () => {},
+  signOut: async () => ({ error: null }),
   userRole: null,
   realRole: null,
   simulatedRole: null,

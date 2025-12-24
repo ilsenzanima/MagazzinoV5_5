@@ -118,7 +118,7 @@ export default function MovementDetailPage() {
         item.inventoryName || "Articolo non trovato",
         item.inventoryUnit || "PZ",
         item.quantity.toString(),
-        item.notes || ""
+        "" // Notes not available on item level
     ]);
 
     autoTable(doc, {

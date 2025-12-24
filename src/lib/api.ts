@@ -170,6 +170,7 @@ export interface Purchase {
   items?: { price: number }[];
   jobId?: string;
   jobCode?: string; // Display
+  documentUrl?: string | null;
 }
 
 export interface PurchaseItem {
@@ -218,7 +219,8 @@ const mapDbToPurchase = (db: any): Purchase => ({
   createdAt: db.created_at,
   items: db.purchase_items,
   jobId: db.job_id,
-  jobCode: db.jobs?.code
+  jobCode: db.jobs?.code,
+  documentUrl: db.document_url
 });
 
 const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
@@ -228,7 +230,8 @@ const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
   status: purchase.status,
   notes: purchase.notes,
   created_by: purchase.createdBy,
-  job_id: purchase.jobId || null
+  job_id: purchase.jobId || null,
+  document_url: purchase.documentUrl
 });
 
 // --- Suppliers API ---

@@ -451,6 +451,15 @@ export default function NewPurchasePage() {
                             )}
                         </div>
                     </div>
+                    <div className="space-y-2 md:col-span-4 border-t pt-2">
+                        <Label>Documento Allegato (PDF, Immagine)</Label>
+                        <Input 
+                            type="file" 
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                            className="cursor-pointer"
+                        />
+                    </div>
                 </CardContent>
             </Card>
 

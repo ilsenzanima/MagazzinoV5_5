@@ -6,12 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { purchasesApi, Purchase } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 
-export default function PurchasesPage() {
+function PurchasesContent() {
   const searchParams = useSearchParams();
   const initialSupplierId = searchParams?.get("supplierId");
 
@@ -48,7 +48,7 @@ export default function PurchasesPage() {
   });
 
   return (
-    <DashboardLayout>
+    <>
       <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-900">
@@ -137,6 +137,21 @@ export default function PurchasesPage() {
           )}
         </div>
       )}
+    </>
+  );
+}
+
+export default function PurchasesPage() {
+  return (
+    <DashboardLayout>
+      <Suspense fallback={
+        <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="ml-2 text-slate-500">Caricamento...</span>
+        </div>
+      }>
+        <PurchasesContent />
+      </Suspense>
     </DashboardLayout>
   );
 }
