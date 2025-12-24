@@ -118,43 +118,54 @@ export default function InventoryPage() {
   };
 
   useEffect(() => {
-    let scanner: Html5QrcodeScanner | null = null;
-
     if (isScanning) {
       // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
         try {
             // Check if element exists
             if (document.getElementById("reader")) {
-                scanner = new Html5QrcodeScanner(
-                    "reader",
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    false
-                );
+                // Initialize scanner
+                const html5QrCode = new Html5Qrcode("reader");
+                scannerRef.current = html5QrCode;
                 
-                scanner.render(
+                // Start scanning
+                html5QrCode.start(
+                    { facingMode: "environment" }, // Prefer back camera
+                    { 
+                        fps: 10, 
+                        qrbox: { width: 250, height: 250 },
+                        aspectRatio: 1.0
+                    },
                     (decodedText) => {
                         setSearchTerm(decodedText);
                         setIsScanning(false);
                     },
                     (errorMessage) => {
-                        // ignore
+                        // ignore parsing errors
                     }
-                );
+                ).catch(err => {
+                    console.error("Scanner init error", err);
+                });
             }
         } catch (err) {
-            console.error("Scanner init error", err);
+            console.error("Scanner setup error", err);
         }
-      }, 100);
+      }, 200);
 
-      return () => clearTimeout(timer);
+      return () => {
+          clearTimeout(timer);
+          if (scannerRef.current) {
+              scannerRef.current.stop().then(() => {
+                  scannerRef.current?.clear();
+                  scannerRef.current = null;
+              }).catch((err) => {
+                  console.error("Failed to stop scanner", err);
+                  scannerRef.current?.clear();
+                  scannerRef.current = null;
+              });
+          }
+      };
     }
-
-    return () => {
-        if (scanner) {
-            scanner.clear().catch(console.error);
-        }
-    };
   }, [isScanning]);
 
   return (
