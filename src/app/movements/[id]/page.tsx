@@ -23,8 +23,10 @@ import {
 } from "@/lib/api";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useAuth } from "@/components/auth-provider";
 
 export default function MovementDetailPage() {
+  const { userRole } = useAuth();
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;

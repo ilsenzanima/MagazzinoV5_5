@@ -12,6 +12,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useAuth } from "@/components/auth-provider";
 
 // Components
 import { JobOverview } from "@/components/jobs/details/JobOverview";

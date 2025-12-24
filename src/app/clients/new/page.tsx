@@ -10,8 +10,10 @@ import { ArrowLeft, Loader2, Save } from "lucide-react";
 import Link from "next/link";
 import { clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/components/auth-provider";
 
 export default function NewClientPage() {
+  const { userRole } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({

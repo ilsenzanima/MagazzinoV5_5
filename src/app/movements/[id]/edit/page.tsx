@@ -23,6 +23,7 @@ import {
 } from "@/lib/api";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
+import { useAuth } from "@/components/auth-provider";
 
 interface MovementLine {
   tempId: string;

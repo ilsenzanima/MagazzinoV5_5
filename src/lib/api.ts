@@ -167,10 +167,11 @@ export interface Purchase {
   createdBy?: string;
   createdByName?: string;
   createdAt: string;
-  items?: { price: number }[];
+  items?: { price: number; quantity?: number }[];
   jobId?: string;
   jobCode?: string; // Display
   documentUrl?: string | null;
+  totalAmount?: number;
 }
 
 export interface PurchaseItem {
@@ -220,7 +221,8 @@ const mapDbToPurchase = (db: any): Purchase => ({
   items: db.purchase_items,
   jobId: db.job_id,
   jobCode: db.jobs?.code,
-  documentUrl: db.document_url
+  documentUrl: db.document_url,
+  totalAmount: db.purchase_items?.reduce((sum: number, item: any) => sum + ((item.price || 0) * (item.quantity || 1)), 0)
 });
 
 const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
@@ -275,7 +277,7 @@ export const purchasesApi = {
     const { data, error } = await fetchWithTimeout(
       supabase
         .from('purchases')
-        .select('*, suppliers(name), purchase_items(price)')
+        .select('*, suppliers(name), purchase_items(price, quantity)')
         .order('created_at', { ascending: false })
     );
     if (error) throw error;

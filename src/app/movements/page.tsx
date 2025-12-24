@@ -11,8 +11,10 @@ import { deliveryNotesApi, DeliveryNote } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useAuth } from "@/components/auth-provider";
 
 export default function MovementsPage() {
+  const { userRole } = useAuth();
   const [movements, setMovements] = useState<DeliveryNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -120,11 +120,11 @@ function PurchasesContent() {
                     <div className="mb-2">
                       {(userRole === 'admin' || userRole === 'operativo') ? (
                         <div className="font-bold text-lg text-slate-900">
-                          {purchase.total_amount !== undefined && purchase.total_amount !== null
-                            ? `€ ${purchase.total_amount.toFixed(2)}`
+                          {purchase.totalAmount !== undefined && purchase.totalAmount !== null
+                            ? `€ ${purchase.totalAmount.toFixed(2)}`
                             : '-'
                           }
-                          {purchase.total_amount === 0 && (
+                          {purchase.totalAmount === 0 && (
                             <div className="inline-block ml-2" title="Prezzo mancante">
                               <AlertTriangle className="h-4 w-4 text-amber-500" />
                             </div>
