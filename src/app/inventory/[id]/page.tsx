@@ -19,11 +19,15 @@ import {
   brandsApi,
   itemTypesApi,
   unitsApi,
+  inventorySupplierCodesApi,
+  suppliersApi,
   Movement, 
   Job,
   Brand,
   ItemType,
-  Unit
+  Unit,
+  InventorySupplierCode,
+  Supplier
 } from "@/lib/api";
 import {
   Select,
@@ -73,6 +77,9 @@ export default function InventoryDetailPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [types, setTypes] = useState<ItemType[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [supplierCodes, setSupplierCodes] = useState<InventorySupplierCode[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [newSupplierCode, setNewSupplierCode] = useState({ supplierId: "", code: "", note: "" });
   const [editForm, setEditForm] = useState<Partial<InventoryItem>>({});
 
   // Movement Form State
@@ -131,18 +138,22 @@ export default function InventoryDetailPage() {
 
       // 2. Load History & Jobs & Aux Data (Non-critical)
       try {
-        const [movementsData, jobsData, brandsData, typesData, unitsData] = await Promise.all([
+        const [movementsData, jobsData, brandsData, typesData, unitsData, supplierCodesData, suppliersData] = await Promise.all([
           inventoryApi.getHistory(id),
           jobsApi.getAll(),
           brandsApi.getAll(),
           itemTypesApi.getAll(),
-          unitsApi.getAll()
+          unitsApi.getAll(),
+          inventorySupplierCodesApi.getByItemId(id),
+          suppliersApi.getAll()
         ]);
         setMovements(movementsData);
         setActiveJobs(jobsData.filter(j => j.status === 'active'));
         setBrands(brandsData);
         setTypes(typesData);
         setUnits(unitsData);
+        setSupplierCodes(supplierCodesData);
+        setSuppliers(suppliersData);
       } catch (err) {
         console.warn("Error loading auxiliary data:", err);
         // Don't block the page if history fails
@@ -234,6 +245,34 @@ export default function InventoryDetailPage() {
         }
       }
     }
+  };
+
+  const handleAddSupplierCode = async () => {
+      if (!item || !newSupplierCode.code) return;
+      try {
+          const added = await inventorySupplierCodesApi.create({
+              inventoryId: item.id,
+              code: newSupplierCode.code,
+              supplierId: newSupplierCode.supplierId || undefined,
+              note: newSupplierCode.note
+          });
+          setSupplierCodes([added, ...supplierCodes]);
+          setNewSupplierCode({ supplierId: "", code: "", note: "" });
+      } catch (error) {
+          console.error("Failed to add code", error);
+          alert("Errore durante l'aggiunta del codice");
+      }
+  };
+
+  const handleDeleteSupplierCode = async (codeId: string) => {
+      if (!confirm("Eliminare questo codice?")) return;
+      try {
+          await inventorySupplierCodesApi.delete(codeId);
+          setSupplierCodes(supplierCodes.filter(c => c.id !== codeId));
+      } catch (error) {
+          console.error("Failed to delete code", error);
+          alert("Errore durante l'eliminazione");
+      }
   };
 
   // Handle Image Upload
@@ -473,21 +512,28 @@ export default function InventoryDetailPage() {
                 {/* Quantity Read-Only */}
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Quantità Teorica (Sistema)</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                        <div className="p-3 bg-slate-50 border rounded-md text-center">
-                            <div className="text-lg font-bold text-slate-900">{item.pieces ?? item.quantity}</div>
-                            <div className="text-xs text-slate-500 font-medium">
-                                {item.coefficient !== 1 ? "Pezzi (Unità fisiche)" : item.unit}
+                    <Label>Quantità Disponibile</Label>
+                    <div className="flex flex-col gap-2">
+                        {/* Calculated Quantity (Main) */}
+                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md text-center">
+                            <div className="text-2xl font-bold text-blue-700">
+                                {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-blue-500">{item.unit}</span>
                             </div>
+                            <div className="text-xs text-blue-400 font-medium">Quantità Totale</div>
                         </div>
+                        
+                        {/* Real Pieces (Secondary) */}
                         {item.coefficient !== 1 && (
-                            <div className="p-3 bg-slate-50 border rounded-md text-center">
-                                <div className="text-lg font-bold text-slate-900">
-                                    {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })}
-                                </div>
-                                <div className="text-xs text-slate-500 font-medium">{item.unit} (Calc)</div>
+                            <div className="text-center">
+                                <span className="text-xs text-slate-400">
+                                    {item.pieces ?? item.quantity} Pezzi fisici
+                                </span>
                             </div>
+                        )}
+                        {item.coefficient === 1 && (
+                             <div className="text-center text-[10px] text-slate-400">
+                                 1 {item.unit} = 1 Pezzo
+                             </div>
                         )}
                     </div>
                   </div>
@@ -583,7 +629,7 @@ export default function InventoryDetailPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="supplierCode">Codice Fornitore</Label>
+                  <Label htmlFor="supplierCode">Codice Fornitore Principale</Label>
                   {isEditing ? (
                       <Input 
                           id="supplierCode" 
@@ -599,6 +645,58 @@ export default function InventoryDetailPage() {
                       )
                   )}
                 </div>
+
+                {/* Additional Supplier Codes */}
+                {!isEditing && (
+                    <div className="space-y-2 pt-2 border-t">
+                        <Label>Altri Codici Fornitore</Label>
+                        <div className="space-y-2">
+                            {supplierCodes.map(code => (
+                                <div key={code.id} className="flex items-center justify-between p-2 bg-slate-50 rounded border text-sm">
+                                    <div className="flex flex-col">
+                                        <span className="font-mono font-bold">{code.code}</span>
+                                        {code.supplierName && <span className="text-xs text-slate-500">{code.supplierName}</span>}
+                                    </div>
+                                    {(userRole === 'admin' || userRole === 'operativo') && (
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteSupplierCode(code.id)}>
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                <div className="flex gap-2 items-end pt-2">
+                                    <div className="flex-1 space-y-1">
+                                        <Input 
+                                            placeholder="Nuovo codice" 
+                                            value={newSupplierCode.code} 
+                                            onChange={(e) => setNewSupplierCode({...newSupplierCode, code: e.target.value})}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="w-1/3 space-y-1">
+                                         <Select 
+                                            value={newSupplierCode.supplierId} 
+                                            onValueChange={(val) => setNewSupplierCode({...newSupplierCode, supplierId: val})}
+                                        >
+                                            <SelectTrigger className="h-8 text-sm">
+                                                <SelectValue placeholder="Fornitore" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {suppliers.map(s => (
+                                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button size="sm" onClick={handleAddSupplierCode} disabled={!newSupplierCode.code} className="h-8">
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome Prodotto</Label>
@@ -836,6 +934,7 @@ export default function InventoryDetailPage() {
                       <TableHead>Data</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Riferimento</TableHead>
+                      <TableHead>Commessa</TableHead>
                       <TableHead>Pezzi</TableHead>
                       <TableHead className="text-right">Quantità</TableHead>
                     </TableRow>
@@ -843,7 +942,7 @@ export default function InventoryDetailPage() {
                   <TableBody>
                     {movements.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-slate-400 py-6">
+                        <TableCell colSpan={6} className="text-center text-slate-400 py-6">
                           Nessun movimento registrato
                         </TableCell>
                       </TableRow>
@@ -857,6 +956,10 @@ export default function InventoryDetailPage() {
                             case 'purchase': 
                                 typeLabel = "Acquisto"; 
                                 typeColor = "bg-blue-600"; 
+                                if (move.jobId) {
+                                    typeLabel = "Acquisto (Cantiere)";
+                                    typeColor = "bg-purple-600";
+                                }
                                 break;
                             case 'entry': 
                                 typeLabel = "Entrata"; 
@@ -906,39 +1009,39 @@ export default function InventoryDetailPage() {
                                         {typeLabel}
                                     </Badge>
                                     {move.isFictitious && (
-                                        <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50 text-[10px]">
-                                            FITTIZIO
+                                        <Badge variant="outline" className="border-orange-500 text-orange-600 bg-orange-50 text-[10px] h-5 px-1">
+                                            Fittizio
                                         </Badge>
                                     )}
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="flex flex-col">
-                                   <span className="font-medium text-slate-700">{move.reference || "-"}</span>
-                                   {move.userName && <span className="text-[10px] text-slate-400">Utente: {move.userName}</span>}
-                                   {move.isFictitious && (
-                                        <span className="text-[10px] text-orange-500 italic">
-                                            Non movimenta il magazzino
+                                <div className="font-mono text-sm">{move.reference}</div>
+                                {move.notes && <div className="text-xs text-slate-500 max-w-[200px] truncate" title={move.notes}>{move.notes}</div>}
+                              </TableCell>
+                              <TableCell>
+                                {move.jobCode ? (
+                                    <div className="flex flex-col">
+                                        <span className="font-medium text-sm text-blue-600">{move.jobCode}</span>
+                                        <span className="text-[10px] text-slate-500 truncate max-w-[150px]" title={move.jobDescription}>
+                                            {move.jobDescription}
                                         </span>
-                                   )}
-                                   {move.notes && <span className="text-xs text-slate-500 truncate max-w-[200px]">{move.notes}</span>}
-                                </div>
+                                    </div>
+                                ) : (
+                                    <span className="text-slate-300 text-xs">-</span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 {move.pieces ? (
-                                    <span className="text-xs font-mono">
-                                        {move.pieces} pz 
-                                        {move.coefficient && move.coefficient !== 1 && (
-                                            <span className="text-slate-400"> (x{move.coefficient})</span>
-                                        )}
-                                    </span>
-                                ) : "-"}
+                                    <span className="font-mono">{move.pieces}</span>
+                                ) : (
+                                    <span className="text-slate-300">-</span>
+                                )}
                               </TableCell>
-                              <TableCell className={`text-right font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                {isPositive ? '+' : ''}
-                                {move.pieces && move.coefficient && move.coefficient !== 1 
-                                    ? (move.pieces * move.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })
-                                    : move.quantity} {item.unit}
+                              <TableCell className="text-right">
+                                <span className={`font-bold font-mono ${isPositive ? "text-green-600" : "text-red-600"}`}>
+                                    {isPositive ? "+" : ""}{move.quantity.toFixed(2)}
+                                </span>
                               </TableCell>
                             </TableRow>
                         );

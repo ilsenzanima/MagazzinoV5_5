@@ -292,6 +292,45 @@ export const purchasesApi = {
     if (error) throw error;
     return data.map(mapDbToPurchase);
   },
+  getPaginated: async ({ page = 1, limit = 10, search = '', supplierId = '' }) => {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = supabase
+      .from('purchases')
+      .select('*, suppliers(name), purchase_items(price, quantity)', { count: 'exact' });
+
+    if (supplierId) {
+      query = query.eq('supplier_id', supplierId);
+    }
+
+    if (search) {
+      // Search in delivery_note_number or supplier name
+      // Note: searching across related tables (suppliers.name) in Supabase/PostgREST is tricky with single text search.
+      // We will search primarily on delivery_note_number or notes. 
+      // For supplier name search, we might need a separate filter or join, but complex ORs across tables are hard.
+      // Let's stick to delivery_note_number and notes for now, or use the 'or' filter if possible.
+      // Actually, we can use the embedding resource search syntax if we were just filtering, 
+      // but for 'or' across tables it's harder.
+      // Let's keep it simple: filter by delivery_note_number. 
+      // If the user wants to search by supplier, they can use the supplier filter or we rely on client side if needed (but we want server side).
+      // A common workaround is to search on the main table fields.
+      query = query.or(`delivery_note_number.ilike.%${search}%,notes.ilike.%${search}%`);
+    }
+
+    query = query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    const { data, error, count } = await fetchWithTimeout(query);
+
+    if (error) throw error;
+    
+    return {
+      data: data.map(mapDbToPurchase),
+      total: count || 0
+    };
+  },
   getById: async (id: string) => {
     const { data, error } = await fetchWithTimeout(
       supabase
@@ -855,6 +894,56 @@ export const deliveryNotesApi = {
   }
 };
 
+export interface InventorySupplierCode {
+  id: string;
+  inventoryId: string;
+  code: string;
+  supplierId?: string;
+  supplierName?: string;
+  note?: string;
+  createdAt: string;
+}
+
+const mapDbToInventorySupplierCode = (db: any): InventorySupplierCode => ({
+    id: db.id,
+    inventoryId: db.inventory_id,
+    code: db.code,
+    supplierId: db.supplier_id,
+    supplierName: db.supplier_name || db.suppliers?.name,
+    note: db.note,
+    createdAt: db.created_at
+});
+
+export const inventorySupplierCodesApi = {
+    getByItemId: async (itemId: string) => {
+        const { data, error } = await fetchWithTimeout(
+            supabase
+                .from('inventory_supplier_codes')
+                .select('*, suppliers(name)')
+                .eq('inventory_id', itemId)
+                .order('created_at', { ascending: false })
+        );
+        if (error) throw error;
+        return data.map(mapDbToInventorySupplierCode);
+    },
+    create: async (code: Partial<InventorySupplierCode>) => {
+        const dbCode = {
+            inventory_id: code.inventoryId,
+            code: code.code,
+            supplier_id: code.supplierId,
+            supplier_name: code.supplierName,
+            note: code.note
+        };
+        const { data, error } = await supabase.from('inventory_supplier_codes').insert(dbCode).select('*, suppliers(name)').single();
+        if (error) throw error;
+        return mapDbToInventorySupplierCode(data);
+    },
+    delete: async (id: string) => {
+        const { error } = await supabase.from('inventory_supplier_codes').delete().eq('id', id);
+        if (error) throw error;
+    }
+};
+
 export const inventoryApi = {
   // Fetch all items
   getAll: async () => {
@@ -1006,6 +1095,9 @@ export const inventoryApi = {
       pieces: m.pieces,
       coefficient: m.coefficient,
       notes: m.notes,
+      jobId: m.job_id,
+      jobCode: m.job_code,
+      jobDescription: m.job_description,
       isFictitious: m.is_fictitious
     }));
   },
