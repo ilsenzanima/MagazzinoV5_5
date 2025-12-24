@@ -197,8 +197,7 @@ export default function InventoryDetailPage() {
         }
 
         await inventoryApi.update(item.id, {
-            ...editForm,
-            updated_at: new Date().toISOString()
+            ...editForm
         });
         
         // Refresh
