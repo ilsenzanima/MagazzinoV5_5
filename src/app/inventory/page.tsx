@@ -32,6 +32,7 @@ import { useAuth } from "@/components/auth-provider";
 
 export default function InventoryPage() {
   const { userRole } = useAuth();
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
