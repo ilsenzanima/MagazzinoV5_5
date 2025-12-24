@@ -59,7 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("Error fetching user role:", error);
-      setRealRole('user');
+      // Non resettiamo il ruolo in caso di errore per preservare la sessione
+      // durante i refresh del token in background
     }
   };
 

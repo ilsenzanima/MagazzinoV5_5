@@ -1,15 +1,18 @@
--- DEFINITIVE SECURITY FIX (2025-12-24)
--- This script fixes ALL "Function Search Path Mutable" warnings and ensures logic consistency.
+-- DEFINITIVE SECURITY FIX (2025-12-24) - REVISION 2
+-- This script fixes ALL "Function Search Path Mutable" warnings by setting search_path in the function HEADER.
 -- Run this entire script in the Supabase SQL Editor.
 
 -- 1. handle_delivery_note_deletion
 CREATE OR REPLACE FUNCTION public.handle_delivery_note_deletion()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     item RECORD;
     is_fictitious_val BOOLEAN;
 BEGIN
-    SET search_path = public; -- Security Fix
     FOR item IN SELECT * FROM public.delivery_note_items WHERE delivery_note_id = OLD.id LOOP
         is_fictitious_val := COALESCE(item.is_fictitious, FALSE);
 
@@ -48,15 +51,18 @@ BEGIN
     END LOOP;
     RETURN OLD;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 2. handle_purchase_item_change
 CREATE OR REPLACE FUNCTION public.handle_purchase_item_change()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     item_coeff NUMERIC;
 BEGIN
-    SET search_path = public; -- Security Fix
     SELECT coefficient INTO item_coeff FROM public.inventory WHERE id = COALESCE(NEW.item_id, OLD.item_id);
     IF item_coeff IS NULL OR item_coeff = 0 THEN item_coeff := 1; END IF;
 
@@ -80,16 +86,19 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 3. recalculate_inventory_item
 CREATE OR REPLACE FUNCTION public.recalculate_inventory_item(target_item_id UUID)
-RETURNS VOID AS $$
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     item_coeff NUMERIC(10,4);
     total_pieces NUMERIC(10,2) := 0;
 BEGIN
-    SET search_path = public; -- Security Fix
     SELECT coefficient INTO item_coeff FROM public.inventory WHERE id = target_item_id;
     IF item_coeff IS NULL OR item_coeff = 0 THEN item_coeff := 1; END IF;
 
@@ -125,11 +134,15 @@ BEGIN
         quantity = total_pieces * item_coeff
     WHERE id = target_item_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 4. handle_movement_logic
 CREATE OR REPLACE FUNCTION public.handle_movement_logic()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   note_type TEXT;
   note_job_id UUID;
@@ -138,7 +151,6 @@ DECLARE
   new_is_fictitious BOOLEAN;
   old_is_fictitious BOOLEAN;
 BEGIN
-  SET search_path = public; -- Security Fix
   SELECT coefficient INTO item_coeff FROM public.inventory WHERE id = COALESCE(NEW.inventory_id, OLD.inventory_id);
   IF item_coeff IS NULL OR item_coeff = 0 THEN item_coeff := 1; END IF;
   
@@ -196,41 +208,50 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 5. get_my_role
 CREATE OR REPLACE FUNCTION public.get_my_role()
-RETURNS text AS $$
+RETURNS text 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   v_role text;
 BEGIN
-  SET search_path = public; -- Security Fix
   SELECT role INTO v_role FROM public.profiles WHERE id = auth.uid();
   RETURN COALESCE(v_role, 'user');
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 6. get_next_article_code
 CREATE OR REPLACE FUNCTION public.get_next_article_code()
-RETURNS text AS $$
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   next_val integer;
   formatted_code text;
 BEGIN
-  SET search_path = public; -- Security Fix
   next_val := nextval('article_code_seq');
   formatted_code := 'ART-' || lpad(next_val::text, 5, '0');
   RETURN formatted_code;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 7. get_job_total_cost
 CREATE OR REPLACE FUNCTION public.get_job_total_cost(p_job_id uuid)
-RETURNS numeric AS $$
+RETURNS numeric
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     total_cost numeric;
 BEGIN
-    SET search_path = public; -- Security Fix
     WITH job_movements AS (
         SELECT
             type,
@@ -274,13 +295,16 @@ BEGIN
 
     RETURN total_cost;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 8. calculate_quantity_from_pieces
 CREATE OR REPLACE FUNCTION public.calculate_quantity_from_pieces()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
-    SET search_path = public; -- Security Fix
     IF NEW.pieces IS NOT NULL THEN
         NEW.quantity := NEW.pieces * NEW.coefficient;
     ELSIF NEW.quantity IS NOT NULL AND NEW.pieces IS NULL THEN
@@ -291,7 +315,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 9. Fix Views Security
 ALTER VIEW public.purchase_batch_availability SET (security_invoker = true);
