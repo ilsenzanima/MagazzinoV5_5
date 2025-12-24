@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { InventoryItem, User } from './mock-data';
 
 // Helper for timeouts
-export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 5000): Promise<T> => {
+export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 15000): Promise<T> => {
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
             reject(new Error("Request timed out"));
@@ -31,6 +31,7 @@ export interface Brand {
 export interface ItemType {
   id: string;
   name: string;
+  imageUrl?: string;
 }
 
 export interface Unit {
@@ -824,10 +825,12 @@ export const deliveryNotesApi = {
 export const inventoryApi = {
   // Fetch all items
   getAll: async () => {
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('inventory')
+        .select('*')
+        .order('created_at', { ascending: false })
+    );
 
     if (error) throw error;
     return data.map(mapDbItemToInventoryItem);
@@ -915,6 +918,36 @@ export const inventoryApi = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  // Upload image to Storage
+  uploadImage: async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from('images')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  },
+
+  // Get next article code
+  getNextCode: async () => {
+    const { data, error } = await supabase
+      .rpc('get_next_article_code');
+    
+    if (error) throw error;
+    return data as string;
   },
 
   getHistory: async (itemId: string) => {
@@ -1073,7 +1106,11 @@ export const itemTypesApi = {
   getAll: async () => {
     const { data, error } = await supabase.from('item_types').select('*').order('name');
     if (error) throw error;
-    return data as ItemType[];
+    return data.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        imageUrl: t.image_url
+    })) as ItemType[];
   },
   create: async (name: string) => {
     const { data, error } = await supabase.from('item_types').insert({ name }).select().single();
@@ -1187,6 +1224,13 @@ export const jobsApi = {
   delete: async (id: string) => {
     const { error } = await supabase.from('jobs').delete().eq('id', id);
     if (error) throw error;
+  },
+  getCost: async (id: string) => {
+    const { data, error } = await supabase
+      .rpc('get_job_total_cost', { p_job_id: id });
+      
+    if (error) throw error;
+    return data || 0;
   }
 };
 
