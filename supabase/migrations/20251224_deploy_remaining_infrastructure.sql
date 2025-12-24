@@ -33,6 +33,79 @@ CREATE POLICY "Authenticated users can delete images"
 -- 3. Create Sequence for Article Codes (Required for get_next_article_code)
 CREATE SEQUENCE IF NOT EXISTS article_code_seq START 1;
 
+-- C. PERFORMANCE & SECURITY OPTIMIZATIONS
+-- Redefine get_my_role as STABLE to prevent RLS performance issues
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS text 
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_role text;
+BEGIN
+  SELECT role INTO v_role FROM public.profiles WHERE id = auth.uid();
+  RETURN COALESCE(v_role, 'user');
+END;
+$$;
+
+-- Redefine get_job_total_cost as STABLE
+CREATE OR REPLACE FUNCTION public.get_job_total_cost(p_job_id uuid)
+RETURNS numeric
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+    total_cost numeric;
+BEGIN
+    WITH job_movements AS (
+        SELECT
+            type,
+            quantity,
+            item_price,
+            item_id,
+            is_fictitious,
+            date
+        FROM stock_movements_view
+        WHERE job_id = p_job_id
+    ),
+    item_prices AS (
+        SELECT DISTINCT ON (item_id)
+            item_id,
+            item_price as last_price
+        FROM job_movements
+        WHERE type = 'purchase' AND item_price > 0
+        ORDER BY item_id, date DESC
+    ),
+    calc_movements AS (
+        SELECT
+            m.type,
+            m.quantity,
+            COALESCE(
+                NULLIF(m.item_price, 0),
+                ip.last_price,
+                0
+            ) as effective_price
+        FROM job_movements m
+        LEFT JOIN item_prices ip ON m.item_id = ip.item_id
+    )
+    SELECT
+        COALESCE(SUM(
+            CASE 
+                WHEN type = 'purchase' THEN quantity * effective_price
+                ELSE -quantity * effective_price
+            END
+        ), 0)
+    INTO total_cost
+    FROM calc_movements;
+
+    RETURN total_cost;
+END;
+$$;
+
 -- B. RLS POLICIES (Tables)
 
 -- 1. INVENTORY

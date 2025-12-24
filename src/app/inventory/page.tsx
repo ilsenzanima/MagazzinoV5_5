@@ -256,12 +256,16 @@ export default function InventoryPage() {
                 <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group h-full">
                     <CardContent className="p-0 flex flex-col h-full">
                     {/* Immagine */}
-                    <div className="w-full h-48 bg-slate-200 shrink-0 relative">
+                    <div className="w-full h-48 bg-slate-200 shrink-0 relative flex items-center justify-center bg-white">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                       src={item.image || itemTypes.find(t => t.name === item.type)?.imageUrl || "/placeholder.svg"} 
                       alt={item.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className={`transition-transform duration-300 ${
+                        !item.image && (itemTypes.find(t => t.name === item.type)?.imageUrl) 
+                          ? "w-auto h-3/4 object-contain" 
+                          : "w-full h-full object-cover group-hover:scale-105"
+                      }`}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "/placeholder.svg";
                       }}
