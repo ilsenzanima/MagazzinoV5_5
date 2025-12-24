@@ -214,6 +214,7 @@ export default function InventoryDetailPage() {
 
   // Handle Delete Item
   const handleDelete = async () => {
+    if (!item) return;
     if (confirm("Sei sicuro di voler eliminare questo articolo? Questa azione non può essere annullata.")) {
       try {
         await inventoryApi.delete(item.id);
