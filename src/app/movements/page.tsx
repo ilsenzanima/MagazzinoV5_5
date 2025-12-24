@@ -4,9 +4,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar } from "lucide-react";
+import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useDeferredValue } from "react";
 import { deliveryNotesApi, DeliveryNote } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -18,18 +18,33 @@ export default function MovementsPage() {
   const [movements, setMovements] = useState<DeliveryNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Pagination & Search state
   const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearch = useDeferredValue(searchTerm);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const ITEMS_PER_PAGE = 12;
 
   useEffect(() => {
     loadMovements();
-  }, []);
+  }, [page, deferredSearch]);
 
   const loadMovements = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await deliveryNotesApi.getAll();
+      
+      const { data, total } = await deliveryNotesApi.getPaginated({
+        page,
+        limit: ITEMS_PER_PAGE,
+        search: deferredSearch
+      });
+      
       setMovements(data);
+      setTotalItems(total);
+      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
     } catch (error: any) {
       console.error("Failed to load movements", error);
       setError(error.message || "Errore durante il caricamento dei movimenti");
@@ -38,14 +53,10 @@ export default function MovementsPage() {
     }
   };
 
-  const filteredMovements = movements.filter((movement) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      movement.number.toLowerCase().includes(searchLower) ||
-      movement.jobCode?.toLowerCase().includes(searchLower) ||
-      movement.causal.toLowerCase().includes(searchLower)
-    );
-  });
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setPage(1); // Reset page on search
+  };
 
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -81,12 +92,12 @@ export default function MovementsPage() {
             placeholder="Cerca Movimento (Bolla, Commessa, Causale...)" 
             className="pl-9 bg-slate-100 border-none"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange}
           />
         </div>
       </div>
 
-      {loading ? (
+      {loading && movements.length === 0 ? (
         <div className="flex justify-center items-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             <span className="ml-2 text-slate-500">Caricamento movimenti...</span>
@@ -103,61 +114,91 @@ export default function MovementsPage() {
             </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredMovements.length === 0 ? (
-            <div className="col-span-full text-center py-10 text-slate-400">
-              <Truck className="h-12 w-12 mx-auto mb-2 opacity-20" />
-              <p>Nessun movimento trovato</p>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {movements.length === 0 ? (
+              <div className="col-span-full text-center py-10 text-slate-400">
+                <Truck className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                <p>Nessun movimento trovato</p>
+              </div>
+            ) : (
+              movements.map((movement) => {
+                  const typeConfig = getTypeConfig(movement.type);
+                  const Icon = typeConfig.icon;
+                  
+                  return (
+                      <Link href={`/movements/${movement.id}`} key={movement.id}>
+                          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200">
+                          <CardContent className="p-5">
+                              <div className="flex justify-between items-start mb-4">
+                                  <div>
+                                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                          <FileText className="h-4 w-4 text-blue-600" />
+                                          Bolla: {movement.number}
+                                      </h3>
+                                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                                          <Calendar className="h-3 w-3" />
+                                          {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
+                                      </p>
+                                  </div>
+                                  <Badge variant="secondary" className={typeConfig.color}>
+                                      <Icon className="mr-1 h-3 w-3" />
+                                      {typeConfig.label}
+                                  </Badge>
+                              </div>
+                              
+                              <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between py-1 border-b border-slate-50">
+                                      <span className="text-slate-500">Causale</span>
+                                      <span className="font-medium truncate max-w-[150px]">{movement.causal}</span>
+                                  </div>
+                                  {movement.jobCode && (
+                                      <div className="flex justify-between py-1 border-b border-slate-50">
+                                          <span className="text-slate-500">Commessa</span>
+                                          <span className="font-medium text-blue-600">{movement.jobCode}</span>
+                                      </div>
+                                  )}
+                                  <div className="flex justify-between py-1">
+                                      <span className="text-slate-500">Articoli</span>
+                                      <span className="font-medium">
+                                        {/* Fallback per compatibilità con i dati che arrivano dal backend */}
+                                        {movement.itemCount ?? movement.items?.length ?? 0} righe
+                                      </span>
+                                  </div>
+                              </div>
+                          </CardContent>
+                          </Card>
+                      </Link>
+                  );
+              })
+            )}
+          </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8 pb-8">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-slate-600">
+                Pagina {page} di {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-          ) : (
-            filteredMovements.map((movement) => {
-                const typeConfig = getTypeConfig(movement.type);
-                const Icon = typeConfig.icon;
-                
-                return (
-                    <Link href={`/movements/${movement.id}`} key={movement.id}>
-                        <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200">
-                        <CardContent className="p-5">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                                        <FileText className="h-4 w-4 text-blue-600" />
-                                        Bolla: {movement.number}
-                                    </h3>
-                                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                        <Calendar className="h-3 w-3" />
-                                        {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
-                                    </p>
-                                </div>
-                                <Badge variant="secondary" className={typeConfig.color}>
-                                    <Icon className="mr-1 h-3 w-3" />
-                                    {typeConfig.label}
-                                </Badge>
-                            </div>
-                            
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Causale</span>
-                                    <span className="font-medium truncate max-w-[150px]">{movement.causal}</span>
-                                </div>
-                                {movement.jobCode && (
-                                    <div className="flex justify-between py-1 border-b border-slate-50">
-                                        <span className="text-slate-500">Commessa</span>
-                                        <span className="font-medium text-blue-600">{movement.jobCode}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between py-1">
-                                    <span className="text-slate-500">Articoli</span>
-                                    <span className="font-medium">{movement.items?.length || 0} righe</span>
-                                </div>
-                            </div>
-                        </CardContent>
-                        </Card>
-                    </Link>
-                );
-            })
           )}
-        </div>
+        </>
       )}
     </DashboardLayout>
   );

@@ -305,17 +305,25 @@ export const purchasesApi = {
     }
 
     if (search) {
-      // Search in delivery_note_number or supplier name
-      // Note: searching across related tables (suppliers.name) in Supabase/PostgREST is tricky with single text search.
-      // We will search primarily on delivery_note_number or notes. 
-      // For supplier name search, we might need a separate filter or join, but complex ORs across tables are hard.
-      // Let's stick to delivery_note_number and notes for now, or use the 'or' filter if possible.
-      // Actually, we can use the embedding resource search syntax if we were just filtering, 
-      // but for 'or' across tables it's harder.
-      // Let's keep it simple: filter by delivery_note_number. 
-      // If the user wants to search by supplier, they can use the supplier filter or we rely on client side if needed (but we want server side).
-      // A common workaround is to search on the main table fields.
-      query = query.or(`delivery_note_number.ilike.%${search}%,notes.ilike.%${search}%`);
+       // 1. Find matching suppliers to include them in the OR search
+       const { data: suppliers } = await supabase
+         .from('suppliers')
+         .select('id')
+         .ilike('name', `%${search}%`);
+       
+       const supplierIds = suppliers?.map(s => s.id) || [];
+       
+       // 2. Build OR filter
+       let orConditions = [
+         `delivery_note_number.ilike.%${search}%`,
+         `notes.ilike.%${search}%`
+       ];
+
+       if (supplierIds.length > 0) {
+         orConditions.push(`supplier_id.in.(${supplierIds.join(',')})`);
+       }
+
+       query = query.or(orConditions.join(','));
     }
 
     query = query
@@ -713,6 +721,9 @@ export interface DeliveryNote {
   notes?: string;
   items?: DeliveryNoteItem[];
   created_at?: string;
+  // Display helpers
+  itemCount?: number;
+  totalQuantity?: number;
 }
 
 const mapDeliveryNoteToDb = (note: Partial<DeliveryNote>) => ({
@@ -785,6 +796,53 @@ export const deliveryNotesApi = {
     } finally {
       console.timeEnd('deliveryNotesApi.getAll');
     }
+  },
+
+  getPaginated: async ({ page = 1, limit = 10, search = '' }) => {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = supabase
+      .from('delivery_notes')
+      .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'exact' });
+
+    if (search) {
+       // Pre-fetch matching job IDs to include in search
+       const { data: jobs } = await supabase
+         .from('jobs')
+         .select('id')
+         .ilike('code', `%${search}%`);
+       
+       const jobIds = jobs?.map(j => j.id) || [];
+       
+       let orConditions = [
+         `number.ilike.%${search}%`,
+         `causal.ilike.%${search}%`
+       ];
+       
+       if (jobIds.length > 0) {
+          orConditions.push(`job_id.in.(${jobIds.join(',')})`);
+       }
+       
+       query = query.or(orConditions.join(','));
+    }
+
+    query = query
+      .order('date', { ascending: false })
+      .range(from, to);
+
+    const { data, error, count } = await fetchWithTimeout(query);
+
+    if (error) throw error;
+    
+    return {
+      data: data.map((d: any) => ({
+        ...mapDbToDeliveryNote(d),
+        itemCount: d.delivery_note_items?.length || 0,
+        totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+      })),
+      total: count || 0
+    };
   },
   
   getById: async (id: string) => {

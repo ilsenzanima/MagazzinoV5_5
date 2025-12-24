@@ -4,9 +4,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle } from "lucide-react";
+import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useDeferredValue } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { purchasesApi, Purchase } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -20,16 +20,31 @@ function PurchasesContent() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDeferredValue(searchTerm);
+  
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const LIMIT = 12;
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, initialSupplierId]);
 
   useEffect(() => {
     loadPurchases();
-  }, []);
+  }, [page, debouncedSearch, initialSupplierId]);
 
   const loadPurchases = async () => {
     try {
       setLoading(true);
-      const data = await purchasesApi.getAll();
+      const { data, total } = await purchasesApi.getPaginated({
+        page, 
+        limit: LIMIT, 
+        search: debouncedSearch,
+        supplierId: initialSupplierId || ''
+      });
       setPurchases(data);
+      setTotalItems(total);
     } catch (error) {
       console.error("Failed to load purchases", error);
     } finally {
@@ -37,17 +52,7 @@ function PurchasesContent() {
     }
   };
 
-  const filteredPurchases = purchases.filter((purchase) => {
-    // If supplierId param is present, strictly filter by it
-    if (initialSupplierId && purchase.supplierId !== initialSupplierId) {
-        return false;
-    }
-
-    return (
-      purchase.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      purchase.supplierName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  const totalPages = Math.ceil(totalItems / LIMIT);
 
   return (
     <>
@@ -90,14 +95,15 @@ function PurchasesContent() {
             <span className="ml-2 text-slate-500">Caricamento acquisti...</span>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPurchases.length === 0 ? (
+          {purchases.length === 0 ? (
             <div className="col-span-full text-center py-10 text-slate-400">
               <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
               <p>Nessun acquisto trovato</p>
             </div>
           ) : (
-            filteredPurchases.map((purchase) => (
+            purchases.map((purchase) => (
               <Link href={`/purchases/${purchase.id}`} key={purchase.id}>
                 <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200">
                   <CardContent className="p-5">
@@ -158,6 +164,32 @@ function PurchasesContent() {
             ))
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-8">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1 || loading}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-slate-600">
+              Pagina {page} di {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || loading}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        </>
       )}
     </>
   );
