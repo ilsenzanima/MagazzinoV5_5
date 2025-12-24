@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { InventoryItem } from "@/lib/mock-data";
-import { inventoryApi } from "@/lib/api";
+import { inventoryApi, itemTypesApi, ItemType } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import {
@@ -35,6 +35,7 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +53,11 @@ export default function InventoryPage() {
     }, 500);
     return () => clearTimeout(handler);
   }, [searchTerm]);
+
+  // Load types
+  useEffect(() => {
+    itemTypesApi.getAll().then(setItemTypes).catch(console.error);
+  }, []);
 
   // Load items when dependencies change
   useEffect(() => {
@@ -236,16 +242,16 @@ export default function InventoryPage() {
                     <CardContent className="p-0 flex flex-col h-full">
                     {/* Immagine */}
                     <div className="w-full h-48 bg-slate-200 shrink-0 relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                        src={item.image || "/placeholder.svg"} 
-                        alt={item.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/placeholder.svg";
-                        }}
-                        />
-                        {item.quantity === 0 && (
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={item.image || itemTypes.find(t => t.name === item.type)?.imageUrl || "/placeholder.svg"} 
+                      alt={item.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/placeholder.svg";
+                      }}
+                    />
+                    {item.quantity === 0 && (
                         <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm">
                             <Badge variant="destructive" className="text-sm font-bold">ESAURITO</Badge>
                         </div>

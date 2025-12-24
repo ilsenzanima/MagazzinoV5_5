@@ -7,10 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { purchasesApi, Purchase } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 
 export default function PurchasesPage() {
+  const searchParams = useSearchParams();
+  const initialSupplierId = searchParams?.get("supplierId");
+
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,6 +36,11 @@ export default function PurchasesPage() {
   };
 
   const filteredPurchases = purchases.filter((purchase) => {
+    // If supplierId param is present, strictly filter by it
+    if (initialSupplierId && purchase.supplierId !== initialSupplierId) {
+        return false;
+    }
+
     return (
       purchase.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       purchase.supplierName?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -42,13 +51,22 @@ export default function PurchasesPage() {
     <DashboardLayout>
       <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900">Gestione Acquisti</h1>
-          <Link href="/purchases/new">
+          <h1 className="text-xl font-bold text-slate-900">
+            {initialSupplierId ? "Acquisti Fornitore" : "Gestione Acquisti"}
+          </h1>
+          <div className="flex gap-2">
+            {initialSupplierId && (
+                <Link href="/purchases">
+                    <Button variant="outline">Mostra Tutti</Button>
+                </Link>
+            )}
+            <Link href="/purchases/new">
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="mr-2 h-4 w-4" />
               Nuovo Acquisto
             </Button>
-          </Link>
+            </Link>
+          </div>
         </div>
 
         <div className="relative">

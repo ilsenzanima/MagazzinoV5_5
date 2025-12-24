@@ -26,7 +26,7 @@ import { useAuth } from "@/components/auth-provider";
 import { User } from "@/lib/mock-data";
 
 export default function SettingsAdminPage() {
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, setSimulatedRole, realRole } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
     
@@ -152,6 +152,11 @@ export default function SettingsAdminPage() {
         }
     };
 
+    // If user is not admin (checked by effective role), show access denied
+    // BUT if realRole is Admin, we might want to allow them to use the simulator even if they are currently "User"
+    // Wait, if I am simulating User, I can't see this page! 
+    // So this page is only visible if I am effectively Admin.
+    
     return (
         <div className="space-y-6">
             <div>
@@ -179,9 +184,11 @@ export default function SettingsAdminPage() {
                         {connectionStatus === 'connected' && (
                             <div className="flex justify-between items-center">
                                 <span>Connesso al database.</span>
-                                <Badge variant={userRole === 'admin' ? "default" : "secondary"}>
-                                    Ruolo attuale: {userRole?.toUpperCase()}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                    <Badge variant={userRole === 'admin' ? "default" : "secondary"}>
+                                        Ruolo: {userRole?.toUpperCase()}
+                                    </Badge>
+                                </div>
                             </div>
                         )}
                         {connectionStatus === 'error' && (
@@ -192,6 +199,49 @@ export default function SettingsAdminPage() {
                     </div>
                  </CardContent>
             </Card>
+
+            {/* ROLE SIMULATOR - Only for Real Admins */}
+            {realRole === 'admin' && (
+                <Card className="border-amber-400 bg-amber-50/50">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center text-amber-700">
+                            <UserCog className="mr-2 h-4 w-4" />
+                            Simulatore di Ruolo
+                        </CardTitle>
+                        <CardDescription className="text-amber-600/80">
+                            Vedi l'applicazione come se avessi un altro ruolo.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setSimulatedRole('user')}
+                                className="bg-white hover:bg-amber-100 border-amber-200 text-amber-800"
+                            >
+                                Simula User (Sola Lettura)
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setSimulatedRole('operativo')}
+                                className="bg-white hover:bg-amber-100 border-amber-200 text-amber-800"
+                            >
+                                Simula Operativo
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setSimulatedRole(null)}
+                                className="bg-white hover:bg-amber-100 border-amber-200 text-amber-800"
+                            >
+                                Reset (Torna Admin)
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {userRole === 'admin' ? (
                 <>

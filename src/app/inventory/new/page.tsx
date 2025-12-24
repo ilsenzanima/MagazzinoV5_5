@@ -24,18 +24,13 @@ export default function NewInventoryItemPage() {
   const router = useRouter();
   const { user, userRole } = useAuth();
   
-  // Generate a random mock code
-  const generateCode = () => {
-    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-    return `PPA-E${randomSuffix}`;
-  };
-
-  const [code] = useState(generateCode());
+  const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [types, setTypes] = useState<ItemType[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -48,6 +43,18 @@ export default function NewInventoryItemPage() {
         setBrands(brandsData);
         setTypes(typesData);
         setUnits(unitsData);
+        
+        // Generate next code
+        try {
+             const nextCode = await inventoryApi.getNextCode();
+             setCode(nextCode);
+        } catch (err) {
+            console.error("Failed to generate code", err);
+            // Fallback to random if RPC fails (e.g. function not exists yet)
+            const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+            setCode(`PPA-E${randomSuffix}`);
+        }
+
       } catch (error) {
         console.error("Failed to load data", error);
       } finally {
@@ -75,11 +82,12 @@ export default function NewInventoryItemPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
         setPreviewImage(result);
-        setFormData({ ...formData, image: result });
+        // We don't set formData.image here, we'll upload it on save
       };
       reader.readAsDataURL(file);
     }
@@ -89,11 +97,28 @@ export default function NewInventoryItemPage() {
     setIsLoading(true);
     try {
         const coeff = parseFloat(formData.coefficient);
+        const minStock = parseInt(formData.minStock);
+
         if (isNaN(coeff) || coeff <= 0) {
-            // Show simple alert or better UI feedback (using alert for now as requested for simplicity)
             alert("Il coefficiente deve essere maggiore di 0");
             setIsLoading(false);
             return;
+        }
+
+        if (isNaN(minStock) || minStock < 0) {
+            alert("La scorta minima non può essere negativa");
+            setIsLoading(false);
+            return;
+        }
+        
+        let imageUrl = formData.image;
+        if (imageFile) {
+            try {
+                imageUrl = await inventoryApi.uploadImage(imageFile);
+            } catch (uploadErr) {
+                console.error("Image upload failed", uploadErr);
+                alert("Errore caricamento immagine, l'articolo verrà creato senza immagine.");
+            }
         }
 
         const newItem = {
@@ -103,18 +128,18 @@ export default function NewInventoryItemPage() {
             type: formData.type,
             supplierCode: formData.supplierCode,
             quantity: 0,
-            minStock: parseInt(formData.minStock) || 0,
+            minStock: minStock,
             unit: formData.unit as any,
             coefficient: coeff,
             description: formData.description,
-            image: formData.image,
+            image: imageUrl,
         };
         
         await inventoryApi.create(newItem);
         router.push("/inventory");
     } catch (error) {
         console.error("Failed to create item", error);
-        // Here we should probably show a toast error, but for now console error is fine
+        alert("Errore durante la creazione dell'articolo");
     } finally {
         setIsLoading(false);
     }

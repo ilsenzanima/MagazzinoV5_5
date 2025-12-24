@@ -196,6 +196,11 @@ export default function InventoryDetailPage() {
             return;
         }
 
+        if (editForm.minStock !== undefined && editForm.minStock < 0) {
+            alert("La scorta minima non può essere negativa");
+            return;
+        }
+
         await inventoryApi.update(item.id, {
             ...editForm
         });
@@ -231,19 +236,23 @@ export default function InventoryDetailPage() {
     }
   };
 
-  // Handle Image Upload (Mock for now, as we don't have storage set up yet)
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Image Upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (item) {
-            // In a real app, upload to Supabase Storage here
-            // setItem({ ...item, image: reader.result as string });
-            alert("Upload immagini non ancora configurato (richiede Supabase Storage)");
-        }
-      };
-      reader.readAsDataURL(file);
+    if (file && item) {
+      try {
+        const imageUrl = await inventoryApi.uploadImage(file);
+        
+        // Update item with new image URL
+        await inventoryApi.update(item.id, { image: imageUrl });
+        
+        // Update local state
+        setItem({ ...item, image: imageUrl });
+        alert("Immagine caricata con successo!");
+      } catch (error) {
+        console.error("Image upload failed", error);
+        alert("Errore caricamento immagine");
+      }
     }
   };
 

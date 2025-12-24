@@ -16,7 +16,8 @@ import {
   Loader2,
   ShoppingCart,
   Truck,
-  Users
+  Users,
+  Building2
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -54,6 +55,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           icon: ShoppingCart,
           href: "/purchases",
           active: pathname === "/purchases" || pathname.startsWith("/purchases/"),
+        },
+        {
+          label: "Fornitori",
+          icon: Building2,
+          href: "/suppliers",
+          active: pathname === "/suppliers" || pathname.startsWith("/suppliers/"),
         },
         {
           label: "Movimentazione",
@@ -169,7 +176,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { session, loading } = useAuth();
+  const { session, loading, userRole, realRole, simulatedRole, setSimulatedRole } = useAuth();
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -193,13 +200,36 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-background">
+      {/* Simulation Banner */}
+      {simulatedRole && (
+        <div className="fixed top-0 left-0 right-0 h-10 bg-amber-500 text-white z-[60] flex items-center justify-center px-4 font-bold shadow-md">
+          <span className="mr-4">
+            MODALITÀ SIMULAZIONE: Stai vedendo il sito come {simulatedRole.toUpperCase()}
+          </span>
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            className="h-7 text-xs bg-white text-amber-600 hover:bg-amber-50"
+            onClick={() => setSimulatedRole(null)}
+          >
+            ESCI DALLA SIMULAZIONE
+          </Button>
+        </div>
+      )}
+
       {/* Sidebar Desktop */}
-      <div className="hidden md:flex h-screen w-64 flex-col fixed left-0 top-0 border-r border-slate-800 z-50">
+      <div className={cn(
+        "hidden md:flex h-screen w-64 flex-col fixed left-0 border-r border-slate-800 z-50 transition-all",
+        simulatedRole ? "top-10 h-[calc(100vh-40px)]" : "top-0"
+      )}>
         <Sidebar />
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 md:pl-64 flex flex-col min-h-screen">
+      <div className={cn(
+        "flex-1 md:pl-64 flex flex-col min-h-screen transition-all",
+        simulatedRole ? "pt-10" : ""
+      )}>
         
         {/* Mobile Header with Hamburger */}
         <header className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-white dark:bg-slate-900 dark:border-slate-800 p-4 shadow-sm">

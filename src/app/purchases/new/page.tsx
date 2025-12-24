@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Save, Plus, Trash2, Loader2, Search, X } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Loader2, Search, X, Upload } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -59,6 +59,8 @@ export default function NewPurchasePage() {
     deliveryNoteDate: new Date().toISOString().split('T')[0],
     jobId: ""
   });
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Form State - Current Line
   const [currentLine, setCurrentLine] = useState({
@@ -306,6 +308,11 @@ export default function NewPurchasePage() {
     try {
       setLoading(true);
 
+      let documentUrl = undefined;
+      if (selectedFile) {
+          documentUrl = await purchasesApi.uploadDocument(selectedFile);
+      }
+
       // 1. Create Purchase Header
       const purchase = await purchasesApi.create({
         supplierId: formData.supplierId,
@@ -313,7 +320,8 @@ export default function NewPurchasePage() {
         deliveryNoteDate: formData.deliveryNoteDate,
         status: 'draft',
         notes: '',
-        jobId: formData.jobId || undefined
+        jobId: formData.jobId || undefined,
+        documentUrl: documentUrl
       });
 
       // 2. Create Purchase Lines
@@ -328,11 +336,11 @@ export default function NewPurchasePage() {
           jobId: line.jobId
         });
         
-        // TODO: Here we should trigger movements or stock updates logic
-        // The user said: "La logica di funzionamento... lo vediamo quando avremo finito"
-        // So I just save the purchase data for now.
+        // Note: Stock updates are handled automatically by DB triggers (handle_purchase_item_change)
+        // and Cost Calculation is handled by stock_movements_view.
       }
 
+      // Warning about stock update is handled by the UI info below
       router.push('/purchases');
     } catch (error: any) {
       console.error("Failed to save purchase", error);

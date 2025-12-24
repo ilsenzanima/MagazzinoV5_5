@@ -8,6 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Printer } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, Job, Movement } from "@/lib/api";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { format } from "date-fns";
+import { it } from "date-fns/locale";
 
 // Components
 import { JobOverview } from "@/components/jobs/details/JobOverview";
@@ -19,18 +23,97 @@ export default function JobDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [job, setJob] = useState<Job | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [totalCost, setTotalCost] = useState(0);
   const [loading, setLoading] = useState(true);
   
   // Ref for printing
   const printRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
-    // Simple print implementation
-    // For a more complex "Card" print, we might want a dedicated CSS print media query
-    // hiding the TabsList and showing all content, or just printing the current view.
-    // The user requested "Stampa scheda per uso in ufficio".
-    // Usually this means the Overview + Costs.
-    window.print();
+    if (!job) return;
+
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text("SCHEDA CANTIERE / COMMESSA", 105, 15, { align: "center" });
+    
+    // Job Info
+    doc.setFontSize(10);
+    doc.setLineWidth(0.1);
+    
+    // Box 1: General Info
+    doc.rect(14, 25, 182, 35);
+    doc.setFont("helvetica", "bold");
+    doc.text("Codice:", 16, 32);
+    doc.setFont("helvetica", "normal");
+    doc.text(job.code || "-", 35, 32);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Descrizione:", 16, 38);
+    doc.setFont("helvetica", "normal");
+    doc.text(job.description, 16, 44, { maxWidth: 178 });
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Cliente:", 16, 52);
+    doc.setFont("helvetica", "normal");
+    doc.text(job.clientName || "-", 35, 52);
+
+    // Box 2: Site Info & Status
+    doc.rect(14, 65, 90, 30);
+    doc.setFont("helvetica", "bold");
+    doc.text("Indirizzo Cantiere:", 16, 72);
+    doc.setFont("helvetica", "normal");
+    doc.text(job.siteAddress || "-", 16, 78, { maxWidth: 86 });
+
+    doc.rect(106, 65, 90, 30);
+    doc.setFont("helvetica", "bold");
+    doc.text("Stato:", 108, 72);
+    doc.setFont("helvetica", "normal");
+    const statusLabel = job.status === 'active' ? 'In Lavorazione' : job.status === 'completed' ? 'Completata' : 'Sospesa';
+    doc.text(statusLabel, 125, 72);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Data Inizio:", 108, 80);
+    doc.setFont("helvetica", "normal");
+    doc.text(job.startDate ? format(new Date(job.startDate), 'dd/MM/yyyy') : "-", 135, 80);
+
+    // Box 3: Economics
+    doc.rect(14, 100, 182, 20);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Totale Costo Materiali:", 16, 113);
+    doc.text(`€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 190, 113, { align: "right" });
+
+    // Table of Recent Movements (Limit to last 20 for brevity in summary)
+    doc.setFontSize(11);
+    doc.text("Ultimi Movimenti (Max 20)", 14, 130);
+    
+    const tableBody = movements.slice(0, 20).map(m => [
+        format(new Date(m.date), 'dd/MM/yyyy'),
+        m.type === 'purchase' ? 'Acquisto' : m.type === 'exit' ? 'Uscita' : m.type === 'entry' ? 'Rientro' : m.type,
+        m.itemCode || "-",
+        m.itemName || "Articolo",
+        m.quantity.toString() + " " + (m.itemUnit || ""),
+        // Only show price if relevant/visible logic
+        m.type === 'purchase' ? `€ ${m.itemPrice?.toFixed(2)}` : "-" 
+    ]);
+
+    autoTable(doc, {
+        startY: 135,
+        head: [['Data', 'Tipo', 'Codice', 'Descrizione', 'Q.tà', 'Prezzo (Acq.)']],
+        body: tableBody,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    // Footer
+    const finalY = (doc as any).lastAutoTable.finalY || 135;
+    doc.setFontSize(8);
+    doc.text(`Generato il ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, finalY + 10);
+
+    doc.save(`Commessa_${job.code}.pdf`);
   };
 
   useEffect(() => {
@@ -38,12 +121,15 @@ export default function JobDetailsPage() {
       if (!id) return;
       try {
         setLoading(true);
-        const [jobData, movementsData] = await Promise.all([
+        // Parallel fetch: Job Details, Movements (for tabs), and Server-side Cost
+        const [jobData, movementsData, costData] = await Promise.all([
           jobsApi.getById(id),
-          movementsApi.getByJobId(id)
+          movementsApi.getByJobId(id),
+          jobsApi.getCost(id)
         ]);
         setJob(jobData);
         setMovements(movementsData);
+        setTotalCost(costData);
       } catch (error) {
         console.error("Error loading job details:", error);
       } finally {
@@ -75,42 +161,6 @@ export default function JobDetailsPage() {
         </DashboardLayout>
     );
   }
-
-  // Calculate Total Cost
-  // Logic: 
-  // - Purchase/Unload/Exit = Cost (+)
-  // - Load/Entry = Refund (-)
-  // For Fictitious items, we try to use the Last Purchase Price found in the history
-  
-  // 1. Find Last Purchase Price per Item Code
-  const lastPurchasePriceMap = new Map<string, number>()
-  for (const m of movements) {
-    if (m.itemCode && m.type === 'purchase' && m.itemPrice && m.itemPrice > 0) {
-       if (!lastPurchasePriceMap.has(m.itemCode)) {
-           lastPurchasePriceMap.set(m.itemCode, m.itemPrice)
-       }
-    }
-  }
-
-  const totalCost = movements.reduce((acc, m) => {
-    // Determine direction
-    // In to Site (Cost +): purchase, unload (wh->site), exit (wh->site)
-    const isCostPositive = ['purchase', 'unload', 'exit'].includes(m.type);
-    
-    // Determine Price
-    let price = m.itemPrice || 0;
-    
-    // If fictitious, try to use last purchase price
-    if (m.isFictitious && m.itemCode) {
-        const lastPrice = lastPurchasePriceMap.get(m.itemCode);
-        if (lastPrice) {
-            price = lastPrice;
-        }
-    }
-
-    const cost = Math.abs(m.quantity) * price;
-    return acc + (isCostPositive ? cost : -cost);
-  }, 0);
 
   return (
     <DashboardLayout>

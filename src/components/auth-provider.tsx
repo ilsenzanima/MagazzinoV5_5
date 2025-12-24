@@ -12,6 +12,9 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   userRole: 'admin' | 'user' | 'operativo' | null;
+  realRole: 'admin' | 'user' | 'operativo' | null; // The actual role from DB
+  simulatedRole: 'admin' | 'user' | 'operativo' | null; // The role being simulated
+  setSimulatedRole: (role: 'admin' | 'user' | 'operativo' | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,6 +23,9 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signOut: async () => {},
   userRole: null,
+  realRole: null,
+  simulatedRole: null,
+  setSimulatedRole: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -28,9 +34,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => createClient());
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<'admin' | 'user' | 'operativo' | null>(null);
+  const [realRole, setRealRole] = useState<'admin' | 'user' | 'operativo' | null>(null);
+  const [simulatedRole, setSimulatedRole] = useState<'admin' | 'user' | 'operativo' | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  // Effective role is simulatedRole if present, otherwise realRole
+  const userRole = simulatedRole || realRole;
 
   const fetchUserRole = async (userId: string) => {
     try {
@@ -43,13 +53,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       
       if (data) {
-        setUserRole(data.role as 'admin' | 'user' | 'operativo');
+        setRealRole(data.role as 'admin' | 'user' | 'operativo');
       } else {
-        setUserRole('user');
+        setRealRole('user');
       }
     } catch (error) {
       console.error("Error fetching user role:", error);
-      setUserRole('user');
+      setRealRole('user');
     }
   };
 
@@ -62,7 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           await fetchUserRole(session.user.id);
         } else {
-            setUserRole(null);
+            setRealRole(null);
+            setSimulatedRole(null);
         }
       } catch (error) {
         console.error("Error checking session:", error);
@@ -79,11 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-             // Don't set loading false immediately if we need to fetch role? 
-             // Actually, usually we want to show UI updates fast.
              await fetchUserRole(session.user.id);
         } else {
-            setUserRole(null);
+            setRealRole(null);
+            setSimulatedRole(null);
         }
 
         setLoading(false);
@@ -103,17 +113,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [router, supabase]);
 
-  const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      router.push("/login");
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
+  const value = {
+    user,
+    session,
+    loading,
+    signOut: async () => await supabase.auth.signOut(),
+    userRole,
+    realRole,
+    simulatedRole,
+    setSimulatedRole
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut, userRole }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
