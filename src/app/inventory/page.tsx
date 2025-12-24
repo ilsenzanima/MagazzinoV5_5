@@ -28,8 +28,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { useAuth } from "@/components/auth-provider";
 
 export default function InventoryPage() {
+  const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");

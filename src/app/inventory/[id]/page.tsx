@@ -443,19 +443,21 @@ export default function InventoryDetailPage() {
                     }}
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                     <Label htmlFor="image-upload" className="cursor-pointer">
-                        <div className="bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 rounded-md flex items-center text-sm font-medium shadow-sm">
-                          <Upload className="mr-2 h-4 w-4" /> Cambia Foto
-                        </div>
-                        <Input 
-                            id="image-upload" 
-                            type="file" 
-                            accept="image/*" 
-                            capture="environment"
-                            className="hidden" 
-                            onChange={handleImageUpload}
-                        />
-                     </Label>
+                     {(userRole === 'admin' || userRole === 'operativo') && (
+                       <Label htmlFor="image-upload" className="cursor-pointer">
+                          <div className="bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 rounded-md flex items-center text-sm font-medium shadow-sm">
+                            <Upload className="mr-2 h-4 w-4" /> Cambia Foto
+                          </div>
+                          <Input 
+                              id="image-upload" 
+                              type="file" 
+                              accept="image/*" 
+                              capture="environment"
+                              className="hidden" 
+                              onChange={handleImageUpload}
+                          />
+                       </Label>
+                     )}
                   </div>
                 </div>
                 
