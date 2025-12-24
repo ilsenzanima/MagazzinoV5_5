@@ -3,18 +3,27 @@ import { InventoryItem, User } from './mock-data';
 
 // Helper for timeouts
 export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 15000): Promise<T> => {
+    const start = Date.now();
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
+            const duration = Date.now() - start;
+            console.error(`Request timed out after ${duration}ms`);
             reject(new Error("Request timed out"));
         }, ms);
 
         promise.then(
             (res) => {
                 clearTimeout(timeoutId);
+                const duration = Date.now() - start;
+                if (duration > 2000) {
+                    console.warn(`Slow request detected: ${duration}ms`);
+                }
                 resolve(res);
             },
             (err) => {
                 clearTimeout(timeoutId);
+                const duration = Date.now() - start;
+                console.error(`Request failed after ${duration}ms:`, err);
                 reject(err);
             }
         );
