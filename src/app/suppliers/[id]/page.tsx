@@ -11,8 +11,10 @@ import { ArrowLeft, Loader2, Save, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { suppliersApi, Supplier } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/components/auth-provider";
 
 export default function SupplierDetailPage() {
+  const { userRole } = useAuth();
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
@@ -109,7 +111,7 @@ export default function SupplierDetailPage() {
                 {isEditing ? "Modifica Fornitore" : supplier.name}
             </h1>
           </div>
-          {!isEditing && (
+          {!isEditing && (userRole === 'admin' || userRole === 'operativo') && (
             <Button onClick={() => setIsEditing(true)} variant="outline">
                 <Pencil className="mr-2 h-4 w-4" />
                 Modifica

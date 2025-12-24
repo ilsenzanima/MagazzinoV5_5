@@ -26,8 +26,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAuth } from "@/components/auth-provider";
 
 export default function SuppliersPage() {
+  const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,12 +81,14 @@ export default function SuppliersPage() {
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Fornitori</h1>
-          <Link href="/suppliers/new">
-            <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuovo Fornitore
-            </Button>
-          </Link>
+          {(userRole === 'admin' || userRole === 'operativo') && (
+            <Link href="/suppliers/new">
+                <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuovo Fornitore
+                </Button>
+            </Link>
+          )}
         </div>
 
         <div className="relative">
@@ -133,17 +137,19 @@ export default function SuppliersPage() {
                           <Building2 className="h-4 w-4" />
                         </Button>
                       </Link>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="text-slate-400 hover:text-red-600 h-8 w-8"
-                        onClick={() => {
-                          setSupplierToDelete(supplier);
-                          setIsDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {(userRole === 'admin' || userRole === 'operativo') && (
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-slate-400 hover:text-red-600 h-8 w-8"
+                            onClick={() => {
+                            setSupplierToDelete(supplier);
+                            setIsDeleteDialogOpen(true);
+                            }}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardTitle>
                 </CardHeader>

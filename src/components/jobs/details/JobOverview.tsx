@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useAuth } from "@/components/auth-provider"
 
 interface JobOverviewProps {
   job: Job
@@ -23,6 +24,7 @@ interface JobOverviewProps {
 
 export function JobOverview({ job, totalCost }: JobOverviewProps) {
   const router = useRouter()
+  const { userRole } = useAuth()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   // Mock budget (since we don't track it yet)
@@ -61,18 +63,22 @@ export function JobOverview({ job, totalCost }: JobOverviewProps) {
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Pencil className="mr-2 h-4 w-4" />
-            Modifica
-          </Button>
-          <Button 
-            variant="destructive" 
-            size="sm" 
-            onClick={() => setIsDeleteDialogOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Elimina
-          </Button>
+          {(userRole === 'admin' || userRole === 'operativo') && (
+            <Button variant="outline" size="sm">
+                <Pencil className="mr-2 h-4 w-4" />
+                Modifica
+            </Button>
+          )}
+          {(userRole === 'admin' || userRole === 'operativo') && (
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Elimina
+            </Button>
+          )}
         </div>
       </div>
 
@@ -86,7 +92,11 @@ export function JobOverview({ job, totalCost }: JobOverviewProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">€ {totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
+            {userRole === 'user' ? (
+                <div className="text-xl font-bold text-slate-400 italic">Riservato</div>
+            ) : (
+                <div className="text-2xl font-bold">€ {totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
+            )}
             <div className="text-xs text-slate-500 mt-1">Calcolato su listino interno</div>
             {/* Progress bar mock */}
             <div className="h-1.5 w-full bg-slate-100 rounded-full mt-3 overflow-hidden">

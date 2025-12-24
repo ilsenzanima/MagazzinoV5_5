@@ -21,6 +21,8 @@ import { JobDocuments } from "@/components/jobs/details/JobDocuments";
 
 export default function JobDetailsPage() {
   const { id } = useParams<{ id: string }>();
+  const { userRole } = useAuth();
+  const [activeTab, setActiveTab] = useState("overview");
   const [job, setJob] = useState<Job | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [totalCost, setTotalCost] = useState(0);
@@ -79,11 +81,19 @@ export default function JobDetailsPage() {
     doc.text(job.startDate ? format(new Date(job.startDate), 'dd/MM/yyyy') : "-", 135, 80);
 
     // Box 3: Economics
-    doc.rect(14, 100, 182, 20);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("Totale Costo Materiali:", 16, 113);
-    doc.text(`€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 190, 113, { align: "right" });
+    if (userRole === 'admin' || userRole === 'operativo') {
+        doc.rect(14, 100, 182, 20);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Totale Costo Materiali:", 16, 113);
+        doc.text(`€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 190, 113, { align: "right" });
+    } else {
+        // Alternative placeholder for restricted roles or just skip
+        doc.rect(14, 100, 182, 20);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.text("Dati economici riservati", 16, 113);
+    }
 
     // Table of Recent Movements (Limit to last 20 for brevity in summary)
     doc.setFontSize(11);
@@ -96,7 +106,7 @@ export default function JobDetailsPage() {
         m.itemName || "Articolo",
         m.quantity.toString() + " " + (m.itemUnit || ""),
         // Only show price if relevant/visible logic
-        m.type === 'purchase' ? `€ ${m.itemPrice?.toFixed(2)}` : "-" 
+        (userRole === 'admin' || userRole === 'operativo') && m.type === 'purchase' ? `€ ${m.itemPrice?.toFixed(2)}` : "-" 
     ]);
 
     autoTable(doc, {
@@ -174,10 +184,12 @@ export default function JobDetailsPage() {
                 Torna alle Commesse
             </Button>
             </Link>
-            <Button variant="outline" onClick={handlePrint}>
+            {(userRole === 'admin' || userRole === 'operativo') && (
+            <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
-                Stampa Scheda
+                Stampa Report
             </Button>
+            )}
         </div>
 
         {/* Printable Area */}

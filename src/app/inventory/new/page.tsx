@@ -24,6 +24,23 @@ export default function NewInventoryItemPage() {
   const router = useRouter();
   const { user, userRole } = useAuth();
   
+  if (userRole === 'user') {
+    return (
+        <DashboardLayout>
+            <div className="flex flex-col items-center justify-center h-full py-20">
+                <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
+                <p className="text-slate-500 mb-6">Non hai i permessi necessari per creare nuovi articoli.</p>
+                <Link href="/inventory">
+                    <Button variant="outline">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Torna all'Inventario
+                    </Button>
+                </Link>
+            </div>
+        </DashboardLayout>
+    );
+  }
+
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);

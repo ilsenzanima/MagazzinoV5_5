@@ -12,13 +12,32 @@ import { ArrowLeft, Loader2, Save, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, clientsApi, Client } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/components/auth-provider";
 
 export default function NewJobPage() {
   const router = useRouter();
+  const { userRole } = useAuth();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [useClientAddress, setUseClientAddress] = useState(false);
   
+  if (userRole === 'user') {
+    return (
+        <DashboardLayout>
+            <div className="flex flex-col items-center justify-center h-full py-20">
+                <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
+                <p className="text-slate-500 mb-6">Non hai i permessi necessari per creare nuove commesse.</p>
+                <Link href="/jobs">
+                    <Button variant="outline">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Torna alle Commesse
+                    </Button>
+                </Link>
+            </div>
+        </DashboardLayout>
+    );
+  }
+
   const [formData, setFormData] = useState({
     clientId: "",
     code: "",

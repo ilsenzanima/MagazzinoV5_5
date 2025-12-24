@@ -423,7 +423,13 @@ export default function MovementDetailPage() {
                                         <TableCell>{item.inventoryUnit}</TableCell>
                                         <TableCell className="text-right font-bold">{item.quantity}</TableCell>
                                         <TableCell className="text-right">{item.coefficient}</TableCell>
-                                        <TableCell className="text-right">€ {item.price?.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">
+                                            {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                `€ ${item.price?.toFixed(2)}`
+                                            ) : (
+                                                <span className="text-slate-400 italic text-xs">Riservato</span>
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                 ))
                             )}

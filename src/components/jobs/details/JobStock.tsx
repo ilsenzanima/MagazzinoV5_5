@@ -1,17 +1,21 @@
 "use client"
 
+import { useState, useMemo } from "react"
 import { Movement } from "@/lib/api"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Package, ArrowUpRight, ArrowDownLeft, AlertTriangle } from "lucide-react"
+import { Package, ArrowRight, AlertTriangle, ArrowUpRight, ArrowDownLeft } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/components/auth-provider"
 
 interface JobStockProps {
   movements: Movement[]
 }
 
 export function JobStock({ movements }: JobStockProps) {
+  const { userRole } = useAuth()
+  const [searchTerm, setSearchTerm] = useState("")
   // 1. Find Last Purchase Price per Item Code
   // We use this for fictitious items: value of the last purchase made for that item
   const lastPurchasePriceMap = new Map<string, number>()
@@ -189,15 +193,21 @@ export function JobStock({ movements }: JobStockProps) {
                         </TableCell>
                         <TableCell className="text-right text-slate-500">
                             <div className="flex items-center justify-end gap-2">
-                                {(!item.price || item.price === 0) && (
-                                    <div className="group relative">
-                                        <AlertTriangle className="h-4 w-4 text-amber-500 cursor-help" />
-                                        <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-32 bg-slate-800 text-white text-xs rounded p-1 text-center z-10">
-                                            Prezzo mancante
-                                        </span>
-                                    </div>
+                                {userRole === 'user' ? (
+                                    <span className="text-slate-400 italic text-xs">Riservato</span>
+                                ) : (
+                                    <>
+                                        {(!item.price || item.price === 0) && (
+                                            <div className="group relative">
+                                                <AlertTriangle className="h-4 w-4 text-amber-500 cursor-help" />
+                                                <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-32 bg-slate-800 text-white text-xs rounded p-1 text-center z-10">
+                                                    Prezzo mancante
+                                                </span>
+                                            </div>
+                                        )}
+                                        € {(item.qty * item.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                    </>
                                 )}
-                                € {(item.qty * item.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                             </div>
                         </TableCell>
                         </TableRow>

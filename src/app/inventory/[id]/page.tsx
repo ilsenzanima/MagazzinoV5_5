@@ -403,7 +403,8 @@ export default function InventoryDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isEditing ? (
+            {(userRole === 'admin' || userRole === 'operativo') && (
+              isEditing ? (
                 <>
                     <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={isSaving}>
                         <X className="mr-2 h-4 w-4" /> Annulla
@@ -413,7 +414,7 @@ export default function InventoryDetailPage() {
                         Salva
                     </Button>
                 </>
-            ) : (
+              ) : (
                 <>
                   <Button variant="default" size="sm" onClick={handleEdit}>
                       <Pencil className="mr-2 h-4 w-4" /> Modifica
@@ -422,8 +423,8 @@ export default function InventoryDetailPage() {
                       <Trash2 className="mr-2 h-4 w-4" /> Elimina
                   </Button>
                 </>
+              )
             )}
-            {/* Note: Save button logic would go here if we had editable fields outside of movements */}
           </div>
         </div>
 
@@ -718,7 +719,8 @@ export default function InventoryDetailPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Storico Movimenti</CardTitle>
-                <Dialog open={isMovementOpen} onOpenChange={setIsMovementOpen}>
+                {(userRole === 'admin' || userRole === 'operativo') && (
+                  <Dialog open={isMovementOpen} onOpenChange={setIsMovementOpen}>
                     <DialogTrigger asChild>
                         <Button size="sm" className="bg-blue-600">
                             <Plus className="mr-2 h-4 w-4" /> Nuovo Movimento
@@ -824,7 +826,8 @@ export default function InventoryDetailPage() {
                             </Button>
                         </DialogFooter>
                     </DialogContent>
-                </Dialog>
+                  </Dialog>
+                )}
               </CardHeader>
               <CardContent>
                 <Table>

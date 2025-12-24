@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Package, AlertTriangle, Euro } from "lucide-react";
+import { useAuth } from "@/components/auth-provider";
 
 interface StatsCardsProps {
   totalValue: number;
@@ -8,6 +9,8 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ totalValue, lowStockCount, totalItems }: StatsCardsProps) {
+  const { userRole } = useAuth();
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('it-IT', {
       style: 'currency',
@@ -22,7 +25,13 @@ export function StatsCards({ totalValue, lowStockCount, totalItems }: StatsCards
           <div className="text-slate-500 text-xs font-medium mb-1">Valore Magazzino</div>
           <div className="flex items-center gap-2">
             <Euro className="h-5 w-5 text-emerald-500" />
-            <span className="text-2xl font-bold text-slate-900">{formatCurrency(totalValue)}</span>
+            <span className="text-2xl font-bold text-slate-900">
+              {userRole === 'user' ? (
+                <span className="text-slate-400 italic text-lg">Non disponibile</span>
+              ) : (
+                formatCurrency(totalValue)
+              )}
+            </span>
           </div>
         </CardContent>
       </Card>

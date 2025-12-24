@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { purchasesApi, Purchase } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/components/auth-provider";
 
 function PurchasesContent() {
+  const { userRole } = useAuth();
   const searchParams = useSearchParams();
   const initialSupplierId = searchParams?.get("supplierId");
 
@@ -60,12 +62,14 @@ function PurchasesContent() {
                     <Button variant="outline">Mostra Tutti</Button>
                 </Link>
             )}
-            <Link href="/purchases/new">
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuovo Acquisto
-            </Button>
-            </Link>
+            {(userRole === 'admin' || userRole === 'operativo') && (
+              <Link href="/purchases/new">
+                <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuovo Acquisto
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -112,8 +116,26 @@ function PurchasesContent() {
                         {purchase.status === 'completed' ? 'Completato' : 'Bozza'}
                       </Badge>
                     </div>
+
+                    <div className="mb-2">
+                      {(userRole === 'admin' || userRole === 'operativo') ? (
+                        <div className="font-bold text-lg text-slate-900">
+                          {purchase.total_amount !== undefined && purchase.total_amount !== null
+                            ? `€ ${purchase.total_amount.toFixed(2)}`
+                            : '-'
+                          }
+                          {purchase.total_amount === 0 && (
+                            <div className="inline-block ml-2" title="Prezzo mancante">
+                              <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic text-sm">Riservato</span>
+                      )}
+                    </div>
                     
-                    {purchase.items?.some(item => item.price === 0) && (
+                    {purchase.items?.some(item => item.price === 0) && (userRole === 'admin' || userRole === 'operativo') && (
                       <div className="mb-4 flex items-center text-yellow-600 bg-yellow-50 p-2 rounded text-xs font-medium border border-yellow-100">
                         <AlertTriangle className="h-3 w-3 mr-1.5" />
                         Prezzi mancanti
@@ -142,6 +164,9 @@ function PurchasesContent() {
 }
 
 export default function PurchasesPage() {
+  const { userRole } = useAuth();
+  const router = useRouter();
+
   return (
     <DashboardLayout>
       <Suspense fallback={

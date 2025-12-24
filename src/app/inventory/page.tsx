@@ -173,12 +173,14 @@ export default function InventoryPage() {
           </div>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
-             <Link href="/inventory/new" className="w-full sm:w-auto">
-                <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuovo Articolo
-                </Button>
-             </Link>
+             {(userRole === 'admin' || userRole === 'operativo') && (
+               <Link href="/inventory/new" className="w-full sm:w-auto">
+                  <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nuovo Articolo
+                  </Button>
+               </Link>
+             )}
              <Button variant="ghost" size="icon" className="shrink-0" aria-label="Filtra">
                 <Filter className="h-5 w-5 text-slate-600 dark:text-slate-400" />
              </Button>
@@ -341,13 +343,15 @@ export default function InventoryPage() {
     )}
       
       {/* Floating Action Button (FAB) */}
-      <div className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-20">
-        <Link href="/inventory/new">
-          <Button className="h-14 w-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700">
-            <Plus className="h-8 w-8" />
-          </Button>
-        </Link>
-      </div>
+      {(userRole === 'admin' || userRole === 'operativo') && (
+        <div className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-20">
+          <Link href="/inventory/new">
+            <Button className="h-14 w-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-8 w-8" />
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* Scanner Dialog */}
       <Dialog open={isScanning} onOpenChange={setIsScanning}>

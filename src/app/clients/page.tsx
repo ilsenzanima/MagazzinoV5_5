@@ -26,7 +26,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import { useAuth } from "@/components/auth-provider";
+
 export default function ClientsPage() {
+  const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,12 +81,14 @@ export default function ClientsPage() {
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Committenti</h1>
-          <Link href="/clients/new">
-            <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuovo Committente
-            </Button>
-          </Link>
+          {(userRole === 'admin' || userRole === 'operativo') && (
+            <Link href="/clients/new">
+              <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuovo Committente
+              </Button>
+            </Link>
+          )}
         </div>
 
         <div className="relative">
@@ -126,17 +131,19 @@ export default function ClientsPage() {
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center justify-between">
                     <span className="truncate">{client.name}</span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-slate-400 hover:text-red-600 h-8 w-8"
-                      onClick={() => {
-                        setClientToDelete(client);
-                        setIsDeleteDialogOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {(userRole === 'admin' || userRole === 'operativo') && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-slate-400 hover:text-red-600 h-8 w-8"
+                        onClick={() => {
+                          setClientToDelete(client);
+                          setIsDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm space-y-2 text-slate-600">

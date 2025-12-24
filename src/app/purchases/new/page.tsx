@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
+import { useAuth } from "@/components/auth-provider";
 
 interface PurchaseLine {
   tempId: string;
@@ -44,8 +45,26 @@ interface PurchaseLine {
 
 export default function NewPurchasePage() {
   const router = useRouter();
+  const { userRole } = useAuth();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+
+  if (userRole === 'user') {
+    return (
+        <DashboardLayout>
+            <div className="flex flex-col items-center justify-center h-full py-20">
+                <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
+                <p className="text-slate-500 mb-6">Non hai i permessi necessari per registrare nuovi acquisti.</p>
+                <Link href="/purchases">
+                    <Button variant="outline">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Torna agli Acquisti
+                    </Button>
+                </Link>
+            </div>
+        </DashboardLayout>
+    );
+  }
 
   // Data Sources
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);

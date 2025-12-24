@@ -26,6 +26,23 @@ export default function NewClientPage() {
     phone: ""
   });
 
+  if (userRole === 'user') {
+    return (
+        <DashboardLayout>
+            <div className="flex flex-col items-center justify-center h-full py-20">
+                <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
+                <p className="text-slate-500 mb-6">Non hai i permessi necessari per creare nuovi committenti.</p>
+                <Link href="/clients">
+                    <Button variant="outline">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Torna ai Committenti
+                    </Button>
+                </Link>
+            </div>
+        </DashboardLayout>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {

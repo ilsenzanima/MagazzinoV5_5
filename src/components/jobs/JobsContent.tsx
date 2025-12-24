@@ -27,9 +27,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAuth } from "@/components/auth-provider";
 
 export default function JobsContent() {
   const router = useRouter();
+  const { userRole } = useAuth();
   const searchParams = useSearchParams();
   const filterClientId = searchParams.get('clientId');
 
@@ -107,12 +109,14 @@ export default function JobsContent() {
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Commesse</h1>
-          <Link href="/jobs/new">
-            <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuova Commessa
-            </Button>
-          </Link>
+          {(userRole === 'admin' || userRole === 'operativo') && (
+            <Link href="/jobs/new">
+                <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuova Commessa
+                </Button>
+            </Link>
+          )}
         </div>
 
         <div className="relative">
@@ -165,19 +169,21 @@ export default function JobsContent() {
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         {getStatusBadge(job.status)}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                          aria-label="Elimina commessa"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setJobToDelete(job);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {(userRole === 'admin' || userRole === 'operativo') && (
+                            <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Elimina commessa"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setJobToDelete(job);
+                                setIsDeleteDialogOpen(true);
+                            }}
+                            >
+                            <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
                       </div>
                   </div>
                 </CardHeader>

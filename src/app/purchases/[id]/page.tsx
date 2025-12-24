@@ -27,8 +27,10 @@ import {
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocuments";
+import { useAuth } from "@/components/auth-provider";
 
 export default function PurchaseDetailPage() {
+  const { userRole } = useAuth();
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
@@ -405,14 +407,16 @@ export default function PurchaseDetailPage() {
                         <span className="font-medium">Attenzione: Ci sono articoli con prezzo mancante (0.00)</span>
                     </div>
                 )}
-                <Button 
-                    variant="destructive" 
-                    onClick={handleDeletePurchase}
-                    className="flex items-center gap-2"
-                >
-                    <Trash2 className="h-4 w-4" />
-                    Elimina Acquisto
-                </Button>
+                {(userRole === 'admin' || userRole === 'operativo') && (
+                    <Button 
+                        variant="destructive" 
+                        onClick={handleDeletePurchase}
+                        className="flex items-center gap-2"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Elimina Acquisto
+                    </Button>
+                )}
             </div>
           </div>
         </div>
@@ -563,20 +567,28 @@ export default function PurchaseDetailPage() {
                                             </TableCell>
                                             <TableCell className="text-right">{item.quantity}</TableCell>
                                             <TableCell className="text-right">
-                                                {item.price === 0 ? (
-                                                    <span className="text-red-500 font-bold flex items-center justify-end">
-                                                        <AlertTriangle className="h-3 w-3 mr-1" />
-                                                        MANCANTE
-                                                    </span>
+                                                {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                    item.price === 0 ? (
+                                                        <span className="text-red-500 font-bold flex items-center justify-end">
+                                                            <AlertTriangle className="h-3 w-3 mr-1" />
+                                                            MANCANTE
+                                                        </span>
+                                                    ) : (
+                                                        `€ ${item.price.toFixed(5)}`
+                                                    )
                                                 ) : (
-                                                    `€ ${item.price.toFixed(5)}`
+                                                    <span className="text-slate-400 italic text-xs">Riservato</span>
                                                 )}
                                             </TableCell>
                                         </>
                                     )}
 
                                     <TableCell className="text-right font-medium">
-                                        € {(item.quantity * item.price).toFixed(2)}
+                                        {(userRole === 'admin' || userRole === 'operativo') ? (
+                                            `€ ${(item.quantity * item.price).toFixed(2)}`
+                                        ) : (
+                                            <span className="text-slate-400 italic text-xs">Riservato</span>
+                                        )}
                                     </TableCell>
                                     
                                     <TableCell>
@@ -606,6 +618,7 @@ export default function PurchaseDetailPage() {
                                                 </Button>
                                             </div>
                                         ) : (
+                                            (userRole === 'admin' || userRole === 'operativo') && (
                                             <div className="flex justify-end gap-1">
                                                 <Button 
                                                     variant="ghost" 
@@ -623,6 +636,7 @@ export default function PurchaseDetailPage() {
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
+                                            )
                                         )}
                                     </TableCell>
                                 </TableRow>
@@ -630,7 +644,11 @@ export default function PurchaseDetailPage() {
                             <TableRow className="bg-slate-50 font-bold text-lg">
                                 <TableCell colSpan={5} className="text-right">TOTALE BOLLA</TableCell>
                                 <TableCell className="text-right">
-                                    € {items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}
+                                    {(userRole === 'admin' || userRole === 'operativo') ? (
+                                        `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
+                                    ) : (
+                                        <span className="text-slate-400 italic text-sm">Riservato</span>
+                                    )}
                                 </TableCell>
                                 <TableCell></TableCell>
                                 <TableCell></TableCell>
@@ -641,6 +659,7 @@ export default function PurchaseDetailPage() {
             </Card>
 
             {/* Add New Item Section */}
+            {(userRole === 'admin' || userRole === 'operativo') && (
             <Card>
                 <CardHeader>
                     <CardTitle>Aggiungi Materiale</CardTitle>
@@ -745,6 +764,7 @@ export default function PurchaseDetailPage() {
                     </div>
                 </CardContent>
             </Card>
+            )}
 
             <ItemSelectorDialog
                 open={isItemSelectorOpen}

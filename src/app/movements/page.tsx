@@ -63,12 +63,14 @@ export default function MovementsPage() {
       <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-900">Movimentazione Merce</h1>
-          <Link href="/movements/new">
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuova Bolla
-            </Button>
-          </Link>
+          {(userRole === 'admin' || userRole === 'operativo') && (
+            <Link href="/movements/new">
+                <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuova Bolla
+                </Button>
+            </Link>
+          )}
         </div>
 
         <div className="relative">
