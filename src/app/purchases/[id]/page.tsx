@@ -278,7 +278,7 @@ export default function PurchaseDetailPage() {
     
     // Use coefficient from inventory if available, otherwise fallback to item's saved coefficient
     const inventoryItem = inventory.find(i => i.id === item.itemId);
-    const coefficient = inventoryItem?.coefficient || item.coefficient || 1;
+    const coefficient = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
     
     // If pieces are missing but quantity exists and coeff > 1, try to calculate pieces
     let piecesStr = item.pieces?.toString() || "";
@@ -523,7 +523,7 @@ export default function PurchaseDetailPage() {
                                                     value={editValues.pieces}
                                                     onChange={(e) => {
                                                         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                        const coeff = inventoryItem?.coefficient || item.coefficient || 1;
+                                                        const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
                                                         handleEditPiecesChange(e.target.value, coeff);
                                                     }}
                                                 />
@@ -531,7 +531,7 @@ export default function PurchaseDetailPage() {
                                             <TableCell className="text-right text-slate-500">
                                                 {(() => {
                                                     const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                    return inventoryItem?.coefficient || item.coefficient || 1;
+                                                    return inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
                                                 })()}
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -542,7 +542,7 @@ export default function PurchaseDetailPage() {
                                                     value={editValues.quantity}
                                                     onChange={(e) => {
                                                         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                        const coeff = inventoryItem?.coefficient || item.coefficient || 1;
+                                                        const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
                                                         handleEditQuantityChange(e.target.value, coeff);
                                                     }}
                                                 />
@@ -608,7 +608,7 @@ export default function PurchaseDetailPage() {
                                             <div className="flex justify-end gap-1">
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => {
                                                     const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                    const coeff = inventoryItem?.coefficient || item.coefficient || 1;
+                                                    const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
                                                     saveEdit(item.id, coeff);
                                                 }}>
                                                     <Save className="h-4 w-4" />
@@ -775,7 +775,7 @@ export default function PurchaseDetailPage() {
                     setNewItem(prev => ({
                         ...prev,
                         itemId: item.id,
-                        coefficient: item.coefficient || 1,
+                        coefficient: item.coefficient ? Number(item.coefficient) : 1,
                         pieces: "",
                         quantity: "",
                         price: item.price ? item.price.toString() : ""

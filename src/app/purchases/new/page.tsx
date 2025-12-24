@@ -131,7 +131,7 @@ export default function NewPurchasePage() {
     setCurrentLine({
         ...currentLine, 
         itemId: item.id,
-        coefficient: item.coefficient || 1,
+        coefficient: item.coefficient ? Number(item.coefficient) : 1,
         unit: item.unit || 'PZ',
         pieces: "",
         quantity: "" 
