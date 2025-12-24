@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useDeferredValue } from "react";
+import { useState, useEffect, useDeferredValue, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import Link from "next/link";
 import { InventoryItem } from "@/lib/mock-data";
 import { inventoryApi, itemTypesApi, ItemType } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5QrcodeScanner, Html5Qrcode } from "html5-qrcode";
 import {
   Dialog,
   DialogContent,
