@@ -127,8 +127,8 @@ export function RecentMovements() {
                     </div>
                   </div>
                 </div>
-                <div className="text-xs text-slate-400 flex items-center gap-1 whitespace-nowrap">
-                  <Clock className="h-3 w-3" />
+                <div className="text-xs text-slate-400 flex items-center gap-1 mt-1 sm:mt-0 sm:whitespace-nowrap">
+                  <Clock className="h-3 w-3 flex-shrink-0" />
                   {formatDistanceToNow(new Date(movement.created_at), { addSuffix: true, locale: it })}
                 </div>
               </div>

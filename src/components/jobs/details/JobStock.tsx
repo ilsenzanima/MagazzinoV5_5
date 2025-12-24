@@ -127,7 +127,57 @@ export function JobStock({ movements }: JobStockProps) {
             </Badge>
         </div>
 
-        <Card>
+        <div className="grid gap-4 md:hidden">
+            {currentStock.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-lg border border-dashed">
+                    Nessun materiale attualmente in cantiere.
+                </div>
+            ) : (
+                currentStock.map((item, idx) => (
+                    <Card key={`mobile-${item.code}-${item.isFictitious}-${idx}`}>
+                        <CardContent className="p-4 space-y-3">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="font-medium text-slate-900">{item.name}</div>
+                                    <div className="text-xs text-slate-500 font-mono mt-0.5">{item.code}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="font-bold text-slate-900">{item.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}</div>
+                                    {Math.abs(item.pieces) > 0.01 && (
+                                        <div className="text-xs text-slate-500">{item.pieces.toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz</div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t">
+                                <div>
+                                    <span className="text-xs text-slate-500 block">Riferimento</span>
+                                    {item.deliveryNoteId ? (
+                                        <Link href={`/movements/${item.deliveryNoteId}`} className="text-blue-600 hover:underline">
+                                            {item.reference || '-'}
+                                        </Link>
+                                    ) : (
+                                        <span className="text-slate-700">{item.reference || '-'}</span>
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-xs text-slate-500 block">Valore</span>
+                                    {userRole === 'user' ? (
+                                        <span className="text-slate-400 italic text-xs">Riservato</span>
+                                    ) : (
+                                        <span className="font-medium text-slate-700">
+                                            € {(item.qty * item.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))
+            )}
+        </div>
+
+        <Card className="hidden md:block">
             <Table>
             <TableHeader>
                 <TableRow>
@@ -221,7 +271,71 @@ export function JobStock({ movements }: JobStockProps) {
       {/* Movement History Section */}
       <div className="space-y-4 pt-4 border-t">
         <h2 className="text-lg font-semibold text-slate-800">Storico Movimenti</h2>
-        <Card>
+        
+        <div className="grid gap-4 md:hidden">
+            {movements.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-lg border border-dashed">
+                    Nessun movimento registrato.
+                </div>
+            ) : (
+                movements.map((move) => {
+                    const isSiteIn = ['purchase', 'unload', 'exit'].includes(move.type)
+                    const displayQty = isSiteIn ? Math.abs(move.quantity) : -Math.abs(move.quantity)
+                    
+                    return (
+                        <Card key={`mobile-hist-${move.id}`}>
+                            <CardContent className="p-4 space-y-3">
+                                <div className="flex justify-between items-start">
+                                    <div className="space-y-1">
+                                        <div className="text-xs text-slate-500 font-mono">
+                                            {new Date(move.date).toLocaleDateString()}
+                                        </div>
+                                        <div className="font-medium text-slate-900">{move.itemName || 'Articolo Cancellato'}</div>
+                                    </div>
+                                    <div className={`font-bold ${isSiteIn ? 'text-green-700' : 'text-orange-700'}`}>
+                                        {displayQty > 0 ? '+' : ''}{displayQty} {move.itemUnit}
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    {isSiteIn ? (
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex w-fit gap-1 items-center text-xs">
+                                            <ArrowDownLeft className="h-3 w-3" /> In Ingresso
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 flex w-fit gap-1 items-center text-xs">
+                                            <ArrowUpRight className="h-3 w-3" /> Reso
+                                        </Badge>
+                                    )}
+                                    {move.isFictitious && (
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                                            Fittizio
+                                        </Badge>
+                                    )}
+                                </div>
+
+                                <div className="text-sm pt-2 border-t text-slate-600">
+                                    <span className="text-xs text-slate-400 block mb-1">Riferimento</span>
+                                    {move.deliveryNoteId ? (
+                                        <Link href={`/movements/${move.deliveryNoteId}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                                            {move.reference || '-'}
+                                        </Link>
+                                    ) : move.purchaseId && move.type === 'purchase' ? (
+                                        <Link href={`/purchases/${move.purchaseId}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                                            {move.reference || '-'}
+                                        </Link>
+                                    ) : (
+                                        move.reference || '-'
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )
+                })
+            )}
+        </div>
+
+        <Card className="hidden md:block">
             <Table>
             <TableHeader>
                 <TableRow>

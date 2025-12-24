@@ -78,8 +78,8 @@ export function ActiveJobsWidget() {
         <CardTitle className="text-sm font-medium">Stato Commesse</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center justify-between">
-            <div className="space-y-4 w-1/2">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-4 w-full sm:w-1/2">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-blue-500" />
