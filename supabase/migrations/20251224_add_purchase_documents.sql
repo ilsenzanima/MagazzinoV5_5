@@ -8,6 +8,13 @@ VALUES ('documents', 'documents', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. Storage Policies for 'documents' bucket
+
+-- Drop existing policies to ensure idempotency
+DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated downloads" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated updates" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated deletes" ON storage.objects;
+
 -- Allow authenticated users to upload
 CREATE POLICY "Allow authenticated uploads"
 ON storage.objects FOR INSERT
