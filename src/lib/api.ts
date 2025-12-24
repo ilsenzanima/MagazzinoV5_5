@@ -318,7 +318,6 @@ export const purchasesApi = {
     return publicUrl;
   },
 
-  addItem: async (item: Partial<PurchaseItem>) => {
   update: async (id: string, purchase: Partial<Purchase>) => {
     const dbPurchase = mapPurchaseToDb(purchase);
     
