@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText, AlertTriangle } from "lucide-react";
 import { 
   InventoryItem 
 } from "@/lib/mock-data";
@@ -70,6 +70,8 @@ export default function InventoryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [stockValue, setStockValue] = useState<number>(0);
+  const [isStockValueComplete, setIsStockValueComplete] = useState(true);
   
   // Edit Mode State
   const [isEditing, setIsEditing] = useState(false);
@@ -131,6 +133,34 @@ export default function InventoryDetailPage() {
         const itemData = await inventoryApi.getById(id);
         setItem(itemData);
         setRealQtyInput(itemData.realQuantity?.toString() || "");
+
+        // Calculate Stock Value from Batches
+        try {
+            const batches = await inventoryApi.getAvailableBatches(id);
+            let val = 0;
+            let complete = true;
+            
+            // EXACT CALCULATION based on traced batches
+            // We sum the value of all remaining quantities from purchases.
+            // This assumes strict traceability (exits must be linked to purchases).
+            
+            batches.forEach(b => {
+                if (b.remainingQty > 0) {
+                     if (b.price !== undefined && b.price !== null) {
+                        val += b.remainingQty * b.price;
+                    } else {
+                        complete = false; // Batch without price
+                    }
+                }
+            });
+    
+            setStockValue(val);
+            setIsStockValueComplete(complete);
+        } catch (e) {
+            console.error("Error calculating stock value", e);
+            setIsStockValueComplete(false);
+        }
+
       } catch (err: any) {
         console.error("Error loading item:", err);
         throw new Error(err.message || "Impossibile caricare l'articolo");
@@ -521,6 +551,21 @@ export default function InventoryDetailPage() {
                             </div>
                             <div className="text-xs text-blue-400 font-medium">Quantità Totale</div>
                         </div>
+
+                        {/* Stock Value */}
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-center">
+                            <div className="text-2xl font-bold text-slate-700">
+                                {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                            </div>
+                            <div className="text-xs text-slate-500 font-medium">Valore Stock Attuale</div>
+                        </div>
+                        
+                        {!isStockValueComplete && (
+                            <div className="p-2 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-xs flex items-center gap-2 justify-center">
+                                <AlertTriangle className="h-4 w-4 shrink-0" />
+                                <span>Dati costo incompleti (Valore parziale)</span>
+                            </div>
+                        )}
                         
                         {/* Real Pieces (Secondary) */}
                         {item.coefficient !== 1 && (

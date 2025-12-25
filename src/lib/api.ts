@@ -1178,7 +1178,8 @@ export const inventoryApi = {
         originalQty: b.original_quantity,
         remainingQty: b.remaining_quantity,
         originalPieces: b.original_pieces,
-        remainingPieces: b.remaining_pieces
+        remainingPieces: b.remaining_pieces,
+        price: b.unit_price
     }));
   },
 

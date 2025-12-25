@@ -68,6 +68,23 @@ export default function ClientsPage() {
     }
   };
 
+  const openEditDialog = (client: Client) => {
+    setClientToEdit(client);
+    setEditForm({
+      name: client.name,
+      vatNumber: client.vatNumber,
+      email: client.email,
+      phone: client.phone,
+      street: client.street,
+      streetNumber: client.streetNumber,
+      postalCode: client.postalCode,
+      city: client.city,
+      province: client.province
+      // Don't include address string so it gets regenerated from components
+    });
+    setIsEditDialogOpen(true);
+  };
+
   const filteredClients = clients.filter((client) => {
     return (
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -197,6 +214,115 @@ export default function ClientsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Annulla</Button>
             <Button variant="destructive" onClick={handleDeleteClient}>Elimina</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Modifica Committente</DialogTitle>
+            <DialogDescription>
+              Modifica i dati del committente. Se cambi l'indirizzo, le commesse associate a questo indirizzo verranno aggiornate.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Ragione Sociale / Nome *</Label>
+                <Input
+                  id="name"
+                  value={editForm.name || ""}
+                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vatNumber">P.IVA / Codice Fiscale</Label>
+                <Input
+                  id="vatNumber"
+                  value={editForm.vatNumber || ""}
+                  onChange={(e) => setEditForm({...editForm, vatNumber: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={editForm.email || ""}
+                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefono</Label>
+                <Input
+                  id="phone"
+                  value={editForm.phone || ""}
+                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Indirizzo Sede Legale</Label>
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-8">
+                  <Input 
+                    placeholder="Via/Piazza" 
+                    value={editForm.street || ""} 
+                    onChange={(e) => setEditForm({...editForm, street: e.target.value})}
+                  />
+                </div>
+                <div className="col-span-4">
+                  <Input 
+                    placeholder="N. Civico" 
+                    value={editForm.streetNumber || ""} 
+                    onChange={(e) => setEditForm({...editForm, streetNumber: e.target.value})}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Input 
+                    placeholder="CAP" 
+                    value={editForm.postalCode || ""} 
+                    onChange={(e) => setEditForm({...editForm, postalCode: e.target.value})}
+                  />
+                </div>
+                <div className="col-span-6">
+                  <Input 
+                    placeholder="Città" 
+                    value={editForm.city || ""} 
+                    onChange={(e) => setEditForm({...editForm, city: e.target.value})}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Input 
+                    placeholder="Prov" 
+                    maxLength={2} 
+                    className="uppercase"
+                    value={editForm.province || ""} 
+                    onChange={(e) => setEditForm({...editForm, province: e.target.value})}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>Annulla</Button>
+            <Button onClick={handleUpdateClient} disabled={isSaving || !editForm.name}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                "Salva Modifiche"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
