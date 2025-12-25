@@ -127,26 +127,27 @@ export default function JobDetailsPage() {
     doc.save(`Commessa_${job.code}.pdf`);
   };
 
+  const loadData = async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      // Parallel fetch: Job Details, Movements (for tabs), and Server-side Cost
+      const [jobData, movementsData, costData] = await Promise.all([
+        jobsApi.getById(id),
+        movementsApi.getByJobId(id),
+        jobsApi.getCost(id)
+      ]);
+      setJob(jobData);
+      setMovements(movementsData);
+      setTotalCost(costData);
+    } catch (error) {
+      console.error("Error loading job details:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      try {
-        setLoading(true);
-        // Parallel fetch: Job Details, Movements (for tabs), and Server-side Cost
-        const [jobData, movementsData, costData] = await Promise.all([
-          jobsApi.getById(id),
-          movementsApi.getByJobId(id),
-          jobsApi.getCost(id)
-        ]);
-        setJob(jobData);
-        setMovements(movementsData);
-        setTotalCost(costData);
-      } catch (error) {
-        console.error("Error loading job details:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadData();
   }, [id]);
 
