@@ -462,7 +462,8 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
   unit: dbItem.unit,
   coefficient: dbItem.coefficient ? Number(dbItem.coefficient) : 1,
   pieces: dbItem.pieces,
-  supplierCode: dbItem.supplier_code
+  supplierCode: dbItem.supplier_code,
+  model: dbItem.model
 });
 
 export const mapDbProfileToUser = (profile: any): User => {
@@ -683,7 +684,8 @@ export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => ({
   unit: item.unit,
   coefficient: item.coefficient,
   supplier_code: item.supplierCode,
-  real_quantity: item.realQuantity
+  real_quantity: item.realQuantity,
+  model: item.model
 });
 
 export interface DeliveryNoteItem {

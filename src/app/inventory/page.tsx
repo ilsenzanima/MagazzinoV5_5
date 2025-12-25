@@ -283,7 +283,10 @@ export default function InventoryPage() {
                         <div className="flex justify-between items-start">
                         <div>
                             <p className="text-xs text-slate-500 font-mono mb-1">{item.code}</p>
-                            <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight">{item.name}</h3>
+                            <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight">
+                                {item.name}
+                                {item.model && <span className="text-slate-500 font-medium ml-1">({item.model})</span>}
+                            </h3>
                         </div>
                         </div>
                         

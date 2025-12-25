@@ -466,7 +466,7 @@ export default function InventoryDetailPage() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                {item.name}
+                {item.name} {item.model && <span className="font-normal text-slate-500">({item.model})</span>}
               </h1>
               <p className="text-sm text-slate-500 font-mono">{item.code}</p>
             </div>
@@ -753,6 +753,20 @@ export default function InventoryDetailPage() {
                       />
                   ) : (
                       <Input id="name" value={item.name} readOnly className="bg-slate-50" />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="model">Modello / Variante</Label>
+                  {isEditing ? (
+                      <Input 
+                          id="model" 
+                          placeholder="Es. 10mm, DN 50..."
+                          value={editForm.model || ""} 
+                          onChange={(e) => setEditForm({...editForm, model: e.target.value})} 
+                      />
+                  ) : (
+                      <Input id="model" value={item.model || ""} readOnly className="bg-slate-50" placeholder="-" />
                   )}
                 </div>
 

@@ -19,7 +19,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import Link from "next/link";
-import { Client, clientsApi } from "@/lib/api";
+import { Client, clientsApi, jobsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Dialog,
@@ -100,7 +100,19 @@ export default function ClientsPage() {
     try {
       setIsSaving(true);
       
-      // Update client
+      // Helper to construct address
+      const constructAddress = (c: Partial<Client>) => {
+        return `${c.street || ''} ${c.streetNumber || ''}, ${c.postalCode || ''} ${c.city || ''} ${c.province ? '(' + c.province + ')' : ''}`
+          .trim()
+          .replace(/^,/, '')
+          .replace(/,$/, '')
+          .trim();
+      };
+
+      // 1. Calculate new address
+      const newAddress = constructAddress(editForm);
+      
+      // 2. Update Client
       await clientsApi.update(clientToEdit.id, {
         name: editForm.name,
         vatNumber: editForm.vatNumber,
@@ -111,9 +123,41 @@ export default function ClientsPage() {
         postalCode: editForm.postalCode,
         city: editForm.city,
         province: editForm.province,
-        // Reconstruct full address if needed, or let the backend/frontend logic handle it. 
-        address: `${editForm.street || ''} ${editForm.streetNumber || ''}, ${editForm.postalCode || ''} ${editForm.city || ''} ${editForm.province ? '(' + editForm.province + ')' : ''}`.trim().replace(/^,/, '').trim()
+        address: newAddress
       });
+
+      // 3. Check and Update Job Addresses if needed
+      // Use existing address from DB, or construct it if missing (legacy data)
+      let oldAddress = clientToEdit.address;
+      if (!oldAddress) {
+        oldAddress = constructAddress(clientToEdit);
+      }
+      
+      console.log('Checking cascading update:', { oldAddress, newAddress });
+
+      if (oldAddress && newAddress && oldAddress !== newAddress) {
+        // Fetch all jobs for this client
+        const jobs = await jobsApi.getByClientId(clientToEdit.id);
+        console.log(`Found ${jobs.length} jobs for client ${clientToEdit.id}`);
+        
+        // Update jobs that have the old address as site address
+        const updatePromises = jobs.map(async (job) => {
+          const jobAddress = job.siteAddress || '';
+          // Normalize for comparison: trim, lowercase, collapse spaces, remove commas
+          const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/,/g, '');
+          
+          const isMatch = normalize(jobAddress) === normalize(oldAddress || '');
+          console.log(`Checking job ${job.code}:`, { jobAddress, oldAddress, isMatch });
+
+          if (isMatch) {
+            console.log(`Updating job ${job.code} address from "${job.siteAddress}" to "${newAddress}"`);
+            return jobsApi.update(job.id, { siteAddress: newAddress });
+          }
+          return Promise.resolve();
+        });
+        
+        await Promise.all(updatePromises);
+      }
 
       await loadClients();
       setIsEditDialogOpen(false);

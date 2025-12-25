@@ -85,6 +85,7 @@ export default function NewInventoryItemPage() {
   // Form State
   const [formData, setFormData] = useState({
     name: "",
+    model: "",
     brand: "",
     type: "",
     supplierCode: "",
@@ -142,6 +143,7 @@ export default function NewInventoryItemPage() {
         const newItem = {
             code,
             name: formData.name,
+            model: formData.model,
             brand: formData.brand,
             type: formData.type,
             supplierCode: formData.supplierCode,
@@ -285,6 +287,17 @@ export default function NewInventoryItemPage() {
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="model">Modello / Variante / Dimensioni</Label>
+                  <Input 
+                    id="model" 
+                    placeholder="Es. DN 50, 10mm, XL..."
+                    value={formData.model}
+                    onChange={(e) => setFormData({...formData, model: e.target.value})}
+                  />
+                  <p className="text-[10px] text-slate-400">Opzionale: Utile per distinguere articoli con lo stesso nome ma dimensioni diverse.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

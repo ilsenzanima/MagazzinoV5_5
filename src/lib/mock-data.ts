@@ -16,6 +16,7 @@ export interface InventoryItem {
   pieces?: number;
   supplierCode?: string;
   realQuantity?: number | null;
+  model?: string;
 }
 
 export interface Movement {
