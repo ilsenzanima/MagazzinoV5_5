@@ -67,9 +67,10 @@ export default function NewInventoryItemPage() {
              setCode(nextCode);
         } catch (err) {
             console.error("Failed to generate code", err);
-            // Fallback to random if RPC fails (e.g. function not exists yet)
-            const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-            setCode(`PPA-E${randomSuffix}`);
+            // Fallback to random UUID segment if RPC fails
+            // Format: PPA-XXXXXXXX (8 chars)
+            const randomSuffix = crypto.randomUUID().split('-')[0].toUpperCase();
+            setCode(`PPA-${randomSuffix}`);
         }
 
       } catch (error) {

@@ -908,6 +908,8 @@ export default function NewMovementPage() {
             onOpenChange={setIsJobSelectorOpen} 
             jobs={jobs}
             onSelect={handleJobSelect}
+            onSearch={handleJobSearch}
+            loading={jobsLoading}
         />
 
         <ItemSelectorDialog
@@ -915,6 +917,8 @@ export default function NewMovementPage() {
             onOpenChange={setIsItemSelectorOpen}
             items={dialogItems}
             onSelect={handleItemSelect}
+            onSearch={handleItemSearch}
+            loading={itemsLoading}
         />
       </div>
     </DashboardLayout>
