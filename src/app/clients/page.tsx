@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -36,6 +37,12 @@ export default function ClientsPage() {
   const [error, setError] = useState<string | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  // Edit state
+  const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Client>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadClients();
@@ -65,6 +72,38 @@ export default function ClientsPage() {
     } catch (error) {
       console.error("Failed to delete client:", error);
       alert("Errore durante l'eliminazione del committente");
+    }
+  };
+
+  const handleUpdateClient = async () => {
+    if (!clientToEdit || !editForm.name) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Update client
+      await clientsApi.update(clientToEdit.id, {
+        name: editForm.name,
+        vatNumber: editForm.vatNumber,
+        email: editForm.email,
+        phone: editForm.phone,
+        street: editForm.street,
+        streetNumber: editForm.streetNumber,
+        postalCode: editForm.postalCode,
+        city: editForm.city,
+        province: editForm.province,
+        // Reconstruct full address if needed, or let the backend/frontend logic handle it. 
+        address: `${editForm.street || ''} ${editForm.streetNumber || ''}, ${editForm.postalCode || ''} ${editForm.city || ''} ${editForm.province ? '(' + editForm.province + ')' : ''}`.trim().replace(/^,/, '').trim()
+      });
+
+      await loadClients();
+      setIsEditDialogOpen(false);
+      setClientToEdit(null);
+    } catch (error) {
+      console.error("Failed to update client:", error);
+      alert("Errore durante l'aggiornamento del committente");
+    } finally {
+      setIsSaving(false);
     }
   };
 
