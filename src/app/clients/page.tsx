@@ -13,7 +13,8 @@ import {
   Phone,
   Mail,
   MapPin,
-  Trash2
+  Trash2,
+  Pencil
 } from "lucide-react";
 import Link from "next/link";
 import { Client, clientsApi } from "@/lib/api";
