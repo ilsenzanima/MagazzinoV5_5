@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,9 @@ import {
   Mail,
   MapPin,
   Trash2,
-  Pencil
+  Pencil,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import Link from "next/link";
 import { Client, clientsApi } from "@/lib/api";
@@ -33,9 +35,16 @@ import { useAuth } from "@/components/auth-provider";
 export default function ClientsPage() {
   const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDeferredValue(searchTerm);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const LIMIT = 12;
+
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
@@ -46,15 +55,24 @@ export default function ClientsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
     loadClients();
-  }, []);
+  }, [page, debouncedSearch]);
 
   const loadClients = async () => {
     try {
         setLoading(true);
         setError(null);
-        const data = await clientsApi.getAll();
+        const { data, total } = await clientsApi.getPaginated({
+          page,
+          limit: LIMIT,
+          search: debouncedSearch
+        });
         setClients(data);
+        setTotalItems(total);
     } catch (error: any) {
         console.error("Failed to load clients:", error);
         setError(error.message || "Errore sconosciuto durante il caricamento");
@@ -125,13 +143,7 @@ export default function ClientsPage() {
     setIsEditDialogOpen(true);
   };
 
-  const filteredClients = clients.filter((client) => {
-    return (
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.vatNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  const totalPages = Math.ceil(totalItems / LIMIT);
 
   return (
     <DashboardLayout>
@@ -176,79 +188,113 @@ export default function ClientsPage() {
             </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredClients.length === 0 ? (
-            <div className="col-span-full text-center py-10 text-slate-400">
-              <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
-              <p>Nessun committente trovato</p>
-            </div>
-          ) : (
-            filteredClients.map((client) => (
-              <Card key={client.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="truncate">{client.name}</span>
-                    {(userRole === 'admin' || userRole === 'operativo') && (
-                      <div className="flex gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-slate-400 hover:text-blue-600 h-8 w-8"
-                          onClick={() => openEditDialog(client)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-slate-400 hover:text-red-600 h-8 w-8"
-                          onClick={() => {
-                            setClientToDelete(client);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {clients.length === 0 ? (
+              <div className="col-span-full text-center py-10 text-slate-400">
+                <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                <p>Nessun committente trovato</p>
+              </div>
+            ) : (
+              clients.map((client) => (
+                <Card key={client.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="truncate">{client.name}</span>
+                      {(userRole === 'admin' || userRole === 'operativo') && (
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-slate-400 hover:text-blue-600 h-8 w-8"
+                            onClick={() => openEditDialog(client)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-slate-400 hover:text-red-600 h-8 w-8"
+                            onClick={() => {
+                              setClientToDelete(client);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                    {client.vatNumber && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold w-8">P.IVA</span>
+                        <span>{client.vatNumber}</span>
                       </div>
                     )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm space-y-2 text-slate-600">
-                  {client.vatNumber && (
-                    <div className="font-mono text-xs bg-slate-100 p-1 rounded w-fit">
-                      P.IVA: {client.vatNumber}
-                    </div>
-                  )}
-                  {client.address && (
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                      <span>{client.address}</span>
-                    </div>
-                  )}
-                  {client.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 shrink-0" />
-                      <span>{client.phone}</span>
-                    </div>
-                  )}
-                  {client.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 shrink-0" />
-                      <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline">
-                        {client.email}
-                      </a>
-                    </div>
-                  )}
-                  <div className="pt-2 mt-2 border-t flex justify-end">
-                     <Link href={`/jobs?clientId=${client.id}`}>
-                        <Button variant="outline" size="sm">Vedi Commesse</Button>
-                     </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                    {(client.street || client.city) && (
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span>
+                          {client.street} {client.streetNumber}
+                          {client.street && client.city && ", "}
+                          {client.postalCode} {client.city} {client.province && `(${client.province})`}
+                        </span>
+                      </div>
+                    )}
+                    {client.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 shrink-0" />
+                        <a href={`mailto:${client.email}`} className="hover:underline text-blue-600">
+                          {client.email}
+                        </a>
+                      </div>
+                    )}
+                    {client.phone && (
+                       <div className="flex items-center gap-2">
+                         <Phone className="h-4 w-4 shrink-0" />
+                         <a href={`tel:${client.phone}`} className="hover:underline">
+                           {client.phone}
+                         </a>
+                       </div>
+                     )}
+                     <div className="pt-2 mt-2 border-t flex justify-end">
+                        <Link href={`/jobs?clientId=${client.id}`}>
+                           <Button variant="outline" size="sm">Vedi Commesse</Button>
+                        </Link>
+                     </div>
+                   </CardContent>
+                 </Card>
+               ))
+            )}
+          </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-slate-600 dark:text-slate-400">
+                Pagina {page} di {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           )}
-        </div>
+        </>
       )}
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

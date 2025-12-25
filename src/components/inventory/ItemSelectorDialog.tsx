@@ -9,8 +9,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InventoryItem } from "@/lib/api";
-import { Search, Package, Plus } from "lucide-react";
-import { useState, useMemo, useDeferredValue, memo } from "react";
+import { Search, Package, Plus, Loader2 } from "lucide-react";
+import { useState, useMemo, useDeferredValue, memo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface ItemSelectorDialogProps {
@@ -18,13 +18,28 @@ interface ItemSelectorDialogProps {
   onOpenChange: (open: boolean) => void;
   onSelect: (item: InventoryItem) => void;
   items: InventoryItem[];
+  onSearch?: (term: string) => void;
+  loading?: boolean;
 }
 
-export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpenChange, onSelect, items }: ItemSelectorDialogProps) {
+export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpenChange, onSelect, items, onSearch, loading }: ItemSelectorDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
+  // Effect for server-side search
+  useEffect(() => {
+    if (onSearch) {
+      const handler = setTimeout(() => {
+        onSearch(searchTerm);
+      }, 300);
+      return () => clearTimeout(handler);
+    }
+  }, [searchTerm, onSearch]);
+
   const filteredItems = useMemo(() => {
+    // If server-side search is enabled, assume items are already filtered
+    if (onSearch) return items;
+
     const term = deferredSearchTerm.toLowerCase();
     if (!term) return items;
     
@@ -36,7 +51,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
         item.type.toLowerCase().includes(term) ||
         (item.supplierCode?.toLowerCase().includes(term) ?? false)
     );
-  }, [items, deferredSearchTerm]);
+  }, [items, deferredSearchTerm, onSearch]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -71,7 +86,14 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredItems.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                    <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
+                    <p>Caricamento...</p>
+                  </TableCell>
+                </TableRow>
+              ) : filteredItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-slate-400">
                     <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />

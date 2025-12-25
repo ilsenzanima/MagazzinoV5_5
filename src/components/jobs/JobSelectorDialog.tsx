@@ -9,8 +9,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Job } from "@/lib/api";
-import { Search, Briefcase, Check } from "lucide-react";
-import { useState, useMemo, useDeferredValue, memo } from "react";
+import { Search, Briefcase, Check, Loader2 } from "lucide-react";
+import { useState, useMemo, useDeferredValue, memo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface JobSelectorDialogProps {
@@ -18,13 +18,28 @@ interface JobSelectorDialogProps {
   onOpenChange: (open: boolean) => void;
   onSelect: (job: Job) => void;
   jobs: Job[];
+  onSearch?: (term: string) => void;
+  loading?: boolean;
 }
 
-export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenChange, onSelect, jobs }: JobSelectorDialogProps) {
+export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenChange, onSelect, jobs, onSearch, loading }: JobSelectorDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
+  // Effect for server-side search
+  useEffect(() => {
+    if (onSearch) {
+      const handler = setTimeout(() => {
+        onSearch(searchTerm);
+      }, 300);
+      return () => clearTimeout(handler);
+    }
+  }, [searchTerm, onSearch]);
+
   const filteredJobs = useMemo(() => {
+    // If server-side search is enabled, assume jobs are already filtered
+    if (onSearch) return jobs;
+
     const term = deferredSearchTerm.toLowerCase();
     if (!term) return jobs;
 
@@ -34,7 +49,7 @@ export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenC
         job.description.toLowerCase().includes(term) ||
         job.clientName?.toLowerCase().includes(term)
     );
-  }, [jobs, deferredSearchTerm]);
+  }, [jobs, deferredSearchTerm, onSearch]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,7 +84,14 @@ export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenC
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredJobs.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                    <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
+                    <p>Caricamento...</p>
+                  </TableCell>
+                </TableRow>
+              ) : filteredJobs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-slate-400">
                     <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />

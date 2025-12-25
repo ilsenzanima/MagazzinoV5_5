@@ -170,15 +170,52 @@ export default function NewMovementPage() {
     try {
       setInitialLoading(true);
       const [inventoryData, jobsData] = await Promise.all([
-        inventoryApi.getAll(),
-        jobsApi.getAll()
+        inventoryApi.getPaginated({ page: 1, limit: 50 }),
+        jobsApi.getPaginated({ page: 1, limit: 50, status: 'active' })
       ]);
-      setInventory(inventoryData);
-      setJobs(jobsData.filter(j => j.status === 'active'));
+      setInventory(inventoryData.items);
+      setJobs(jobsData.data);
     } catch (error) {
       console.error("Failed to load data", error);
     } finally {
       setInitialLoading(false);
+    }
+  };
+
+  const handleJobSearch = async (term: string) => {
+    setJobsLoading(true);
+    try {
+        const { data } = await jobsApi.getPaginated({ 
+            page: 1, 
+            limit: 50, 
+            search: term,
+            status: 'active'
+        });
+        setJobs(data);
+    } catch (error) {
+        console.error("Failed to search jobs", error);
+    } finally {
+        setJobsLoading(false);
+    }
+  };
+
+  const handleItemSearch = async (term: string) => {
+    // If we are in entry mode with a job selected, we don't use server search 
+    // because we are showing job inventory which is already fully loaded
+    if (activeTab === 'entry' && selectedJob) return;
+
+    setItemsLoading(true);
+    try {
+        const { items } = await inventoryApi.getPaginated({ 
+            page: 1, 
+            limit: 50, 
+            search: term 
+        });
+        setInventory(items);
+    } catch (error) {
+        console.error("Failed to search items", error);
+    } finally {
+        setItemsLoading(false);
     }
   };
 

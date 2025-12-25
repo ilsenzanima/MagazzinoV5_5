@@ -48,6 +48,8 @@ export default function NewPurchasePage() {
   const { userRole } = useAuth();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [jobsLoading, setJobsLoading] = useState(false);
 
   if (userRole === 'user') {
     return (
@@ -113,16 +115,49 @@ export default function NewPurchasePage() {
       setInitialLoading(true);
       const [suppliersData, inventoryData, jobsData] = await Promise.all([
         suppliersApi.getAll(),
-        inventoryApi.getAll(),
-        jobsApi.getAll()
+        inventoryApi.getPaginated({ page: 1, limit: 50 }),
+        jobsApi.getPaginated({ page: 1, limit: 50, status: 'active' })
       ]);
       setSuppliers(suppliersData);
-      setInventory(inventoryData);
-      setJobs(jobsData.filter(j => j.status === 'active')); // Only active jobs
+      setInventory(inventoryData.items);
+      setJobs(jobsData.data);
     } catch (error) {
       console.error("Failed to load data", error);
     } finally {
       setInitialLoading(false);
+    }
+  };
+
+  const handleItemSearch = async (term: string) => {
+    setItemsLoading(true);
+    try {
+        const { items } = await inventoryApi.getPaginated({ 
+            page: 1, 
+            limit: 50, 
+            search: term 
+        });
+        setInventory(items);
+    } catch (error) {
+        console.error("Failed to search items", error);
+    } finally {
+        setItemsLoading(false);
+    }
+  };
+
+  const handleJobSearch = async (term: string) => {
+    setJobsLoading(true);
+    try {
+        const { data } = await jobsApi.getPaginated({ 
+            page: 1, 
+            limit: 50, 
+            search: term,
+            status: 'active'
+        });
+        setJobs(data);
+    } catch (error) {
+        console.error("Failed to search jobs", error);
+    } finally {
+        setJobsLoading(false);
     }
   };
 
@@ -705,6 +740,8 @@ export default function NewPurchasePage() {
         onOpenChange={setIsItemSelectorOpen}
         onSelect={handleItemSelect}
         items={inventory}
+        onSearch={handleItemSearch}
+        loading={itemsLoading}
       />
 
       <JobSelectorDialog 
@@ -712,6 +749,8 @@ export default function NewPurchasePage() {
         onOpenChange={setIsJobSelectorOpen}
         onSelect={handleJobSelect}
         jobs={jobs}
+        onSearch={handleJobSearch}
+        loading={jobsLoading}
       />
 
       <JobSelectorDialog 
@@ -719,6 +758,8 @@ export default function NewPurchasePage() {
         onOpenChange={setIsHeaderJobSelectorOpen}
         onSelect={handleHeaderJobSelect}
         jobs={jobs}
+        onSearch={handleJobSearch}
+        loading={jobsLoading}
       />
     </DashboardLayout>
   );

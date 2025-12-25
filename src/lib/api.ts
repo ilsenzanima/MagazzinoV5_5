@@ -1338,6 +1338,33 @@ export const clientsApi = {
     if (error) throw error;
     return data.map(mapDbToClient);
   },
+  
+  getPaginated: async (options: { page: number; limit: number; search?: string }) => {
+    let query = supabase.from('clients').select('*', { count: 'exact' });
+
+    // Filter by search term
+    if (options.search) {
+      const term = options.search;
+      query = query.or(`name.ilike.%${term}%,vat_number.ilike.%${term}%,email.ilike.%${term}%`);
+    }
+
+    // Sort by name
+    query = query.order('name');
+
+    // Pagination
+    const from = (options.page - 1) * options.limit;
+    const to = from + options.limit - 1;
+    query = query.range(from, to);
+
+    const { data, error, count } = await fetchWithTimeout(query);
+    if (error) throw error;
+
+    return {
+      data: data.map(mapDbToClient),
+      total: count || 0
+    };
+  },
+
   getById: async (id: string) => {
     const { data, error } = await fetchWithTimeout(
       supabase.from('clients').select('*').eq('id', id).single()
@@ -1372,6 +1399,69 @@ export const jobsApi = {
     );
     if (error) throw error;
     return data.map(mapDbToJob);
+  },
+  getPaginated: async ({ page = 1, limit = 10, search = '', clientId = '', status = '' }) => {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = supabase
+      .from('jobs')
+      .select('*, clients!inner(name)', { count: 'exact' });
+
+    if (clientId) {
+      query = query.eq('client_id', clientId);
+    }
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    if (search) {
+       // Search in job fields and client name
+       // Since we use !inner join on clients, we can filter by client name
+       // However, OR conditions across tables are tricky in Supabase JS client without raw SQL or RPC
+       // But if we use the foreign table syntax in filter:
+       // "clients.name.ilike.%search%" might work if mapped correctly
+       
+       // Strategy: Pre-fetch matching client IDs if searching for client name
+       // Or rely on job fields + client name if possible.
+       // Simpler approach for now matching other implementations:
+       // Search code/description OR matching client IDs.
+
+       const { data: clients } = await supabase
+         .from('clients')
+         .select('id')
+         .ilike('name', `%${search}%`);
+       
+       const clientIds = clients?.map(c => c.id) || [];
+       
+       let orConditions = [
+         `code.ilike.%${search}%`,
+         `description.ilike.%${search}%`
+       ];
+
+       if (clientIds.length > 0) {
+         orConditions.push(`client_id.in.(${clientIds.join(',')})`);
+       }
+
+       query = query.or(orConditions.join(','));
+    }
+
+    // Reset select to include all fields needed for mapping
+    query = query.select('*, clients(*)');
+
+    query = query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    const { data, error, count } = await fetchWithTimeout(query);
+
+    if (error) throw error;
+    
+    return {
+      data: data.map(mapDbToJob),
+      total: count || 0
+    };
   },
   getByClientId: async (clientId: string) => {
     console.time('jobsApi.getByClientId');
