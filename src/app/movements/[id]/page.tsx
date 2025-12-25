@@ -144,14 +144,14 @@ export default function MovementDetailPage() {
     const tableBody = groupedItems.map(item => [
         item.inventoryCode || "-",
         item.inventoryName || "Articolo non trovato",
-        item.inventoryUnit || "PZ",
+        item.inventoryDescription || "-",
         item.quantity.toString(),
-        "" // Notes not available on item level
+        item.inventoryUnit || "PZ"
     ]);
 
     autoTable(doc, {
         startY: 80,
-        head: [['Codice', 'Descrizione', 'U.M.', 'Q.tà', 'Note']],
+        head: [['Codice', 'Articolo', 'Descrizione', 'Q.tà', 'U.M.']],
         body: tableBody,
         theme: 'grid',
         styles: { fontSize: 9 },
@@ -428,9 +428,9 @@ export default function MovementDetailPage() {
                             <TableRow>
                                 <TableHead>Codice</TableHead>
                                 <TableHead>Articolo</TableHead>
-                                <TableHead>U.M.</TableHead>
+                                <TableHead>Descrizione</TableHead>
                                 <TableHead className="text-right">Q.tà</TableHead>
-                                <TableHead className="text-right">Coeff.</TableHead>
+                                <TableHead>U.M.</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -448,9 +448,11 @@ export default function MovementDetailPage() {
                                             <div className="font-medium">{item.inventoryName}</div>
                                             <div className="text-xs text-slate-500">{item.inventoryBrand}</div>
                                         </TableCell>
-                                        <TableCell>{item.inventoryUnit}</TableCell>
+                                        <TableCell className="text-sm text-slate-600 max-w-md truncate" title={item.inventoryDescription}>
+                                            {item.inventoryDescription || "-"}
+                                        </TableCell>
                                         <TableCell className="text-right font-bold">{item.quantity}</TableCell>
-                                        <TableCell className="text-right">{item.coefficient}</TableCell>
+                                        <TableCell>{item.inventoryUnit}</TableCell>
                                     </TableRow>
                                 ))
                             )}

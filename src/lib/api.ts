@@ -1024,7 +1024,7 @@ export const inventoryApi = {
     // Filter by search term
     if (options.search) {
       const term = options.search;
-      query = query.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,supplier_code.ilike.%${term}%`);
+      query = query.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,category.ilike.%${term}%,supplier_code.ilike.%${term}%`);
     }
 
     // Filter by tab

@@ -32,7 +32,9 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
       (item) =>
         item.code.toLowerCase().includes(term) ||
         item.name.toLowerCase().includes(term) ||
-        item.brand.toLowerCase().includes(term)
+        item.brand.toLowerCase().includes(term) ||
+        item.type.toLowerCase().includes(term) ||
+        (item.supplierCode?.toLowerCase().includes(term) ?? false)
     );
   }, [items, deferredSearchTerm]);
 
@@ -49,7 +51,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Cerca per codice, nome o marca..."
+            placeholder="Cerca per codice, nome, marca o tipologia..."
             className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
