@@ -73,6 +73,10 @@ export default function NewMovementPage() {
   const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
   const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
 
+  // Loading States for Search
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [itemsLoading, setItemsLoading] = useState(false);
+
   // Form State
   const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale'>('entry');
   const [numberPart, setNumberPart] = useState("");
