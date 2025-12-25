@@ -224,7 +224,7 @@ export default function JobDetailsPage() {
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">
-                    <JobOverview job={job} totalCost={totalCost} />
+                    <JobOverview job={job} totalCost={totalCost} onJobUpdated={loadData} />
                 </TabsContent>
 
                 <TabsContent value="stock" className="space-y-6 focus-visible:outline-none">

@@ -6,7 +6,17 @@ import { Job, jobsApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Euro, Trash2, Pencil, Building2, MapPin } from "lucide-react"
+import { Calendar, Euro, Trash2, Pencil, Building2, MapPin, User, FileText } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -20,16 +30,53 @@ import { useAuth } from "@/components/auth-provider"
 interface JobOverviewProps {
   job: Job
   totalCost: number
+  onJobUpdated?: () => void
 }
 
-export function JobOverview({ job, totalCost }: JobOverviewProps) {
+export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) {
   const router = useRouter()
   const { userRole } = useAuth()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  
+  // Edit State
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [editForm, setEditForm] = useState<Partial<Job>>({})
 
-  // Mock budget (since we don't track it yet)
   const mockBudget = 0 
   const percentage = mockBudget > 0 ? Math.min(100, Math.round((totalCost / mockBudget) * 100)) : 0
+
+  const handleEditClick = () => {
+    setEditForm({
+      description: job.description,
+      status: job.status,
+      siteAddress: job.siteAddress || '',
+      siteManager: job.siteManager || '',
+      startDate: job.startDate,
+      endDate: job.endDate,
+      cig: job.cig || '',
+      cup: job.cup || ''
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true)
+      await jobsApi.update(job.id, editForm)
+      setIsEditOpen(false)
+      if (onJobUpdated) {
+        onJobUpdated()
+      } else {
+        router.refresh()
+      }
+    } catch (error) {
+      console.error("Failed to update job", error)
+      alert("Errore durante l'aggiornamento della commessa")
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleDelete = async () => {
     try {
@@ -64,7 +111,7 @@ export function JobOverview({ job, totalCost }: JobOverviewProps) {
         
         <div className="flex gap-2">
           {(userRole === 'admin' || userRole === 'operativo') && (
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleEditClick}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Modifica
             </Button>
@@ -98,123 +145,214 @@ export function JobOverview({ job, totalCost }: JobOverviewProps) {
                 <div className="text-2xl font-bold">€ {totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
             )}
             <div className="text-xs text-slate-500 mt-1">Calcolato su listino interno</div>
-            {/* Progress bar mock */}
-            <div className="h-1.5 w-full bg-slate-100 rounded-full mt-3 overflow-hidden">
-               <div className="h-full bg-blue-600 rounded-full" style={{ width: '100%' }} />
-            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Data Inizio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {job.startDate ? new Date(job.startDate).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              Avviata da {job.startDate ? Math.floor((new Date().getTime() - new Date(job.startDate).getTime()) / (1000 * 60 * 60 * 24 * 30)) : 0} mesi
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-               <Calendar className="h-4 w-4" />
-               Consegna Prevista
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {job.endDate ? new Date(job.endDate).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Indefinita'}
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              {job.endDate ? 'Data confermata' : 'Data da definire'}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Info */}
-        <div className="lg:col-span-2 space-y-6">
-           <Card>
-             <CardHeader>
-               <CardTitle className="text-base flex items-center gap-2">
-                 <Building2 className="h-5 w-5 text-blue-600" />
-                 Descrizione & Note
-               </CardTitle>
-             </CardHeader>
-             <CardContent className="space-y-4">
-               <p className="text-slate-600 leading-relaxed">
-                 {job.description}
-               </p>
-               
-               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-                 <div className="flex">
-                   <div className="ml-3">
-                     <p className="text-sm text-yellow-700">
-                       <span className="font-bold">Nota Importante:</span>
-                       {' '}Verificare sempre la disponibilità dei materiali prima di pianificare il ritiro.
-                     </p>
-                   </div>
-                 </div>
-               </div>
-
-               <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                 <div>
-                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">CIG</span>
-                   <p className="font-mono text-slate-900">{job.cig || '-'}</p>
-                 </div>
-                 <div>
-                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">CUP</span>
-                   <p className="font-mono text-slate-900">{job.cup || '-'}</p>
-                 </div>
-               </div>
-             </CardContent>
-           </Card>
-        </div>
-
-        {/* Sidebar Info */}
-        <div className="space-y-6">
-          <Card>
-            <CardContent className="pt-6">
-               <div className="flex items-center gap-4 mb-6">
-                 <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl">
-                    {job.clientName?.charAt(0).toUpperCase()}
-                 </div>
-                 <div>
-                   <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Cliente</div>
-                   <div className="font-bold text-slate-900">{job.clientName}</div>
-                 </div>
-               </div>
-               
-               <div className="space-y-3 pt-4 border-t">
-                 <div className="flex items-start gap-3">
-                   <MapPin className="h-4 w-4 text-slate-400 mt-1" />
-                   <div>
-                     <div className="text-xs text-slate-500">Indirizzo Cantiere</div>
-                     <div className="text-sm font-medium">{job.siteAddress || 'N/D'}</div>
-                     <a 
-                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.siteAddress || '')}`} 
-                       target="_blank" 
-                       rel="noopener noreferrer"
-                       className="text-xs text-blue-600 hover:underline block mt-1"
-                     >
-                       Visualizza Mappa
-                     </a>
-                   </div>
-                 </div>
-               </div>
+            <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Data Inizio
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">
+                    {job.startDate ? new Date(job.startDate).toLocaleDateString() : '-'}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                    Fine: {job.endDate ? new Date(job.endDate).toLocaleDateString() : 'In corso'}
+                </div>
             </CardContent>
-          </Card>
-        </div>
+        </Card>
+
+        <Card>
+            <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Committente
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="text-lg font-bold truncate" title={job.clientName}>
+                    {job.clientName || '-'}
+                </div>
+                <div className="text-xs text-slate-500 mt-1 truncate" title={job.clientAddress}>
+                    {job.clientAddress || 'Indirizzo non disponibile'}
+                </div>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Cantiere
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="text-sm font-medium mb-1 truncate" title={job.siteAddress}>
+                    {job.siteAddress || 'Indirizzo cantiere mancante'}
+                </div>
+                {job.siteManager && (
+                    <div className="text-xs text-slate-500 flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        Resp: {job.siteManager}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Additional Info Card */}
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">Informazioni Amministrative</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label className="text-slate-500">Codice Commessa</Label>
+                        <div className="font-mono font-medium">{job.code}</div>
+                    </div>
+                    <div>
+                        <Label className="text-slate-500">Stato</Label>
+                        <div className="font-medium capitalize">{
+                            job.status === 'active' ? 'In Lavorazione' : 
+                            job.status === 'completed' ? 'Completata' : 'Sospesa'
+                        }</div>
+                    </div>
+                    <div>
+                        <Label className="text-slate-500">CIG</Label>
+                        <div className="font-medium">{job.cig || '-'}</div>
+                    </div>
+                    <div>
+                        <Label className="text-slate-500">CUP</Label>
+                        <div className="font-medium">{job.cup || '-'}</div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        {/* Description Card */}
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">Descrizione Lavori</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p className="text-slate-700 whitespace-pre-wrap">{job.description}</p>
+            </CardContent>
+        </Card>
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Modifica Commessa</DialogTitle>
+            <DialogDescription>
+              Modifica i dettagli della commessa.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrizione *</Label>
+              <Textarea
+                id="description"
+                value={editForm.description || ""}
+                onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="status">Stato</Label>
+                <Select 
+                  value={editForm.status} 
+                  onValueChange={(value: any) => setEditForm({...editForm, status: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleziona stato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">In Lavorazione</SelectItem>
+                    <SelectItem value="suspended">Sospesa</SelectItem>
+                    <SelectItem value="completed">Completata</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="siteManager">Responsabile Cantiere</Label>
+                <Input
+                  id="siteManager"
+                  value={editForm.siteManager || ""}
+                  onChange={(e) => setEditForm({...editForm, siteManager: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="siteAddress">Indirizzo Cantiere</Label>
+              <Input
+                id="siteAddress"
+                value={editForm.siteAddress || ""}
+                onChange={(e) => setEditForm({...editForm, siteAddress: e.target.value})}
+                placeholder="Via, Città..."
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startDate">Data Inizio</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={editForm.startDate ? (typeof editForm.startDate === 'string' ? editForm.startDate.split('T')[0] : '') : ""}
+                  onChange={(e) => setEditForm({...editForm, startDate: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endDate">Data Fine</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={editForm.endDate ? (typeof editForm.endDate === 'string' ? editForm.endDate.split('T')[0] : '') : ""}
+                  onChange={(e) => setEditForm({...editForm, endDate: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cig">CIG</Label>
+                <Input
+                  id="cig"
+                  value={editForm.cig || ""}
+                  onChange={(e) => setEditForm({...editForm, cig: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cup">CUP</Label>
+                <Input
+                  id="cup"
+                  value={editForm.cup || ""}
+                  onChange={(e) => setEditForm({...editForm, cup: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>Annulla</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>}
+              Salva Modifiche
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
