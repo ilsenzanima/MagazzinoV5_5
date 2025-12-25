@@ -767,7 +767,8 @@ const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
     inventoryUnit: i.inventory?.unit,
     inventoryBrand: i.inventory?.brand,
     inventoryCategory: i.inventory?.category,
-    inventoryDescription: i.inventory?.description
+    inventoryDescription: i.inventory?.description,
+    price: i.price || i.purchase_items?.price || i.inventory?.price || 0
   }))
 });
 
@@ -853,7 +854,8 @@ export const deliveryNotesApi = {
         jobs(code, description),
         delivery_note_items(
           *,
-          inventory(name, code, unit, brand, category, description)
+          inventory(name, code, unit, brand, category, description, price),
+          purchase_items(price)
         )
       `)
       .eq('id', id)

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -81,6 +81,32 @@ export default function MovementDetailPage() {
     }
   };
 
+  // Group items by inventory ID for display
+  const groupedItems = useMemo(() => {
+    const grouped = new Map<string, DeliveryNoteItem>();
+    
+    items.forEach(item => {
+        // Use inventoryId as key to group identical products
+        const key = item.inventoryId;
+        
+        if (grouped.has(key)) {
+            const existing = grouped.get(key)!;
+            grouped.set(key, {
+                ...existing,
+                quantity: existing.quantity + item.quantity,
+                // Don't sum coefficients or prices, keep the first one found or average? 
+                // For display purposes, keeping the static data of the first entry is usually enough 
+                // unless we want weighted average. 
+                // Since user asked to group identical items, we sum quantities.
+            });
+        } else {
+            grouped.set(key, { ...item });
+        }
+    });
+    
+    return Array.from(grouped.values());
+  }, [items]);
+
   const handlePrint = () => {
     if (!movement) return;
 
@@ -115,7 +141,7 @@ export default function MovementDetailPage() {
     doc.text(`Aspetto: ${movement.appearance || "-"}`, 110, 73);
     
     // Table
-    const tableBody = items.map(item => [
+    const tableBody = groupedItems.map(item => [
         item.inventoryCode || "-",
         item.inventoryName || "Articolo non trovato",
         item.inventoryUnit || "PZ",
@@ -389,6 +415,7 @@ export default function MovementDetailPage() {
                     )}
                 </CardContent>
             </Card>
+        </div>
 
             {/* Items List - Read Only */}
             <Card>
@@ -404,18 +431,17 @@ export default function MovementDetailPage() {
                                 <TableHead>U.M.</TableHead>
                                 <TableHead className="text-right">Q.tà</TableHead>
                                 <TableHead className="text-right">Coeff.</TableHead>
-                                <TableHead className="text-right">Prezzo</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {items.length === 0 ? (
+                            {groupedItems.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
                                         Nessun articolo
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                items.map((item) => (
+                                groupedItems.map((item) => (
                                     <TableRow key={item.id}>
                                         <TableCell className="font-mono text-sm">{item.inventoryCode}</TableCell>
                                         <TableCell>
@@ -425,13 +451,6 @@ export default function MovementDetailPage() {
                                         <TableCell>{item.inventoryUnit}</TableCell>
                                         <TableCell className="text-right font-bold">{item.quantity}</TableCell>
                                         <TableCell className="text-right">{item.coefficient}</TableCell>
-                                        <TableCell className="text-right">
-                                            {(userRole === 'admin' || userRole === 'operativo') ? (
-                                                `€ ${item.price?.toFixed(2)}`
-                                            ) : (
-                                                <span className="text-slate-400 italic text-xs">Riservato</span>
-                                            )}
-                                        </TableCell>
                                     </TableRow>
                                 ))
                             )}
@@ -439,7 +458,6 @@ export default function MovementDetailPage() {
                     </Table>
                 </CardContent>
             </Card>
-        </div>
       </div>
     </DashboardLayout>
   );
