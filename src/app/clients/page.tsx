@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { useAuth } from "@/components/auth-provider";
 
@@ -52,6 +53,7 @@ export default function ClientsPage() {
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Client>>({});
+  const [shouldUpdateActiveJobs, setShouldUpdateActiveJobs] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -126,34 +128,20 @@ export default function ClientsPage() {
         address: newAddress
       });
 
-      // 3. Check and Update Job Addresses if needed
-      // Use existing address from DB, or construct it if missing (legacy data)
-      let oldAddress = clientToEdit.address;
-      if (!oldAddress) {
-        oldAddress = constructAddress(clientToEdit);
-      }
-      
-      console.log('Checking cascading update:', { oldAddress, newAddress });
-
-      if (oldAddress && newAddress && oldAddress !== newAddress) {
+      // 3. Update Job Addresses if requested
+      if (shouldUpdateActiveJobs && newAddress) {
+        console.log('Updating active jobs to new address:', newAddress);
         // Fetch all jobs for this client
         const jobs = await jobsApi.getByClientId(clientToEdit.id);
-        console.log(`Found ${jobs.length} jobs for client ${clientToEdit.id}`);
         
-        // Update jobs that have the old address as site address
-        const updatePromises = jobs.map(async (job) => {
-          const jobAddress = job.siteAddress || '';
-          // Normalize for comparison: trim, lowercase, collapse spaces, remove commas
-          const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/,/g, '');
-          
-          const isMatch = normalize(jobAddress) === normalize(oldAddress || '');
-          console.log(`Checking job ${job.code}:`, { jobAddress, oldAddress, isMatch });
-
-          if (isMatch) {
-            console.log(`Updating job ${job.code} address from "${job.siteAddress}" to "${newAddress}"`);
-            return jobsApi.update(job.id, { siteAddress: newAddress });
-          }
-          return Promise.resolve();
+        // Filter for active jobs
+        const activeJobs = jobs.filter(job => job.status === 'active');
+        console.log(`Found ${activeJobs.length} active jobs to update out of ${jobs.length} total`);
+        
+        // Update them
+        const updatePromises = activeJobs.map(job => {
+           console.log(`Updating job ${job.code} address to "${newAddress}"`);
+           return jobsApi.update(job.id, { siteAddress: newAddress });
         });
         
         await Promise.all(updatePromises);
@@ -172,6 +160,7 @@ export default function ClientsPage() {
 
   const openEditDialog = (client: Client) => {
     setClientToEdit(client);
+    setShouldUpdateActiveJobs(false);
     setEditForm({
       name: client.name,
       vatNumber: client.vatNumber,
@@ -448,6 +437,17 @@ export default function ClientsPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox 
+                id="update-jobs" 
+                checked={shouldUpdateActiveJobs} 
+                onCheckedChange={(checked) => setShouldUpdateActiveJobs(checked as boolean)} 
+              />
+              <Label htmlFor="update-jobs" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                Aggiorna l'indirizzo anche nelle commesse attive associate
+              </Label>
             </div>
           </div>
 

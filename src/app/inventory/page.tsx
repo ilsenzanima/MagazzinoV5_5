@@ -266,14 +266,14 @@ export default function InventoryPage() {
                         !item.image && (itemTypes.find(t => t.name === item.type)?.imageUrl) 
                           ? "w-auto h-3/4 object-contain" 
                           : "w-full h-full object-cover group-hover:scale-105"
-                      }`}
+                      } ${item.quantity === 0 ? "grayscale opacity-80" : ""}`}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "/placeholder.svg";
                       }}
                     />
                     {item.quantity === 0 && (
-                        <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm">
-                            <Badge variant="destructive" className="text-sm font-bold">ESAURITO</Badge>
+                        <div className="absolute inset-0 bg-white/10 flex items-center justify-center">
+                            <Badge variant="destructive" className="text-sm font-bold shadow-sm">ESAURITO</Badge>
                         </div>
                         )}
                     </div>
