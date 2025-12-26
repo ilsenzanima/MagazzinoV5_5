@@ -50,20 +50,31 @@ GRANT SELECT ON public.purchase_batch_availability TO authenticated;
 DROP POLICY IF EXISTS "Supplier codes modifiable by authenticated" ON public.inventory_supplier_codes;
 DROP POLICY IF EXISTS "Inventory supplier codes modifiable by authenticated" ON public.inventory_supplier_codes;
 
--- Create granular policies
+-- Create granular policies (Drop first to avoid conflicts)
+DROP POLICY IF EXISTS "Supplier codes viewable by authenticated" ON public.inventory_supplier_codes;
 CREATE POLICY "Supplier codes viewable by authenticated" ON public.inventory_supplier_codes FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Supplier codes insert by Admin/Operativo" ON public.inventory_supplier_codes;
 CREATE POLICY "Supplier codes insert by Admin/Operativo" ON public.inventory_supplier_codes FOR INSERT TO authenticated WITH CHECK (public.get_my_role() IN ('admin', 'operativo'));
+
+DROP POLICY IF EXISTS "Supplier codes update by Admin/Operativo" ON public.inventory_supplier_codes;
 CREATE POLICY "Supplier codes update by Admin/Operativo" ON public.inventory_supplier_codes FOR UPDATE TO authenticated USING (public.get_my_role() IN ('admin', 'operativo'));
+
+DROP POLICY IF EXISTS "Supplier codes delete by Admin only" ON public.inventory_supplier_codes;
 CREATE POLICY "Supplier codes delete by Admin only" ON public.inventory_supplier_codes FOR DELETE TO authenticated USING (public.get_my_role() = 'admin');
 
 
 -- Fix Performance Advisor Issue: Permissive Policies on public.job_inventory
 DROP POLICY IF EXISTS "Job Inventory modifiable by authenticated" ON public.job_inventory;
--- Note: "Job Inventory viewable by authenticated" is kept (or recreated if needed, but usually safe)
 
--- Create granular policies for modification
+-- Create granular policies for modification (Drop first to avoid conflicts)
+DROP POLICY IF EXISTS "Job Inventory insert by Admin/Operativo" ON public.job_inventory;
 CREATE POLICY "Job Inventory insert by Admin/Operativo" ON public.job_inventory FOR INSERT TO authenticated WITH CHECK (public.get_my_role() IN ('admin', 'operativo'));
+
+DROP POLICY IF EXISTS "Job Inventory update by Admin/Operativo" ON public.job_inventory;
 CREATE POLICY "Job Inventory update by Admin/Operativo" ON public.job_inventory FOR UPDATE TO authenticated USING (public.get_my_role() IN ('admin', 'operativo'));
+
+DROP POLICY IF EXISTS "Job Inventory delete by Admin only" ON public.job_inventory;
 CREATE POLICY "Job Inventory delete by Admin only" ON public.job_inventory FOR DELETE TO authenticated USING (public.get_my_role() = 'admin');
 
 
@@ -74,10 +85,16 @@ DROP POLICY IF EXISTS "Users can insert their own profile." ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile." ON public.profiles;
 DROP POLICY IF EXISTS "Profiles viewable by all" ON public.profiles;
 
--- Recreate with authenticated restriction (no public access)
+-- Recreate with authenticated restriction (Drop first to avoid conflicts)
+DROP POLICY IF EXISTS "Profiles viewable by authenticated" ON public.profiles;
 CREATE POLICY "Profiles viewable by authenticated" ON public.profiles FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
+
 -- Allow Admins to update any profile
 DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
 CREATE POLICY "Admins can update any profile" ON public.profiles FOR UPDATE TO authenticated USING (public.get_my_role() = 'admin');

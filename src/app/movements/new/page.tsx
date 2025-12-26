@@ -387,6 +387,8 @@ export default function NewMovementPage() {
       itemCategory: selectedItemForLine.type, // Map type to category
       itemDescription: selectedItemForLine.description,
       quantity: Number(currentLine.quantity),
+      pieces: currentLine.pieces ? Number(currentLine.pieces) : undefined,
+      coefficient: currentLine.coefficient ? Number(currentLine.coefficient) : 1,
       purchaseItemId: isFictitious ? undefined : (currentLine.purchaseItemId || undefined),
       purchaseRef: isFictitious ? "Lotto Fittizio" : availableBatches.find(b => b.id === currentLine.purchaseItemId)?.purchaseRef,
       isFictitious: isFictitious
