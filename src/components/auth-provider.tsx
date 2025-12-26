@@ -44,24 +44,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserRole = async (userId: string, retries = 3) => {
     try {
+      // Increased timeout for role fetching (critical operation)
+      // and use maybeSingle() instead of single() to avoid errors on missing rows
       const { data, error } = await fetchWithTimeout(
         supabase
           .from('profiles')
           .select('role')
           .eq('id', userId)
-          .single()
+          .maybeSingle(),
+        10000 // 10 seconds timeout for this critical call
       );
       
       if (data) {
         setRealRole(data.role as 'admin' | 'user' | 'operativo');
       } else {
+        // If profile doesn't exist yet (e.g. just registered), default to user
         setRealRole('user');
       }
     } catch (error) {
       console.error(`Error fetching user role (attempts left: ${retries}):`, error);
       if (retries > 0) {
-        // Wait 1 second before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, 3 - retries) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
         return fetchUserRole(userId, retries - 1);
       }
       // Non resettiamo il ruolo in caso di errore per preservare la sessione

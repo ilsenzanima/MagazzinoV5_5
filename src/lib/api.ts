@@ -7,7 +7,10 @@ export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
             const duration = Date.now() - start;
-            console.error(`Request timed out after ${duration}ms`);
+            // Only log as error if it's a real timeout, not cancelled
+            if (ms > 2000) {
+                 console.error(`Request timed out after ${duration}ms (Limit: ${ms}ms)`);
+            }
             reject(new Error("Request timed out"));
         }, ms);
 
@@ -15,7 +18,8 @@ export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 
             (res) => {
                 clearTimeout(timeoutId);
                 const duration = Date.now() - start;
-                if (duration > 2000) {
+                // Increased threshold for warning to reduce noise
+                if (duration > 5000) {
                     console.warn(`Slow request detected: ${duration}ms`);
                 }
                 resolve(res);
@@ -23,7 +27,10 @@ export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 
             (err) => {
                 clearTimeout(timeoutId);
                 const duration = Date.now() - start;
-                console.error(`Request failed after ${duration}ms:`, err);
+                // Log failed requests but be less verbose for expected aborts
+                if (err.name !== 'AbortError') {
+                    console.error(`Request failed after ${duration}ms:`, err);
+                }
                 reject(err);
             }
         );
@@ -1249,6 +1256,7 @@ export const inventoryApi = {
         purchaseItemId: b.purchase_item_id,
         purchaseRef: b.purchase_ref,
         itemName: b.item_name,
+        itemModel: b.item_model,
         itemCode: b.item_code,
         itemUnit: b.item_unit,
         itemBrand: b.item_brand,

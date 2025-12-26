@@ -255,7 +255,8 @@ export default function NewMovementPage() {
          description: "",
          coefficient: batch.coefficient,
          supplierCode: "",
-         price: 0
+         price: 0,
+         model: batch.itemModel
      };
     
     setSelectedItemForLine(item);
@@ -638,7 +639,10 @@ export default function NewMovementPage() {
                                                     >
                                                         <TableCell>
                                                             <div className="font-medium text-slate-900">{batch.itemName}</div>
-                                                            <div className="text-xs text-slate-500">{batch.itemCode}</div>
+                                                            <div className="text-xs text-slate-500">
+                                                                {batch.itemCode}
+                                                                {batch.itemModel && <span className="ml-2 text-slate-400 border-l pl-2">{batch.itemModel}</span>}
+                                                            </div>
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge variant="outline" className="bg-white">{batch.purchaseRef}</Badge>
