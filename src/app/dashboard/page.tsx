@@ -8,6 +8,7 @@ import { CalendarView } from "@/components/dashboard/CalendarView";
 import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
 import { RecentMovements } from "@/components/dashboard/RecentMovements";
 import { ActiveJobsWidget } from "@/components/dashboard/ActiveJobs";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { createClient } from "@/lib/supabase/client";
 import { fetchWithTimeout } from "@/lib/api";
 
@@ -96,11 +97,15 @@ export default function Dashboard() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
-            <StatsCards 
-              totalValue={stats.totalValue} 
-              lowStockCount={stats.lowStockCount}
-              totalItems={stats.totalItems}
-            />
+            {loading ? (
+              <DashboardSkeleton />
+            ) : (
+              <StatsCards 
+                totalValue={stats.totalValue} 
+                lowStockCount={stats.lowStockCount}
+                totalItems={stats.totalItems}
+              />
+            )}
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <div className="col-span-4">

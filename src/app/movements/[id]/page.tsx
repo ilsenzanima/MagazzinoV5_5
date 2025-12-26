@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -21,6 +21,7 @@ import {
   DeliveryNote,
   DeliveryNoteItem
 } from "@/lib/api";
+import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from "@/components/auth-provider";
@@ -38,6 +39,7 @@ export default function MovementDetailPage() {
   // Edit State
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<DeliveryNote>>({});
+  const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
   
   // Items State (for local manipulation before save)
   const [items, setItems] = useState<DeliveryNoteItem[]>([]);
@@ -143,7 +145,7 @@ export default function MovementDetailPage() {
     // Table
     const tableBody = groupedItems.map(item => [
         item.inventoryCode || "-",
-        item.inventoryName || "Articolo non trovato",
+        item.inventoryName ? `${item.inventoryName}${item.inventoryModel ? ` (${item.inventoryModel})` : ''}` : "Articolo non trovato",
         item.inventoryDescription || "-",
         item.quantity.toString(),
         item.inventoryUnit || "PZ"
@@ -199,8 +201,18 @@ export default function MovementDetailPage() {
     
     try {
         setLoading(true);
-        // Only update header fields
-        await deliveryNotesApi.update(id, editForm); // Pass items only if you want to replace them, here we don't
+        // Update header fields and items
+        await deliveryNotesApi.update(id, {
+            ...editForm,
+            items: items.map(item => ({
+                inventoryId: item.inventoryId,
+                quantity: item.quantity,
+                pieces: item.pieces,
+                coefficient: item.coefficient,
+                purchaseItemId: item.purchaseItemId,
+                isFictitious: item.isFictitious
+            }))
+        });
         
         alert("Modifiche salvate con successo!");
         setIsEditing(false);
@@ -210,6 +222,38 @@ export default function MovementDetailPage() {
         alert("Errore nel salvataggio");
         setLoading(false);
     }
+  };
+
+  const handleAddItem = (inventoryItem: InventoryItem) => {
+    const newItem: DeliveryNoteItem = {
+        id: `temp-${Date.now()}`,
+        deliveryNoteId: id,
+        inventoryId: inventoryItem.id,
+        quantity: 1,
+        pieces: 0,
+        coefficient: 0,
+        isFictitious: false,
+        inventoryCode: inventoryItem.code,
+        inventoryName: inventoryItem.name,
+        inventoryModel: inventoryItem.model,
+        inventoryUnit: inventoryItem.unit,
+        inventoryDescription: inventoryItem.description
+    };
+    
+    setItems([...items, newItem]);
+    setIsItemSelectorOpen(false);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const newItems = [...items];
+    newItems.splice(index, 1);
+    setItems(newItems);
+  };
+
+  const handleUpdateItem = (index: number, field: keyof DeliveryNoteItem, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
   };
 
   if (loading) {
@@ -437,10 +481,16 @@ export default function MovementDetailPage() {
             </Card>
         </div>
 
-            {/* Items List - Read Only */}
+            {/* Items List */}
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Articoli (Sola Lettura)</CardTitle>
+                    <CardTitle>Articoli {isEditing ? "(Modifica)" : ""}</CardTitle>
+                    {isEditing && (
+                        <Button onClick={() => setIsItemSelectorOpen(true)} size="sm">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Aggiungi Articolo
+                        </Button>
+                    )}
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -451,28 +501,52 @@ export default function MovementDetailPage() {
                                 <TableHead>Descrizione</TableHead>
                                 <TableHead className="text-right">Q.tà</TableHead>
                                 <TableHead>U.M.</TableHead>
+                                {isEditing && <TableHead className="w-[50px]"></TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {groupedItems.length === 0 ? (
+                            {(isEditing ? items : groupedItems).length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                                    <TableCell colSpan={isEditing ? 6 : 5} className="text-center py-8 text-slate-500">
                                         Nessun articolo
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                groupedItems.map((item) => (
-                                    <TableRow key={item.id}>
+                                (isEditing ? items : groupedItems).map((item, index) => (
+                                    <TableRow key={item.id || index}>
                                         <TableCell className="font-mono text-sm">{item.inventoryCode}</TableCell>
                                         <TableCell>
-                                            <div className="font-medium">{item.inventoryName}</div>
+                                            <div className="font-medium">
+                                                {item.inventoryName}
+                                                {item.inventoryModel && <span className="text-slate-500 font-medium ml-1">({item.inventoryModel})</span>}
+                                            </div>
                                             <div className="text-xs text-slate-500">{item.inventoryBrand}</div>
                                         </TableCell>
                                         <TableCell className="text-sm text-slate-600 max-w-md truncate" title={item.inventoryDescription}>
                                             {item.inventoryDescription || "-"}
                                         </TableCell>
-                                        <TableCell className="text-right font-bold">{item.quantity}</TableCell>
+                                        <TableCell className="text-right font-bold">
+                                            {isEditing ? (
+                                                <Input 
+                                                    type="number" 
+                                                    min="0.01" 
+                                                    step="0.01"
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleUpdateItem(index, 'quantity', parseFloat(e.target.value))}
+                                                    className="w-24 text-right ml-auto"
+                                                />
+                                            ) : (
+                                                item.quantity
+                                            )}
+                                        </TableCell>
                                         <TableCell>{item.inventoryUnit}</TableCell>
+                                        {isEditing && (
+                                            <TableCell>
+                                                <Button variant="ghost" size="sm" onClick={() => handleRemoveItem(index)}>
+                                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                                </Button>
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 ))
                             )}
@@ -480,6 +554,13 @@ export default function MovementDetailPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            <ItemSelectorDialog
+                open={isItemSelectorOpen}
+                onOpenChange={setIsItemSelectorOpen}
+                onSelect={handleAddItem}
+                items={inventory}
+            />
       </div>
     </DashboardLayout>
   );

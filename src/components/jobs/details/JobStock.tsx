@@ -32,6 +32,7 @@ export function JobStock({ movements }: JobStockProps) {
   // Calculate Current Stock at Site
   const stockMap = new Map<string, { 
     name: string, 
+    model?: string,
     code: string, 
     qty: number, 
     pieces: number,
@@ -91,6 +92,7 @@ export function JobStock({ movements }: JobStockProps) {
 
       stockMap.set(key, {
         name: m.itemName || 'Sconosciuto',
+        model: m.itemModel,
         code: m.itemCode,
         qty: qtyChange,
         pieces: piecesChange,
@@ -138,7 +140,10 @@ export function JobStock({ movements }: JobStockProps) {
                         <CardContent className="p-4 space-y-3">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <div className="font-medium text-slate-900">{item.name}</div>
+                                    <div className="font-medium text-slate-900">
+                                      {item.name}
+                                      {item.model && <span className="text-slate-500 font-normal ml-1">({item.model})</span>}
+                                    </div>
                                     <div className="text-xs text-slate-500 font-mono mt-0.5">{item.code}</div>
                                 </div>
                                 <div className="text-right">
@@ -202,6 +207,7 @@ export function JobStock({ movements }: JobStockProps) {
                         <TableCell className="font-mono text-xs">{item.code}</TableCell>
                         <TableCell className="font-medium">
                           {item.name}
+                          {item.model && <span className="text-slate-500 font-normal ml-1">({item.model})</span>}
                           {item.isFictitious && (
                             <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5 px-1.5">
                               Fittizio
@@ -290,7 +296,10 @@ export function JobStock({ movements }: JobStockProps) {
                                         <div className="text-xs text-slate-500 font-mono">
                                             {new Date(move.date).toLocaleDateString()}
                                         </div>
-                                        <div className="font-medium text-slate-900">{move.itemName || 'Articolo Cancellato'}</div>
+                                        <div className="font-medium text-slate-900">
+                                            {move.itemName || 'Articolo Cancellato'}
+                                            {move.itemModel && <span className="text-slate-500 font-normal ml-1">({move.itemModel})</span>}
+                                        </div>
                                     </div>
                                     <div className={`font-bold ${isSiteIn ? 'text-green-700' : 'text-orange-700'}`}>
                                         {displayQty > 0 ? '+' : ''}{displayQty} {move.itemUnit}
@@ -379,6 +388,7 @@ export function JobStock({ movements }: JobStockProps) {
                                 <div className="flex flex-col">
                                 <span className="font-medium text-slate-900 flex items-center gap-2">
                                 {move.itemName || 'Articolo Cancellato'}
+                                {move.itemModel && <span className="text-slate-500 font-normal">({move.itemModel})</span>}
                                 {move.isFictitious && (
                                     <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5 px-1.5">
                                     Fittizio

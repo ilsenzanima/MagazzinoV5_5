@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { InventoryItem, User } from './mock-data';
 
 // Helper for timeouts
-export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 15000): Promise<T> => {
+export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 30000): Promise<T> => {
     const start = Date.now();
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
@@ -98,6 +98,7 @@ export interface Movement {
   jobId?: string;
   jobCode?: string; // For display
   jobDescription?: string; // For display
+  itemModel?: string;
   itemName?: string; // For display
   itemCode?: string; // For display
   itemUnit?: string; // For display
@@ -188,6 +189,7 @@ export interface PurchaseItem {
   purchaseId: string;
   itemId: string;
   itemName?: string; // Display
+  itemModel?: string; // Display
   itemCode?: string; // Display
   quantity: number;
   pieces?: number;
@@ -423,7 +425,7 @@ export const purchasesApi = {
     const { data, error } = await fetchWithTimeout(
       supabase
         .from('purchase_items')
-        .select('*, inventory(name, code), jobs(code)')
+        .select('*, inventory(name, code, model), jobs(code)')
         .eq('purchase_id', purchaseId)
     );
       
@@ -433,6 +435,7 @@ export const purchasesApi = {
       purchaseId: item.purchase_id,
       itemId: item.item_id,
       itemName: item.inventory?.name,
+      itemModel: item.inventory?.model,
       itemCode: item.inventory?.code,
       quantity: item.quantity,
       pieces: item.pieces,
@@ -643,6 +646,7 @@ const mapJobDocumentToDb = (doc: Partial<JobDocument>) => ({
 const mapDbToMovement = (db: any): Movement => ({
   id: db.id,
   itemId: db.item_id,
+  itemModel: db.item_model,
   userId: db.user_id,
   userName: db.profiles?.full_name || 'Utente',
   type: db.type,
@@ -721,6 +725,7 @@ export interface DeliveryNoteItem {
   deliveryNoteId: string;
   inventoryId: string;
   inventoryName?: string;
+  inventoryModel?: string;
   inventoryCode?: string;
   inventoryUnit?: string;
   inventoryBrand?: string;
@@ -793,6 +798,7 @@ const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
     purchaseItemId: i.purchase_item_id,
     isFictitious: i.is_fictitious,
     inventoryName: i.inventory?.name,
+    inventoryModel: i.inventory?.model,
     inventoryCode: i.inventory?.code,
     inventoryUnit: i.inventory?.unit,
     inventoryBrand: i.inventory?.brand,
@@ -884,7 +890,7 @@ export const deliveryNotesApi = {
         jobs(code, description),
         delivery_note_items(
           *,
-          inventory(name, code, unit, brand, category, description, price),
+          inventory(name, code, unit, brand, category, description, price, model),
           purchase_items(price)
         )
       `)
@@ -1637,6 +1643,7 @@ export const movementsApi = {
       date: db.date,
       jobId: db.job_id,
       itemName: db.item_name,
+      itemModel: db.item_model,
       itemCode: db.item_code,
       itemUnit: db.item_unit,
       itemPrice: db.item_price || 0,

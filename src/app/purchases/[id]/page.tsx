@@ -523,7 +523,10 @@ export default function PurchaseDetailPage() {
                             {items.map((item) => (
                                 <TableRow key={item.id} className={item.price === 0 ? "bg-yellow-50/50" : ""}>
                                     <TableCell>
-                                        <div className="font-medium">{item.itemName}</div>
+                                        <div className="font-medium">
+                                            {item.itemName}
+                                            {item.itemModel && <span className="text-slate-500 font-medium ml-1">({item.itemModel})</span>}
+                                        </div>
                                         <div className="text-xs text-slate-500">{item.itemCode}</div>
                                     </TableCell>
                                     

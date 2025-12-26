@@ -1,0 +1,29 @@
+name: Keep Alive Database
+
+on:
+  schedule:
+    # Esegue ogni 10 minuti
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Permette di eseguirlo manualmente dal tab Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Health Endpoint
+        run: |
+          # Sostituisci con il tuo URL di produzione reale
+          # Se hai impostato il segreto, usa ${{ secrets.APP_URL }}
+          # Altrimenti modifica direttamente qui sotto
+          
+          URL="${{ secrets.APP_URL || 'https://magazzino-v5-5.vercel.app' }}/api/health"
+          
+          echo "Pinging $URL..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          
+          if [ "$response" -eq 200 ]; then
+            echo "Success! Status code: $response"
+          else
+            echo "Failed! Status code: $response"
+            exit 1
+          fi

@@ -104,7 +104,7 @@ export default function JobDetailsPage() {
         format(new Date(m.date), 'dd/MM/yyyy'),
         m.type === 'purchase' ? 'Acquisto' : m.type === 'exit' ? 'Uscita' : m.type === 'entry' ? 'Rientro' : m.type,
         m.itemCode || "-",
-        m.itemName || "Articolo",
+        m.itemModel ? `${m.itemName || "Articolo"} (${m.itemModel})` : (m.itemName || "Articolo"),
         m.quantity.toString() + " " + (m.itemUnit || ""),
         // Only show price if relevant/visible logic
         (userRole === 'admin' || userRole === 'operativo') && m.type === 'purchase' ? `€ ${m.itemPrice?.toFixed(2)}` : "-" 

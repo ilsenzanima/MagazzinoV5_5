@@ -16,6 +16,7 @@ interface Movement {
   created_at: string;
   inventory: {
     name: string;
+    model?: string;
     unit: string;
   };
   profiles: {
@@ -39,7 +40,7 @@ export function RecentMovements() {
               type,
               quantity,
               created_at,
-              inventory (name, unit),
+              inventory (name, model, unit),
               profiles:user_id (full_name)
             `)
             .order('created_at', { ascending: false })
@@ -111,6 +112,11 @@ export function RecentMovements() {
                   <div>
                     <p className="text-sm font-medium text-slate-900">
                       {movement.inventory?.name || 'Articolo sconosciuto'}
+                      {movement.inventory?.model && (
+                        <span className="text-slate-500 font-normal ml-1">
+                          ({movement.inventory.model})
+                        </span>
+                      )}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${

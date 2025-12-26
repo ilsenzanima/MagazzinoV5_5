@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Effective role is simulatedRole if present, otherwise realRole
   const userRole = simulatedRole || realRole;
 
-  const fetchUserRole = async (userId: string) => {
+  const fetchUserRole = async (userId: string, retries = 3) => {
     try {
       const { data, error } = await fetchWithTimeout(
         supabase
@@ -58,7 +58,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRealRole('user');
       }
     } catch (error) {
-      console.error("Error fetching user role:", error);
+      console.error(`Error fetching user role (attempts left: ${retries}):`, error);
+      if (retries > 0) {
+        // Wait 1 second before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return fetchUserRole(userId, retries - 1);
+      }
       // Non resettiamo il ruolo in caso di errore per preservare la sessione
       // durante i refresh del token in background
     }
