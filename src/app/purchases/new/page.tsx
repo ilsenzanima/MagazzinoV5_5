@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Search, X, Upload } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { 
   suppliersApi, 
@@ -128,7 +128,7 @@ export default function NewPurchasePage() {
     }
   };
 
-  const handleItemSearch = async (term: string) => {
+  const handleItemSearch = useCallback(async (term: string) => {
     setItemsLoading(true);
     try {
         const { items } = await inventoryApi.getPaginated({ 
@@ -142,9 +142,9 @@ export default function NewPurchasePage() {
     } finally {
         setItemsLoading(false);
     }
-  };
+  }, []);
 
-  const handleJobSearch = async (term: string) => {
+  const handleJobSearch = useCallback(async (term: string) => {
     setJobsLoading(true);
     try {
         const { data } = await jobsApi.getPaginated({ 
@@ -159,7 +159,7 @@ export default function NewPurchasePage() {
     } finally {
         setJobsLoading(false);
     }
-  };
+  }, []);
 
   const handleItemSelect = (item: InventoryItem) => {
     setSelectedItemForLine(item);

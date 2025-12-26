@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Briefcase, Search, Clock, Package } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { 
   inventoryApi, 
@@ -186,7 +186,7 @@ export default function NewMovementPage() {
     }
   };
 
-  const handleJobSearch = async (term: string) => {
+  const handleJobSearch = useCallback(async (term: string) => {
     setJobsLoading(true);
     try {
         const { data } = await jobsApi.getPaginated({ 
@@ -201,9 +201,9 @@ export default function NewMovementPage() {
     } finally {
         setJobsLoading(false);
     }
-  };
+  }, []);
 
-  const handleItemSearch = async (term: string) => {
+  const handleItemSearch = useCallback(async (term: string) => {
     // If we are in entry mode with a job selected, we don't use server search 
     // because we are showing job inventory which is already fully loaded
     if (activeTab === 'entry' && selectedJob) return;
@@ -221,7 +221,7 @@ export default function NewMovementPage() {
     } finally {
         setItemsLoading(false);
     }
-  };
+  }, [activeTab, selectedJob]);
 
   useEffect(() => {
     // If Job Changes and we are in ENTRY mode, fetch Job Inventory
@@ -917,13 +917,13 @@ export default function NewMovementPage() {
         />
 
         <ItemSelectorDialog
-            open={isItemSelectorOpen}
-            onOpenChange={setIsItemSelectorOpen}
-            items={dialogItems}
-            onSelect={handleItemSelect}
-            onSearch={handleItemSearch}
-            loading={itemsLoading}
-        />
+    open={isItemSelectorOpen}
+    onOpenChange={setIsItemSelectorOpen}
+    items={dialogItems}
+    onSelect={handleItemSelect}
+    onSearch={activeTab === 'entry' && selectedJob ? undefined : handleItemSearch}
+    loading={itemsLoading}
+  />
       </div>
     </DashboardLayout>
   );

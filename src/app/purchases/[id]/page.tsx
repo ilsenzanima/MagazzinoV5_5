@@ -28,6 +28,8 @@ import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocuments";
 import { useAuth } from "@/components/auth-provider";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 export default function PurchaseDetailPage() {
   const { userRole } = useAuth();
@@ -38,12 +40,14 @@ export default function PurchaseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [items, setItems] = useState<PurchaseItem[]>([]);
+  const [batchAvailability, setBatchAvailability] = useState<any[]>([]); // New state for traceability
   
   // Data Sources for Add Item
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
 
   // Add Item State
+  const [isAddPopupOpen, setIsAddPopupOpen] = useState(false); // New state for popup
   const [addingItem, setAddingItem] = useState(false);
   const [newItem, setNewItem] = useState({
     itemId: "",
@@ -76,17 +80,19 @@ export default function PurchaseDetailPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [purchaseData, itemsData, inventoryData, jobsData] = await Promise.all([
+      const [purchaseData, itemsData, inventoryData, jobsData, availabilityData] = await Promise.all([
         purchasesApi.getById(id),
         purchasesApi.getItems(id),
         inventoryApi.getAll(),
-        jobsApi.getAll()
+        jobsApi.getAll(),
+        purchasesApi.getPurchaseBatchAvailability(id)
       ]);
       
       setPurchase(purchaseData);
       setItems(itemsData);
       setInventory(inventoryData);
       setJobs(jobsData.filter(j => j.status === 'active'));
+      setBatchAvailability(availabilityData);
 
       if (purchaseData.jobId) {
           const job = jobsData.find(j => j.id === purchaseData.jobId);
@@ -408,14 +414,23 @@ export default function PurchaseDetailPage() {
                     </div>
                 )}
                 {(userRole === 'admin' || userRole === 'operativo') && (
-                    <Button 
-                        variant="destructive" 
-                        onClick={handleDeletePurchase}
-                        className="flex items-center gap-2"
-                    >
-                        <Trash2 className="h-4 w-4" />
-                        Elimina Acquisto
-                    </Button>
+                    <>
+                        <Button 
+                            onClick={() => setIsAddPopupOpen(true)}
+                            className="flex items-center gap-2"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Aggiungi Articolo
+                        </Button>
+                        <Button 
+                            variant="destructive" 
+                            onClick={handleDeletePurchase}
+                            className="flex items-center gap-2"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Elimina Acquisto
+                        </Button>
+                    </>
                 )}
             </div>
           </div>
@@ -658,13 +673,68 @@ export default function PurchaseDetailPage() {
                 </CardContent>
             </Card>
 
-            {/* Add New Item Section */}
-            {(userRole === 'admin' || userRole === 'operativo') && (
+            {/* Traceability Table */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Aggiungi Materiale</CardTitle>
+                    <CardTitle>Tracciabilità Lotti</CardTitle>
                 </CardHeader>
                 <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Articolo</TableHead>
+                                <TableHead className="text-right">Q.tà Iniziale</TableHead>
+                                <TableHead className="text-right">Q.tà Residua</TableHead>
+                                <TableHead className="text-right">Stato</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {items.map((item) => {
+                                const batch = batchAvailability.find(b => b.id === item.id);
+                                const remaining = batch ? batch.remainingQty : item.quantity;
+                                const original = item.quantity;
+                                
+                                let statusColor = "bg-green-100 text-green-800";
+                                let statusText = "Disponibile";
+                                
+                                if (remaining <= 0.001) {
+                                    statusColor = "bg-slate-100 text-slate-800";
+                                    statusText = "Esaurito";
+                                } else if (remaining < original) {
+                                    statusColor = "bg-yellow-100 text-yellow-800";
+                                    statusText = "Parziale";
+                                } else if (remaining > original) {
+                                    // Should not happen unless returns > exits
+                                    statusColor = "bg-blue-100 text-blue-800";
+                                    statusText = "Eccedenza";
+                                }
+
+                                return (
+                                    <TableRow key={item.id}>
+                                        <TableCell>
+                                            <div className="font-medium">{item.itemName}</div>
+                                            <div className="text-xs text-slate-500">{item.itemCode}</div>
+                                        </TableCell>
+                                        <TableCell className="text-right">{original}</TableCell>
+                                        <TableCell className="text-right font-bold">{typeof remaining === 'number' ? remaining.toFixed(2) : '-'}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Badge variant="secondary" className={statusColor}>
+                                                {statusText}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            <Dialog open={isAddPopupOpen} onOpenChange={setIsAddPopupOpen}>
+                <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>Aggiungi Materiale</DialogTitle>
+                    </DialogHeader>
                     <div className="p-4 bg-slate-50 rounded-lg border space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                             <div className="md:col-span-4 space-y-2">
@@ -752,19 +822,27 @@ export default function PurchaseDetailPage() {
                             </div>
                         )}
 
-                        <Button 
-                            type="button" 
-                            onClick={handleAddItem} 
-                            disabled={addingItem}
-                            className="w-full md:w-auto"
-                        >
-                            {addingItem ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                            Aggiungi Riga
-                        </Button>
+                        <DialogFooter className="mt-4">
+                            <Button variant="outline" onClick={() => setIsAddPopupOpen(false)}>
+                                Annulla
+                            </Button>
+                            <Button 
+                                type="button" 
+                                onClick={async () => {
+                                    await handleAddItem();
+                                    // If successful, close dialog? handleAddItem doesn't return success status easily but it alerts on error.
+                                    // We can check if newItem is reset.
+                                    if (newItem.itemId === "") setIsAddPopupOpen(false);
+                                }} 
+                                disabled={addingItem}
+                            >
+                                {addingItem ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                                Aggiungi Riga
+                            </Button>
+                        </DialogFooter>
                     </div>
-                </CardContent>
-            </Card>
-            )}
+                </DialogContent>
+            </Dialog>
 
             <ItemSelectorDialog
                 open={isItemSelectorOpen}

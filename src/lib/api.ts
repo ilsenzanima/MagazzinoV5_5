@@ -390,6 +390,34 @@ export const purchasesApi = {
     const { error } = await supabase.from('purchases').delete().eq('id', id);
     if (error) throw error;
   },
+  // Get batch availability for a specific purchase (all items)
+  getPurchaseBatchAvailability: async (purchaseId: string) => {
+    // First get the purchase items to get their IDs
+    const { data: items } = await supabase.from('purchase_items').select('id').eq('purchase_id', purchaseId);
+    
+    if (!items || items.length === 0) return [];
+    
+    const ids = items.map(i => i.id);
+    
+    const { data, error } = await supabase
+      .from('purchase_batch_availability')
+      .select('*')
+      .in('purchase_item_id', ids);
+      
+    if (error) throw error;
+    return data.map((b: any) => ({
+        id: b.purchase_item_id,
+        purchaseRef: b.purchase_ref,
+        date: b.purchase_date,
+        originalQty: b.original_quantity,
+        remainingQty: b.remaining_quantity,
+        originalPieces: b.original_pieces,
+        remainingPieces: b.remaining_pieces,
+        price: b.unit_price,
+        coefficient: b.coefficient
+    }));
+  },
+
   // Items management
   getItems: async (purchaseId: string) => {
     const { data, error } = await fetchWithTimeout(

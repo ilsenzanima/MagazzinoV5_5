@@ -180,6 +180,20 @@ export default function MovementDetailPage() {
     doc.save(`DDT_${movement.number.replace(/\//g, '-')}.pdf`);
   };
 
+  const handleDelete = async () => {
+    if (!confirm("Sei sicuro di voler eliminare questo movimento? Questa azione è irreversibile.")) return;
+    
+    try {
+        setLoading(true);
+        await deliveryNotesApi.delete(id);
+        router.push('/movements');
+    } catch (error) {
+        console.error("Failed to delete movement", error);
+        alert("Errore durante l'eliminazione del movimento");
+        setLoading(false);
+    }
+  };
+
   const handleSaveChanges = async () => {
     if (!movement) return;
     
@@ -251,6 +265,12 @@ export default function MovementDetailPage() {
                     <FileText className="h-4 w-4 mr-2" />
                     Stampa PDF
                 </Button>
+                {(userRole === 'admin' || userRole === 'operativo') && (
+                    <Button variant="destructive" onClick={handleDelete}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Elimina
+                    </Button>
+                )}
                 <Button onClick={() => setIsEditing(true)}>
                     Modifica Testata
                 </Button>
