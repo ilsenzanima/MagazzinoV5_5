@@ -343,17 +343,30 @@ export default function NewMovementPage() {
     if ((activeTab === 'exit' || activeTab === 'sale') && currentLine.purchaseItemId && !isFictitious) {
         const batch = availableBatches.find(b => b.id === currentLine.purchaseItemId);
         if (batch) {
+            // Calculate already used quantity in current session for this batch
+            const alreadyUsedQty = lines
+                .filter(l => l.purchaseItemId === currentLine.purchaseItemId)
+                .reduce((acc, l) => acc + l.quantity, 0);
+            
+            const alreadyUsedPieces = lines
+                .filter(l => l.purchaseItemId === currentLine.purchaseItemId)
+                .reduce((acc, l) => acc + (l.pieces || 0), 0);
+
             // Check pieces if available (source of truth)
             if (currentLine.pieces && batch.remainingPieces !== undefined) {
-                if (Number(currentLine.pieces) > batch.remainingPieces) {
-                     alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
+                const totalPieces = Number(currentLine.pieces) + alreadyUsedPieces;
+                if (totalPieces > batch.remainingPieces) {
+                     alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi (Già in lista: ${alreadyUsedPieces})`);
                      return;
                 }
             } 
             // Fallback to quantity check
-            else if (Number(currentLine.quantity) > batch.remainingQty) {
-                alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty}`);
-                return;
+            else if (Number(currentLine.quantity) + alreadyUsedQty > batch.remainingQty) {
+                const totalQty = Number(currentLine.quantity) + alreadyUsedQty;
+                if (totalQty > batch.remainingQty) {
+                    alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty} (Già in lista: ${alreadyUsedQty})`);
+                    return;
+                }
             }
         }
     }
