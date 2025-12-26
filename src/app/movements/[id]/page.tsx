@@ -202,18 +202,15 @@ export default function MovementDetailPage() {
     try {
         setLoading(true);
         // Update header fields and items
-        await deliveryNotesApi.update(id, {
-            ...editForm,
-            items: items.map(item => ({
-                inventoryId: item.inventoryId,
-                quantity: item.quantity,
-                pieces: item.pieces,
-                coefficient: item.coefficient,
-                purchaseItemId: item.purchaseItemId || undefined,
-                isFictitious: item.isFictitious,
-                price: item.price // Add missing property
-            })) as any // Type assertion to bypass strict checking for now as API handles omit internally
-        );
+        await deliveryNotesApi.update(id, editForm, items.map(item => ({
+            inventoryId: item.inventoryId,
+            quantity: item.quantity,
+            pieces: item.pieces,
+            coefficient: item.coefficient,
+            purchaseItemId: item.purchaseItemId || undefined,
+            isFictitious: item.isFictitious,
+            price: item.price
+        })) as any);
         
         alert("Modifiche salvate con successo!");
         setIsEditing(false);
