@@ -1,12 +1,11 @@
 -- ==========================================
--- PERFORMANCE & SECURITY FIXES
+-- PERFORMANCE & SECURITY FIXES (FINAL V3)
 -- ==========================================
--- Questo script risolve i problemi segnalati da Supabase (performance.json)
--- 1. Aggiunge indici mancanti sulle Foreign Keys
--- 2. Rimuove policy duplicate/permissive obsolete
--- 3. Ottimizza le chiamate RLS
+-- Questo script risolve gli ULTIMI 3 warning rimasti in performance.json
+-- 1. Risolve l'overlap tra "SELECT" (tutti) e "ALL" (admin) splittando le policy.
+-- 2. Unifica le policy di UPDATE su Profiles per evitarne due separate.
 
--- 1. INDICI MANCANTI (Unindexed Foreign Keys)
+-- 1. INDICI MANCANTI (Sempre utile averli)
 -- ==========================================
 CREATE INDEX IF NOT EXISTS idx_delivery_note_items_delivery_note_id ON public.delivery_note_items(delivery_note_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_note_items_inventory_id ON public.delivery_note_items(inventory_id);
@@ -41,64 +40,81 @@ CREATE INDEX IF NOT EXISTS idx_purchases_supplier_id ON public.purchases(supplie
 CREATE INDEX IF NOT EXISTS idx_sites_job_id ON public.sites(job_id);
 
 
--- 2. CLEANUP POLICY DUPLICATE (Multiple Permissive Policies)
+-- 2. FIX POLICY "OVERLAPPING" (Risolve i 3 warning rimasti)
 -- ==========================================
--- Rimuoviamo le policy "vecchie" o troppo permissive che vanno in conflitto con quelle granulari (RBAC)
--- definite in ONLINE_SETUP.sql. Questo migliora performance e sicurezza.
 
--- Clients
-DROP POLICY IF EXISTS "Clients policies" ON public.clients;
+-- A) INVENTORY SUPPLIER CODES
+-- Problema: "viewable by all" (SELECT) e "manage by Admin" (ALL) si sovrapponevano su SELECT.
+-- Soluzione: Dividiamo "manage" in INSERT/UPDATE/DELETE espliciti.
 
--- Inventory Supplier Codes
--- Teniamo solo quelle specifiche se esistono, o ne creiamo una corretta.
--- Per sicurezza, rimuoviamo le vecchie e ricreiamo standard.
-DROP POLICY IF EXISTS "Supplier codes modifiable by authenticated" ON public.inventory_supplier_codes;
-DROP POLICY IF EXISTS "Supplier codes viewable by authenticated" ON public.inventory_supplier_codes;
+DROP POLICY IF EXISTS "Supplier codes manage by Admin/Operativo" ON public.inventory_supplier_codes;
+DROP POLICY IF EXISTS "Supplier codes viewable by all" ON public.inventory_supplier_codes;
+-- Cleanup vecchie policy se presenti
+DROP POLICY IF EXISTS "Supplier codes insert by Admin/Operativo" ON public.inventory_supplier_codes;
+DROP POLICY IF EXISTS "Supplier codes update by Admin/Operativo" ON public.inventory_supplier_codes;
+DROP POLICY IF EXISTS "Supplier codes delete by Admin/Operativo" ON public.inventory_supplier_codes;
+DROP POLICY IF EXISTS "Supplier codes delete by Admin only" ON public.inventory_supplier_codes;
 
+-- 1. SELECT (Tutti)
 CREATE POLICY "Supplier codes viewable by all" ON public.inventory_supplier_codes FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Supplier codes manage by Admin/Operativo" ON public.inventory_supplier_codes FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'operativo'));
 
--- Job Inventory
-DROP POLICY IF EXISTS "Job Inventory modifiable by authenticated" ON public.job_inventory;
-DROP POLICY IF EXISTS "Job Inventory viewable by authenticated" ON public.job_inventory;
+-- 2. INSERT (Admin/Operativo)
+CREATE POLICY "Supplier codes insert by Admin/Operativo" ON public.inventory_supplier_codes FOR INSERT TO authenticated WITH CHECK (public.get_my_role() IN ('admin', 'operativo'));
 
+-- 3. UPDATE (Admin/Operativo)
+CREATE POLICY "Supplier codes update by Admin/Operativo" ON public.inventory_supplier_codes FOR UPDATE TO authenticated USING (public.get_my_role() IN ('admin', 'operativo'));
+
+-- 4. DELETE (Admin/Operativo)
+CREATE POLICY "Supplier codes delete by Admin/Operativo" ON public.inventory_supplier_codes FOR DELETE TO authenticated USING (public.get_my_role() IN ('admin', 'operativo'));
+
+
+-- B) JOB INVENTORY
+-- Problema: Stesso problema di overlap tra SELECT (Tutti) e ALL (Admin).
+-- Soluzione: Split in INSERT/UPDATE/DELETE.
+
+DROP POLICY IF EXISTS "Job Inventory manage by Admin/Operativo" ON public.job_inventory;
+DROP POLICY IF EXISTS "Job Inventory viewable by all" ON public.job_inventory;
+-- Cleanup vecchie
+DROP POLICY IF EXISTS "Job Inventory insert by Admin/Operativo" ON public.job_inventory;
+DROP POLICY IF EXISTS "Job Inventory update by Admin/Operativo" ON public.job_inventory;
+DROP POLICY IF EXISTS "Job Inventory delete by Admin/Operativo" ON public.job_inventory;
+DROP POLICY IF EXISTS "Job Inventory delete by Admin only" ON public.job_inventory;
+
+-- 1. SELECT (Tutti)
 CREATE POLICY "Job Inventory viewable by all" ON public.job_inventory FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Job Inventory manage by Admin/Operativo" ON public.job_inventory FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'operativo'));
 
--- Jobs
-DROP POLICY IF EXISTS "Jobs policies" ON public.jobs;
+-- 2. INSERT (Admin/Operativo)
+CREATE POLICY "Job Inventory insert by Admin/Operativo" ON public.job_inventory FOR INSERT TO authenticated WITH CHECK (public.get_my_role() IN ('admin', 'operativo'));
 
--- Profiles
--- Rimuoviamo le policy che potrebbero essere duplicate
-DROP POLICY IF EXISTS "Users can insert their own profile." ON public.profiles;
-DROP POLICY IF EXISTS "Users can update own profile." ON public.profiles;
+-- 3. UPDATE (Admin/Operativo)
+CREATE POLICY "Job Inventory update by Admin/Operativo" ON public.job_inventory FOR UPDATE TO authenticated USING (public.get_my_role() IN ('admin', 'operativo'));
+
+-- 4. DELETE (Admin/Operativo)
+CREATE POLICY "Job Inventory delete by Admin/Operativo" ON public.job_inventory FOR DELETE TO authenticated USING (public.get_my_role() IN ('admin', 'operativo'));
+
+
+-- C) PROFILES
+-- Problema: Due policy separate per UPDATE ("Admins can..." e "Users can...").
+-- Soluzione: Unica policy con logica OR.
+
 DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
-DROP POLICY IF EXISTS "Admins can delete any profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles; -- variante nome
 
--- Ricreiamo le policy Profiles ottimizzate (vedi punto 3)
-CREATE POLICY "Profiles viewable by all" ON public.profiles FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = id);
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING ((select auth.uid()) = id);
-CREATE POLICY "Admins can update any profile" ON public.profiles FOR UPDATE TO authenticated USING (public.get_my_role() = 'admin');
-CREATE POLICY "Admins can delete any profile" ON public.profiles FOR DELETE TO authenticated USING (public.get_my_role() = 'admin');
-
--- Purchase Items
-DROP POLICY IF EXISTS "Authenticated users can delete purchase items." ON public.purchase_items;
-
--- Purchases
-DROP POLICY IF EXISTS "Authenticated users can delete purchases." ON public.purchases;
-DROP POLICY IF EXISTS "Authenticated users can update purchases job_id." ON public.purchases;
+-- Unica policy combinata
+CREATE POLICY "Users and Admins can update profile" ON public.profiles 
+FOR UPDATE TO authenticated 
+USING (
+  (select auth.uid()) = id  -- Utente modifica se stesso
+  OR 
+  public.get_my_role() = 'admin' -- Admin modifica tutti
+);
 
 
--- 3. OTTIMIZZAZIONE RLS (Auth Init Plan)
+-- 3. CLEANUP GENERALE (Per sicurezza)
 -- ==========================================
--- Ottimizziamo la funzione helper per evitare re-valutazioni costose
-ALTER FUNCTION public.get_my_role() STABLE;
-
--- Job Logs (Fix auth.uid call)
-DROP POLICY IF EXISTS "Authenticated users can create logs." ON public.job_logs;
-CREATE POLICY "Authenticated users can create logs" ON public.job_logs FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
-
--- Job Documents (Fix auth.uid call)
-DROP POLICY IF EXISTS "Authenticated users can upload documents." ON public.job_documents;
-CREATE POLICY "Authenticated users can upload documents" ON public.job_documents FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = uploaded_by);
+-- Rieseguiamo i drop delle policy duplicate già fixate, per sicurezza
+DROP POLICY IF EXISTS "Clients policies" ON public.clients;
+DROP POLICY IF EXISTS "Jobs policies" ON public.jobs;
+DROP POLICY IF EXISTS "Authenticated users can delete purchase items." ON public.purchase_items;
+DROP POLICY IF EXISTS "Authenticated users can delete purchases." ON public.purchases;
