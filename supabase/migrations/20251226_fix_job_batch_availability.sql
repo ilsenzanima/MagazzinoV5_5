@@ -4,7 +4,7 @@
 
 DROP VIEW IF EXISTS public.job_batch_availability;
 
-CREATE OR REPLACE VIEW public.job_batch_availability AS
+CREATE OR REPLACE VIEW public.job_batch_availability WITH (security_invoker = true) AS
 WITH 
 -- 1. Movimenti da Magazzino (Exit = + al cantiere, Entry = - dal cantiere)
 warehouse_movements AS (
