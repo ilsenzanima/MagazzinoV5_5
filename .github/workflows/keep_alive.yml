@@ -19,11 +19,14 @@ jobs:
           URL="${{ secrets.APP_URL || 'https://magazzino-v5-5.vercel.app' }}/api/health"
           
           echo "Pinging $URL..."
-          response=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          http_code=$(curl -s -o response.txt -w "%{http_code}" "$URL")
           
-          if [ "$response" -eq 200 ]; then
-            echo "Success! Status code: $response"
+          if [ "$http_code" -eq 200 ]; then
+            echo "Success! Status code: $http_code"
+            cat response.txt
           else
-            echo "Failed! Status code: $response"
+            echo "Failed! Status code: $http_code"
+            echo "Response body:"
+            cat response.txt
             exit 1
           fi

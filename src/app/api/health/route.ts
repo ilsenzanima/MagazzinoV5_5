@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
+  console.log(`[Health Check] Ping received at ${new Date().toISOString()}`);
   try {
     const supabase = await createClient();
     
