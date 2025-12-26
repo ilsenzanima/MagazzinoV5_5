@@ -20,7 +20,7 @@ import Link from "next/link";
 import { InventoryItem } from "@/lib/mock-data";
 import { inventoryApi, itemTypesApi, ItemType } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Html5QrcodeScanner, Html5Qrcode } from "html5-qrcode";
+import type { Html5Qrcode } from "html5-qrcode";
 import {
   Dialog,
   DialogContent,
@@ -121,16 +121,18 @@ export default function InventoryPage() {
   useEffect(() => {
     if (isScanning) {
       // Small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         try {
             // Check if element exists
             if (document.getElementById("reader")) {
-                // Initialize scanner
+                // Initialize scanner dynamically to avoid SSR issues
+                const { Html5Qrcode } = await import("html5-qrcode");
+                
                 const html5QrCode = new Html5Qrcode("reader");
                 scannerRef.current = html5QrCode;
                 
                 // Start scanning
-                html5QrCode.start(
+                await html5QrCode.start(
                     { facingMode: "environment" }, // Prefer back camera
                     { 
                         fps: 10, 
@@ -144,9 +146,7 @@ export default function InventoryPage() {
                     (errorMessage) => {
                         // ignore parsing errors
                     }
-                ).catch(err => {
-                    console.error("Scanner init error", err);
-                });
+                );
             }
         } catch (err) {
             console.error("Scanner setup error", err);

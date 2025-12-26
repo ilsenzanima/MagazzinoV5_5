@@ -16,6 +16,9 @@ interface JobStockProps {
 export function JobStock({ movements }: JobStockProps) {
   const { userRole } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
+  
+  if (!movements) return null;
+
   // 1. Find Last Purchase Price per Item Code
   // We use this for fictitious items: value of the last purchase made for that item
   const lastPurchasePriceMap = new Map<string, number>()
