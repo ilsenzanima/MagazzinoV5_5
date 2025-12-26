@@ -305,7 +305,11 @@ export default function MovementDetailPage() {
                 <>
                 <Button variant="outline" onClick={handlePrint}>
                     <FileText className="h-4 w-4 mr-2" />
-                    Stampa PDF
+                    Export PDF
+                </Button>
+                <Button variant="default" className="bg-[#003366] hover:bg-[#002244]" onClick={() => window.open(`/print/delivery-note/${movement.id}`, '_blank')}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Stampa Bolla
                 </Button>
                 {(userRole === 'admin' || userRole === 'operativo') && (
                     <Button variant="destructive" onClick={handleDelete}>
