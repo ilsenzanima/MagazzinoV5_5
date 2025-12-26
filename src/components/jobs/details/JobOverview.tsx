@@ -26,6 +26,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useAuth } from "@/components/auth-provider"
+import { JobMap } from "./JobMap"
+import { JobWeatherWidget } from "./JobWeatherWidget"
 
 interface JobOverviewProps {
   job: Job
@@ -244,6 +246,17 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
             </CardContent>
         </Card>
       </div>
+
+      {job.siteAddress && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+            <div className="md:col-span-2 min-h-[300px]">
+                <JobMap address={job.siteAddress} />
+            </div>
+            <div>
+                <JobWeatherWidget address={job.siteAddress} />
+            </div>
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

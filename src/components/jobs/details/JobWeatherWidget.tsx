@@ -11,30 +11,53 @@ interface WeatherData {
   temperature_2m_min: number[]
 }
 
-export function JobWeatherWidget() {
+interface JobWeatherWidgetProps {
+  address?: string
+}
+
+export function JobWeatherWidget({ address }: JobWeatherWidgetProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
-
-  // Default to Rome for demo purposes
-  const lat = 41.9028
-  const long = 12.4964
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     async function fetchWeather() {
+      if (!address) {
+        setLoading(false)
+        return
+      }
+
       try {
+        setLoading(true)
+        // 1. Geocoding
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`
+        )
+        const geoData = await geoRes.json()
+        
+        if (!geoData || geoData.length === 0) {
+          setError(true)
+          return
+        }
+
+        const { lat, lon } = geoData[0]
+
+        // 2. Weather
         const res = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${long}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
         )
         const data = await res.json()
         setWeather(data.daily)
       } catch (error) {
         console.error("Failed to fetch weather", error)
+        setError(true)
       } finally {
         setLoading(false)
       }
     }
+    
     fetchWeather()
-  }, [])
+  }, [address])
 
   const getWeatherIcon = (code: number) => {
     if (code <= 3) return <Sun className="h-6 w-6 text-yellow-500" />
@@ -44,11 +67,16 @@ export function JobWeatherWidget() {
   }
 
   if (loading) return <div className="h-32 animate-pulse bg-slate-100 rounded-lg" />
+  
+  if (error || !weather) return null;
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-slate-500">Meteo Settimanale</CardTitle>
+        <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+            <Cloud className="h-4 w-4" />
+            Meteo Cantiere
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex gap-4 overflow-x-auto pb-2">
