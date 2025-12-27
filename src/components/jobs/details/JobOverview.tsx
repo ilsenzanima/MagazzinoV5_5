@@ -29,6 +29,8 @@ import { useAuth } from "@/components/auth-provider"
 import { JobMap } from "./JobMap"
 import { JobWeatherWidget } from "./JobWeatherWidget"
 
+import { Checkbox } from "@/components/ui/checkbox"
+
 interface JobOverviewProps {
   job: Job
   totalCost: number
@@ -44,6 +46,7 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Job>>({})
+  const [updateExistingMovements, setUpdateExistingMovements] = useState(false)
 
   const mockBudget = 0 
   const percentage = mockBudget > 0 ? Math.min(100, Math.round((totalCost / mockBudget) * 100)) : 0
@@ -59,13 +62,14 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
       cig: job.cig || '',
       cup: job.cup || ''
     })
+    setUpdateExistingMovements(false)
     setIsEditOpen(true)
   }
 
   const handleSave = async () => {
     try {
       setIsSaving(true)
-      await jobsApi.update(job.id, editForm)
+      await jobsApi.update(job.id, editForm, updateExistingMovements)
       setIsEditOpen(false)
       if (onJobUpdated) {
         onJobUpdated()
@@ -354,6 +358,20 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
                   onChange={(e) => setEditForm({...editForm, cup: e.target.value})}
                 />
               </div>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2 border-t mt-2">
+              <Checkbox 
+                id="updateMovements" 
+                checked={updateExistingMovements}
+                onCheckedChange={(checked) => setUpdateExistingMovements(checked as boolean)}
+              />
+              <label
+                htmlFor="updateMovements"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Aggiorna CIG/CUP nelle note delle bolle esistenti
+              </label>
             </div>
           </div>
 

@@ -1540,9 +1540,49 @@ export const jobsApi = {
     if (error) throw error;
     return mapDbToJob(data);
   },
-  update: async (id: string, job: Partial<Job>) => {
+  update: async (id: string, job: Partial<Job>, updateMovements: boolean = false) => {
     const { data, error } = await supabase.from('jobs').update(mapJobToDb(job)).eq('id', id).select().single();
     if (error) throw error;
+    
+    // If flag is true and CIG/CUP are present, update existing delivery notes
+    if (updateMovements && (job.cig || job.cup)) {
+        // We do this optimistically and don't block return
+        // Ideally this should be a stored procedure or server function to handle regex replacement safely
+        // But for now we fetch relevant notes, update text, and save back
+        
+        // 1. Fetch all delivery notes for this job
+        const { data: notes } = await supabase
+            .from('delivery_notes')
+            .select('id, notes')
+            .eq('job_id', id);
+            
+        if (notes && notes.length > 0) {
+            const cigPart = job.cig ? `CIG: ${job.cig}` : '';
+            const cupPart = job.cup ? `CUP: ${job.cup}` : '';
+            const newCodes = [cigPart, cupPart].filter(Boolean).join(' ');
+            
+            // 2. Update each note
+            const updates = notes.map(note => {
+                let currentNotes = note.notes || '';
+                
+                // Remove existing CIG/CUP patterns if they exist to avoid duplication
+                // Regex looks for CIG: XXXXX or CUP: XXXXX
+                currentNotes = currentNotes.replace(/CIG:\s*[^\s\n]+(\s|$)/g, '').replace(/CUP:\s*[^\s\n]+(\s|$)/g, '');
+                
+                // Prepend new codes
+                const updatedNotes = (newCodes + '\n' + currentNotes).trim();
+                
+                return {
+                    id: note.id,
+                    notes: updatedNotes
+                };
+            });
+            
+            // 3. Batch update (Supabase upsert)
+            await supabase.from('delivery_notes').upsert(updates);
+        }
+    }
+
     return mapDbToJob(data);
   },
   delete: async (id: string) => {
