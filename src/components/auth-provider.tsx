@@ -77,56 +77,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Non blocchiamo il rendering mentre recuperiamo il ruolo
-        // Questo evita la schermata bianca lunga se il DB è lento
-        setLoading(false);
+    let mounted = true;
 
-        if (session?.user) {
-          // Fetch role in background
-          fetchUserRole(session.user.id);
+    const initAuth = async () => {
+      try {
+        // 1. Prendi la sessione iniziale
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+
+        if (initialSession?.user) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          await fetchUserRole(initialSession.user.id);
         } else {
+            // Se non c'è sessione, puliamo tutto subito
+            setSession(null);
+            setUser(null);
             setRealRole(null);
             setSimulatedRole(null);
         }
       } catch (error) {
-        console.error("Error checking session:", error);
-        setLoading(false);
+        console.error("Auth init error:", error);
+      } finally {
+        if (mounted) setLoading(false);
       }
     };
 
-    checkUser();
+    initAuth();
 
+    // 2. Ascolta i cambiamenti
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      async (event, newSession) => {
+        if (!mounted) return;
         
-        if (session?.user) {
-             await fetchUserRole(session.user.id);
-        } else {
-            setRealRole(null);
-            setSimulatedRole(null);
-        }
-
-        setLoading(false);
-        
-        if (event === 'SIGNED_IN') {
-             router.refresh();
-        }
-        if (event === 'SIGNED_OUT') {
-             router.push('/login');
-             router.refresh();
+        // Aggiorna solo se la sessione è effettivamente cambiata o è un evento di Sign In/Out esplicito
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
+            setSession(newSession);
+            setUser(newSession?.user ?? null);
+            
+            if (newSession?.user) {
+                await fetchUserRole(newSession.user.id);
+            } else {
+                setRealRole(null);
+                setSimulatedRole(null);
+            }
+            
+            if (event === 'SIGNED_IN') router.refresh();
+            if (event === 'SIGNED_OUT') {
+                router.push('/login'); 
+                router.refresh();
+            }
         }
       }
     );
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [router]);

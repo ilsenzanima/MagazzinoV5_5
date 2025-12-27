@@ -100,6 +100,7 @@ CREATE POLICY "Job Inventory delete by Admin/Operativo" ON public.job_inventory 
 DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles; -- variante nome
+DROP POLICY IF EXISTS "Users and Admins can update profile" ON public.profiles; -- fix: drop if exists
 
 -- Unica policy combinata
 CREATE POLICY "Users and Admins can update profile" ON public.profiles 

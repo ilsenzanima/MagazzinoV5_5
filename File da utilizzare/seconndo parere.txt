@@ -1,160 +1,122 @@
-Ciao! Ho analizzato attentamente i file che hai caricato, in particolare src/app/dashboard/page.tsx e la configurazione di Supabase.
+Capisco perfettamente. Quando si parla di "rogne" nei caricamenti che persistono nonostante le ottimizzazioni di base, il problema risiede spesso nei dettagli architetturali e in colli di bottiglia nascosti ("silent killers") che non generano errori evidenti ma rallentano l'esperienza utente.
 
-Il "nuovo problema" che riscontri (disconnessione dopo inutilizzo, risolvibile solo con F5) e il fatto che il caricamento a volte si blocchi, derivano da un conflitto fondamentale nel codice attuale:
+Ho analizzato a fondo i file schema.sql, auth-provider.tsx e la configurazione generale. Ecco i 3 problemi critici che stanno ancora causando lentezza e instabilità, e le relative soluzioni chirurgiche.
 
-Il file src/app/dashboard/page.tsx è ancora un Client Component ("use client"), ma la gestione della sessione di Supabase è configurata per funzionare lato Server (tramite Middleware).
+1. Il "Collo di Bottiglia" SQL (RLS senza Indici)
+Il Problema: Hai attivato la Row Level Security (RLS) su inventory e movements. È un'ottima pratica di sicurezza, ma è disastrosa per le performance se non ci sono gli indici giusti.
 
-⚠️ Perché succede? (Diagnosi Tecnica)
-Sessione Scaduta: Il token di accesso di Supabase dura circa 1 ora. In una configurazione moderna Next.js + Supabase SSR, è il Middleware (middleware.ts) che si occupa di rinnovare questo token.
+Guarda questa policy:
 
-Il blocco: Il Middleware si attiva solo quando fai una richiesta al server (es. ricarichi la pagina o navighi). Se rimani fermo sulla Dashboard (che è renderizzata lato Client) o cambi scheda nel browser, il Middleware non viene mai chiamato.
+SQL
 
-Risultato: Il token scade mentre la pagina è aperta. Quando torni sulla scheda e l'app prova a chiamare il database, il token è vecchio e la richiesta fallisce. Premendo F5, forzi il browser a chiamare il server -> il Middleware parte -> il token si rinnova -> tutto funziona.
+create policy "Only admins can modify inventory."
+  on inventory ...
+  using ( exists ( select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'admin' ) );
+Cosa succede: Ogni volta che carichi 100 articoli dell'inventario, il database deve eseguire (potenzialmente) 100 sotto-query nella tabella profiles per controllare se sei admin. Senza un indice sulla colonna role, questo diventa lentissimo man mano che i dati crescono.
 
-🛠️ La Soluzione Definitiva: Server Components
-Per risolvere definitivamente e rendere l'app veloce e stabile, dobbiamo spostare il recupero dati sul Server. In questo modo, ogni volta che la pagina viene caricata o ricaricata, il server gestisce la connessione (che è molto più stabile del browser).
+✅ La Soluzione (Esegui questo SQL in Supabase): Dobbiamo indicizzare le chiavi esterne e i campi usati nelle policy.
 
-Segui questi 2 passaggi precisi per sostituire il codice attuale.
+SQL
 
-Passo 1: Crea il componente per la vista (DashboardClient.tsx)
-Crea un nuovo file in src/components/dashboard/DashboardClient.tsx. Questo file si occuperà solo di mostrare i dati che il server gli passerà.
+-- Velocizza il controllo dei ruoli nelle policy RLS
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
+CREATE INDEX IF NOT EXISTS idx_profiles_id_role ON public.profiles(id, role);
+
+-- Velocizza le join tra movimenti e inventario/utenti
+CREATE INDEX IF NOT EXISTS idx_movements_item_id ON public.movements(item_id);
+CREATE INDEX IF NOT EXISTS idx_movements_user_id ON public.movements(user_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_code ON public.inventory(code);
+2. Il Conflitto dei Ruoli (Bug Logico Bloccante)
+Il Problema: Nel file auth-provider.tsx gestisci tre ruoli: 'admin' | 'user' | 'operativo'. Tuttavia, nel database (schema.sql), hai imposto un vincolo rigido:
+
+SQL
+
+role text check (role in ('admin', 'user')) default 'user',
+Cosa succede: Se provi a creare un utente "operativo", il database rifiuta silenziosamente o genera un errore che il frontend potrebbe non gestire bene, causando timeout o stati inconsistenti in cui l'utente sembra loggato ma non ha permessi.
+
+✅ La Soluzione: Aggiorna il vincolo nel database per accettare il nuovo ruolo.
+
+SQL
+
+ALTER TABLE public.profiles DROP CONSTRAINT profiles_role_check;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin', 'user', 'operativo'));
+3. L'AuthProvider "Chiacchierone" (Network Overhead)
+Il Problema: Il tuo AuthProvider esegue troppe chiamate di rete all'avvio.
+
+useEffect chiama checkUser() -> getSession -> fetchUserRole.
+
+onAuthStateChange si attiva quasi subito dopo -> chiama di nuovo fetchUserRole.
+
+Questo "doppio colpo" rallenta il rendering iniziale e, se la connessione è instabile (cambio tab/scheda), può causare quella sensazione di "blocco".
+
+✅ La Soluzione: Ottimizza auth-provider.tsx per evitare chiamate ridondanti. Sostituisci il contenuto di useEffect con questo codice più robusto che usa un flag mounted:
 
 TypeScript
 
-"use client";
+// In src/components/auth-provider.tsx
 
-import { useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { StatsCards } from "@/components/dashboard/StatsCards";
-import { CalendarView } from "@/components/dashboard/CalendarView";
-import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
-import { RecentMovements } from "@/components/dashboard/RecentMovements";
-import { ActiveJobsWidget } from "@/components/dashboard/ActiveJobs";
+useEffect(() => {
+    let mounted = true;
 
-// Interfaccia per i dati che arriveranno dal server
-interface DashboardStats {
-  totalValue: number;
-  lowStockCount: number;
-  totalItems: number;
-}
+    const initAuth = async () => {
+      try {
+        // 1. Prendi la sessione iniziale
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
 
-export function DashboardClient({ initialStats }: { initialStats: DashboardStats }) {
-  const [activeTab, setActiveTab] = useState("overview");
+        if (initialSession?.user) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          await fetchUserRole(initialSession.user.id);
+        } else {
+            // Se non c'è sessione, puliamo tutto subito
+            setSession(null);
+            setUser(null);
+            setUserRole(null);
+        }
+      } catch (error) {
+        console.error("Auth init error:", error);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center mb-6">
-           <h1 className="text-2xl font-bold text-slate-900 dark:text-white hidden md:block">Dashboard</h1>
-        </div>
+    initAuth();
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Panoramica</TabsTrigger>
-            <TabsTrigger value="calendar">Calendario Presenze</TabsTrigger>
-            <TabsTrigger value="analytics">Analisi</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-4">
-            <StatsCards 
-              totalValue={initialStats.totalValue} 
-              lowStockCount={initialStats.lowStockCount}
-              totalItems={initialStats.totalItems}
-            />
+    // 2. Ascolta i cambiamenti (ma ignora il primo evento 'INITIAL_SESSION' se già gestito)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        if (!mounted) return;
+        
+        // Aggiorna solo se la sessione è effettivamente cambiata o è un evento di Sign In/Out esplicito
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
+            setSession(newSession);
+            setUser(newSession?.user ?? null);
             
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <div className="col-span-4">
-                  <RecentMovements />
-                </div>
-                <div className="col-span-3">
-                  <ActiveJobsWidget />
-                </div>
-            </div>
-          </TabsContent>
+            if (newSession?.user) {
+                await fetchUserRole(newSession.user.id);
+            } else {
+                setUserRole(null);
+            }
+            
+            if (event === 'SIGNED_IN') router.refresh();
+            if (event === 'SIGNED_OUT') {
+                router.push('/login'); 
+                router.refresh();
+            }
+        }
+      }
+    );
 
-          <TabsContent value="calendar" className="space-y-4">
-            {activeTab === 'calendar' && <CalendarView />}
-          </TabsContent>
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router, supabase]);
+Riassunto Piano d'Azione
+Immediato: Esegui le query SQL (punto 1 e 2) nell'editor SQL di Supabase. Gli indici risolveranno gran parte della lentezza nel caricamento dati.
 
-          <TabsContent value="analytics" className="space-y-4">
-            {activeTab === 'analytics' && <AttendanceChart />}
-          </TabsContent>
-        </Tabs>
-      </div>
-    </DashboardLayout>
-  );
-}
-Passo 2: Sostituisci src/app/dashboard/page.tsx (Logica Server)
-Copia e incolla questo codice interamente in src/app/dashboard/page.tsx. Nota che non c'è più "use client". Questo codice gira sul server, quindi non soffre dei problemi di "schede dormienti" del browser.
+Codice: Aggiorna l'AuthProvider per evitare doppie richieste.
 
-TypeScript
-
-import { createClient } from "@/lib/supabase/server";
-import { DashboardClient } from "@/components/dashboard/DashboardClient";
-import { Suspense } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-
-// Scheletro di caricamento (Skeleton)
-function DashboardSkeleton() {
-  return (
-    <div className="p-8 pt-6 space-y-6">
-      <div className="flex justify-between items-center mb-6">
-         <Skeleton className="h-8 w-48" />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-      </div>
-    </div>
-  );
-}
-
-export default async function DashboardPage() {
-  // 1. Inizializza il client Supabase lato server (usa i cookie sicuri)
-  const supabase = await createClient();
-
-  // 2. Esegui la query direttamente sul server
-  // Questo è molto più veloce e sicuro rispetto al useEffect del client
-  const { data: inventory, error } = await supabase
-    .from('inventory')
-    .select('quantity, price, min_stock');
-
-  if (error) {
-    console.error("Errore caricamento dashboard:", error);
-  }
-
-  // 3. Calcola le statistiche
-  let totalValue = 0;
-  let lowStockCount = 0;
-  const totalItems = inventory?.length || 0;
-
-  inventory?.forEach(item => {
-    totalValue += (item.quantity || 0) * (item.price || 0);
-    if ((item.quantity || 0) <= (item.min_stock || 0)) {
-      lowStockCount++;
-    }
-  });
-
-  const stats = {
-    totalValue,
-    lowStockCount,
-    totalItems
-  };
-
-  // 4. Passa i dati pronti al componente Client
-  return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardClient initialStats={stats} />
-    </Suspense>
-  );
-}
-Cosa cambia ora?
-Con questa modifica:
-
-Stabilità: Il caricamento avviene sui server (Vercel/Node), che sono sempre connessi. Non importa se l'utente ha lasciato la scheda aperta per 3 giorni; al refresh o alla navigazione, il server ricostruisce la pagina correttamente.
-
-Velocità: Non devi aspettare il caricamento del JavaScript del browser per vedere i numeri. Arrivano già pronti.
-
-Token: Essendo una richiesta server, il Middleware intercetta automaticamente la chiamata e aggiorna il token se necessario, prevenendo le disconnessioni.
+Verifica: Fai un riavvio completo (chiudi e riapri browser) per verificare che il "Cold Start" sia ora gestito meglio grazie alle query più efficienti.
