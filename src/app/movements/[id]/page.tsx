@@ -109,39 +109,112 @@ export default function MovementDetailPage() {
     return Array.from(grouped.values());
   }, [items]);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!movement) return;
 
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
     
-    // Header
-    doc.setFontSize(20);
-    doc.text("DOCUMENTO DI TRASPORTO (D.D.T.)", 105, 15, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.text(`Numero: ${movement.number}`, 14, 25);
-    doc.text(`Data: ${format(new Date(movement.date), 'dd/MM/yyyy')}`, 14, 30);
-    
-    // Locations
-    doc.setLineWidth(0.1);
-    doc.rect(14, 35, 90, 25);
-    doc.text("Luogo di Ritiro:", 16, 40);
-    doc.setFontSize(9);
-    doc.text(movement.pickupLocation || "-", 16, 45, { maxWidth: 86 });
+    // Load logo
+    try {
+        const logoUrl = '/opi_logo.jpg';
+        const logoData = await fetch(logoUrl).then(res => res.blob()).then(blob => new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+        }));
+        doc.addImage(logoData as string, 'JPEG', 14, 10, 50, 20);
+    } catch (e) {
+        console.error("Could not load logo", e);
+    }
 
-    doc.setFontSize(10);
-    doc.rect(110, 35, 90, 25);
-    doc.text("Luogo di Destinazione:", 112, 40);
-    doc.setFontSize(9);
-    doc.text(movement.deliveryLocation || "-", 112, 45, { maxWidth: 86 });
+    // Company Info (Right aligned)
+    doc.setFontSize(8);
+    const companyInfoX = pageWidth - 14;
+    doc.text("OPI Firesafe S.r.l.", companyInfoX, 15, { align: "right" });
+    doc.text("Via della Tecnica, 10", companyInfoX, 19, { align: "right" });
+    doc.text("33048 San Giovanni al Natisone (UD)", companyInfoX, 23, { align: "right" });
+    doc.text("P.IVA 02817540306", companyInfoX, 27, { align: "right" });
+    doc.text("Tel. +39 0432 756111", companyInfoX, 31, { align: "right" });
+    doc.text("info@opifiresafe.it - www.opifiresafe.it", companyInfoX, 35, { align: "right" });
 
-    // Transport Details
-    doc.setFontSize(10);
-    doc.text(`Causale: ${movement.causal || "-"}`, 14, 68);
-    doc.text(`Mezzo: ${movement.transportMean || "-"}`, 14, 73);
-    doc.text(`Colli: ${movement.packagesCount || "-"}`, 110, 68);
-    doc.text(`Aspetto: ${movement.appearance || "-"}`, 110, 73);
+    // Document Title
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("DOCUMENTO DI TRASPORTO (D.D.T.)", 14, 45);
+    doc.line(14, 47, pageWidth - 14, 47); // Horizontal line
+
+    // Document Details Grid
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
     
+    let currentY = 55;
+    
+    // Row 1: Number, Date, Causal
+    doc.setFont("helvetica", "bold");
+    doc.text("Numero Documento:", 14, currentY);
+    doc.text("Data Documento:", 80, currentY);
+    doc.text("Causale:", 140, currentY);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(movement.number, 14, currentY + 5);
+    doc.text(format(new Date(movement.date), 'dd/MM/yyyy'), 80, currentY + 5);
+    doc.text(movement.causal || "-", 140, currentY + 5);
+    
+    currentY += 15;
+
+    // Row 2: Locations Boxes
+    // Mittente Box
+    doc.rect(14, currentY, 60, 30);
+    doc.setFont("helvetica", "bold");
+    doc.text("MITTENTE", 16, currentY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text("OPI Firesafe S.r.l.", 16, currentY + 10);
+    doc.text("Via della Tecnica, 10", 16, currentY + 15);
+    doc.text("33048 San Giovanni al Natisone (UD)", 16, currentY + 20);
+
+    // Destinatario Box
+    doc.rect(78, currentY, 60, 30);
+    doc.setFont("helvetica", "bold");
+    doc.text("DESTINATARIO / COMMITTENTE", 80, currentY + 5);
+    doc.setFont("helvetica", "normal");
+    if (movement.jobCode) {
+         doc.setFont("helvetica", "bold");
+         doc.text(`Commessa: ${movement.jobCode}`, 80, currentY + 10);
+         doc.setFont("helvetica", "normal");
+    }
+    doc.text(movement.jobDescription || "-", 80, currentY + 15, { maxWidth: 56 });
+
+    // Luogo Destinazione Box
+    doc.rect(142, currentY, 54, 30);
+    doc.setFont("helvetica", "bold");
+    doc.text("LUOGO DI DESTINAZIONE", 144, currentY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text(movement.deliveryLocation || movement.pickupLocation || "-", 144, currentY + 10, { maxWidth: 50 });
+
+    currentY += 35;
+
+    // Transport Details Grid
+    doc.rect(14, currentY, pageWidth - 28, 15);
+    
+    // Labels
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("Vettore", 16, currentY + 5);
+    doc.text("Porto", 80, currentY + 5);
+    doc.text("Aspetto Beni", 120, currentY + 5);
+    doc.text("N. Colli", 170, currentY + 5);
+    
+    // Values
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(movement.transportMean || "Mittente", 16, currentY + 10);
+    doc.text("Franco", 80, currentY + 10);
+    doc.text(movement.appearance || "A vista", 120, currentY + 10);
+    doc.text((movement.packagesCount || 0).toString(), 170, currentY + 10);
+
+    currentY += 20;
+
     // Table
     const tableBody = groupedItems.map(item => [
         item.inventoryCode || "-",
@@ -152,32 +225,50 @@ export default function MovementDetailPage() {
     ]);
 
     autoTable(doc, {
-        startY: 80,
+        startY: currentY,
         head: [['Codice', 'Articolo', 'Descrizione', 'Q.tà', 'U.M.']],
         body: tableBody,
         theme: 'grid',
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [41, 128, 185] }
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [0, 51, 102], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+            0: { cellWidth: 30 }, // Codice
+            1: { cellWidth: 50 }, // Articolo
+            2: { cellWidth: 'auto' }, // Descrizione
+            3: { cellWidth: 20, halign: 'right' }, // Q.tà
+            4: { cellWidth: 15, halign: 'center' }  // U.M.
+        }
     });
 
     // Footer
-    const finalY = (doc as any).lastAutoTable.finalY || 80;
+    const finalY = (doc as any).lastAutoTable.finalY || currentY;
     
     if (movement.notes) {
-        doc.text("Note:", 14, finalY + 10);
         doc.setFontSize(9);
-        doc.text(movement.notes, 14, finalY + 15, { maxWidth: 180 });
+        doc.setFont("helvetica", "bold");
+        doc.text("Note:", 14, finalY + 10);
+        doc.setFont("helvetica", "normal");
+        doc.text(movement.notes, 14, finalY + 15, { maxWidth: pageWidth - 28 });
     }
 
     // Signatures
-    doc.line(14, 270, 70, 270);
-    doc.text("Firma Conducente", 14, 275);
+    const signatureY = Math.max(finalY + 30, 250);
     
-    doc.line(80, 270, 136, 270);
-    doc.text("Firma Destinatario", 80, 275);
+    doc.setLineWidth(0.1);
+    doc.line(14, signatureY, 70, signatureY);
+    doc.setFontSize(8);
+    doc.text("Firma Conducente", 14, signatureY + 5);
     
-    doc.line(146, 270, 202, 270);
-    doc.text("Firma Trasportatore", 146, 275);
+    doc.line(80, signatureY, 136, signatureY);
+    doc.text("Firma Destinatario", 80, signatureY + 5);
+    
+    doc.line(146, signatureY, pageWidth - 14, signatureY);
+    doc.text("Firma Trasportatore", 146, signatureY + 5);
+
+    // Footer small print
+    doc.setFontSize(7);
+    doc.setTextColor(100);
+    doc.text(`Generato da Magazzino V5.5 il ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 285);
 
     doc.save(`DDT_${movement.number.replace(/\//g, '-')}.pdf`);
   };
