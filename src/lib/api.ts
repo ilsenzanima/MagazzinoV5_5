@@ -1599,8 +1599,12 @@ export const jobsApi = {
                 };
             });
             
-            // 3. Batch update (Supabase upsert)
-            await supabase.from('delivery_notes').upsert(updates);
+            // 3. Batch update (Use update instead of upsert to avoid validation errors on missing required fields)
+            const updatePromises = updates.map(u => 
+                supabase.from('delivery_notes').update({ notes: u.notes }).eq('id', u.id)
+            );
+            
+            await Promise.all(updatePromises);
         }
     }
 
