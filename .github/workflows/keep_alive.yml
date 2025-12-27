@@ -2,8 +2,8 @@ name: Keep Alive Database
 
 on:
   schedule:
-    # Esegue ogni 5 minuti (minimo consentito da GitHub Actions)
-    - cron: '*/5 * * * *'
+    # Esegue ogni 15 minuti per ridurre il carico e i log
+    - cron: '*/15 * * * *'
   workflow_dispatch: # Permette di eseguirlo manualmente dal tab Actions
 
 jobs:

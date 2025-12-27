@@ -753,6 +753,7 @@ export interface DeliveryNote {
   date: string;
   jobId?: string;
   jobCode?: string;
+  jobDescription?: string;
   causal: string;
   pickupLocation: string;
   deliveryLocation: string;
@@ -790,6 +791,7 @@ const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
   date: db.date,
   jobId: db.job_id,
   jobCode: db.jobs?.code,
+  jobDescription: db.jobs?.description,
   causal: db.causal,
   pickupLocation: db.pickup_location,
   deliveryLocation: db.delivery_location,
