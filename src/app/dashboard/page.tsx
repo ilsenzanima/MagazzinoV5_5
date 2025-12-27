@@ -23,52 +23,19 @@ export default async function DashboardPage() {
   // 1. Creiamo il client lato server (non soffre di problemi di timeout del browser)
   const supabase = await createClient();
 
-  // 2. Scarichiamo i dati direttamente prima di mostrare la pagina
-  // Fetch Inventory for Counts
-  const { data: inventory, error: invError } = await supabase
-    .from('inventory')
-    .select('quantity, min_stock');
+  // 2. Usiamo la RPC per calcolare tutto lato database (Performance Fix)
+  // Questo sostituisce il download di migliaia di righe e il ciclo foreach
+  const { data: statsData, error } = await supabase.rpc('get_dashboard_stats');
 
-  if (invError) {
-    console.error("Errore caricamento dashboard (inventory):", invError);
+  if (error) {
+    console.error("Errore caricamento dashboard (rpc):", error);
   }
 
-  // Fetch Batches for Value Calculation
-  const { data: batches, error: batchError } = await supabase
-    .from('purchase_batch_availability')
-    .select('remaining_pieces, coefficient, unit_price');
-
-  if (batchError) {
-      console.error("Errore caricamento dashboard (batches):", batchError);
-  }
-
-  // 3. Calcoli lato server (più veloci e sicuri)
-  let totalValue = 0;
-  let lowStockCount = 0;
-  const totalItems = inventory?.length || 0;
-
-  // Calculate Value from Batches
-  batches?.forEach(batch => {
-      const pieces = Number(batch.remaining_pieces) || 0;
-      const coeff = Number(batch.coefficient) || 1; 
-      const price = Number(batch.unit_price) || 0;
-      
-      if (pieces > 0) {
-          totalValue += (pieces * coeff) * price;
-      }
-  });
-
-  // Calculate Low Stock
-  inventory?.forEach(item => {
-    if ((item.quantity || 0) <= (item.min_stock || 0)) {
-      lowStockCount++;
-    }
-  });
-
+  // Fallback sicuro se la RPC fallisce o ritorna null
   const stats = {
-    totalValue,
-    lowStockCount,
-    totalItems
+    totalValue: Number(statsData?.totalValue) || 0,
+    lowStockCount: Number(statsData?.lowStockCount) || 0,
+    totalItems: Number(statsData?.totalItems) || 0
   };
 
   // 4. Passiamo i dati pronti al Client Component

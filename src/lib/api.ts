@@ -1066,6 +1066,29 @@ export const inventoryApi = {
   },
 
   getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string }) => {
+    // Special handling for 'low_stock' using RPC to avoid client-side filtering of large datasets
+    if (options.tab === 'low_stock') {
+      let rpcQuery = supabase.rpc('get_low_stock_inventory', {}, { count: 'exact' });
+      
+      if (options.search) {
+        const term = options.search;
+        rpcQuery = rpcQuery.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,category.ilike.%${term}%,supplier_code.ilike.%${term}%`);
+      }
+
+      // Pagination
+      const from = (options.page - 1) * options.limit;
+      const to = from + options.limit - 1;
+      rpcQuery = rpcQuery.range(from, to);
+
+      const { data, error, count } = await fetchWithTimeout(rpcQuery);
+      if (error) throw error;
+
+      return {
+        items: (data || []).map(mapDbItemToInventoryItem),
+        total: count || 0
+      };
+    }
+
     let query = supabase.from('inventory').select('*', { count: 'exact' });
 
     // Filter by search term
@@ -1078,9 +1101,7 @@ export const inventoryApi = {
     if (options.tab === 'out_of_stock') {
         query = query.eq('quantity', 0);
     } 
-    // Note: 'low_stock' filtering (quantity <= min_stock) is complex in PostgREST without a view or RPC.
-    // For now, we only handle 'out_of_stock' server-side. 'low_stock' might need client-side filtering or specific endpoint.
-
+    
     // Sort by name for paginated view (usually preferred over created_at)
     query = query.order('name');
 

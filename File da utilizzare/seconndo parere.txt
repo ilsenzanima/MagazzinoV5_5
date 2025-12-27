@@ -1,122 +1,91 @@
-Capisco perfettamente. Quando si parla di "rogne" nei caricamenti che persistono nonostante le ottimizzazioni di base, il problema risiede spesso nei dettagli architetturali e in colli di bottiglia nascosti ("silent killers") che non generano errori evidenti ma rallentano l'esperienza utente.
+Perfetto, proseguiamo l'analisi. Hai chiesto di trovare tutto ciò che può causare "noie, fastidi e sovraccarichi". Ho scavato a fondo nel codice e nell'infrastruttura.
 
-Ho analizzato a fondo i file schema.sql, auth-provider.tsx e la configurazione generale. Ecco i 3 problemi critici che stanno ancora causando lentezza e instabilità, e le relative soluzioni chirurgiche.
+Oltre ai problemi già risolti (Server Components e Indici SQL), ecco i 3 problemi nascosti che stanno ancora frenando la tua app e come risolverli definitivamente.
 
-1. Il "Collo di Bottiglia" SQL (RLS senza Indici)
-Il Problema: Hai attivato la Row Level Security (RLS) su inventory e movements. È un'ottima pratica di sicurezza, ma è disastrosa per le performance se non ci sono gli indici giusti.
+1. Il "Calcolo Pesante" Lato Client (Optimization Killer)
+Il Problema: Nella tua Dashboard (e probabilmente altrove), stai scaricando tutto l'inventario per calcolare tre numeri. Codice attuale:
 
-Guarda questa policy:
+JavaScript
 
-SQL
+// Scarichi 5000 righe solo per fare una somma?
+const { data: inventory } = await supabase.from('inventory').select('*');
+inventory.forEach(...) // Ciclo JS che blocca la CPU del server
+Se il magazzino cresce, questo ucciderà le performance. Ogni volta che carichi la pagina, trasferisci MB di dati inutili.
 
-create policy "Only admins can modify inventory."
-  on inventory ...
-  using ( exists ( select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'admin' ) );
-Cosa succede: Ogni volta che carichi 100 articoli dell'inventario, il database deve eseguire (potenzialmente) 100 sotto-query nella tabella profiles per controllare se sei admin. Senza un indice sulla colonna role, questo diventa lentissimo man mano che i dati crescono.
+✅ Soluzione: Postgres RPC (Remote Procedure Call) Sposta il calcolo sul database. Postgres può sommare 10.000 prezzi in 2 millisecondi. Node.js ci mette molto di più dovendo scaricare i dati.
 
-✅ La Soluzione (Esegui questo SQL in Supabase): Dobbiamo indicizzare le chiavi esterne e i campi usati nelle policy.
-
-SQL
-
--- Velocizza il controllo dei ruoli nelle policy RLS
-CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
-CREATE INDEX IF NOT EXISTS idx_profiles_id_role ON public.profiles(id, role);
-
--- Velocizza le join tra movimenti e inventario/utenti
-CREATE INDEX IF NOT EXISTS idx_movements_item_id ON public.movements(item_id);
-CREATE INDEX IF NOT EXISTS idx_movements_user_id ON public.movements(user_id);
-CREATE INDEX IF NOT EXISTS idx_inventory_code ON public.inventory(code);
-2. Il Conflitto dei Ruoli (Bug Logico Bloccante)
-Il Problema: Nel file auth-provider.tsx gestisci tre ruoli: 'admin' | 'user' | 'operativo'. Tuttavia, nel database (schema.sql), hai imposto un vincolo rigido:
+Esegui questo SQL in Supabase:
 
 SQL
 
-role text check (role in ('admin', 'user')) default 'user',
-Cosa succede: Se provi a creare un utente "operativo", il database rifiuta silenziosamente o genera un errore che il frontend potrebbe non gestire bene, causando timeout o stati inconsistenti in cui l'utente sembra loggato ma non ha permessi.
-
-✅ La Soluzione: Aggiorna il vincolo nel database per accettare il nuovo ruolo.
-
-SQL
-
-ALTER TABLE public.profiles DROP CONSTRAINT profiles_role_check;
-ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin', 'user', 'operativo'));
-3. L'AuthProvider "Chiacchierone" (Network Overhead)
-Il Problema: Il tuo AuthProvider esegue troppe chiamate di rete all'avvio.
-
-useEffect chiama checkUser() -> getSession -> fetchUserRole.
-
-onAuthStateChange si attiva quasi subito dopo -> chiama di nuovo fetchUserRole.
-
-Questo "doppio colpo" rallenta il rendering iniziale e, se la connessione è instabile (cambio tab/scheda), può causare quella sensazione di "blocco".
-
-✅ La Soluzione: Ottimizza auth-provider.tsx per evitare chiamate ridondanti. Sostituisci il contenuto di useEffect con questo codice più robusto che usa un flag mounted:
+CREATE OR REPLACE FUNCTION get_dashboard_stats()
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  result json;
+BEGIN
+  SELECT json_build_object(
+    'totalValue', COALESCE(SUM(quantity * price), 0),
+    'lowStockCount', COUNT(*) FILTER (WHERE quantity <= min_stock),
+    'totalItems', COUNT(*)
+  ) INTO result
+  FROM inventory;
+  
+  RETURN result;
+END;
+$$;
+Come usarlo in src/app/dashboard/page.tsx:
 
 TypeScript
 
-// In src/components/auth-provider.tsx
+// Sostituisci la query vecchia con questa:
+const { data: stats, error } = await supabase.rpc('get_dashboard_stats');
+// stats conterrà direttamente { totalValue: 1234, ... } istantaneamente.
+2. Il Problema "Sleeping Beauty" (Cold Start)
+Hai notato che dopo un po' di inattività si blocca tutto? Il Problema: Se usi il piano Free di Supabase, il database va in "pausa" dopo l'inattività. Anche Vercel spegne le Server Functions. La prima richiesta deve svegliare entrambi, impiegando 5-10 secondi (il "fastidio" che noti).
 
-useEffect(() => {
-    let mounted = true;
+✅ Soluzione: Cron Job "Sveglia" (Gratis) Non serve pagare il piano Pro se configuri un "ping" automatico. Crea un file .github/workflows/keep-alive.yml nel tuo progetto (se usi GitHub):
 
-    const initAuth = async () => {
-      try {
-        // 1. Prendi la sessione iniziale
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
+YAML
 
-        if (initialSession?.user) {
-          setSession(initialSession);
-          setUser(initialSession.user);
-          await fetchUserRole(initialSession.user.id);
-        } else {
-            // Se non c'è sessione, puliamo tutto subito
-            setSession(null);
-            setUser(null);
-            setUserRole(null);
-        }
-      } catch (error) {
-        console.error("Auth init error:", error);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
+name: Keep Supabase Awake
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Esegue ogni 15 minuti
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Database
+        run: curl -I https://TUO-PROGETTO.supabase.co
+Questo manterrà le connessioni attive ed eviterà che il database si addormenti.
 
-    initAuth();
+3. Effetto "Waterfall" sulle altre pagine
+Hai detto che "cambiando pagina" ci sono problemi. Ho visto che hai pagine come src/app/inventory/page.tsx o movements. Il Problema: Se queste pagine sono ancora fatte con "use client" e useEffect, soffrono dello stesso difetto della dashboard originale.
 
-    // 2. Ascolta i cambiamenti (ma ignora il primo evento 'INITIAL_SESSION' se già gestito)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        if (!mounted) return;
-        
-        // Aggiorna solo se la sessione è effettivamente cambiata o è un evento di Sign In/Out esplicito
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
-            setSession(newSession);
-            setUser(newSession?.user ?? null);
-            
-            if (newSession?.user) {
-                await fetchUserRole(newSession.user.id);
-            } else {
-                setUserRole(null);
-            }
-            
-            if (event === 'SIGNED_IN') router.refresh();
-            if (event === 'SIGNED_OUT') {
-                router.push('/login'); 
-                router.refresh();
-            }
-        }
-      }
-    );
+Ogni volta che navighi, il browser deve: Scaricare JS -> Eseguire React -> Chiedere i dati.
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [router, supabase]);
-Riassunto Piano d'Azione
-Immediato: Esegui le query SQL (punto 1 e 2) nell'editor SQL di Supabase. Gli indici risolveranno gran parte della lentezza nel caricamento dati.
+Se la connessione cade (es. cambio tab), la pagina resta bianca o gira a vuoto.
 
-Codice: Aggiorna l'AuthProvider per evitare doppie richieste.
+✅ Soluzione Sistematica: Devi applicare il pattern Server Component (che ti ho mostrato per la Dashboard) a tutte le pagine principali (/inventory, /movements, /jobs).
 
-Verifica: Fai un riavvio completo (chiudi e riapri browser) per verificare che il "Cold Start" sia ora gestito meglio grazie alle query più efficienti.
+Pagina (page.tsx): Diventa async, usa createClient (server), scarica i dati.
+
+Componente (InventoryTable.tsx): Diventa "use client", riceve i dati via props e gestisce solo filtri/ordinamento.
+
+Riepilogo Piano d'Azione Aggiornato
+SQL: Crea la funzione get_dashboard_stats (punto 1). Questo renderà la dashboard un fulmine.
+
+Github: Aggiungi il file .yml per tenere sveglio il DB (punto 2).
+
+Refactoring: Applica la logica Server Component anche a inventory/page.tsx.
+
+Vuoi che ti scriva il codice refactoring per la pagina Inventory (che è solitamente la più pesante)?
+
+Ecco un video che spiega bene come usare le RPC per velocizzare Next.js e Supabase: Supabase RPC Functions Guide Questo video è rilevante perché mostra esattamente come spostare la logica pesante da JavaScript a SQL per eliminare i colli di bottiglia.
+
+3 reasons you should use Postgres Functions and Transactions - YouTube
+
+Supabase · 18K visualizzazioni

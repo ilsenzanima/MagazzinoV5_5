@@ -89,43 +89,17 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         setLoading(true);
         setError(null);
 
-        // Handle 'low_stock' separately because server-side filtering for column comparison is complex
-        if (activeTab === 'low_stock') {
-             // Client-side filtering for low stock
-             const allData = await inventoryApi.getAll();
-             let filtered = allData.filter(i => i.quantity > 0 && i.quantity <= i.minStock);
-             
-             // Client-side search
-             if (debouncedSearchTerm) {
-                 const term = debouncedSearchTerm.toLowerCase();
-                 filtered = filtered.filter(item => 
-                    item.name.toLowerCase().includes(term) ||
-                    item.code.toLowerCase().includes(term) ||
-                    item.brand.toLowerCase().includes(term) ||
-                    item.type.toLowerCase().includes(term) ||
-                    (item.supplierCode?.toLowerCase().includes(term) ?? false)
-                 );
-             }
-             
-             // Client-side pagination
-             setTotalItems(filtered.length);
-             setTotalPages(Math.ceil(filtered.length / limit) || 1);
-             
-             const from = (page - 1) * limit;
-             const to = from + limit;
-             setItems(filtered.slice(from, to));
-        } else {
-            // Server-side pagination for 'all' and 'out_of_stock'
-            const { items: paginatedItems, total } = await inventoryApi.getPaginated({
-                page,
-                limit,
-                search: debouncedSearchTerm,
-                tab: activeTab
-            });
-            setItems(paginatedItems);
-            setTotalItems(total);
-            setTotalPages(Math.ceil(total / limit) || 1);
-        }
+        // Server-side pagination for ALL tabs (including low_stock via RPC)
+        const { items: paginatedItems, total } = await inventoryApi.getPaginated({
+            page,
+            limit,
+            search: debouncedSearchTerm,
+            tab: activeTab
+        });
+        setItems(paginatedItems);
+        setTotalItems(total);
+        setTotalPages(Math.ceil(total / limit) || 1);
+
     } catch (error: any) {
         console.error("Failed to load inventory:", error);
         setError(error.message || "Errore sconosciuto durante il caricamento inventario");
