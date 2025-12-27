@@ -133,6 +133,9 @@ export default function InventoryDetailPage() {
         const itemData = await inventoryApi.getById(id);
         setItem(itemData);
         setRealQtyInput(itemData.realQuantity?.toString() || "");
+        
+        // Unblock UI immediately after item is loaded
+        setLoading(false);
 
         // Calculate Stock Value from Batches
         try {
@@ -168,8 +171,12 @@ export default function InventoryDetailPage() {
 
       // 2. Load History & Jobs & Aux Data (Non-critical)
       try {
-        const [movementsData, jobsData, brandsData, typesData, unitsData, supplierCodesData, suppliersData] = await Promise.all([
-          inventoryApi.getHistory(id),
+        // Load history first as it is displayed immediately
+        const movementsData = await inventoryApi.getHistory(id);
+        setMovements(movementsData);
+
+        // Load auxiliary data for forms in background
+        const [jobsData, brandsData, typesData, unitsData, supplierCodesData, suppliersData] = await Promise.all([
           jobsApi.getAll(),
           brandsApi.getAll(),
           itemTypesApi.getAll(),
@@ -177,7 +184,7 @@ export default function InventoryDetailPage() {
           inventorySupplierCodesApi.getByItemId(id),
           suppliersApi.getAll()
         ]);
-        setMovements(movementsData);
+        
         setActiveJobs(jobsData.filter(j => j.status === 'active'));
         setBrands(brandsData);
         setTypes(typesData);
@@ -192,9 +199,9 @@ export default function InventoryDetailPage() {
     } catch (error: any) {
       console.error("Error loading data:", error);
       setError(error.message || "Errore durante il caricamento dei dati");
-    } finally {
-      setLoading(false);
-    }
+      setLoading(false); // Ensure loading is disabled on error
+    } 
+    // finally { setLoading(false); } // Removed finally as we set it earlier
   };
 
   useEffect(() => {

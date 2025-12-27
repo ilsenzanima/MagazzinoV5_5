@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session, AuthError } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase"; // Use singleton instance
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/api";
 
@@ -31,7 +31,9 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => createClient());
+  // Use singleton instance instead of creating new one
+  // const [supabase] = useState(() => createClient()); 
+  
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [realRole, setRealRole] = useState<'admin' | 'user' | 'operativo' | null>(null);
@@ -122,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [router, supabase]);
+  }, [router]);
 
   const value = {
     user,
