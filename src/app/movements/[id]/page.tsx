@@ -133,35 +133,16 @@ export default function MovementDetailPage() {
         doc.text(title, x + 2, y + h - 2); // Text padding
     };
 
-    // --- Helper: Draw Content Box ---
-    const drawContentBox = (x: number, y: number, w: number, h: number, text: string, fontSize = 10, bold = false, align: "left" | "center" | "right" = "left") => {
-        doc.setDrawColor(0);
-        doc.rect(x, y, w, h, 'S');
-        doc.setTextColor(0);
-        doc.setFontSize(fontSize);
-        doc.setFont("helvetica", bold ? "bold" : "normal");
-        
-        // Handle multiline text
-        const textLines = doc.splitTextToSize(text, w - 4);
-        const textY = y + 5; // Top padding
-        
-        if (align === "center") {
-             doc.text(text, x + w / 2, y + h / 2 + 3, { align: "center" });
-        } else {
-             doc.text(textLines, x + 2, textY);
-        }
-    };
-
     // --- 1. Logo & Company Info ---
     try {
-        const logoUrl = '/logo_header.png';
+        const logoUrl = '/opi_logo.jpg';
         const logoData = await fetch(logoUrl).then(res => res.blob()).then(blob => new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
             reader.readAsDataURL(blob);
         }));
         // Logo centered/large as in reference
-        doc.addImage(logoData as string, 'PNG', 60, 5, 90, 25); 
+        doc.addImage(logoData as string, 'JPEG', 60, 5, 90, 25); 
     } catch (e) {
         console.error("Could not load logo", e);
         // Fallback text if logo fails
@@ -178,54 +159,14 @@ export default function MovementDetailPage() {
     doc.text("Tel. 0432-1901608 - email: amministrazione@opifiresafe.com", pageWidth - margin, headerTextY + 3, { align: "right" });
     doc.text("Cod. Fisc: 02357730304 - P.IVA e RI UD 02357730304 - Capitale Sociale € 250.000,00 i.v.", pageWidth - margin, headerTextY + 6, { align: "right" });
 
-    // --- 2. Grid Layout ---
+    // --- 2. Grid Layout (Header) ---
     let currentY = 45;
-
-    // Row 1
-    // Box 1.1: Documento di Trasporto Header
-    drawHeaderBox(margin, currentY, 50, 6, "DOCUMENTO DI TRASPORTO", 7, true);
-    // Box 1.2: Causale Header
-    drawHeaderBox(margin + 50, currentY, contentWidth - 50, 6, "CAUSALE DEL TRASPORTO:", 8, true);
-    
-    currentY += 6;
-    
-    // Row 2
-    // Box 2.1: DDT Reference Text (Small)
-    doc.setDrawColor(0);
-    doc.rect(margin, currentY, 50, 6); // Empty box for small text
-    doc.setFontSize(5);
-    doc.setFont("helvetica", "normal");
-    doc.text("D.D.T. - D.P.R. 472 del 14-08-1996 - D.P.R. 696 del 21-12-1996", margin + 1, currentY + 4, { maxWidth: 48 });
-    
-    // Box 2.2: Causale Content
-    // We merge this with the row below for the content part? No, in ref image "Causale" header is above content.
-    // Actually, let's look at the ref image structure again.
-    // Col 1: DDT Header | Subtext | Number Header | Number Value | Date Header | Date Value
-    // Col 2: Causale Header | Causale Value | Pickup Header | Pickup Value | Dest Header | Dest Value
-    
-    // Refined Grid Structure based on "1/PP23" image:
-    // The "1/PP23" is in a box to the left.
-    // Let's restart the grid logic to match Image 2 exactly.
-    
-    currentY = 45;
     const col1W = 50;
     const col2W = contentWidth - col1W;
     
     // -- Row A: Headers --
-    // Col 1: DDT Header
-    doc.setFillColor(...grayBg);
-    doc.rect(margin, currentY, col1W, 5, 'F');
-    doc.rect(margin, currentY, col1W, 5, 'S');
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("DOCUMENTO DI TRASPORTO", margin + 1, currentY + 3.5);
-
-    // Col 2: Causale Header
-    doc.setFillColor(...grayBg);
-    doc.rect(margin + col1W, currentY, col2W, 5, 'F');
-    doc.rect(margin + col1W, currentY, col2W, 5, 'S');
-    doc.text("CAUSALE DEL TRASPORTO:", margin + col1W + 1, currentY + 3.5);
-
+    drawHeaderBox(margin, currentY, col1W, 5, "DOCUMENTO DI TRASPORTO", 7, true);
+    drawHeaderBox(margin + col1W, currentY, col2W, 5, "CAUSALE DEL TRASPORTO:", 8, true);
     currentY += 5;
 
     // -- Row B: Sub-headers / Content --
@@ -240,14 +181,10 @@ export default function MovementDetailPage() {
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.text(movement.causal || "Rifornimento cantiere", margin + col1W + 2, currentY + 5);
-
     currentY += 8;
 
     // -- Row C: Number & Pickup --
-    // Col 1: Number (Large) - This spans 2 rows of the right side? No, looks like its own block.
-    // In ref: Left side has "1/PP23" large. Right side has "LUOGO DI RITIRO MERCE" header then content.
     const rowCHeight = 12;
-    
     // Col 1: Number
     doc.rect(margin, currentY, col1W, rowCHeight, 'S');
     doc.setFontSize(14);
@@ -255,12 +192,7 @@ export default function MovementDetailPage() {
     doc.text(movement.number, margin + col1W - 2, currentY + 8, { align: "right" });
 
     // Col 2: Pickup Header (Small strip) & Content
-    // Header Strip
-    doc.setFillColor(...grayBg);
-    doc.rect(margin + col1W, currentY, col2W, 5, 'F');
-    doc.rect(margin + col1W, currentY, col2W, 5, 'S');
-    doc.setFontSize(7);
-    doc.text("LUOGO DI RITIRO MERCE:", margin + col1W + 1, currentY + 3.5);
+    drawHeaderBox(margin + col1W, currentY, col2W, 5, "LUOGO DI RITIRO MERCE:", 7, false);
     
     // Content (Rest of height)
     doc.rect(margin + col1W, currentY + 5, col2W, rowCHeight - 5, 'S');
@@ -268,24 +200,11 @@ export default function MovementDetailPage() {
     doc.setFont("helvetica", "normal");
     const pickupText = movement.pickupLocation || "OPI Firesafe S.r.l. MAGAZZINO: Via A. Malignani, 9 REANA DEL ROJALE (UD)";
     doc.text(pickupText, margin + col1W + 2, currentY + 9);
-
     currentY += rowCHeight;
 
     // -- Row D: Date & Destination --
-    // Col 1: Header "DATA DI CARICO"
-    doc.setFillColor(...grayBg);
-    doc.rect(margin, currentY, col1W, 5, 'F');
-    doc.rect(margin, currentY, col1W, 5, 'S');
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("DATA DI CARICO", margin + 1, currentY + 3.5); // Centered in ref? Looks left.
-
-    // Col 2: Header "LUOGO DI DESTINAZIONE MERCE"
-    doc.setFillColor(...grayBg);
-    doc.rect(margin + col1W, currentY, col2W, 5, 'F');
-    doc.rect(margin + col1W, currentY, col2W, 5, 'S');
-    doc.text("LUOGO DI DESTINAZIONE MERCE:", margin + col1W + 1, currentY + 3.5);
-
+    drawHeaderBox(margin, currentY, col1W, 5, "DATA DI CARICO", 7, true);
+    drawHeaderBox(margin + col1W, currentY, col2W, 5, "LUOGO DI DESTINAZIONE MERCE:", 7, false);
     currentY += 5;
 
     // -- Row E: Date Content & Dest Content --
@@ -301,20 +220,20 @@ export default function MovementDetailPage() {
     doc.rect(margin + col1W, currentY, col2W, rowEHeight, 'S');
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    // Build dest text from job/location
     let destText = "";
     if (movement.jobCode) destText += `Commessa: ${movement.jobCode} - `;
     if (movement.jobDescription) destText += `${movement.jobDescription} `;
     if (movement.deliveryLocation) destText += `: ${movement.deliveryLocation}`;
-    
     doc.text(destText || "Sede cliente", margin + col1W + 2, currentY + 5, { maxWidth: col2W - 4 });
-
+    
     currentY += rowEHeight + 2; // Gap before table
 
+    // --- Footer Calculation ---
+    // Define Footer Height
+    // Transport (13) + Aspect (13) + Notes (15) + Signatures (20) = 61mm + gaps ~ 70mm
+    const footerHeight = 70; 
+
     // --- 3. Table ---
-    // Columns: Categoria | Prodotto | Quantità (Unit | Value)
-    // Ref: Categoria | Prodotto | Mq/Pezzi | Value
-    
     const tableBody = groupedItems.map(item => [
         item.inventoryCategory || "-",
         `${item.inventoryName || "Articolo"} ${item.inventoryDescription ? `- ${item.inventoryDescription}` : ""}`,
@@ -326,7 +245,7 @@ export default function MovementDetailPage() {
         startY: currentY,
         head: [['Categoria', 'Prodotto', 'U.M.', 'Quantità']],
         body: tableBody,
-        theme: 'grid', // The ref has simple grid
+        theme: 'grid',
         styles: { 
             fontSize: 8, 
             cellPadding: 2, 
@@ -342,141 +261,110 @@ export default function MovementDetailPage() {
             lineWidth: 0.1
         },
         columnStyles: {
-            0: { cellWidth: 30 }, // Categoria
-            1: { cellWidth: 'auto' }, // Prodotto
-            2: { cellWidth: 20 }, // U.M.
-            3: { cellWidth: 20, halign: 'right' } // Quantità
-        }
+            0: { cellWidth: 30 },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 20 },
+            3: { cellWidth: 20, halign: 'right' }
+        },
+        margin: { bottom: 20 }, // Minimal margin to maximize space on intermediate pages
+        rowPageBreak: 'avoid',
     });
 
-    // --- 4. Footer ---
-    const finalY = (doc as any).lastAutoTable.finalY || currentY;
-    const footerY = Math.max(finalY + 5, 230); // Push to bottom if space allows, or just after table
-    
-    // Footer Grid
-    const footerRowHeight = 6;
-    let fy = footerY;
+    // --- 4. Footer Drawing Function ---
+    const drawFooter = (y: number) => {
+        let fy = y;
+        const footerRowHeight = 5;
+        const footerContentHeight = 8;
 
-    // Header Row for Footer
-    doc.setFillColor(...grayBg);
-    doc.rect(margin, fy, contentWidth, footerRowHeight, 'F');
-    doc.rect(margin, fy, contentWidth, footerRowHeight, 'S');
-    
-    doc.setFontSize(6);
-    doc.setFont("helvetica", "normal"); // Headers seem normal in ref? "TRASPORTO A MEZZO" looks grey text? No, white text on grey?
-    // Ref Image 2: "TRASPORTO A MEZZO" is grey text on white? No, it's a grey BAR with text.
-    // Let's assume standard grey bar with dark text.
-    doc.setTextColor(100); // Dark Gray text
-    
-    // Labels positions
-    const col1X = margin + 2;
-    const col2X = margin + 100; // Data di ritiro
-    const col3X = margin + 150; // Ora del ritiro
-    
-    doc.text("TRASPORTO A MEZZO", col1X, fy + 4);
-    doc.text("DATA DI RITIRO", col2X, fy + 4);
-    doc.text("ORA DEL RITIRO", col3X, fy + 4);
+        // Labels positions
+        const col1X = margin + 2;
+        const col2X = margin + 100;
+        const col3X = margin + 150;
 
-    fy += footerRowHeight;
-
-    // Value Row 1
-    doc.setTextColor(0);
-    doc.setFontSize(9);
-    doc.rect(margin, fy, contentWidth, 8, 'S');
-    // Values
-    doc.text("Mittente", col1X, fy + 5); // Hardcoded "Mittente" as in ref? Or movement.transportMean?
-    doc.text(format(new Date(movement.date), 'dd/MM/yyyy'), col2X, fy + 5);
-    doc.text("08:00:00", col3X, fy + 5); // Mock time or field?
-    
-    // Vertical lines to separate columns? Ref image has them.
-    // We can just draw rects for each cell if we want perfect grid.
-    // Let's stick to outer rect for now to keep it simple, or draw vertical lines.
-    doc.line(margin + 98, fy - footerRowHeight, margin + 98, fy + 8); // Split 1
-    doc.line(margin + 148, fy - footerRowHeight, margin + 148, fy + 8); // Split 2
-
-    fy += 8;
-
-    // Header Row 2
-    doc.setFillColor(...grayBg);
-    doc.rect(margin, fy, contentWidth, footerRowHeight, 'F');
-    doc.rect(margin, fy, contentWidth, footerRowHeight, 'S');
-    doc.setTextColor(100);
-    doc.setFontSize(6);
-    doc.text("ASPETTO ESTERIORE DEI BENI", col1X, fy + 4);
-    doc.text("NUMERO DI COLLI", col3X, fy + 4); // Aligned with Ora?
-
-    fy += footerRowHeight;
-
-    // Value Row 2
-    doc.setTextColor(0);
-    doc.setFontSize(9);
-    doc.rect(margin, fy, contentWidth, 8, 'S');
-    doc.text(movement.appearance || "A VISTA", col1X, fy + 5);
-    doc.text((movement.packagesCount || 0).toString(), col3X + 30, fy + 5, { align: "right" });
-    
-    doc.line(margin + 148, fy - footerRowHeight, margin + 148, fy + 8); // Split
-
-    fy += 8;
-
-    // Annotazioni Header
-    doc.setFillColor(...grayBg);
-    doc.rect(margin, fy, contentWidth, footerRowHeight, 'F');
-    doc.rect(margin, fy, contentWidth, footerRowHeight, 'S');
-    doc.setTextColor(100);
-    doc.setFontSize(6);
-    doc.text("ANNOTAZIONI", col1X, fy + 4);
-
-    fy += footerRowHeight;
-
-    // Annotazioni Value
-    doc.setTextColor(0);
-    doc.setFontSize(8);
-    doc.rect(margin, fy, contentWidth, 12, 'S');
-    if (movement.notes) {
-        doc.text(movement.notes, col1X, fy + 5);
-    }
-
-    fy += 15;
-
-    // Signatures
-    // Ref: Firma Mittente | Firma Vettore | Firma Destinatario
-    // Grey headers for signatures too? Ref shows "FIRMA MITTENTE" in a grey bar?
-    // Image 2 shows:
-    // Grey bar "FIRMA MITTENTE" -> White box
-    // Grey bar "FIRMA VETTORE" -> White box
-    // Grey bar "FIRMA DESTINATARIO" -> White box
-    
-    const sigH = 5;
-    const sigBoxH = 15;
-    
-    // 3 Boxes
-    const sigW = contentWidth; // They are stacked? No, stacked in Ref Image 2!
-    // Image 2 shows them stacked at the bottom?
-    // Wait, Image 2 shows:
-    // "FIRMA MITTENTE" bar -> box
-    // "FIRMA VETTORE" bar -> box
-    // "FIRMA DESTINATARIO" bar -> box
-    // They are stacked vertically!
-    
-    // Stacked Signatures
-    const drawSigBlock = (y: number, title: string) => {
-        doc.setFillColor(...grayBg);
-        doc.rect(margin, y, contentWidth, sigH, 'F');
-        doc.rect(margin, y, contentWidth, sigH, 'S');
+        // Row 1: Transport
+        drawHeaderBox(margin, fy, contentWidth, footerRowHeight, "", 6, false); // Background bar
         doc.setTextColor(100);
-        doc.setFontSize(6);
-        doc.text(title, margin + 2, y + 3.5);
+        doc.text("TRASPORTO A MEZZO", col1X, fy + 3.5);
+        doc.text("DATA DI RITIRO", col2X, fy + 3.5);
+        doc.text("ORA DEL RITIRO", col3X, fy + 3.5);
+        fy += footerRowHeight;
+
+        // Content Row 1
+        doc.rect(margin, fy, contentWidth, footerContentHeight, 'S');
+        doc.setTextColor(0);
+        doc.setFontSize(9);
+        doc.text("Mittente", col1X, fy + 5);
+        doc.text(format(new Date(movement.date), 'dd/MM/yyyy'), col2X, fy + 5);
+        doc.text("08:00:00", col3X, fy + 5);
+        // Vertical lines
+        doc.line(margin + 98, fy - footerRowHeight, margin + 98, fy + footerContentHeight);
+        doc.line(margin + 148, fy - footerRowHeight, margin + 148, fy + footerContentHeight);
+        fy += footerContentHeight;
+
+        // Row 2: Aspect
+        drawHeaderBox(margin, fy, contentWidth, footerRowHeight, "", 6, false);
+        doc.setTextColor(100);
+        doc.text("ASPETTO ESTERIORE DEI BENI", col1X, fy + 3.5);
+        doc.text("NUMERO DI COLLI", col3X, fy + 3.5);
+        fy += footerRowHeight;
+
+        // Content Row 2
+        doc.rect(margin, fy, contentWidth, footerContentHeight, 'S');
+        doc.setTextColor(0);
+        doc.setFontSize(9);
+        doc.text(movement.appearance || "A VISTA", col1X, fy + 5);
+        doc.text((movement.packagesCount || 0).toString(), col3X + 30, fy + 5, { align: "right" });
+        doc.line(margin + 148, fy - footerRowHeight, margin + 148, fy + footerContentHeight);
+        fy += footerContentHeight;
+
+        // Row 3: Notes
+        drawHeaderBox(margin, fy, contentWidth, footerRowHeight, "ANNOTAZIONI", 6, false);
         
-        doc.rect(margin, y + sigH, contentWidth, sigBoxH, 'S');
+        fy += footerRowHeight;
+        
+        // Content Row 3
+        const notesHeight = 10;
+        doc.rect(margin, fy, contentWidth, notesHeight, 'S');
+        doc.setTextColor(0);
+        doc.setFontSize(8);
+        if (movement.notes) {
+            doc.text(movement.notes, col1X, fy + 5);
+        }
+        fy += notesHeight + 2; // Gap
+
+        // Signatures (Side by Side)
+        const sigW = contentWidth / 3;
+        const sigH = 5;
+        const sigBoxH = 15;
+        
+        const drawSigBlock = (x: number, title: string) => {
+            // Header
+            doc.setFillColor(...grayBg);
+            doc.rect(x, fy, sigW, sigH, 'F');
+            doc.rect(x, fy, sigW, sigH, 'S');
+            doc.setTextColor(100);
+            doc.setFontSize(6);
+            doc.text(title, x + 2, fy + 3.5);
+            // Box
+            doc.rect(x, fy + sigH, sigW, sigBoxH, 'S');
+        };
+
+        drawSigBlock(margin, "FIRMA MITTENTE");
+        drawSigBlock(margin + sigW, "FIRMA VETTORE");
+        drawSigBlock(margin + sigW * 2, "FIRMA DESTINATARIO");
     };
 
-    drawSigBlock(fy, "FIRMA MITTENTE");
-    fy += sigH + sigBoxH;
+    // --- Handle Pagination for Footer ---
+    const finalY = (doc as any).lastAutoTable.finalY || currentY;
+    const spaceNeeded = footerHeight + margin;
     
-    drawSigBlock(fy, "FIRMA VETTORE");
-    fy += sigH + sigBoxH;
+    // If not enough space on current page, add new page
+    if (pageHeight - finalY < spaceNeeded) {
+        doc.addPage();
+    }
     
-    drawSigBlock(fy, "FIRMA DESTINATARIO");
+    // Draw footer at the bottom of the current (last) page
+    drawFooter(pageHeight - footerHeight - margin);
 
     doc.save(`DDT_${movement.number.replace(/\//g, '-')}.pdf`);
   };

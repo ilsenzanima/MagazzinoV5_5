@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Magazzino V5.5",
   description: "Gestione Magazzino Intelligente",
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
