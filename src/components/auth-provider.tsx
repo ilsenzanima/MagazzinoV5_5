@@ -82,15 +82,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // Non blocchiamo il rendering mentre recuperiamo il ruolo
+        // Questo evita la schermata bianca lunga se il DB è lento
+        setLoading(false);
+
         if (session?.user) {
-          await fetchUserRole(session.user.id);
+          // Fetch role in background
+          fetchUserRole(session.user.id);
         } else {
             setRealRole(null);
             setSimulatedRole(null);
         }
       } catch (error) {
         console.error("Error checking session:", error);
-      } finally {
         setLoading(false);
       }
     };
