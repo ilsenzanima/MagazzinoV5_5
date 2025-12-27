@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,8 @@ import { useAuth } from "@/components/auth-provider";
 
 export default function NewInventoryItemPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const cloneId = searchParams.get('cloneId');
   const { user, userRole } = useAuth();
   
   if (userRole === 'user') {
@@ -81,6 +83,42 @@ export default function NewInventoryItemPage() {
     };
     loadData();
   }, []);
+
+  // Handle Clone
+  useEffect(() => {
+    if (!cloneId || loadingData) return;
+
+    const loadCloneData = async () => {
+      try {
+        setIsLoading(true);
+        const item = await inventoryApi.getById(cloneId);
+        if (item) {
+          setFormData({
+            name: item.name,
+            model: "", // Clear model as requested for variants
+            brand: item.brand,
+            type: item.type,
+            supplierCode: item.supplierCode || "",
+            minStock: item.minStock.toString(),
+            unit: item.unit,
+            coefficient: item.coefficient.toString(),
+            description: item.description || "",
+            image: item.image || ""
+          });
+          if (item.image) {
+            setPreviewImage(item.image);
+          }
+          // Note: We keep the auto-generated code, don't copy the old one
+        }
+      } catch (error) {
+        console.error("Failed to load clone data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCloneData();
+  }, [cloneId, loadingData]);
 
   // Form State
   const [formData, setFormData] = useState({

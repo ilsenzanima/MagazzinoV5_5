@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText, AlertTriangle, Copy } from "lucide-react";
 import { 
   InventoryItem 
 } from "@/lib/mock-data";
@@ -764,7 +764,17 @@ export default function InventoryDetailPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="model">Modello / Variante</Label>
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="model">Modello / Variante</Label>
+                    {!isEditing && (
+                      <Link href={`/inventory/new?cloneId=${item.id}`} title="Crea variante da questo articolo">
+                        <Button variant="ghost" size="sm" className="h-6 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2">
+                          <Copy className="h-3 w-3 mr-1" />
+                          Crea Variante
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
                   {isEditing ? (
                       <Input 
                           id="model" 

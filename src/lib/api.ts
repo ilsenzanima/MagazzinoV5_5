@@ -571,7 +571,7 @@ const mapClientToDb = (client: Partial<Client>) => ({
   phone: client.phone
 });
 
-const mapDbToJob = (db: any): Job => ({
+export const mapDbToJob = (db: any): Job => ({
   id: db.id,
   clientId: db.client_id,
   clientName: db.clients?.name,
@@ -785,7 +785,7 @@ const mapDeliveryNoteToDb = (note: Partial<DeliveryNote>) => ({
   notes: note.notes
 });
 
-const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
+export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
   id: db.id,
   type: db.type,
   number: db.number,

@@ -13,7 +13,6 @@ import {
   Calendar,
   Building,
   MapPin,
-  FileText,
   Trash2
 } from "lucide-react";
 import Link from "next/link";
@@ -29,15 +28,19 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/components/auth-provider";
 
-export default function JobsContent() {
+interface JobsContentProps {
+  initialJobs: Job[];
+}
+
+export default function JobsContent({ initialJobs }: JobsContentProps) {
   const router = useRouter();
   const { userRole } = useAuth();
   const searchParams = useSearchParams();
   const filterClientId = searchParams.get('clientId');
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [jobs, setJobs] = useState<Job[]>(initialJobs);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -45,9 +48,10 @@ export default function JobsContent() {
   // Ottimizzazione INP: Defer search term update
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
+  // Update jobs if props change (e.g. server re-render with new filters)
   useEffect(() => {
-    loadJobs();
-  }, [filterClientId]);
+    setJobs(initialJobs);
+  }, [initialJobs]);
 
   const loadJobs = async () => {
     try {
@@ -72,7 +76,8 @@ export default function JobsContent() {
     if (!jobToDelete) return;
     try {
       await jobsApi.delete(jobToDelete.id);
-      await loadJobs();
+      // Refresh data - ideally via router.refresh() to update server data
+      router.refresh(); 
       setIsDeleteDialogOpen(false);
       setJobToDelete(null);
     } catch (error) {
