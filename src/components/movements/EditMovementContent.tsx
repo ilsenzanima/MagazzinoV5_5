@@ -8,17 +8,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Search, Package } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Search, Package, Clock } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  inventoryApi, 
+  inventoryApi,
   deliveryNotesApi,
   InventoryItem, 
   Job,
   DeliveryNote
 } from "@/lib/api";
+import { updateMovement } from "@/app/movements/actions";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
@@ -363,9 +371,9 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
         isFictitious: line.isFictitious
       }));
 
-      await deliveryNotesApi.update(initialNote.id, noteData, itemsData);
+      await updateMovement(initialNote.id, noteData, itemsData);
       
-      router.push('/movements');
+      // Redirect handled by server action
     } catch (error: any) {
       console.error("Error saving movement:", error);
       alert(`Errore durante il salvataggio: ${error.message || "Errore sconosciuto"}`);
@@ -528,6 +536,32 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
                                     <Search className="h-4 w-4 text-slate-400 flex-shrink-0" />
                                 </div>
                             </div>
+
+                            {/* Batch Selector for Exit/Sale */}
+                            {(activeTab === 'exit' || activeTab === 'sale') && selectedItemForLine && availableBatches.length > 0 && (
+                                <div className="w-full sm:w-48 space-y-2">
+                                    <Label className="text-xs">Lotto (FIFO)</Label>
+                                    <Select 
+                                        value={currentLine.purchaseItemId} 
+                                        onValueChange={(val) => setCurrentLine({...currentLine, purchaseItemId: val})}
+                                    >
+                                        <SelectTrigger className="h-10 bg-white">
+                                            <SelectValue placeholder="Lotto..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableBatches.map(batch => (
+                                                <SelectItem key={batch.id} value={batch.id}>
+                                                    <span className="flex flex-col text-left">
+                                                        <span className="font-medium">{batch.purchaseRef || "Nessun Rif."}</span>
+                                                        <span className="text-xs text-slate-500">Disp: {batch.remainingQty}</span>
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
                             <div className="w-full sm:w-32 space-y-2">
                                 {currentLine.coefficient !== 1 && (
                                     <div>
@@ -726,7 +760,8 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
         <JobSelectorDialog 
             open={isJobSelectorOpen} 
             onOpenChange={setIsJobSelectorOpen} 
-            onSelect={handleJobSelect} 
+            onSelect={handleJobSelect}
+            jobs={jobs}
         />
         
         <ItemSelectorDialog

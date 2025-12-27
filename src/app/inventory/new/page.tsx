@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 
-export default function NewInventoryItemPage() {
+function NewInventoryItemContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const cloneId = searchParams.get('cloneId');
@@ -432,5 +432,19 @@ export default function NewInventoryItemPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function NewInventoryItemPage() {
+  return (
+    <Suspense fallback={
+        <DashboardLayout>
+            <div className="flex items-center justify-center h-screen">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            </div>
+        </DashboardLayout>
+    }>
+      <NewInventoryItemContent />
+    </Suspense>
   );
 }

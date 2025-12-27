@@ -17,10 +17,10 @@ import { format } from "date-fns";
 import { 
   inventoryApi, 
   jobsApi, 
-  deliveryNotesApi,
   InventoryItem, 
   Job 
 } from "@/lib/api";
+import { createMovement } from "@/app/movements/actions";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
@@ -326,19 +326,30 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
     const qty = parseFloat(currentLine.quantity);
     if (qty <= 0) return;
 
-    // Check availability for EXIT
-    if (activeTab === 'exit') {
+    // Check availability for EXIT or SALE
+    if (activeTab === 'exit' || activeTab === 'sale') {
         const batch = availableBatches.find(b => b.id === currentLine.purchaseItemId);
+        
+        // If we have a selected batch, check its limits
         if (currentLine.purchaseItemId && batch) {
-            if (qty > batch.remainingQty) {
+             // Check pieces if available (source of truth)
+             if (currentLine.pieces && batch.remainingPieces !== undefined) {
+                 if (Number(currentLine.pieces) > batch.remainingPieces) {
+                      alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
+                      return;
+                 }
+             } 
+             // Fallback to quantity check
+             else if (qty > batch.remainingQty) {
                 alert(`Quantità eccessiva per il lotto selezionato. Disponibile: ${batch.remainingQty}`);
                 return;
             }
-        } else if (availableBatches.length > 0) {
-            // If batches exist but none selected, warn user
-             // alert("Seleziona un lotto di provenienza");
-             // return;
-             // Allowing generic exit for now if needed
+        } 
+        // If no batch selected but batches exist, we might want to warn
+        else if (availableBatches.length > 0) {
+            // Optional: enforce batch selection
+            // alert("Seleziona un lotto di provenienza");
+            // return;
         }
     }
 
@@ -401,7 +412,7 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
     try {
         setLoading(true);
         
-        await deliveryNotesApi.create({
+        await createMovement({
             type: activeTab,
             number: fullNumber,
             date: date,
@@ -421,12 +432,10 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
             coefficient: l.coefficient,
             purchaseItemId: l.purchaseItemId,
             isFictitious: l.isFictitious,
-            // Price is not handled in UI yet, defaulting to 0 or fetching from inventory?
-            // Backend/API might handle price retrieval if not provided
-            price: 0 
+            price: 0
         })));
 
-        router.push('/movements');
+        // Redirect handled by server action
     } catch (error: any) {
         console.error("Create failed", error);
         alert(`Errore durante il salvataggio: ${error.message}`);
@@ -642,8 +651,8 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                                 </Button>
                             </div>
                             
-                            {/* If Exit, Show Batches */}
-                            {activeTab === 'exit' && selectedItemForLine && availableBatches.length > 0 && (
+                            {/* If Exit or Sale, Show Batches */}
+                            {(activeTab === 'exit' || activeTab === 'sale') && selectedItemForLine && availableBatches.length > 0 && (
                                 <div className="space-y-2">
                                     <Label className="text-xs">Seleziona Lotto (FIFO)</Label>
                                     <Select 
