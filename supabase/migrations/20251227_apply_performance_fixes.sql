@@ -102,6 +102,7 @@ DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles; -- variante nome
 
 -- Unica policy combinata
+DROP POLICY IF EXISTS "Users and Admins can update profile" ON public.profiles;
 CREATE POLICY "Users and Admins can update profile" ON public.profiles 
 FOR UPDATE TO authenticated 
 USING (
