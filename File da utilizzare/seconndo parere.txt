@@ -1,0 +1,152 @@
+Il motivo per cui riscontri ancora problemi (connessione che cade quando cambi scheda e si risolve solo con F5) è che il codice attuale della Dashboard è ancora completamente Client-Side ("use client").
+
+Perché succede questo? Quando cambi scheda (tab) nel browser, Chrome/Edge mette "in pausa" le risorse JavaScript per risparmiare memoria. Questo spesso interrompe la connessione con Supabase o fa scadere il token di sessione senza che il browser riesca a rinnovarlo in tempo. Quando torni sulla scheda, la funzione fetchStats dentro useEffect non viene rieseguita (perché il componente è già montato) o fallisce silenziosamente perché la connessione è "congelata".
+
+La Soluzione Definitiva: Server Components Dobbiamo spostare il caricamento dei dati sul Server. Il server non va mai in "pausa" e non soffre del problema delle schede in background.
+
+Ecco il codice esatto per dividere la tua dashboard in due parti: una parte Server (che scarica i dati in modo robusto) e una parte Client (che mostra i grafici).
+
+Passo 1: Crea il componente Client (DashboardClient.tsx)
+Crea questo nuovo file. Questo gestirà solo la parte visiva (Tabs, Layout) ricevendo i dati già pronti.
+
+File: src/components/dashboard/DashboardClient.tsx
+
+TypeScript
+
+"use client";
+
+import { useState } from "react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StatsCards } from "@/components/dashboard/StatsCards";
+import { CalendarView } from "@/components/dashboard/CalendarView";
+import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
+import { RecentMovements } from "@/components/dashboard/RecentMovements";
+import { ActiveJobsWidget } from "@/components/dashboard/ActiveJobs";
+
+// Definiamo il tipo dei dati che ci aspettiamo dal Server
+interface DashboardStats {
+  totalValue: number;
+  lowStockCount: number;
+  totalItems: number;
+}
+
+export function DashboardClient({ initialStats }: { initialStats: DashboardStats }) {
+  const [activeTab, setActiveTab] = useState("overview");
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center mb-6">
+           <h1 className="text-2xl font-bold text-slate-900 dark:text-white hidden md:block">Dashboard</h1>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="overview">Panoramica</TabsTrigger>
+            <TabsTrigger value="calendar">Calendario Presenze</TabsTrigger>
+            <TabsTrigger value="analytics">Analisi</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-4">
+            {/* Passiamo i dati calcolati dal server ai componenti */}
+            <StatsCards 
+              totalValue={initialStats.totalValue} 
+              lowStockCount={initialStats.lowStockCount}
+              totalItems={initialStats.totalItems}
+            />
+            
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                <div className="col-span-4">
+                  <RecentMovements />
+                </div>
+                <div className="col-span-3">
+                  <ActiveJobsWidget />
+                </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="calendar" className="space-y-4">
+            {activeTab === 'calendar' && <CalendarView />}
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-4">
+            {activeTab === 'analytics' && <AttendanceChart />}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </DashboardLayout>
+  );
+}
+Passo 2: Aggiorna la Pagina (page.tsx) per usare il Server
+Ora sostituisci completamente il contenuto di src/app/dashboard/page.tsx con questo. Nota che non c'è più "use client" in cima e usiamo createClient da lib/supabase/server (che è molto più stabile per il data fetching).
+
+File: src/app/dashboard/page.tsx
+
+TypeScript
+
+import { createClient } from "@/lib/supabase/server"; // Importante: usa la versione SERVER
+import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Componente di caricamento mentre il server recupera i dati
+function DashboardSkeleton() {
+  return (
+    <div className="p-8 pt-6 space-y-6">
+      <div className="flex justify-between items-center mb-6">
+         <Skeleton className="h-8 w-48" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+      </div>
+    </div>
+  );
+}
+
+export default async function DashboardPage() {
+  // 1. Creiamo il client lato server (non soffre di problemi di timeout del browser)
+  const supabase = await createClient();
+
+  // 2. Scarichiamo i dati direttamente prima di mostrare la pagina
+  const { data: inventory, error } = await supabase
+    .from('inventory')
+    .select('quantity, price, min_stock');
+
+  if (error) {
+    console.error("Errore caricamento dashboard:", error);
+  }
+
+  // 3. Calcoli lato server (più veloci e sicuri)
+  let totalValue = 0;
+  let lowStockCount = 0;
+  const totalItems = inventory?.length || 0;
+
+  inventory?.forEach(item => {
+    totalValue += (item.quantity || 0) * (item.price || 0);
+    if ((item.quantity || 0) <= (item.min_stock || 0)) {
+      lowStockCount++;
+    }
+  });
+
+  const stats = {
+    totalValue,
+    lowStockCount,
+    totalItems
+  };
+
+  // 4. Passiamo i dati pronti al Client Component
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardClient initialStats={stats} />
+    </Suspense>
+  );
+}
+Cosa cambia con questa modifica?
+Stabilità: Il caricamento dei dati avviene sui server di Vercel, non nel browser dell'utente. Se l'utente lascia la scheda aperta per 3 giorni e torna, Next.js ricaricherà la pagina dal server automaticamente se necessario, garantendo dati freschi.
+
+Velocità: Non devi aspettare che il browser scarichi React, esegua l'effect e poi chiami il DB. I dati arrivano già pronti insieme all'HTML.
+
+Fix del "Cold Start": Anche se il database dorme, la richiesta parte dal server (backend), che gestisce meglio l'attesa rispetto a un browser che potrebbe aver "congelato" la scheda.
