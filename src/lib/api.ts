@@ -754,6 +754,7 @@ export interface DeliveryNote {
   jobId?: string;
   jobCode?: string;
   jobDescription?: string;
+  jobAddress?: string;
   causal: string;
   pickupLocation: string;
   deliveryLocation: string;
@@ -792,6 +793,7 @@ const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
   jobId: db.job_id,
   jobCode: db.jobs?.code,
   jobDescription: db.jobs?.description,
+  jobAddress: db.jobs?.site_address,
   causal: db.causal,
   pickupLocation: db.pickup_location,
   deliveryLocation: db.delivery_location,
@@ -824,7 +826,7 @@ export const deliveryNotesApi = {
       const { data, error } = await fetchWithTimeout<any>(
         supabase
           .from('delivery_notes')
-          .select('*, jobs(code, description), delivery_note_items(quantity)')
+          .select('*, jobs(code, description, site_address), delivery_note_items(quantity)')
           .order('date', { ascending: false })
       );
 
@@ -896,7 +898,7 @@ export const deliveryNotesApi = {
       .from('delivery_notes')
       .select(`
         *,
-        jobs(code, description),
+        jobs(code, description, site_address),
         delivery_note_items(
           *,
           inventory(name, code, unit, brand, category, description, price, model),
