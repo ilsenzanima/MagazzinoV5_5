@@ -41,6 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Cache keys
+  const STORAGE_KEY_ROLE = 'fireblock_user_role';
+  const STORAGE_KEY_SIMULATED_ROLE = 'fireblock_simulated_role';
+
   // Effective role is simulatedRole if present, otherwise realRole
   const userRole = simulatedRole || realRole;
 
@@ -58,10 +62,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       
       if (data) {
-        setRealRole(data.role as 'admin' | 'user' | 'operativo');
+        const role = data.role as 'admin' | 'user' | 'operativo';
+        setRealRole(role);
+        // Update cache
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY_ROLE, role);
+        }
       } else {
         // If profile doesn't exist yet (e.g. just registered), default to user
         setRealRole('user');
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY_ROLE, 'user');
+        }
       }
     } catch (error) {
       console.error(`Error fetching user role (attempts left: ${retries}):`, error);
@@ -78,6 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    // Track if we've just fetched to avoid double calls
+    let justFetched = false;
 
     const initAuth = async () => {
       try {
@@ -86,16 +100,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (!mounted) return;
 
+        // Try to load from cache first for immediate feedback
+        if (typeof window !== 'undefined') {
+          const cachedRole = localStorage.getItem(STORAGE_KEY_ROLE) as 'admin' | 'user' | 'operativo' | null;
+          const cachedSimulated = sessionStorage.getItem(STORAGE_KEY_SIMULATED_ROLE) as 'admin' | 'user' | 'operativo' | null;
+          
+          if (cachedRole) setRealRole(cachedRole);
+          if (cachedSimulated) setSimulatedRole(cachedSimulated);
+        }
+
         if (initialSession?.user) {
           setSession(initialSession);
           setUser(initialSession.user);
-          await fetchUserRole(initialSession.user.id);
+          
+          // Background fetch to update cache/state if changed
+          justFetched = true;
+          fetchUserRole(initialSession.user.id).finally(() => {
+             // Reset flag after a reasonable time or immediately? 
+             // actually justFetched is local to the effect scope but shared with the closure?
+             // No, initAuth is called once. 
+             // We need to signal to the subscription.
+             setTimeout(() => { justFetched = false; }, 2000);
+          });
         } else {
             // Se non c'è sessione, puliamo tutto subito
             setSession(null);
             setUser(null);
             setRealRole(null);
             setSimulatedRole(null);
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem(STORAGE_KEY_ROLE);
+              sessionStorage.removeItem(STORAGE_KEY_SIMULATED_ROLE);
+            }
         }
       } catch (error) {
         console.error("Auth init error:", error);
@@ -117,10 +153,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(newSession?.user ?? null);
             
             if (newSession?.user) {
-                await fetchUserRole(newSession.user.id);
+                // Skip if we just fetched in initAuth (prevent double fetch on load)
+                if (!justFetched) {
+                  await fetchUserRole(newSession.user.id);
+                }
             } else {
                 setRealRole(null);
                 setSimulatedRole(null);
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem(STORAGE_KEY_ROLE);
+                  sessionStorage.removeItem(STORAGE_KEY_SIMULATED_ROLE);
+                }
             }
             
             if (event === 'SIGNED_IN') router.refresh();
@@ -138,15 +181,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
+  // Update simulated role persistence
+  const updateSimulatedRole = (role: 'admin' | 'user' | 'operativo' | null) => {
+    setSimulatedRole(role);
+    if (typeof window !== 'undefined') {
+      if (role) {
+        sessionStorage.setItem(STORAGE_KEY_SIMULATED_ROLE, role);
+      } else {
+        sessionStorage.removeItem(STORAGE_KEY_SIMULATED_ROLE);
+      }
+    }
+  };
+
   const value = {
     user,
     session,
     loading,
-    signOut: async () => await supabase.auth.signOut(),
+    signOut: async () => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY_ROLE);
+        sessionStorage.removeItem(STORAGE_KEY_SIMULATED_ROLE);
+      }
+      return await supabase.auth.signOut();
+    },
     userRole,
     realRole,
     simulatedRole,
-    setSimulatedRole
+    setSimulatedRole: updateSimulatedRole
   };
 
   return (

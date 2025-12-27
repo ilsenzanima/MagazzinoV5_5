@@ -1,0 +1,14 @@
+# Regole del Progetto
+
+1. **Next.js 16 Proxy**:
+   - In questo progetto (Next.js 16), utilizzare SEMPRE `src/proxy.ts` invece di `src/middleware.ts`.
+   - `middleware.ts` è deprecato e non deve essere creato.
+   - `proxy.ts` gestisce l'intercettazione delle richieste e la sessione Supabase.
+
+2. **Supabase Auth**:
+   - La gestione della sessione avviene in `src/proxy.ts` importando `updateSession` da `@/lib/supabase/middleware`.
+   - Non modificare la logica di autenticazione senza verificare la compatibilità con il proxy.
+
+3. **Docker Environment**:
+   - Utilizzare sempre `docker-compose.dev.yml`.
+   - Eseguire comandi backend nel container `backend_dev`.
