@@ -145,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       try {
         // 1. Optimistic Load from Cache
+        let cacheIsValid = false;
         if (typeof window !== 'undefined') {
           const cachedRole = localStorage.getItem(STORAGE_KEY_ROLE) as 'admin' | 'user' | 'operativo' | null;
           const cachedRoleTs = localStorage.getItem(STORAGE_KEY_ROLE_TS);
@@ -154,6 +155,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setRealRole(cachedRole);
             if (cachedRoleTs) {
               lastFetchedRef.current = Number(cachedRoleTs);
+              if (Date.now() - Number(cachedRoleTs) < MIN_CACHE_TTL) {
+                cacheIsValid = true;
+              }
             }
           }
           if (cachedSimulated) setSimulatedRole(cachedSimulated);
@@ -169,7 +173,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(initialSession.user);
 
           // Fetch will internally check if cache is fresh and skip if needed
-          fetchUserRole(initialSession.user.id);
+          // But we double check here to prevent even the call attempt on mount
+          if (!cacheIsValid) {
+            fetchUserRole(initialSession.user.id);
+          }
         } else {
           setSession(null);
           setUser(null);
