@@ -1477,6 +1477,14 @@ export const clientsApi = {
     return mapDbToClient(data);
   },
   delete: async (id: string) => {
+    // Cascade delete jobs first
+    const { data: jobs } = await supabase.from('jobs').select('id').eq('client_id', id);
+    if (jobs && jobs.length > 0) {
+      for (const job of jobs) {
+        await jobsApi.delete(job.id);
+      }
+    }
+
     const { error } = await supabase.from('clients').delete().eq('id', id);
     if (error) throw error;
   }
@@ -1629,6 +1637,42 @@ export const jobsApi = {
     return mapDbToJob(data);
   },
   delete: async (id: string) => {
+    // Manually delete related records to handle foreign key constraints
+    
+    // 1. Delete job logs
+    await supabase.from('job_logs').delete().eq('job_id', id);
+    
+    // 2. Delete job documents
+    await supabase.from('job_documents').delete().eq('job_id', id);
+
+    // 3. Delete sites
+    await supabase.from('sites').delete().eq('job_id', id);
+
+    // 4. Delete job inventory (explicitly, though it might cascade)
+    await supabase.from('job_inventory').delete().eq('job_id', id);
+
+    // 5. Handle movements and delivery notes
+    // First fetch delivery notes to clean up their movements AND items
+    const { data: notes } = await supabase.from('delivery_notes').select('id').eq('job_id', id);
+    
+    if (notes && notes.length > 0) {
+        const noteIds = notes.map(n => n.id);
+        
+        // Delete delivery_note_items associated with these delivery notes
+        await supabase.from('delivery_note_items').delete().in('delivery_note_id', noteIds);
+    }
+    
+    // Delete any other movements associated with this job
+    await supabase.from('movements').delete().eq('job_id', id);
+
+    // Now safe to delete delivery notes
+    await supabase.from('delivery_notes').delete().eq('job_id', id);
+
+    // Unlink purchases and purchase items (don't delete them as they are accounting records)
+    await supabase.from('purchases').update({ job_id: null }).eq('job_id', id);
+    await supabase.from('purchase_items').update({ job_id: null }).eq('job_id', id);
+
+    // 6. Finally delete the job
     const { error } = await supabase.from('jobs').delete().eq('id', id);
     if (error) throw error;
   },
