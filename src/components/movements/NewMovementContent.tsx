@@ -673,7 +673,26 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-4 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Pezzi</Label>
+                                        <Input
+                                            type="number"
+                                            placeholder="0"
+                                            value={currentLine.pieces || ""}
+                                            onChange={e => {
+                                                const p = e.target.value;
+                                                const coef = currentLine.coefficient || 0;
+                                                let q = currentLine.quantity;
+
+                                                if (p && !isNaN(parseFloat(p)) && coef > 0) {
+                                                    q = (parseFloat(p) * coef).toFixed(2);
+                                                }
+
+                                                setCurrentLine({ ...currentLine, pieces: p, quantity: q });
+                                            }}
+                                        />
+                                    </div>
                                     <div className="space-y-2">
                                         <Label>Quantità</Label>
                                         <Input
@@ -704,6 +723,7 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                                     <TableRow>
                                         <TableHead>Codice</TableHead>
                                         <TableHead>Descrizione</TableHead>
+                                        <TableHead className="text-right">Pezzi</TableHead>
                                         <TableHead className="text-right">Q.tà</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
@@ -727,6 +747,9 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                                                             Lotto: {line.purchaseRef}
                                                         </Badge>
                                                     )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {line.pieces || "-"}
                                                 </TableCell>
                                                 <TableCell className="text-right font-bold">
                                                     {line.quantity} {line.itemUnit}
