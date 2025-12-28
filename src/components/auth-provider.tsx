@@ -25,7 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   realRole: null,
   simulatedRole: null,
-  setSimulatedRole: () => {},
+  setSimulatedRole: () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -33,7 +33,7 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Use singleton instance instead of creating new one
   // const [supabase] = useState(() => createClient()); 
-  
+
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [realRole, setRealRole] = useState<'admin' | 'user' | 'operativo' | null>(null);
@@ -50,26 +50,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserRole = async (userId: string, retries = 3) => {
     try {
-      // Increased timeout for role fetching (critical operation)
-      // and use maybeSingle() instead of single() to avoid errors on missing rows
+      console.log("Fetching user role for:", userId);
+      // Increased timeout for role fetching to 5s (fail faster than 10s)
       const { data, error } = await fetchWithTimeout(
         supabase
           .from('profiles')
           .select('role')
           .eq('id', userId)
           .maybeSingle(),
-        10000 // 10 seconds timeout for this critical call
+        5000
       );
-      
+
       if (data) {
         const role = data.role as 'admin' | 'user' | 'operativo';
         setRealRole(role);
         // Update cache
         if (typeof window !== 'undefined') {
+          const oldRole = localStorage.getItem(STORAGE_KEY_ROLE);
           localStorage.setItem(STORAGE_KEY_ROLE, role);
+          // Only refresh if role actually changed
+          if (oldRole !== role) {
+            router.refresh();
+          }
         }
       } else {
-        // If profile doesn't exist yet (e.g. just registered), default to user
+        // Default to user if no profile
         setRealRole('user');
         if (typeof window !== 'undefined') {
           localStorage.setItem(STORAGE_KEY_ROLE, 'user');
@@ -78,60 +83,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error(`Error fetching user role (attempts left: ${retries}):`, error);
       if (retries > 0) {
-        // Exponential backoff: 1s, 2s, 4s
         const delay = Math.pow(2, 3 - retries) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
         return fetchUserRole(userId, retries - 1);
       }
-      // Non resettiamo il ruolo in caso di errore per preservare la sessione
-      // durante i refresh del token in background
+      // Fallback: keep existing role or default to 'user' if nothing set
+      if (!realRole) setRealRole('user');
     }
   };
 
   useEffect(() => {
     let mounted = true;
-    // Track if we've just fetched to avoid double calls
-    let justFetched = false;
 
     const initAuth = async () => {
       try {
-        // 1. Prendi la sessione iniziale
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
-
-        // Try to load from cache first for immediate feedback
+        // 1. Optimistic Load from Cache
         if (typeof window !== 'undefined') {
           const cachedRole = localStorage.getItem(STORAGE_KEY_ROLE) as 'admin' | 'user' | 'operativo' | null;
           const cachedSimulated = sessionStorage.getItem(STORAGE_KEY_SIMULATED_ROLE) as 'admin' | 'user' | 'operativo' | null;
-          
-          if (cachedRole) setRealRole(cachedRole);
+
+          if (cachedRole) {
+            console.log("Loaded role from cache:", cachedRole);
+            setRealRole(cachedRole);
+          }
           if (cachedSimulated) setSimulatedRole(cachedSimulated);
         }
+
+        // 2. Get Session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+
+        if (!mounted) return;
 
         if (initialSession?.user) {
           setSession(initialSession);
           setUser(initialSession.user);
-          
-          // Background fetch to update cache/state if changed
-          justFetched = true;
-          fetchUserRole(initialSession.user.id).finally(() => {
-             // Reset flag after a reasonable time or immediately? 
-             // actually justFetched is local to the effect scope but shared with the closure?
-             // No, initAuth is called once. 
-             // We need to signal to the subscription.
-             setTimeout(() => { justFetched = false; }, 2000);
-          });
+
+          // Background fetch to ensure cache is fresh
+          // Don't await this to unblock UI immediately
+          fetchUserRole(initialSession.user.id);
         } else {
-            // Se non c'è sessione, puliamo tutto subito
-            setSession(null);
-            setUser(null);
-            setRealRole(null);
-            setSimulatedRole(null);
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem(STORAGE_KEY_ROLE);
-              sessionStorage.removeItem(STORAGE_KEY_SIMULATED_ROLE);
-            }
+          setSession(null);
+          setUser(null);
+          setRealRole(null);
+          setSimulatedRole(null);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem(STORAGE_KEY_ROLE);
+            sessionStorage.removeItem(STORAGE_KEY_SIMULATED_ROLE);
+          }
         }
       } catch (error) {
         console.error("Auth init error:", error);
@@ -142,41 +140,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
-    // 2. Ascolta i cambiamenti
+    // 3. Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         if (!mounted) return;
-        
-        // Always update session and user on these events
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
-            setSession(newSession);
-            setUser(newSession?.user ?? null);
-            
-            if (newSession?.user) {
-                // Only fetch role if:
-                // 1. It's a fresh SIGNED_IN event
-                // 2. The user ID has changed (rare, but correct)
-                // 3. We haven't just fetched it in initAuth
-                const userIdChanged = user?.id !== newSession.user.id;
-                const shouldFetch = (event === 'SIGNED_IN' || userIdChanged) && !justFetched;
 
-                if (shouldFetch) {
-                  await fetchUserRole(newSession.user.id);
-                }
-            } else {
-                setRealRole(null);
-                setSimulatedRole(null);
-                if (typeof window !== 'undefined') {
-                  localStorage.removeItem(STORAGE_KEY_ROLE);
-                  sessionStorage.removeItem(STORAGE_KEY_SIMULATED_ROLE);
-                }
+        // Always update session
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
+          setSession(newSession);
+          setUser(newSession?.user ?? null);
+
+          if (newSession?.user) {
+            const userIdChanged = user?.id !== newSession.user.id;
+            // Fetch if user changed or it's a fresh login
+            // (Optimistic initAuth handles the initial load, this handles updates)
+            if (event === 'SIGNED_IN' || userIdChanged) {
+              await fetchUserRole(newSession.user.id);
             }
-            
-            if (event === 'SIGNED_IN') router.refresh();
-            if (event === 'SIGNED_OUT') {
-                router.push('/login'); 
-                router.refresh();
+          } else {
+            setRealRole(null);
+            setSimulatedRole(null);
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem(STORAGE_KEY_ROLE);
+              sessionStorage.removeItem(STORAGE_KEY_SIMULATED_ROLE);
             }
+          }
+
+          if (event === 'SIGNED_OUT') {
+            router.push('/login');
+            router.refresh();
+          }
         }
       }
     );
