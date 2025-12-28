@@ -209,8 +209,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(newSession?.user ?? null);
 
           if (newSession?.user) {
-            // Just call fetchUserRole - it will handle deduplication and throttling internally!
-            await fetchUserRole(newSession.user.id);
+            // Check cache before fetching even on refresh
+            let skipFetch = false;
+            if (typeof window !== 'undefined') {
+              const cachedRoleTs = localStorage.getItem(STORAGE_KEY_ROLE_TS);
+              if (cachedRoleTs && (Date.now() - Number(cachedRoleTs) < MIN_CACHE_TTL)) {
+                skipFetch = true;
+                console.log("Token refreshed, but role cache is fresh. Skipping fetch.");
+              }
+            }
+
+            if (!skipFetch) {
+              await fetchUserRole(newSession.user.id);
+            }
           } else {
             setRealRole(null);
             setSimulatedRole(null);
