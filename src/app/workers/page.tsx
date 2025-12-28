@@ -2,12 +2,12 @@ import { Suspense } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import WorkersContent from "./components/workers-content";
 import { Loader2 } from "lucide-react";
-import { workersApi } from "@/lib/api";
+import { workersApi, Worker } from "@/lib/api";
 
 export const dynamic = 'force-dynamic';
 
 export default async function WorkersPage() {
-    let workers = [];
+    let workers: Worker[] = [];
     try {
         workers = await workersApi.getAll();
     } catch (e) {
