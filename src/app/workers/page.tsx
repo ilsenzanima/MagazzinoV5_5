@@ -1,17 +1,25 @@
 import { Suspense } from "react";
+import { createClient } from "@/lib/supabase/server";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import WorkersContent from "./components/workers-content";
 import { Loader2, AlertCircle } from "lucide-react";
-import { workersApi, Worker } from "@/lib/api";
+import { Worker, mapDbToWorker } from "@/lib/api";
 
 export const dynamic = 'force-dynamic';
 
 export default async function WorkersPage() {
+    const supabase = await createClient();
     let workers: Worker[] = [];
     let error: string | null = null;
 
     try {
-        workers = await workersApi.getAll();
+        const { data, error: apiError } = await supabase
+            .from('workers')
+            .select('*')
+            .order('last_name', { ascending: true });
+
+        if (apiError) throw apiError;
+        workers = (data || []).map(mapDbToWorker);
     } catch (e: any) {
         console.error("Failed to fetch workers", e);
         error = e.message || "Impossibile recuperare la lista degli operai.";
