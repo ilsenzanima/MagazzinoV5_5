@@ -8,7 +8,7 @@ function DashboardSkeleton() {
   return (
     <div className="p-8 pt-6 space-y-6">
       <div className="flex justify-between items-center mb-6">
-         <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-8 w-48" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Skeleton className="h-32" />
@@ -20,28 +20,68 @@ function DashboardSkeleton() {
 }
 
 export default async function DashboardPage() {
-  // 1. Creiamo il client lato server (non soffre di problemi di timeout del browser)
   const supabase = await createClient();
 
-  // 2. Usiamo la RPC per calcolare tutto lato database (Performance Fix)
-  // Questo sostituisce il download di migliaia di righe e il ciclo foreach
-  const { data: statsData, error } = await supabase.rpc('get_dashboard_stats');
+  // Fetch all data in parallel for performance
+  const [statsResult, movementsResult, jobsResult] = await Promise.allSettled([
+    supabase.rpc('get_dashboard_stats'),
+    supabase
+      .from('movements')
+      .select(`
+        id,
+        type,
+        quantity,
+        created_at,
+        inventory (name, model, unit),
+        profiles:user_id (full_name)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase.from('jobs').select('status')
+  ]);
 
-  if (error) {
-    console.error("Errore caricamento dashboard (rpc):", error);
-  }
+  // Process Stats
+  const statsData = statsResult.status === 'fulfilled' ? statsResult.value.data : null;
+  if (statsResult.status === 'rejected') console.error("Error fetching stats:", statsResult.reason);
 
-  // Fallback sicuro se la RPC fallisce o ritorna null
   const stats = {
     totalValue: Number(statsData?.totalValue) || 0,
     lowStockCount: Number(statsData?.lowStockCount) || 0,
     totalItems: Number(statsData?.totalItems) || 0
   };
 
-  // 4. Passiamo i dati pronti al Client Component
+  // Process Movements
+  const recentMovements = movementsResult.status === 'fulfilled' && movementsResult.value.data
+    ? movementsResult.value.data
+    : [];
+  if (movementsResult.status === 'rejected') console.error("Error fetching movements:", movementsResult.reason);
+
+  // Process Jobs Stats
+  const jobsData = jobsResult.status === 'fulfilled' ? jobsResult.value.data : [];
+  if (jobsResult.status === 'rejected') console.error("Error fetching jobs:", jobsResult.reason);
+
+  const jobStats = (jobsData || []).reduce((acc, job) => {
+    const status = job.status as 'active' | 'completed' | 'suspended';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, { active: 0, completed: 0, suspended: 0, total: (jobsData?.length || 0) });
+
+  // Eplicitly add total if not calculated above (reduce implementation above doesn't add total property to acc except initial)
+  // Fix: The reduce above accumulates into {active, completed, suspended}, we need to add total separately or include it.
+  const finalJobStats = {
+    active: jobStats.active || 0,
+    completed: jobStats.completed || 0,
+    suspended: jobStats.suspended || 0,
+    total: jobsData?.length || 0
+  };
+
   return (
     <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardClient initialStats={stats} />
+      <DashboardClient
+        initialStats={stats}
+        recentMovements={recentMovements}
+        jobStats={finalJobStats}
+      />
     </Suspense>
   );
 }

@@ -24,64 +24,13 @@ interface Movement {
   } | null;
 }
 
-export function RecentMovements() {
-  const [movements, setMovements] = useState<Movement[]>([]);
-  const [loading, setLoading] = useState(true);
+interface RecentMovementsProps {
+  data: Movement[];
+}
 
-  useEffect(() => {
-    const fetchMovements = async () => {
-      try {
-        const supabase = createClient();
-        const { data, error } = await fetchWithTimeout(
-          supabase
-            .from('movements')
-            .select(`
-              id,
-              type,
-              quantity,
-              created_at,
-              inventory (name, model, unit),
-              profiles:user_id (full_name)
-            `)
-            .order('created_at', { ascending: false })
-            .limit(5)
-        );
-
-        if (!error && data) {
-          setMovements(data as any);
-        }
-      } catch (error) {
-        console.error("Error fetching recent movements:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMovements();
-  }, []);
-
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Movimenti Recenti</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center justify-between animate-pulse">
-                <div className="h-10 w-10 bg-slate-100 rounded-full" />
-                <div className="space-y-2 flex-1 ml-4">
-                  <div className="h-4 bg-slate-100 rounded w-3/4" />
-                  <div className="h-3 bg-slate-100 rounded w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+export function RecentMovements({ data }: RecentMovementsProps) {
+  // Safe fallback if data is undefined/null
+  const movements = data || [];
 
   return (
     <Card>
@@ -98,11 +47,10 @@ export function RecentMovements() {
             movements.map((movement) => (
               <div key={movement.id} className="flex items-start justify-between group">
                 <div className="flex items-start gap-4">
-                  <div className={`p-2 rounded-full ${
-                    movement.type === 'load' 
-                      ? 'bg-emerald-100 text-emerald-600' 
+                  <div className={`p-2 rounded-full ${movement.type === 'load'
+                      ? 'bg-emerald-100 text-emerald-600'
                       : 'bg-amber-100 text-amber-600'
-                  }`}>
+                    }`}>
                     {movement.type === 'load' ? (
                       <ArrowDownRight className="h-4 w-4" />
                     ) : (
@@ -119,11 +67,10 @@ export function RecentMovements() {
                       )}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                        movement.type === 'load' 
-                          ? 'bg-emerald-50 text-emerald-700' 
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${movement.type === 'load'
+                          ? 'bg-emerald-50 text-emerald-700'
                           : 'bg-amber-50 text-amber-700'
-                      }`}>
+                        }`}>
                         {movement.type === 'load' ? '+' : '-'}{movement.quantity} {movement.inventory?.unit}
                       </span>
                       <span className="text-xs text-slate-400 flex items-center gap-1">

@@ -16,14 +16,22 @@ interface DashboardStats {
   totalItems: number;
 }
 
-export function DashboardClient({ initialStats }: { initialStats: DashboardStats }) {
+export function DashboardClient({
+  initialStats,
+  recentMovements,
+  jobStats
+}: {
+  initialStats: DashboardStats,
+  recentMovements: any[], // Definito meglio nel componente figlio, ma qui passiamo i dati
+  jobStats: any // Idem
+}) {
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center mb-6">
-           <h1 className="text-2xl font-bold text-slate-900 dark:text-white hidden md:block">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white hidden md:block">Dashboard</h1>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -35,19 +43,19 @@ export function DashboardClient({ initialStats }: { initialStats: DashboardStats
 
           <TabsContent value="overview" className="space-y-4">
             {/* Passiamo i dati calcolati dal server ai componenti */}
-            <StatsCards 
-              totalValue={initialStats.totalValue} 
+            <StatsCards
+              totalValue={initialStats.totalValue}
               lowStockCount={initialStats.lowStockCount}
               totalItems={initialStats.totalItems}
             />
-            
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <div className="col-span-4">
-                  <RecentMovements />
-                </div>
-                <div className="col-span-3">
-                  <ActiveJobsWidget />
-                </div>
+              <div className="col-span-4">
+                <RecentMovements data={recentMovements} />
+              </div>
+              <div className="col-span-3">
+                <ActiveJobsWidget stats={jobStats} />
+              </div>
             </div>
           </TabsContent>
 

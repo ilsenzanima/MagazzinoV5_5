@@ -1494,7 +1494,7 @@ export const jobsApi = {
     if (error) throw error;
     return data.map(mapDbToJob);
   },
-  getPaginated: async ({ page = 1, limit = 10, search = '', clientId = '', status = '' }) => {
+  getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '' }) => {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -1511,17 +1511,6 @@ export const jobsApi = {
     }
 
     if (search) {
-      // Search in job fields and client name
-      // Since we use !inner join on clients, we can filter by client name
-      // However, OR conditions across tables are tricky in Supabase JS client without raw SQL or RPC
-      // But if we use the foreign table syntax in filter:
-      // "clients.name.ilike.%search%" might work if mapped correctly
-
-      // Strategy: Pre-fetch matching client IDs if searching for client name
-      // Or rely on job fields + client name if possible.
-      // Simpler approach for now matching other implementations:
-      // Search code/description OR matching client IDs.
-
       const { data: clients } = await supabase
         .from('clients')
         .select('id')
@@ -1531,7 +1520,10 @@ export const jobsApi = {
 
       let orConditions = [
         `code.ilike.%${search}%`,
-        `description.ilike.%${search}%`
+        `description.ilike.%${search}%`,
+        `cig.ilike.%${search}%`,
+        `cup.ilike.%${search}%`,
+        `site_address.ilike.%${search}%`
       ];
 
       if (clientIds.length > 0) {
@@ -1557,6 +1549,7 @@ export const jobsApi = {
       total: count || 0
     };
   },
+
   getByClientId: async (clientId: string) => {
     console.time('jobsApi.getByClientId');
     try {
