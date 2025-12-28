@@ -72,7 +72,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   // Load Jobs (Server Side Search & Pagination)
   useEffect(() => {
     // Skip initial load if data matches props (prevent double fetch)
-    if (page === 1 && !deferredSearchTerm && !filterClientId && jobs === initialJobs) {
+    // ONLY if we actually have data. If we have 0 jobs, it might be the server-side auth failing,
+    // so we want to try fetching client-side just in case.
+    if (page === 1 && !deferredSearchTerm && !filterClientId && jobs === initialJobs && initialJobs.length > 0) {
       return;
     }
     loadJobs();
