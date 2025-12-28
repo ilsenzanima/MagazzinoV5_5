@@ -1853,7 +1853,7 @@ export const workersApi = {
         .order('last_name', { ascending: true })
     );
     if (error) throw error;
-    return data.map(mapDbToWorker);
+    return (data || []).map(mapDbToWorker);
   },
 
   create: async (worker: Partial<Worker>) => {

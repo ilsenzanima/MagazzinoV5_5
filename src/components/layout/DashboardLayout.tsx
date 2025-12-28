@@ -79,6 +79,10 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/workers",
           active: pathname === "/workers" || pathname.startsWith("/workers/"),
         },
+      ]
+    },
+    {
+      items: [
         {
           label: "Commesse",
           icon: ClipboardList,
