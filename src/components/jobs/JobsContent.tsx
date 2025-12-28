@@ -62,6 +62,13 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     setPage(1);
   }, [deferredSearchTerm, filterClientId]);
 
+  // Sync state with props when validation/refresh happens
+  useEffect(() => {
+    setJobs(initialJobs);
+    setTotalItems(initialTotal);
+    setTotalPages(Math.ceil(initialTotal / limit) || 1);
+  }, [initialJobs, initialTotal, limit]);
+
   // Load Jobs (Server Side Search & Pagination)
   useEffect(() => {
     // Skip initial load if data matches props (prevent double fetch)
