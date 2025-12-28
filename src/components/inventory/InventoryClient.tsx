@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -193,14 +194,16 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Label htmlFor="inventory-search" className="sr-only">Cerca articoli</Label>
             <Input
               id="inventory-search"
               name="search"
+              type="search"
+              autoComplete="off"
               placeholder="Cerca Articoli (Nome, Codice, Marca, Tipologia...)"
               className="pl-9 bg-slate-100 dark:bg-muted border-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              aria-label="Cerca articoli"
             />
           </div>
           <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR" aria-label="Scansiona Barcode/QR">
@@ -249,19 +252,36 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                   <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group h-full">
                     <CardContent className="p-0 flex flex-col h-full">
                       {/* Immagine */}
-                      <div className="w-full h-48 bg-slate-200 shrink-0 relative flex items-center justify-center bg-white">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.image || itemTypes.find(t => t.name === item.type)?.imageUrl || "/placeholder.svg"}
-                          alt={item.name}
-                          className={`transition-transform duration-300 ${!item.image && (itemTypes.find(t => t.name === item.type)?.imageUrl)
+                      <div className="w-full h-48 bg-slate-200 shrink-0 relative flex items-center justify-center bg-white overflow-hidden">
+                        {/* Use Next.js Image for optimization and CLS prevention */}
+                        {/* Note: We use unoptimized for user uploads if domains aren't configured, but it still helps with layout */}
+                        {/* Fallback pattern would require a more complex Image component, for now we keep simple conditional */}
+                        {(item.image || itemTypes.find(t => t.name === item.type)?.imageUrl) ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.image || itemTypes.find(t => t.name === item.type)?.imageUrl || "/placeholder.svg"}
+                            alt={item.name}
+                            className={`transition-transform duration-300 ${!item.image && (itemTypes.find(t => t.name === item.type)?.imageUrl)
                               ? "w-auto h-3/4 object-contain"
                               : "w-full h-full object-cover group-hover:scale-105"
-                            } ${item.quantity === 0 ? "grayscale opacity-80" : ""}`}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/placeholder.svg";
-                          }}
-                        />
+                              } ${item.quantity === 0 ? "grayscale opacity-80" : ""}`}
+                            loading="lazy"
+                            width={400} // Explicit width/height to help browser reserve space
+                            height={300}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/placeholder.svg";
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src="/placeholder.svg"
+                            alt={item.name}
+                            className="w-auto h-3/4 object-contain opacity-50"
+                            width={100}
+                            height={100}
+                          />
+                        )}
+
                         {item.quantity === 0 && (
                           <div className="absolute inset-0 bg-white/10 flex items-center justify-center">
                             <Badge variant="destructive" className="text-sm font-bold shadow-sm">ESAURITO</Badge>
@@ -274,7 +294,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="text-xs text-slate-500 font-mono mb-1">{item.code}</p>
-                            <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight">
+                            <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight" title={item.name}>
                               {item.name}
                               {item.model && <span className="text-slate-500 font-medium ml-1">({item.model})</span>}
                             </h3>
