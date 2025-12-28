@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .select('role')
             .eq('id', userId)
             .maybeSingle(),
-          5000
+          15000
         );
 
         if (data) {
