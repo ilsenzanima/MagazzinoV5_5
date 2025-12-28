@@ -1828,7 +1828,7 @@ export interface Worker {
   createdAt: string;
 }
 
-const mapDbToWorker = (db: any): Worker => ({
+export const mapDbToWorker = (db: any): Worker => ({
   id: db.id,
   firstName: db.first_name,
   lastName: db.last_name,
