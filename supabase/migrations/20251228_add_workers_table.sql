@@ -1,5 +1,8 @@
--- Create Workers Table
-create table public.workers (
+-- Create extension if not exists (required for uuid_generate_v4)
+create extension if not exists "uuid-ossp";
+
+-- Create Workers Table if it doesn't exist
+create table if not exists public.workers (
   id uuid default uuid_generate_v4() primary key,
   first_name text not null,
   last_name text not null,
@@ -12,7 +15,11 @@ create table public.workers (
 -- Enable RLS
 alter table public.workers enable row level security;
 
--- Policies
+-- Drop existing policies to ensure clean state and avoid "policy already exists" errors
+drop policy if exists "Workers are viewable by authenticated users." on workers;
+drop policy if exists "Operativo and Admin can create workers." on workers;
+drop policy if exists "Operativo and Admin can update workers." on workers;
+drop policy if exists "Only Admins can delete workers." on workers;
 
 -- 1. Read: Authenticated users can read workers
 create policy "Workers are viewable by authenticated users."
@@ -24,8 +31,8 @@ create policy "Workers are viewable by authenticated users."
 create policy "Operativo and Admin can create workers."
   on workers for insert
   to authenticated
-  with check ( 
-    exists (
+  with check (
+     exists (
       select 1 from profiles
       where profiles.id = auth.uid()
       and profiles.role in ('admin', 'operativo')
@@ -36,8 +43,8 @@ create policy "Operativo and Admin can create workers."
 create policy "Operativo and Admin can update workers."
   on workers for update
   to authenticated
-  using ( 
-    exists (
+  using (
+     exists (
       select 1 from profiles
       where profiles.id = auth.uid()
       and profiles.role in ('admin', 'operativo')
@@ -48,8 +55,8 @@ create policy "Operativo and Admin can update workers."
 create policy "Only Admins can delete workers."
   on workers for delete
   to authenticated
-  using ( 
-    exists (
+  using (
+     exists (
       select 1 from profiles
       where profiles.id = auth.uid()
       and profiles.role = 'admin'
@@ -66,6 +73,9 @@ begin
   return new;
 end;
 $$;
+
+-- Drop trigger if exists
+drop trigger if exists on_worker_updated on public.workers;
 
 -- Trigger for updated_at
 create trigger on_worker_updated
