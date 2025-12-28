@@ -3,38 +3,38 @@ import { InventoryItem, User } from './mock-data';
 
 // Helper for timeouts
 export const fetchWithTimeout = async <T>(promise: PromiseLike<T>, ms: number = 30000): Promise<T> => {
-    const start = Date.now();
-    return new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-            const duration = Date.now() - start;
-            // Only log as error if it's a real timeout, not cancelled
-            if (ms > 2000) {
-                 console.error(`Request timed out after ${duration}ms (Limit: ${ms}ms)`);
-            }
-            reject(new Error("Request timed out"));
-        }, ms);
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      const duration = Date.now() - start;
+      // Only log as error if it's a real timeout, not cancelled
+      if (ms > 2000) {
+        console.error(`Request timed out after ${duration}ms (Limit: ${ms}ms)`);
+      }
+      reject(new Error("Request timed out"));
+    }, ms);
 
-        promise.then(
-            (res) => {
-                clearTimeout(timeoutId);
-                const duration = Date.now() - start;
-                // Increased threshold for warning to reduce noise
-                if (duration > 5000) {
-                    console.warn(`Slow request detected: ${duration}ms`);
-                }
-                resolve(res);
-            },
-            (err) => {
-                clearTimeout(timeoutId);
-                const duration = Date.now() - start;
-                // Log failed requests but be less verbose for expected aborts
-                if (err.name !== 'AbortError') {
-                    console.error(`Request failed after ${duration}ms:`, err);
-                }
-                reject(err);
-            }
-        );
-    });
+    promise.then(
+      (res) => {
+        clearTimeout(timeoutId);
+        const duration = Date.now() - start;
+        // Increased threshold for warning to reduce noise
+        if (duration > 5000) {
+          console.warn(`Slow request detected: ${duration}ms`);
+        }
+        resolve(res);
+      },
+      (err) => {
+        clearTimeout(timeoutId);
+        const duration = Date.now() - start;
+        // Log failed requests but be less verbose for expected aborts
+        if (err.name !== 'AbortError') {
+          console.error(`Request failed after ${duration}ms:`, err);
+        }
+        reject(err);
+      }
+    );
+  });
 };
 
 export type { InventoryItem, User };
@@ -68,7 +68,7 @@ export interface Client {
   province: string;
   // Display helper
   address?: string; // Constructed full address
-  
+
   email: string;
   phone: string;
   createdAt?: string;
@@ -266,6 +266,31 @@ export const suppliersApi = {
     if (error) throw error;
     return data.map(mapDbToSupplier);
   },
+  getPaginated: async ({ page = 1, limit = 10, search = '' }) => {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = supabase
+      .from('suppliers')
+      .select('*', { count: 'exact' });
+
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,vat_number.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    query = query
+      .order('name')
+      .range(from, to);
+
+    const { data, error, count } = await fetchWithTimeout(query);
+
+    if (error) throw error;
+
+    return {
+      data: data.map(mapDbToSupplier),
+      total: count || 0
+    };
+  },
   getById: async (id: string) => {
     const { data, error } = await fetchWithTimeout(
       supabase.from('suppliers').select('*').eq('id', id).single()
@@ -314,25 +339,25 @@ export const purchasesApi = {
     }
 
     if (search) {
-       // 1. Find matching suppliers to include them in the OR search
-       const { data: suppliers } = await supabase
-         .from('suppliers')
-         .select('id')
-         .ilike('name', `%${search}%`);
-       
-       const supplierIds = suppliers?.map(s => s.id) || [];
-       
-       // 2. Build OR filter
-       let orConditions = [
-         `delivery_note_number.ilike.%${search}%`,
-         `notes.ilike.%${search}%`
-       ];
+      // 1. Find matching suppliers to include them in the OR search
+      const { data: suppliers } = await supabase
+        .from('suppliers')
+        .select('id')
+        .ilike('name', `%${search}%`);
 
-       if (supplierIds.length > 0) {
-         orConditions.push(`supplier_id.in.(${supplierIds.join(',')})`);
-       }
+      const supplierIds = suppliers?.map(s => s.id) || [];
 
-       query = query.or(orConditions.join(','));
+      // 2. Build OR filter
+      let orConditions = [
+        `delivery_note_number.ilike.%${search}%`,
+        `notes.ilike.%${search}%`
+      ];
+
+      if (supplierIds.length > 0) {
+        orConditions.push(`supplier_id.in.(${supplierIds.join(',')})`);
+      }
+
+      query = query.or(orConditions.join(','));
     }
 
     query = query
@@ -342,7 +367,7 @@ export const purchasesApi = {
     const { data, error, count } = await fetchWithTimeout(query);
 
     if (error) throw error;
-    
+
     return {
       data: data.map(mapDbToPurchase),
       total: count || 0
@@ -364,12 +389,12 @@ export const purchasesApi = {
     if (!user) throw new Error("Utente non autenticato");
 
     const dbPurchase = mapPurchaseToDb({ ...purchase, createdBy: user.id });
-    
+
     const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name)').single();
     if (error) throw error;
     return mapDbToPurchase(data);
   },
-  
+
   uploadDocument: async (file: File) => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
@@ -390,7 +415,7 @@ export const purchasesApi = {
 
   update: async (id: string, purchase: Partial<Purchase>) => {
     const dbPurchase = mapPurchaseToDb(purchase);
-    
+
     const { data, error } = await supabase.from('purchases').update(dbPurchase).eq('id', id).select('*, suppliers(name)').single();
     if (error) throw error;
     return mapDbToPurchase(data);
@@ -403,27 +428,27 @@ export const purchasesApi = {
   getPurchaseBatchAvailability: async (purchaseId: string) => {
     // First get the purchase items to get their IDs
     const { data: items } = await supabase.from('purchase_items').select('id').eq('purchase_id', purchaseId);
-    
+
     if (!items || items.length === 0) return [];
-    
+
     const ids = items.map(i => i.id);
-    
+
     const { data, error } = await supabase
       .from('purchase_batch_availability')
       .select('*')
       .in('purchase_item_id', ids);
-      
+
     if (error) throw error;
     return data.map((b: any) => ({
-        id: b.purchase_item_id,
-        purchaseRef: b.purchase_ref,
-        date: b.purchase_date,
-        originalQty: b.original_quantity,
-        remainingQty: b.remaining_quantity,
-        originalPieces: b.original_pieces,
-        remainingPieces: b.remaining_pieces,
-        price: b.unit_price,
-        coefficient: b.coefficient
+      id: b.purchase_item_id,
+      purchaseRef: b.purchase_ref,
+      date: b.purchase_date,
+      originalQty: b.original_quantity,
+      remainingQty: b.remaining_quantity,
+      originalPieces: b.original_pieces,
+      remainingPieces: b.remaining_pieces,
+      price: b.unit_price,
+      coefficient: b.coefficient
     }));
   },
 
@@ -435,7 +460,7 @@ export const purchasesApi = {
         .select('*, inventory(name, code, model), jobs(code)')
         .eq('purchase_id', purchaseId)
     );
-      
+
     if (error) throw error;
     return data.map((item: any) => ({
       id: item.id,
@@ -473,7 +498,7 @@ export const purchasesApi = {
     if (item.pieces !== undefined) dbItem.pieces = item.pieces;
     if (item.price !== undefined) dbItem.price = item.price;
     if (item.jobId !== undefined) dbItem.job_id = item.jobId;
-    
+
     const { data, error } = await supabase.from('purchase_items').update(dbItem).eq('id', id).select().single();
     if (error) throw error;
     return data;
@@ -507,17 +532,17 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
 export const mapDbProfileToUser = (profile: any): User => {
   const role = (profile.role || 'user') as 'admin' | 'user' | 'operativo';
   let avatarFile = 'user.png';
-  
+
   if (role === 'admin') avatarFile = 'admin.png';
   else if (role === 'operativo') avatarFile = 'operativo.png';
-  
+
   return {
     id: profile.id,
     name: profile.full_name || profile.email?.split('@')[0] || 'Utente',
     email: profile.email || '',
     role: role,
     // Use role-based avatar instead of user uploaded one
-    avatar: `/avatars/${avatarFile}`, 
+    avatar: `/avatars/${avatarFile}`,
     status: 'active', // Default value as it's not in profiles table
     lastLogin: profile.updated_at // Using updated_at as proxy for now
   };
@@ -529,15 +554,15 @@ const mapDbToClient = (db: any): Client => {
   // but for now we'll handle the flat structure or provide defaults
   // Assuming the DB still has a single 'address' column for legacy/simplicity 
   // OR we need to split it.
-  
+
   // Since we updated the interface but maybe not the DB schema yet, 
   // let's be safe.
-  
+
   return {
     id: db.id,
     name: db.name,
     vatNumber: db.vat_number,
-    
+
     // Map legacy single address field to new fields if needed, 
     // or just use empty strings if columns don't exist yet.
     // Ideally, we should update the DB schema to match.
@@ -548,9 +573,9 @@ const mapDbToClient = (db: any): Client => {
     postalCode: db.postal_code || '',
     city: db.city || '',
     province: db.province || '',
-    
+
     address: db.address, // Keep original full string if available
-    
+
     email: db.email,
     phone: db.phone,
     createdAt: db.created_at
@@ -576,10 +601,10 @@ export const mapDbToJob = (db: any): Job => ({
   clientId: db.client_id,
   clientName: db.clients?.name,
   clientAddress: db.clients?.address || [
-      db.clients?.street ? `${db.clients.street} ${db.clients.street_number || ''}` : '',
-      db.clients?.postal_code,
-      db.clients?.city,
-      db.clients?.province ? `(${db.clients.province})` : ''
+    db.clients?.street ? `${db.clients.street} ${db.clients.street_number || ''}` : '',
+    db.clients?.postal_code,
+    db.clients?.city,
+    db.clients?.province ? `(${db.clients.province})` : ''
   ].filter(Boolean).join(' - '),
   code: db.code,
   description: db.description,
@@ -831,9 +856,9 @@ export const deliveryNotesApi = {
       );
 
       if (error) {
-          // Table doesn't exist yet, return mock data or empty
-          console.warn("Delivery notes table not found, returning empty");
-          return [];
+        // Table doesn't exist yet, return mock data or empty
+        console.warn("Delivery notes table not found, returning empty");
+        return [];
       }
 
       return data.map((d: any) => ({
@@ -855,24 +880,24 @@ export const deliveryNotesApi = {
       .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'exact' });
 
     if (search) {
-       // Pre-fetch matching job IDs to include in search
-       const { data: jobs } = await supabase
-         .from('jobs')
-         .select('id')
-         .ilike('code', `%${search}%`);
-       
-       const jobIds = jobs?.map(j => j.id) || [];
-       
-       let orConditions = [
-         `number.ilike.%${search}%`,
-         `causal.ilike.%${search}%`
-       ];
-       
-       if (jobIds.length > 0) {
-          orConditions.push(`job_id.in.(${jobIds.join(',')})`);
-       }
-       
-       query = query.or(orConditions.join(','));
+      // Pre-fetch matching job IDs to include in search
+      const { data: jobs } = await supabase
+        .from('jobs')
+        .select('id')
+        .ilike('code', `%${search}%`);
+
+      const jobIds = jobs?.map(j => j.id) || [];
+
+      let orConditions = [
+        `number.ilike.%${search}%`,
+        `causal.ilike.%${search}%`
+      ];
+
+      if (jobIds.length > 0) {
+        orConditions.push(`job_id.in.(${jobIds.join(',')})`);
+      }
+
+      query = query.or(orConditions.join(','));
     }
 
     query = query
@@ -882,7 +907,7 @@ export const deliveryNotesApi = {
     const { data, error, count } = await fetchWithTimeout(query);
 
     if (error) throw error;
-    
+
     return {
       data: data.map((d: any) => ({
         ...mapDbToDeliveryNote(d),
@@ -892,7 +917,7 @@ export const deliveryNotesApi = {
       total: count || 0
     };
   },
-  
+
   getById: async (id: string) => {
     const { data, error } = await supabase
       .from('delivery_notes')
@@ -909,7 +934,7 @@ export const deliveryNotesApi = {
       .single();
 
     if (error) throw error;
-    
+
     return mapDbToDeliveryNote(data);
   },
 
@@ -928,7 +953,7 @@ export const deliveryNotesApi = {
       if (noteError) {
         console.error("Error creating delivery note:", noteError);
         throw noteError;
-    }
+      }
 
       // 2. Create Items
       if (items.length > 0) {
@@ -961,34 +986,34 @@ export const deliveryNotesApi = {
   update: async (id: string, note: Partial<DeliveryNote>, items?: Omit<DeliveryNoteItem, 'id' | 'deliveryNoteId'>[]) => {
     // Update Note
     const { error: noteError } = await supabase
-        .from('delivery_notes')
-        .update(mapDeliveryNoteToDb(note))
-        .eq('id', id);
-    
+      .from('delivery_notes')
+      .update(mapDeliveryNoteToDb(note))
+      .eq('id', id);
+
     if (noteError) throw noteError;
 
     // Update Items (Delete all and recreate - simplest strategy for now)
     if (items) {
-        // Delete existing
-        await supabase.from('delivery_note_items').delete().eq('delivery_note_id', id);
-        
-        // Insert new
-        const itemsToInsert = items.map(item => ({
-            delivery_note_id: id,
-            inventory_id: item.inventoryId,
-            quantity: item.quantity,
-            pieces: item.pieces,
-            coefficient: item.coefficient,
-            price: item.price,
-            purchase_item_id: item.purchaseItemId || null,
-            is_fictitious: item.isFictitious || false
-        }));
-        
-        const { error: itemsError } = await supabase
-            .from('delivery_note_items')
-            .insert(itemsToInsert);
+      // Delete existing
+      await supabase.from('delivery_note_items').delete().eq('delivery_note_id', id);
 
-        if (itemsError) throw itemsError;
+      // Insert new
+      const itemsToInsert = items.map(item => ({
+        delivery_note_id: id,
+        inventory_id: item.inventoryId,
+        quantity: item.quantity,
+        pieces: item.pieces,
+        coefficient: item.coefficient,
+        price: item.price,
+        purchase_item_id: item.purchaseItemId || null,
+        is_fictitious: item.isFictitious || false
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('delivery_note_items')
+        .insert(itemsToInsert);
+
+      if (itemsError) throw itemsError;
     }
   },
 
@@ -1012,43 +1037,43 @@ export interface InventorySupplierCode {
 }
 
 const mapDbToInventorySupplierCode = (db: any): InventorySupplierCode => ({
-    id: db.id,
-    inventoryId: db.inventory_id,
-    code: db.code,
-    supplierId: db.supplier_id,
-    supplierName: db.supplier_name || db.suppliers?.name,
-    note: db.note,
-    createdAt: db.created_at
+  id: db.id,
+  inventoryId: db.inventory_id,
+  code: db.code,
+  supplierId: db.supplier_id,
+  supplierName: db.supplier_name || db.suppliers?.name,
+  note: db.note,
+  createdAt: db.created_at
 });
 
 export const inventorySupplierCodesApi = {
-    getByItemId: async (itemId: string) => {
-        const { data, error } = await fetchWithTimeout(
-            supabase
-                .from('inventory_supplier_codes')
-                .select('*, suppliers(name)')
-                .eq('inventory_id', itemId)
-                .order('created_at', { ascending: false })
-        );
-        if (error) throw error;
-        return data.map(mapDbToInventorySupplierCode);
-    },
-    create: async (code: Partial<InventorySupplierCode>) => {
-        const dbCode = {
-            inventory_id: code.inventoryId,
-            code: code.code,
-            supplier_id: code.supplierId,
-            supplier_name: code.supplierName,
-            note: code.note
-        };
-        const { data, error } = await supabase.from('inventory_supplier_codes').insert(dbCode).select('*, suppliers(name)').single();
-        if (error) throw error;
-        return mapDbToInventorySupplierCode(data);
-    },
-    delete: async (id: string) => {
-        const { error } = await supabase.from('inventory_supplier_codes').delete().eq('id', id);
-        if (error) throw error;
-    }
+  getByItemId: async (itemId: string) => {
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('inventory_supplier_codes')
+        .select('*, suppliers(name)')
+        .eq('inventory_id', itemId)
+        .order('created_at', { ascending: false })
+    );
+    if (error) throw error;
+    return data.map(mapDbToInventorySupplierCode);
+  },
+  create: async (code: Partial<InventorySupplierCode>) => {
+    const dbCode = {
+      inventory_id: code.inventoryId,
+      code: code.code,
+      supplier_id: code.supplierId,
+      supplier_name: code.supplierName,
+      note: code.note
+    };
+    const { data, error } = await supabase.from('inventory_supplier_codes').insert(dbCode).select('*, suppliers(name)').single();
+    if (error) throw error;
+    return mapDbToInventorySupplierCode(data);
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase.from('inventory_supplier_codes').delete().eq('id', id);
+    if (error) throw error;
+  }
 };
 
 export const inventoryApi = {
@@ -1069,7 +1094,7 @@ export const inventoryApi = {
     // Special handling for 'low_stock' using RPC to avoid client-side filtering of large datasets
     if (options.tab === 'low_stock') {
       let rpcQuery = supabase.rpc('get_low_stock_inventory', {}, { count: 'exact' });
-      
+
       if (options.search) {
         const term = options.search;
         rpcQuery = rpcQuery.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,category.ilike.%${term}%,supplier_code.ilike.%${term}%`);
@@ -1099,9 +1124,9 @@ export const inventoryApi = {
 
     // Filter by tab
     if (options.tab === 'out_of_stock') {
-        query = query.eq('quantity', 0);
-    } 
-    
+      query = query.eq('quantity', 0);
+    }
+
     // Sort by name for paginated view (usually preferred over created_at)
     query = query.order('name');
 
@@ -1195,7 +1220,7 @@ export const inventoryApi = {
   getNextCode: async () => {
     const { data, error } = await supabase
       .rpc('get_next_article_code');
-    
+
     if (error) throw error;
     return data as string;
   },
@@ -1208,7 +1233,7 @@ export const inventoryApi = {
         .eq('item_id', itemId)
         .order('date', { ascending: false })
     );
-      
+
     if (error) throw error;
 
     return data.map((m: any) => ({
@@ -1237,58 +1262,58 @@ export const inventoryApi = {
       .select('*')
       .eq('item_id', itemId)
       .order('purchase_date', { ascending: true }); // FIFO by default
-      
+
     if (error) throw error;
     return data.map((b: any) => ({
-        id: b.purchase_item_id,
-        purchaseRef: b.purchase_ref,
-        date: b.purchase_date,
-        originalQty: b.original_quantity,
-        remainingQty: b.remaining_quantity,
-        originalPieces: b.original_pieces,
-        remainingPieces: b.remaining_pieces,
-        price: b.unit_price
+      id: b.purchase_item_id,
+      purchaseRef: b.purchase_ref,
+      date: b.purchase_date,
+      originalQty: b.original_quantity,
+      remainingQty: b.remaining_quantity,
+      originalPieces: b.original_pieces,
+      remainingPieces: b.remaining_pieces,
+      price: b.unit_price
     }));
   },
 
   // Get items currently at a specific job site (for Returns)
   getJobInventory: async (jobId: string) => {
     const { data, error } = await supabase
-        .from('job_inventory')
-        .select('*, inventory(*)')
-        .eq('job_id', jobId)
-        .gt('quantity', 0); // Only show items actually there
+      .from('job_inventory')
+      .select('*, inventory(*)')
+      .eq('job_id', jobId)
+      .gt('quantity', 0); // Only show items actually there
 
     if (error) throw error;
     return data.map((i: any) => ({
-        itemId: i.item_id,
-        quantity: i.quantity,
-        item: mapDbItemToInventoryItem(i.inventory)
+      itemId: i.item_id,
+      quantity: i.quantity,
+      item: mapDbItemToInventoryItem(i.inventory)
     }));
   },
 
   // Get job inventory broken down by purchase batch (for Returns with traceability)
   getJobBatchAvailability: async (jobId: string) => {
     const { data, error } = await supabase
-        .from('job_batch_availability')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('item_name', { ascending: true });
+      .from('job_batch_availability')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('item_name', { ascending: true });
 
     if (error) throw error;
     return data.map((b: any) => ({
-        itemId: b.item_id,
-        purchaseItemId: b.purchase_item_id,
-        purchaseRef: b.purchase_ref,
-        itemName: b.item_name,
-        itemModel: b.item_model,
-        itemCode: b.item_code,
-        itemUnit: b.item_unit,
-        itemBrand: b.item_brand,
-        itemCategory: b.item_category,
-        quantity: b.quantity,
-        pieces: b.pieces,
-        coefficient: b.coefficient
+      itemId: b.item_id,
+      purchaseItemId: b.purchase_item_id,
+      purchaseRef: b.purchase_ref,
+      itemName: b.item_name,
+      itemModel: b.item_model,
+      itemCode: b.item_code,
+      itemUnit: b.item_unit,
+      itemBrand: b.item_brand,
+      itemCategory: b.item_category,
+      quantity: b.quantity,
+      pieces: b.pieces,
+      coefficient: b.coefficient
     }));
   },
 
@@ -1303,7 +1328,7 @@ export const inventoryApi = {
       console.log('Database already seeded');
       return;
     }
-    return; 
+    return;
   }
 };
 
@@ -1362,9 +1387,9 @@ export const itemTypesApi = {
     const { data, error } = await supabase.from('item_types').select('*').order('name');
     if (error) throw error;
     return data.map((t: any) => ({
-        id: t.id,
-        name: t.name,
-        imageUrl: t.image_url
+      id: t.id,
+      name: t.name,
+      imageUrl: t.image_url
     })) as ItemType[];
   },
   create: async (name: string) => {
@@ -1407,7 +1432,7 @@ export const clientsApi = {
     if (error) throw error;
     return data.map(mapDbToClient);
   },
-  
+
   getPaginated: async (options: { page: number; limit: number; search?: string }) => {
     let query = supabase.from('clients').select('*', { count: 'exact' });
 
@@ -1486,34 +1511,34 @@ export const jobsApi = {
     }
 
     if (search) {
-       // Search in job fields and client name
-       // Since we use !inner join on clients, we can filter by client name
-       // However, OR conditions across tables are tricky in Supabase JS client without raw SQL or RPC
-       // But if we use the foreign table syntax in filter:
-       // "clients.name.ilike.%search%" might work if mapped correctly
-       
-       // Strategy: Pre-fetch matching client IDs if searching for client name
-       // Or rely on job fields + client name if possible.
-       // Simpler approach for now matching other implementations:
-       // Search code/description OR matching client IDs.
+      // Search in job fields and client name
+      // Since we use !inner join on clients, we can filter by client name
+      // However, OR conditions across tables are tricky in Supabase JS client without raw SQL or RPC
+      // But if we use the foreign table syntax in filter:
+      // "clients.name.ilike.%search%" might work if mapped correctly
 
-       const { data: clients } = await supabase
-         .from('clients')
-         .select('id')
-         .ilike('name', `%${search}%`);
-       
-       const clientIds = clients?.map(c => c.id) || [];
-       
-       let orConditions = [
-         `code.ilike.%${search}%`,
-         `description.ilike.%${search}%`
-       ];
+      // Strategy: Pre-fetch matching client IDs if searching for client name
+      // Or rely on job fields + client name if possible.
+      // Simpler approach for now matching other implementations:
+      // Search code/description OR matching client IDs.
 
-       if (clientIds.length > 0) {
-         orConditions.push(`client_id.in.(${clientIds.join(',')})`);
-       }
+      const { data: clients } = await supabase
+        .from('clients')
+        .select('id')
+        .ilike('name', `%${search}%`);
 
-       query = query.or(orConditions.join(','));
+      const clientIds = clients?.map(c => c.id) || [];
+
+      let orConditions = [
+        `code.ilike.%${search}%`,
+        `description.ilike.%${search}%`
+      ];
+
+      if (clientIds.length > 0) {
+        orConditions.push(`client_id.in.(${clientIds.join(',')})`);
+      }
+
+      query = query.or(orConditions.join(','));
     }
 
     // Reset select to include all fields needed for mapping
@@ -1526,7 +1551,7 @@ export const jobsApi = {
     const { data, error, count } = await fetchWithTimeout(query);
 
     if (error) throw error;
-    
+
     return {
       data: data.map(mapDbToJob),
       total: count || 0
@@ -1564,48 +1589,48 @@ export const jobsApi = {
   update: async (id: string, job: Partial<Job>, updateMovements: boolean = false) => {
     const { data, error } = await supabase.from('jobs').update(mapJobToDb(job)).eq('id', id).select().single();
     if (error) throw error;
-    
+
     // If flag is true and CIG/CUP are present, update existing delivery notes
     if (updateMovements && (job.cig || job.cup)) {
-        // We do this optimistically and don't block return
-        // Ideally this should be a stored procedure or server function to handle regex replacement safely
-        // But for now we fetch relevant notes, update text, and save back
-        
-        // 1. Fetch all delivery notes for this job
-        const { data: notes } = await supabase
-            .from('delivery_notes')
-            .select('id, notes')
-            .eq('job_id', id);
-            
-        if (notes && notes.length > 0) {
-            const cigPart = job.cig ? `CIG: ${job.cig}` : '';
-            const cupPart = job.cup ? `CUP: ${job.cup}` : '';
-            const newCodes = [cigPart, cupPart].filter(Boolean).join(' ');
-            
-            // 2. Update each note
-            const updates = notes.map(note => {
-                let currentNotes = note.notes || '';
-                
-                // Remove existing CIG/CUP patterns if they exist to avoid duplication
-                // Regex looks for CIG: XXXXX or CUP: XXXXX
-                currentNotes = currentNotes.replace(/CIG:\s*[^\s\n]+(\s|$)/g, '').replace(/CUP:\s*[^\s\n]+(\s|$)/g, '');
-                
-                // Prepend new codes
-                const updatedNotes = (newCodes + '\n' + currentNotes).trim();
-                
-                return {
-                    id: note.id,
-                    notes: updatedNotes
-                };
-            });
-            
-            // 3. Batch update (Use update instead of upsert to avoid validation errors on missing required fields)
-            const updatePromises = updates.map(u => 
-                supabase.from('delivery_notes').update({ notes: u.notes }).eq('id', u.id)
-            );
-            
-            await Promise.all(updatePromises);
-        }
+      // We do this optimistically and don't block return
+      // Ideally this should be a stored procedure or server function to handle regex replacement safely
+      // But for now we fetch relevant notes, update text, and save back
+
+      // 1. Fetch all delivery notes for this job
+      const { data: notes } = await supabase
+        .from('delivery_notes')
+        .select('id, notes')
+        .eq('job_id', id);
+
+      if (notes && notes.length > 0) {
+        const cigPart = job.cig ? `CIG: ${job.cig}` : '';
+        const cupPart = job.cup ? `CUP: ${job.cup}` : '';
+        const newCodes = [cigPart, cupPart].filter(Boolean).join(' ');
+
+        // 2. Update each note
+        const updates = notes.map(note => {
+          let currentNotes = note.notes || '';
+
+          // Remove existing CIG/CUP patterns if they exist to avoid duplication
+          // Regex looks for CIG: XXXXX or CUP: XXXXX
+          currentNotes = currentNotes.replace(/CIG:\s*[^\s\n]+(\s|$)/g, '').replace(/CUP:\s*[^\s\n]+(\s|$)/g, '');
+
+          // Prepend new codes
+          const updatedNotes = (newCodes + '\n' + currentNotes).trim();
+
+          return {
+            id: note.id,
+            notes: updatedNotes
+          };
+        });
+
+        // 3. Batch update (Use update instead of upsert to avoid validation errors on missing required fields)
+        const updatePromises = updates.map(u =>
+          supabase.from('delivery_notes').update({ notes: u.notes }).eq('id', u.id)
+        );
+
+        await Promise.all(updatePromises);
+      }
     }
 
     return mapDbToJob(data);
@@ -1617,7 +1642,7 @@ export const jobsApi = {
   getCost: async (id: string) => {
     const { data, error } = await supabase
       .rpc('get_job_total_cost', { p_job_id: id });
-      
+
     if (error) throw error;
     return data || 0;
   }
@@ -1692,7 +1717,7 @@ export const movementsApi = {
         .eq('item_id', itemId)
         .order('created_at', { ascending: false })
     );
-      
+
     if (error) throw error;
     return data.map(mapDbToMovement);
   },
@@ -1732,25 +1757,25 @@ export const movementsApi = {
       deliveryNoteId: db.delivery_note_id
     }));
   },
-  
+
   create: async (movement: Partial<Movement>) => {
     // 1. Get current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
-    
+
     // 2. Prepare movement data
     const dbMovement = mapMovementToDb({
       ...movement,
       userId: user.id
     });
-    
+
     // 3. Insert movement
     const { data, error } = await supabase
       .from('movements')
       .insert(dbMovement)
       .select()
       .single();
-      
+
     if (error) throw error;
     return mapDbToMovement(data);
   }

@@ -147,14 +147,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, newSession) => {
         if (!mounted) return;
         
-        // Aggiorna solo se la sessione è effettivamente cambiata o è un evento di Sign In/Out esplicito
+        // Always update session and user on these events
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
             setSession(newSession);
             setUser(newSession?.user ?? null);
             
             if (newSession?.user) {
-                // Skip if we just fetched in initAuth (prevent double fetch on load)
-                if (!justFetched) {
+                // Only fetch role if:
+                // 1. It's a fresh SIGNED_IN event
+                // 2. The user ID has changed (rare, but correct)
+                // 3. We haven't just fetched it in initAuth
+                const userIdChanged = user?.id !== newSession.user.id;
+                const shouldFetch = (event === 'SIGNED_IN' || userIdChanged) && !justFetched;
+
+                if (shouldFetch) {
                   await fetchUserRole(newSession.user.id);
                 }
             } else {
