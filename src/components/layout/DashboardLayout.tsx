@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { 
-  LayoutDashboard, 
-  Package, 
-  ClipboardList, 
-  BarChart3, 
-  Settings, 
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetHeader } from "@/components/ui/sheet";
+import {
+  LayoutDashboard,
+  Package,
+  ClipboardList,
+  BarChart3,
+  Settings,
   Menu,
   LogOut,
   Loader2,
@@ -105,7 +105,7 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           <h2 className="mb-6 px-4 text-lg font-semibold tracking-tight text-blue-400">
             Magazzino V5.5
           </h2>
-          
+
           <div className="space-y-4">
             {routeGroups.map((group, groupIndex) => (
               <div key={groupIndex} className="space-y-1">
@@ -114,7 +114,7 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
                     <Button
                       variant={route.active ? "secondary" : "ghost"}
                       className={cn(
-                        "w-full justify-start", 
+                        "w-full justify-start",
                         route.active ? "bg-slate-800 text-white hover:bg-slate-800" : "text-slate-400 hover:text-white hover:bg-slate-800"
                       )}
                     >
@@ -131,40 +131,40 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           </div>
         </div>
       </div>
-      
+
       <div className="p-4 bg-slate-900 border-t border-slate-800">
         <Link href="/settings" onClick={onLinkClick}>
-            <Button
-              variant={pathname === "/settings" ? "secondary" : "ghost"}
-              className={cn(
-                "w-full justify-start mb-2", 
-                pathname === "/settings" ? "bg-slate-800 text-white hover:bg-slate-800" : "text-slate-400 hover:text-white hover:bg-slate-800"
-              )}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Impostazioni
-            </Button>
+          <Button
+            variant={pathname === "/settings" ? "secondary" : "ghost"}
+            className={cn(
+              "w-full justify-start mb-2",
+              pathname === "/settings" ? "bg-slate-800 text-white hover:bg-slate-800" : "text-slate-400 hover:text-white hover:bg-slate-800"
+            )}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Impostazioni
+          </Button>
         </Link>
-        
+
         {user && (
           <div className="mb-4 px-2 flex items-center space-x-3 bg-slate-800/50 p-2 rounded-md">
-             <Avatar className="h-8 w-8">
-                <AvatarImage src={`/avatars/${userRole || 'user'}.png`} />
-                <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
-             </Avatar>
-             <div className="overflow-hidden">
-                <p className="text-sm font-medium text-white truncate">{user.email}</p>
-                <p className="text-xs text-slate-400 capitalize">{userRole || 'User'}</p>
-             </div>
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={`/avatars/${userRole || 'user'}.png`} />
+              <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div className="overflow-hidden">
+              <p className="text-sm font-medium text-white truncate">{user.email}</p>
+              <p className="text-xs text-slate-400 capitalize">{userRole || 'User'}</p>
+            </div>
           </div>
         )}
-        <Button 
-            variant="ghost" 
-            className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-slate-800"
-            onClick={signOut}
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-slate-800"
+          onClick={signOut}
         >
-            <LogOut className="mr-2 h-4 w-4" />
-            Esci
+          <LogOut className="mr-2 h-4 w-4" />
+          Esci
         </Button>
       </div>
     </div>
@@ -206,9 +206,9 @@ export default function DashboardLayout({
           <span className="mr-4">
             MODALITÀ SIMULAZIONE: Stai vedendo il sito come {simulatedRole.toUpperCase()}
           </span>
-          <Button 
-            variant="secondary" 
-            size="sm" 
+          <Button
+            variant="secondary"
+            size="sm"
             className="h-7 text-xs bg-white text-amber-600 hover:bg-amber-50"
             onClick={() => setSimulatedRole(null)}
           >
@@ -230,20 +230,24 @@ export default function DashboardLayout({
         "flex-1 md:pl-64 flex flex-col min-h-screen transition-all",
         simulatedRole ? "pt-10" : ""
       )}>
-        
+
         {/* Mobile Header with Hamburger */}
         <header className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-white dark:bg-slate-900 dark:border-slate-800 p-4 shadow-sm">
-           <div className="font-bold text-lg text-slate-900 dark:text-white">Magazzino V5.5</div>
-           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-             <SheetTrigger asChild>
-               <Button variant="ghost" size="icon">
-                 <Menu className="h-6 w-6" />
-               </Button>
-             </SheetTrigger>
-             <SheetContent side="left" className="p-0 bg-slate-900 border-r-slate-800 text-white w-64">
-               <Sidebar onLinkClick={() => setIsSheetOpen(false)} />
-             </SheetContent>
-           </Sheet>
+          <div className="font-bold text-lg text-slate-900 dark:text-white">Magazzino V5.5</div>
+          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 bg-slate-900 border-r-slate-800 text-white w-64">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Menu di Navigazione</SheetTitle>
+                <SheetDescription>Navigazione principale dell'applicazione</SheetDescription>
+              </SheetHeader>
+              <Sidebar onLinkClick={() => setIsSheetOpen(false)} />
+            </SheetContent>
+          </Sheet>
         </header>
 
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">

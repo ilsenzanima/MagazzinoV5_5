@@ -62,7 +62,7 @@ export function ActiveJobsWidget({ stats }: ActiveJobsWidgetProps) {
           </div>
 
           <div className="h-[120px] w-[120px] min-w-[120px]">
-            {stats.length > 0 ? (
+            {currentStats.total > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
