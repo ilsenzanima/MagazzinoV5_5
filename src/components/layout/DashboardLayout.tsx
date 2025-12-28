@@ -17,7 +17,8 @@ import {
   ShoppingCart,
   Truck,
   Users,
-  Building2
+  Building2,
+  HardHat
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -72,6 +73,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
     },
     {
       items: [
+        {
+          label: "Operai",
+          icon: HardHat,
+          href: "/workers",
+          active: pathname === "/workers" || pathname.startsWith("/workers/"),
+        },
         {
           label: "Commesse",
           icon: ClipboardList,

@@ -1638,10 +1638,10 @@ export const jobsApi = {
   },
   delete: async (id: string) => {
     // Manually delete related records to handle foreign key constraints
-    
+
     // 1. Delete job logs
     await supabase.from('job_logs').delete().eq('job_id', id);
-    
+
     // 2. Delete job documents
     await supabase.from('job_documents').delete().eq('job_id', id);
 
@@ -1654,14 +1654,14 @@ export const jobsApi = {
     // 5. Handle movements and delivery notes
     // First fetch delivery notes to clean up their movements AND items
     const { data: notes } = await supabase.from('delivery_notes').select('id').eq('job_id', id);
-    
+
     if (notes && notes.length > 0) {
-        const noteIds = notes.map(n => n.id);
-        
-        // Delete delivery_note_items associated with these delivery notes
-        await supabase.from('delivery_note_items').delete().in('delivery_note_id', noteIds);
+      const noteIds = notes.map(n => n.id);
+
+      // Delete delivery_note_items associated with these delivery notes
+      await supabase.from('delivery_note_items').delete().in('delivery_note_id', noteIds);
     }
-    
+
     // Delete any other movements associated with this job
     await supabase.from('movements').delete().eq('job_id', id);
 
@@ -1815,5 +1815,84 @@ export const movementsApi = {
 
     if (error) throw error;
     return mapDbToMovement(data);
+  }
+};
+
+// --- Workers API ---
+export interface Worker {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+const mapDbToWorker = (db: any): Worker => ({
+  id: db.id,
+  firstName: db.first_name,
+  lastName: db.last_name,
+  email: db.email,
+  isActive: db.is_active,
+  createdAt: db.created_at
+});
+
+const mapWorkerToDb = (worker: Partial<Worker>) => ({
+  first_name: worker.firstName,
+  last_name: worker.lastName,
+  email: worker.email,
+  is_active: worker.isActive
+});
+
+export const workersApi = {
+  getAll: async () => {
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('workers')
+        .select('*')
+        .order('last_name', { ascending: true })
+    );
+    if (error) throw error;
+    return data.map(mapDbToWorker);
+  },
+
+  create: async (worker: Partial<Worker>) => {
+    const { data, error } = await supabase
+      .from('workers')
+      .insert(mapWorkerToDb(worker))
+      .select()
+      .single();
+    if (error) throw error;
+    return mapDbToWorker(data);
+  },
+
+  update: async (id: string, worker: Partial<Worker>) => {
+    const { data, error } = await supabase
+      .from('workers')
+      .update(mapWorkerToDb(worker))
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapDbToWorker(data);
+  },
+
+  toggleStatus: async (id: string, isActive: boolean) => {
+    const { data, error } = await supabase
+      .from('workers')
+      .update({ is_active: isActive })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapDbToWorker(data);
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from('workers')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   }
 };
