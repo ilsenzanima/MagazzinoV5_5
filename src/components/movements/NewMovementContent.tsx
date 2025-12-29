@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Briefcase, Search, Clock, Package } from "lucide-react";
@@ -102,7 +103,8 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
         pieces: "",
         coefficient: 1,
         unit: "PZ",
-        purchaseItemId: ""
+        purchaseItemId: "",
+        isFictitious: false
     });
     const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
     const [availableBatches, setAvailableBatches] = useState<any[]>([]); // For Exit
@@ -377,7 +379,7 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
             pieces: currentLine.pieces ? parseFloat(currentLine.pieces) : undefined,
             coefficient: currentLine.coefficient,
             purchaseItemId: currentLine.purchaseItemId || undefined,
-            isFictitious: false // Default
+            isFictitious: currentLine.isFictitious || false
         };
 
         setLines([...lines, newLine]);
@@ -390,7 +392,8 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
             pieces: "",
             coefficient: 1,
             unit: "PZ",
-            purchaseItemId: ""
+            purchaseItemId: "",
+            isFictitious: false
         });
         setAvailableBatches([]);
     };
@@ -665,48 +668,73 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                                             <SelectContent>
                                                 {availableBatches.map(batch => (
                                                     <SelectItem key={batch.id} value={batch.id}>
-                                                        {batch.purchaseRef || "Nessun Rif."} - Disp: {batch.remainingQty} ({format(new Date(batch.date), 'dd/MM/yy')})
+                                                        {batch.purchaseRef || "Nessun Rif."} - Pz: {batch.remainingPieces ?? '-'} / Q.tà: {batch.remainingQty} ({format(new Date(batch.date), 'dd/MM/yy')})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        <div className="flex items-center space-x-2 mt-2">
+                                            <Checkbox
+                                                id="fictitious"
+                                                checked={currentLine.isFictitious || false}
+                                                onCheckedChange={(c) => setCurrentLine({ ...currentLine, isFictitious: c as boolean })}
+                                            />
+                                            <Label htmlFor="fictitious" className="text-xs cursor-pointer">Pezzi Fittizi (non scalare da magazzino)</Label>
+                                        </div>
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-4 gap-4">
+                                <div className="grid grid-cols-5 gap-4">
                                     <div className="space-y-2">
                                         <Label>Pezzi</Label>
                                         <Input
                                             type="number"
                                             placeholder="0"
+                                            step="0.01"
                                             value={currentLine.pieces || ""}
                                             onChange={e => {
-                                                const p = e.target.value;
-                                                const coef = currentLine.coefficient || 0;
-                                                let q = currentLine.quantity;
+                                                const piecesStr = e.target.value;
+                                                const pieces = parseFloat(piecesStr);
+                                                const coef = currentLine.coefficient || 1;
 
-                                                if (p && !isNaN(parseFloat(p)) && coef > 0) {
-                                                    q = (parseFloat(p) * coef).toFixed(2);
+                                                if (!isNaN(pieces) && coef > 0) {
+                                                    const quantity = (pieces * coef).toFixed(2);
+                                                    setCurrentLine({ ...currentLine, pieces: piecesStr, quantity });
+                                                } else {
+                                                    setCurrentLine({ ...currentLine, pieces: piecesStr });
                                                 }
-
-                                                setCurrentLine({ ...currentLine, pieces: p, quantity: q });
                                             }}
                                         />
+                                        <p className="text-xs text-muted-foreground">Coeff: {currentLine.coefficient}</p>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Quantità</Label>
+                                        <Label>Quantità ({currentLine.unit})</Label>
                                         <Input
                                             type="number"
                                             placeholder="0"
+                                            step="0.01"
                                             value={currentLine.quantity}
-                                            onChange={e => setCurrentLine({ ...currentLine, quantity: e.target.value })}
+                                            onChange={e => {
+                                                const quantityStr = e.target.value;
+                                                const quantity = parseFloat(quantityStr);
+                                                const coef = currentLine.coefficient || 1;
+
+                                                if (!isNaN(quantity) && coef > 0 && coef !== 1) {
+                                                    const pieces = (quantity / coef).toFixed(2);
+                                                    setCurrentLine({ ...currentLine, quantity: quantityStr, pieces });
+                                                } else if (!isNaN(quantity) && coef === 1) {
+                                                    setCurrentLine({ ...currentLine, quantity: quantityStr, pieces: quantityStr });
+                                                } else {
+                                                    setCurrentLine({ ...currentLine, quantity: quantityStr });
+                                                }
+                                            }}
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>U.M.</Label>
                                         <Input value={currentLine.unit} readOnly className="bg-slate-50" />
                                     </div>
-                                    <div className="flex items-end">
+                                    <div className="col-span-2 flex items-end">
                                         <Button onClick={handleAddLine} className="w-full">
                                             <Plus className="h-4 w-4 mr-2" />
                                             Aggiungi
