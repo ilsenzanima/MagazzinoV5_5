@@ -388,10 +388,14 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
         drawSigBlock(margin + sigW, "FIRMA VETTORE");
         drawSigBlock(margin + sigW * 2, "FIRMA DESTINATARIO");
         
-        // Timestamp
-        doc.setFontSize(6);
-        doc.setTextColor(150);
-        doc.text(`Generato il ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, margin, fy + sigH + sigBoxH + 3);
+        // Page Numbering (bottom right)
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.text(`Pagina ${i} di ${pageCount}`, pageWidth - margin, pageHeight - 5, { align: "right" });
+        }
     };
 
     // --- Handle Pagination for Footer ---
