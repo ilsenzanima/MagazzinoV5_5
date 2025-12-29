@@ -80,37 +80,43 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
     }
     console.log('Insert data:', JSON.stringify(insertData, null, 2))
 
-    const { data: result, error: noteError } = await supabase
+      const { data: result, error: noteError } = await supabase
       .from('delivery_notes')
       .insert(insertData)
       .select()
       .single()
 
     if (noteError) {
-      console.error('Error creating delivery note:', noteError.message, noteError.code, noteError.details, noteError.hint)
-      throw new Error(`Errore creazione bolla: ${noteError.message}`)
+      console.error('Error creating delivery note:', JSON.stringify(noteError))
+      throw new Error(`Errore creazione bolla: ${noteError.message} (${noteError.code})`)
     }
     noteData = result
     console.log('Delivery note created:', noteData.id)
   } catch (e: any) {
     console.error('delivery_notes insert failed:', e)
-    throw e
+    if (e instanceof Error) throw e;
+    throw new Error('Errore sconosciuto durante creazione bolla: ' + JSON.stringify(e));
   }
 
   // 2. Create Items
   if (lines.length > 0) {
     try {
       console.log('Inserting', lines.length, 'items...')
-      const itemsToInsert = lines.map(item => ({
-        delivery_note_id: noteData.id,
-        inventory_id: item.inventoryId,
-        quantity: Number(item.quantity),
-        pieces: item.pieces ? Number(item.pieces) : null,
-        coefficient: item.coefficient || 1,
-        price: item.price || 0,
-        purchase_item_id: item.purchaseItemId || null,
-        is_fictitious: item.isFictitious || false
-      }))
+      const itemsToInsert = lines.map(item => {
+        const quantity = Number(item.quantity);
+        if (isNaN(quantity)) throw new Error(`Quantità non valida per articolo ${item.inventoryId}`);
+        
+        return {
+          delivery_note_id: noteData.id,
+          inventory_id: item.inventoryId,
+          quantity: quantity,
+          pieces: item.pieces ? Number(item.pieces) : null,
+          coefficient: item.coefficient || 1,
+          price: item.price || 0,
+          purchase_item_id: item.purchaseItemId || null,
+          is_fictitious: item.isFictitious || false
+        };
+      })
       console.log('Items to insert:', JSON.stringify(itemsToInsert, null, 2))
 
       const { error: itemsError } = await supabase
@@ -118,13 +124,18 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
         .insert(itemsToInsert)
 
       if (itemsError) {
-        console.error('Error creating items:', itemsError.message, itemsError.code, itemsError.details, itemsError.hint)
-        throw new Error(`Errore inserimento articoli: ${itemsError.message}`)
+        console.error('Error creating items:', JSON.stringify(itemsError))
+        throw new Error(`Errore inserimento articoli: ${itemsError.message} (${itemsError.code})`)
       }
       console.log('Items created successfully')
     } catch (e: any) {
       console.error('delivery_note_items insert failed:', e)
-      throw e
+      // If items fail, we might want to rollback the note? 
+      // Ideally we should delete the note we just created to avoid orphans
+      await supabase.from('delivery_notes').delete().eq('id', noteData.id);
+      
+      if (e instanceof Error) throw e;
+      throw new Error('Errore sconosciuto durante inserimento articoli: ' + JSON.stringify(e));
     }
   }
 

@@ -1,4 +1,4 @@
-occha-- Optimize Database Performance based on AI Report
+occ-- Optimize Database Performance based on AI Report
 -- 1. Enable pg_stat_statements for query monitoring (if permissions allow)
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 

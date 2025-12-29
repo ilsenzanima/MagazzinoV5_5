@@ -237,7 +237,7 @@ export default function JobDetailsPage() {
                 </TabsContent>
 
                 <TabsContent value="documents" className="space-y-6 focus-visible:outline-none">
-                    <JobDocuments />
+                    <JobDocuments jobId={job.id} />
                 </TabsContent>
             </Tabs>
         </div>
