@@ -87,8 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetcher = async () => {
       try {
-        console.log("Fetching user role for:", userId);
-        // Timeout set to 15s to be safe, but no retries to prevent blocking UI for too long
+        // Optimizzazione: Usa RPC invece di select diretta per bypassare RLS complessi
+        // e ridurre i tempi di risposta (Security Definer)
+        /*
         const { data, error } = await fetchWithTimeout(
           supabase
             .from('profiles')
@@ -97,11 +98,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .maybeSingle(),
           15000
         );
+        */
+        const { data, error } = await fetchWithTimeout(
+          supabase.rpc('get_my_role'),
+          10000
+        );
 
         if (!isMountedRef.current) return;
 
-        if (data) {
-          const role = data.role as 'admin' | 'user' | 'operativo';
+        if (data || (data === null && !error)) {
+          // RPC returns the string role directly, or null if error?
+          // get_my_role returns 'user' text if null.
+          // data should be string.
+          const roleStr = data as string;
+          const role = (roleStr || 'user') as 'admin' | 'user' | 'operativo';
           setRealRole(role);
 
           if (typeof window !== 'undefined') {

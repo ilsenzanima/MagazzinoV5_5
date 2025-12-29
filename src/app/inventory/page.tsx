@@ -8,8 +8,8 @@ import { mapDbItemToInventoryItem } from "@/lib/api";
 function InventorySkeleton() {
   return (
     <div className="flex justify-center items-center py-12 h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-slate-500">Caricamento inventario...</span>
+      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <span className="ml-2 text-slate-500">Caricamento inventario...</span>
     </div>
   );
 }
@@ -20,7 +20,7 @@ export default async function InventoryPage() {
   // Fetch initial data (Page 1, Limit 12, Tab 'all')
   const { data: dbItems, error, count } = await supabase
     .from('inventory')
-    .select('*', { count: 'exact' })
+    .select('*', { count: 'estimated' })
     .order('name')
     .range(0, 11); // 0 to 11 is 12 items
 
@@ -32,17 +32,17 @@ export default async function InventoryPage() {
 
   const initialItems = dbItems ? dbItems.map(mapDbItemToInventoryItem) : [];
   const initialTotal = count || 0;
-  
+
   const initialTypes = dbTypes?.map(t => ({
-      id: t.id,
-      name: t.name,
-      imageUrl: t.image_url
+    id: t.id,
+    name: t.name,
+    imageUrl: t.image_url
   })) || [];
 
   return (
     <Suspense fallback={<InventorySkeleton />}>
-      <InventoryClient 
-        initialItems={initialItems} 
+      <InventoryClient
+        initialItems={initialItems}
         initialTotal={initialTotal}
         initialTypes={initialTypes}
       />
