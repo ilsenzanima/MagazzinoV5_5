@@ -1736,6 +1736,13 @@ export const jobDocumentsApi = {
       .single();
     if (error) throw error;
     return mapDbToJobDocument(data);
+  },
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from('job_documents')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   }
 };
 
