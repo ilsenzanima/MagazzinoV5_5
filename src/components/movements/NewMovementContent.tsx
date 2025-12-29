@@ -267,7 +267,8 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
             pieces: "",
             coefficient: batch.coefficient || 1,
             unit: item.unit,
-            purchaseItemId: batch.purchaseItemId
+            purchaseItemId: batch.purchaseItemId,
+            isFictitious: false
         });
 
         // Mock availableBatches so validation and UI display works
@@ -293,7 +294,8 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
             pieces: "",
             coefficient: item.coefficient || 1,
             unit: item.unit,
-            purchaseItemId: ""
+            purchaseItemId: "",
+            isFictitious: false
         });
 
         // If Exit, fetch batches

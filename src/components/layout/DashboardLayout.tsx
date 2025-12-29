@@ -58,12 +58,6 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           active: pathname === "/purchases" || pathname.startsWith("/purchases/"),
         },
         {
-          label: "Fornitori",
-          icon: Building2,
-          href: "/suppliers",
-          active: pathname === "/suppliers" || pathname.startsWith("/suppliers/"),
-        },
-        {
           label: "Movimentazione",
           icon: Truck,
           href: "/movements",
