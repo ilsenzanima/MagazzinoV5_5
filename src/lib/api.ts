@@ -1903,3 +1903,77 @@ export const workersApi = {
     if (error) throw error;
   }
 };
+
+// --- Attendance API ---
+export interface Attendance {
+  id: string;
+  workerId: string;
+  workerName?: string;
+  jobId?: string;
+  jobCode?: string; // For display
+  jobDescription?: string; // For display
+  date: string;
+  hours: number;
+  status: 'presence' | 'absence' | 'sick' | 'holiday' | 'permit';
+  notes?: string;
+  createdAt?: string;
+}
+
+export const mapDbToAttendance = (db: any): Attendance => ({
+  id: db.id,
+  workerId: db.worker_id,
+  workerName: db.workers?.first_name ? `${db.workers.first_name} ${db.workers.last_name || ''}` : undefined,
+  jobId: db.job_id,
+  jobCode: db.jobs?.code,
+  jobDescription: db.jobs?.description,
+  date: db.date,
+  hours: Number(db.hours),
+  status: db.status,
+  notes: db.notes,
+  createdAt: db.created_at
+});
+
+const mapAttendanceToDb = (att: Partial<Attendance>) => ({
+  worker_id: att.workerId,
+  job_id: att.jobId || null,
+  date: att.date,
+  hours: att.hours,
+  status: att.status,
+  notes: att.notes
+});
+
+export const attendanceApi = {
+  getByDateRange: async (startDate: string, endDate: string) => {
+    const { data, error } = await fetchWithTimeout(
+      supabase
+        .from('attendance')
+        .select('*, workers(first_name, last_name), jobs(code, description)')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+    );
+
+    if (error) throw error;
+    return (data || []).map(mapDbToAttendance);
+  },
+
+  upsert: async (record: Partial<Attendance>) => {
+    const dbRecord = mapAttendanceToDb(record);
+    const query = supabase.from('attendance');
+
+    if (record.id) {
+      const { data, error } = await query.update(dbRecord).eq('id', record.id).select('*, workers(first_name, last_name), jobs(code, description)').single();
+      if (error) throw error;
+      return mapDbToAttendance(data);
+    } else {
+      const { data, error } = await query.insert(dbRecord).select('*, workers(first_name, last_name), jobs(code, description)').single();
+      if (error) throw error;
+      return mapDbToAttendance(data);
+    }
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase.from('attendance').delete().eq('id', id);
+    if (error) throw error;
+  }
+};
