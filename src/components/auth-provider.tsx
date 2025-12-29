@@ -50,6 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Effective role is simulatedRole if present, otherwise realRole
   const userRole = simulatedRole || realRole;
 
+  // Refs for deduplication and freshness
+  const fetchPromiseRef = useRef<Promise<any> | null>(null);
+  const lastFetchedRef = useRef<number>(0);
+
   /* Ref to track if component is mounted to avoid React state update warnings */
   const isMountedRef = useRef(true);
 
