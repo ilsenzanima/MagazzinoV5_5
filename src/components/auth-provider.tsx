@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         */
         const { data, error } = await fetchWithTimeout(
           supabase.rpc('get_my_role'),
-          10000
+          20000
         );
 
         if (!isMountedRef.current) return;

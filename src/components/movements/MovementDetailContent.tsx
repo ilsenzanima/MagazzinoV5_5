@@ -235,11 +235,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     currentY += 6;
 
     // -- Row E: Content --
-    let destText = "";
-    if (movement.jobCode) destText += `Commessa: ${movement.jobCode}\n`;
-    if (movement.jobDescription) destText += `${movement.jobDescription}\n`;
-    if (movement.deliveryLocation) destText += `${movement.deliveryLocation}`;
-    if (!destText) destText = "Sede cliente";
+    let destText = movement.deliveryLocation || "Sede cliente";
 
     const destHeight = getTextHeight(destText, col2W, 9, "normal");
     const rowEHeight = Math.max(12, destHeight); // Min 12mm
