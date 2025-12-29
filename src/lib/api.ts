@@ -272,7 +272,7 @@ export const suppliersApi = {
 
     let query = supabase
       .from('suppliers')
-      .select('*', { count: 'exact' });
+      .select('*', { count: 'estimated' });
 
     if (search) {
       query = query.or(`name.ilike.%${search}%,vat_number.ilike.%${search}%,email.ilike.%${search}%`);
@@ -332,7 +332,7 @@ export const purchasesApi = {
 
     let query = supabase
       .from('purchases')
-      .select('*, suppliers(name), purchase_items(price, quantity)', { count: 'exact' });
+      .select('*, suppliers(name), purchase_items(price, quantity)', { count: 'estimated' });
 
     if (supplierId) {
       query = query.eq('supplier_id', supplierId);
@@ -877,7 +877,7 @@ export const deliveryNotesApi = {
 
     let query = supabase
       .from('delivery_notes')
-      .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'exact' });
+      .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'estimated' });
 
     if (search) {
       // Pre-fetch matching job IDs to include in search
@@ -1093,7 +1093,7 @@ export const inventoryApi = {
   getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string }) => {
     // Special handling for 'low_stock' using RPC to avoid client-side filtering of large datasets
     if (options.tab === 'low_stock') {
-      let rpcQuery = supabase.rpc('get_low_stock_inventory', {}, { count: 'exact' });
+      let rpcQuery = supabase.rpc('get_low_stock_inventory', {}, { count: 'estimated' });
 
       if (options.search) {
         const term = options.search;
@@ -1114,7 +1114,7 @@ export const inventoryApi = {
       };
     }
 
-    let query = supabase.from('inventory').select('*', { count: 'exact' });
+    let query = supabase.from('inventory').select('*', { count: 'estimated' });
 
     // Filter by search term
     if (options.search) {
@@ -1322,7 +1322,7 @@ export const inventoryApi = {
     // Check if data already exists
     const { count } = await supabase
       .from('inventory')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'estimated', head: true });
 
     if (count && count > 0) {
       console.log('Database already seeded');
@@ -1434,7 +1434,7 @@ export const clientsApi = {
   },
 
   getPaginated: async (options: { page: number; limit: number; search?: string }) => {
-    let query = supabase.from('clients').select('*', { count: 'exact' });
+    let query = supabase.from('clients').select('*', { count: 'estimated' });
 
     // Filter by search term
     if (options.search) {
@@ -1508,7 +1508,7 @@ export const jobsApi = {
 
     let query = supabase
       .from('jobs')
-      .select('*, clients!inner(name)', { count: 'exact' });
+      .select('*, clients!inner(name)', { count: 'estimated' });
 
     if (clientId) {
       query = query.eq('client_id', clientId);

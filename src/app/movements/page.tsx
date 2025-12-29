@@ -8,8 +8,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 function MovementsSkeleton() {
   return (
     <div className="flex justify-center items-center py-12 h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-slate-500">Caricamento movimenti...</span>
+      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <span className="ml-2 text-slate-500">Caricamento movimenti...</span>
     </div>
   );
 }
@@ -20,7 +20,7 @@ export default async function MovementsPage() {
   // Fetch initial data (Page 1, Limit 12)
   const { data: dbMovements, error, count } = await supabase
     .from('delivery_notes')
-    .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'exact' })
+    .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'estimated' })
     .order('date', { ascending: false })
     .range(0, 11);
 
@@ -35,9 +35,9 @@ export default async function MovementsPage() {
   return (
     <DashboardLayout>
       <Suspense fallback={<MovementsSkeleton />}>
-        <MovementsContent 
-          initialMovements={initialMovements} 
-          initialTotalItems={initialTotalItems} 
+        <MovementsContent
+          initialMovements={initialMovements}
+          initialTotalItems={initialTotalItems}
         />
       </Suspense>
     </DashboardLayout>
