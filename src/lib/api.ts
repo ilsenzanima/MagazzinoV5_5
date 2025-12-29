@@ -526,6 +526,7 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
   coefficient: dbItem.coefficient ? Number(dbItem.coefficient) : 1,
   pieces: dbItem.pieces,
   supplierCode: dbItem.supplier_code,
+  realQuantity: dbItem.real_quantity,
   model: dbItem.model
 });
 
