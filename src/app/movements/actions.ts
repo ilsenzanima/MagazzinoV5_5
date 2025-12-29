@@ -92,7 +92,11 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
     }
   }
 
-  revalidatePath('/movements')
+  try {
+    revalidatePath('/movements')
+  } catch (e) {
+    console.warn('Revalidate failed, but save successful:', e)
+  }
   redirect('/movements')
 }
 
