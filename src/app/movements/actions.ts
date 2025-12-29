@@ -31,7 +31,17 @@ interface MovementData {
 
 export async function createMovement(data: MovementData, lines: MovementLine[]) {
   const supabase = await createClient()
-  
+
+  // 0. Verify user is authenticated
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    console.error('Auth error in createMovement:', userError)
+    throw new Error('Non sei autenticato. Effettua il login e riprova.')
+  }
+
+  console.log('createMovement: User authenticated:', user.id, user.email)
+
   // 1. Create Note
   const { data: noteData, error: noteError } = await supabase
     .from('delivery_notes')
@@ -53,8 +63,8 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
     .single()
 
   if (noteError) {
-    console.error('Error creating delivery note:', noteError)
-    throw new Error(noteError.message)
+    console.error('Error creating delivery note:', noteError.message, noteError.code, noteError.details, noteError.hint)
+    throw new Error(`Errore creazione bolla: ${noteError.message}`)
   }
 
   // 2. Create Items
