@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText, AlertTriangle, Copy } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText, AlertTriangle, Copy, RotateCcw } from "lucide-react";
 import {
   InventoryItem
 } from "@/lib/mock-data";
@@ -347,6 +347,22 @@ export default function InventoryDetailPage() {
     }
   };
 
+  // Handle Reset Real Quantity
+  const handleResetRealQty = async () => {
+    if (!item) return;
+    if (!confirm("Vuoi resettare la verifica inventario?")) return;
+    
+    try {
+      await inventoryApi.update(item.id, { realQuantity: null });
+      // Refresh item locally
+      setItem({ ...item, realQuantity: null }); // Force update local state
+      setRealQtyInput(""); // Clear input
+    } catch (error) {
+      console.error("Failed to reset real quantity", error);
+      alert("Errore durante il reset");
+    }
+  };
+
   // Handle Movement Submit
   const handleMovementSubmit = async () => {
     if (!item) return;
@@ -603,8 +619,13 @@ export default function InventoryDetailPage() {
                           className="bg-white"
                         />
                         <Button size="icon" variant="outline" onClick={handleUpdateRealQty} title="Salva quantità reale">
-                          <Save className="h-4 w-4" />
-                        </Button>
+                              <Save className="h-4 w-4" />
+                          </Button>
+                          {item.realQuantity !== null && item.realQuantity !== undefined && (
+                              <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="text-slate-500 hover:text-red-600">
+                                  <RotateCcw className="h-4 w-4" />
+                              </Button>
+                          )}
                       </div>
 
                       {item.realQuantity !== null && item.realQuantity !== undefined && (

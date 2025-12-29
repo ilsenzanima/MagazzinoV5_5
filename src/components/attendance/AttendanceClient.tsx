@@ -22,6 +22,11 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
+    // Debug: Check if client loads
+    useEffect(() => {
+        console.log("AttendanceClient mounted");
+    }, []);
+
     // Modals State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // Bulk Modal State
