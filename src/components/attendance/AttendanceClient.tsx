@@ -2,13 +2,14 @@
 
 import { Worker, Job, Attendance, attendanceApi } from "@/lib/api";
 import { useState, useEffect, useMemo } from "react";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, addDays, isBefore, isSameDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from "date-fns";
 import { it } from "date-fns/locale";
-import AttendanceGrid from "./AttendanceGrid";
+import AttendanceMonthGrid from "./AttendanceMonthGrid"; // New grid
+import { AttendanceToolbar, AttendanceStatus } from "./AttendanceToolbar"; // New toolbar
 import AssignmentModal from "./AssignmentModal";
-import BulkAssignmentModal from "./BulkAssignmentModal"; // Import Bulk Modal
+import BulkAssignmentModal from "./BulkAssignmentModal";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 interface AttendanceClientProps {
@@ -21,31 +22,26 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const [currentDate, setCurrentDate] = useState(new Date());
     const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-
-    // Debug: Check if client loads
-    useEffect(() => {
-        console.log("AttendanceClient mounted");
-    }, []);
+    const [selectedTool, setSelectedTool] = useState<AttendanceStatus | null>(null);
 
     // Modals State
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); // Bulk Modal State
+    const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
     const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [currentAssignment, setCurrentAssignment] = useState<Attendance | null>(null);
 
     // Computed
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 }); // Sunday
-    const weekDates = eachDayOfInterval({ start: weekStart, end: weekEnd });
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
 
     // Fetch Data
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const startStr = format(weekStart, 'yyyy-MM-dd');
-            const endStr = format(weekEnd, 'yyyy-MM-dd');
+            const startStr = format(monthStart, 'yyyy-MM-dd');
+            const endStr = format(monthEnd, 'yyyy-MM-dd');
             const data = await attendanceApi.getByDateRange(startStr, endStr);
             setAttendanceList(data);
         } catch (error) {
@@ -73,85 +69,92 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     }, [attendanceList]);
 
     // Handlers
-    const handlePrevWeek = () => setCurrentDate(subWeeks(currentDate, 1));
-    const handleNextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
+    const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
+    const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const handleToday = () => setCurrentDate(new Date());
 
-    const handleCellClick = (worker: Worker, date: Date, assignment?: Attendance) => {
-        setSelectedWorker(worker);
-        setSelectedDate(date);
-        setCurrentAssignment(assignment || null);
-        setIsModalOpen(true);
+    const handleCellClick = async (worker: Worker, date: Date, assignment?: Attendance) => {
+        // If a tool is selected, apply it immediately ("Paint Mode")
+        if (selectedTool) {
+            // If clicking on same status, maybe clear it? For now just overwrite.
+            const dateStr = format(date, 'yyyy-MM-dd');
+            const payload: Partial<Attendance> = {
+                workerId: worker.id,
+                date: dateStr,
+                status: selectedTool,
+                hours: 8, // Default
+                jobId: undefined // Clear job if switching to simple status like Holiday? Or keep?
+                // User requirement: "simple". Usually holiday/sick means no job.
+            };
+
+            // Optimistic Update (Optional) - skipped for reliability first
+            try {
+                await attendanceApi.upsert(payload);
+                toast.success("Aggiornato", { duration: 1000, position: 'bottom-center' }); // Unobtrusive toast
+                loadData(); // Refresh to ensure sync
+            } catch (e) {
+                toast.error("Errore salvataggio");
+            }
+        } else {
+            // Normal Mode: Open Modal
+            setSelectedWorker(worker);
+            setSelectedDate(date);
+            setCurrentAssignment(assignment || null);
+            setIsModalOpen(true);
+        }
     };
 
     const handleSave = async (data: Partial<Attendance>, repeatUntil?: Date) => {
         try {
             const promises = [];
-
-            // 1. Save the primary entry
             promises.push(attendanceApi.upsert(data));
+            // ... Repeating logic (simplified for brevity, reused from before if needed) ...
+            // Assuming modal handles logic, but here we just upsert.
+            // Re-implement repeat logic if modal returns it:
 
-            // 2. Handle recurring (only if date is valid and repeatUntil is future)
             if (repeatUntil && data.date) {
-                let runnerDate = addDays(new Date(data.date), 1);
-                while (isBefore(runnerDate, repeatUntil) || isSameDay(runnerDate, repeatUntil)) {
-                    // Skip default weekends? For now, simplistic approach: assign all days.
+                // ... Same repeat logic as before ...
+                // We can extract this to a helper if it gets complex
+                let runnerDate = new Date(data.date);
+                runnerDate.setDate(runnerDate.getDate() + 1);
+                while (runnerDate <= repeatUntil) {
                     const payload = { ...data, date: format(runnerDate, 'yyyy-MM-dd'), id: undefined };
                     promises.push(attendanceApi.upsert(payload));
-                    runnerDate = addDays(runnerDate, 1);
+                    runnerDate.setDate(runnerDate.getDate() + 1);
                 }
             }
 
             await Promise.all(promises);
-            toast.success(promises.length > 1 ? `Salvati ${promises.length} inserimenti` : "Salvato con successo");
+            toast.success("Salvato");
             loadData();
         } catch (error) {
             console.error(error);
             toast.error("Errore durante il salvataggio");
-            throw error;
         }
     };
 
     const handleBulkSave = async (workerIds: string[], startDate: Date, endDate: Date, assignment: Partial<Attendance>) => {
         try {
             const promises = [];
-            // Loop through each worker
             for (const wId of workerIds) {
-                // Loop through each day
                 let runnerDate = new Date(startDate);
-                while (isBefore(runnerDate, endDate) || isSameDay(runnerDate, endDate)) {
+                while (runnerDate <= endDate) {
                     const dateStr = format(runnerDate, 'yyyy-MM-dd');
-                    // Check if we need to get existing ID to update or create new?
-                    // Upsert without ID will create new. 
-                    // Ideally we should know if there is an assignment to overwrite or create duplicates.
-                    // Our DB allows duplicates currently? No, we didn't add unique constraint yet, but we should handle it.
-                    // For now, let's just insert. Since we don't pass ID, it inserts. 
-                    // BUT if we want to "overwrite", we probably should find if one exists.
-                    // A smarter upsert in API would be better, but for now client-side loop is okay for small scale.
-
-                    // NOTE: To avoid duplicates if no unique constraint, we might double book.
-                    // However, the user wants "practical". Overwriting is likely intended.
-                    // Let's rely on the user or future DB constraint.
-
-                    // Optimally: Fetch existing for that range and match? Too heavy.
-                    // Simple approach: Just insert. 
-
                     const payload = {
                         ...assignment,
                         workerId: wId,
                         date: dateStr
                     };
                     promises.push(attendanceApi.upsert(payload));
-                    runnerDate = addDays(runnerDate, 1);
+                    runnerDate.setDate(runnerDate.getDate() + 1);
                 }
             }
-
             await Promise.all(promises);
-            toast.success(`Assegnazione di squadra completata (${promises.length} inserimenti)`);
+            toast.success(`Assegnazione completata`);
             loadData();
         } catch (error) {
             console.error(error);
-            toast.error("Errore durante il salvataggio multiplo");
+            toast.error("Errore salvataggio multiplo");
             throw error;
         }
     }
@@ -159,12 +162,11 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const handleDelete = async (id: string) => {
         try {
             await attendanceApi.delete(id);
-            toast.success("Eliminato con successo");
+            toast.success("Eliminato");
             loadData();
         } catch (error) {
             console.error(error);
-            toast.error("Errore durante l'eliminazione");
-            throw error;
+            toast.error("Errore");
         }
     };
 
@@ -175,13 +177,13 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
                 {/* Date Nav */}
                 <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="icon" onClick={handlePrevWeek}>
+                    <Button variant="outline" size="icon" onClick={handlePrevMonth}>
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <div className="font-semibold w-48 text-center capitalize">
-                        {format(weekStart, 'd MMM', { locale: it })} - {format(weekEnd, 'd MMM yyyy', { locale: it })}
+                    <div className="font-semibold w-48 text-center capitalize text-lg">
+                        {format(monthStart, 'MMMM yyyy', { locale: it })}
                     </div>
-                    <Button variant="outline" size="icon" onClick={handleNextWeek}>
+                    <Button variant="outline" size="icon" onClick={handleNextMonth}>
                         <ChevronRight className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="sm" onClick={handleToday} className="ml-2">
@@ -200,16 +202,24 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 </div>
             </div>
 
-            {/* Grid */}
+            {/* Toolbar */}
+            <AttendanceToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />
+
+            {/* Monthly Grid */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <AttendanceGrid
-                        workers={initialWorkers}
-                        weekDates={weekDates}
-                        attendanceMap={attendanceMap}
-                        onCellClick={handleCellClick}
-                    />
-                </div>
+                <AttendanceMonthGrid
+                    currentDate={currentDate}
+                    workers={initialWorkers}
+                    attendanceMap={attendanceMap}
+                    onCellClick={handleCellClick}
+                    selectedTool={selectedTool}
+                />
+            </div>
+
+            <div className="text-xs text-gray-400 mt-2">
+                * Clicca su uno strumento per attivare la modalità inserimento rapido. Clicca di nuovo per disattivarla.
+                <br />
+                * Doppio click o click senza strumento apre i dettagli per assegnare cantieri specifici.
             </div>
 
             {/* Individual Modal */}
