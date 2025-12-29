@@ -442,6 +442,10 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
 
             // Redirect handled by server action
         } catch (error: any) {
+            // In Next.js 15, redirect() throws a NEXT_REDIRECT error that should be rethrown
+            if (error?.message?.includes('NEXT_REDIRECT') || error?.digest?.includes('NEXT_REDIRECT')) {
+                throw error;
+            }
             console.error("Create failed", error);
             alert(`Errore durante il salvataggio: ${error.message}`);
         } finally {
