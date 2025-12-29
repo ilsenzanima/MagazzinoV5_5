@@ -30,22 +30,40 @@ interface MovementData {
 }
 
 export async function createMovement(data: MovementData, lines: MovementLine[]) {
-  const supabase = await createClient()
+  console.log('=== createMovement START ===')
+  console.log('Data:', JSON.stringify(data, null, 2))
+  console.log('Lines count:', lines.length)
 
-  // 0. Verify user is authenticated
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    console.error('Auth error in createMovement:', userError)
-    throw new Error('Non sei autenticato. Effettua il login e riprova.')
+  let supabase;
+  try {
+    supabase = await createClient()
+    console.log('Supabase client created')
+  } catch (e: any) {
+    console.error('Failed to create Supabase client:', e)
+    throw new Error('Errore connessione database: ' + e.message)
   }
 
-  console.log('createMovement: User authenticated:', user.id, user.email)
+  // 0. Verify user is authenticated
+  let user;
+  try {
+    const { data: authData, error: userError } = await supabase.auth.getUser()
+    user = authData?.user
+
+    if (userError || !user) {
+      console.error('Auth error in createMovement:', userError)
+      throw new Error('Non sei autenticato. Effettua il login e riprova.')
+    }
+    console.log('User authenticated:', user.id, user.email)
+  } catch (e: any) {
+    console.error('Auth check failed:', e)
+    throw new Error('Errore verifica autenticazione: ' + e.message)
+  }
 
   // 1. Create Note
-  const { data: noteData, error: noteError } = await supabase
-    .from('delivery_notes')
-    .insert({
+  let noteData;
+  try {
+    console.log('Inserting delivery_note...')
+    const insertData = {
       type: data.type,
       number: data.number,
       date: data.date,
@@ -53,44 +71,64 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
       causal: data.causal,
       pickup_location: data.pickupLocation,
       delivery_location: data.deliveryLocation,
-      transport_mean: data.transportMean,
-      transport_time: data.transportTime,
-      appearance: data.appearance,
-      packages_count: data.packagesCount,
-      notes: data.notes
-    })
-    .select()
-    .single()
+      transport_mean: data.transportMean || null,
+      transport_time: data.transportTime || null,
+      appearance: data.appearance || null,
+      packages_count: data.packagesCount || null,
+      notes: data.notes || null,
+      created_by: user.id
+    }
+    console.log('Insert data:', JSON.stringify(insertData, null, 2))
 
-  if (noteError) {
-    console.error('Error creating delivery note:', noteError.message, noteError.code, noteError.details, noteError.hint)
-    throw new Error(`Errore creazione bolla: ${noteError.message}`)
+    const { data: result, error: noteError } = await supabase
+      .from('delivery_notes')
+      .insert(insertData)
+      .select()
+      .single()
+
+    if (noteError) {
+      console.error('Error creating delivery note:', noteError.message, noteError.code, noteError.details, noteError.hint)
+      throw new Error(`Errore creazione bolla: ${noteError.message}`)
+    }
+    noteData = result
+    console.log('Delivery note created:', noteData.id)
+  } catch (e: any) {
+    console.error('delivery_notes insert failed:', e)
+    throw e
   }
 
   // 2. Create Items
   if (lines.length > 0) {
-    const itemsToInsert = lines.map(item => ({
-      delivery_note_id: noteData.id,
-      inventory_id: item.inventoryId,
-      quantity: Number(item.quantity),
-      pieces: item.pieces ? Number(item.pieces) : null,
-      coefficient: item.coefficient,
-      price: item.price,
-      purchase_item_id: item.purchaseItemId || null,
-      is_fictitious: item.isFictitious || false
-    }))
+    try {
+      console.log('Inserting', lines.length, 'items...')
+      const itemsToInsert = lines.map(item => ({
+        delivery_note_id: noteData.id,
+        inventory_id: item.inventoryId,
+        quantity: Number(item.quantity),
+        pieces: item.pieces ? Number(item.pieces) : null,
+        coefficient: item.coefficient || 1,
+        price: item.price || 0,
+        purchase_item_id: item.purchaseItemId || null,
+        is_fictitious: item.isFictitious || false
+      }))
+      console.log('Items to insert:', JSON.stringify(itemsToInsert, null, 2))
 
-    const { error: itemsError } = await supabase
-      .from('delivery_note_items')
-      .insert(itemsToInsert)
+      const { error: itemsError } = await supabase
+        .from('delivery_note_items')
+        .insert(itemsToInsert)
 
-    if (itemsError) {
-      console.error('Error creating items:', itemsError)
-      // Optional: Delete the note if items fail? 
-      // For now, throw error.
-      throw new Error(itemsError.message)
+      if (itemsError) {
+        console.error('Error creating items:', itemsError.message, itemsError.code, itemsError.details, itemsError.hint)
+        throw new Error(`Errore inserimento articoli: ${itemsError.message}`)
+      }
+      console.log('Items created successfully')
+    } catch (e: any) {
+      console.error('delivery_note_items insert failed:', e)
+      throw e
     }
   }
+
+  console.log('=== createMovement SUCCESS ===')
 
   try {
     revalidatePath('/movements')
