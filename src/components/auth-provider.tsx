@@ -50,38 +50,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Effective role is simulatedRole if present, otherwise realRole
   const userRole = simulatedRole || realRole;
 
-  // Refs for deduplication and freshness
-  const fetchPromiseRef = useRef<Promise<any> | null>(null);
-  const lastFetchedRef = useRef<number>(0);
+  /* Ref to track if component is mounted to avoid React state update warnings */
+  const isMountedRef = useRef(true);
 
-  const fetchUserRole = async (userId: string) => { // Removed retries from signature as per refactor
+  useEffect(() => {
+    return () => { isMountedRef.current = false; };
+  }, []);
+
+  const fetchUserRole = async (userId: string) => {
     // 1. Deduplication: If a fetch is already running, wait for it
     if (fetchPromiseRef.current) {
       return fetchPromiseRef.current;
     }
 
-    // 2. Cache Check (Time-based): Don't spam the API
+    // 2. Cache Check (Time-based)
     if (Date.now() - lastFetchedRef.current < MIN_CACHE_TTL) {
       console.log("Role checks skipped (Cache Fresh)");
       return;
     }
 
-    // 3. LocalStorage Timestamp Check (Cross-tab/Reload persistence)
+    // 3. LocalStorage Timestamp Check
     if (typeof window !== 'undefined') {
       const ts = localStorage.getItem(STORAGE_KEY_ROLE_TS);
       const savedRole = localStorage.getItem(STORAGE_KEY_ROLE);
       if (ts && savedRole && (Date.now() - Number(ts) < MIN_CACHE_TTL)) {
         console.log("Role cache valid from storage");
-        lastFetchedRef.current = Number(ts); // Sync memory ref
-        setRealRole(savedRole as 'admin' | 'user' | 'operativo'); // Cast to correct type
+        lastFetchedRef.current = Number(ts);
+        if (isMountedRef.current) setRealRole(savedRole as 'admin' | 'user' | 'operativo');
         return;
       }
     }
 
-    const fetcher = async (currentRetries = 3) => { // Retries moved inside fetcher
+    const fetcher = async () => {
       try {
         console.log("Fetching user role for:", userId);
-        // Increased timeout for role fetching to 5s (fail faster than 10s)
+        // Timeout set to 15s to be safe, but no retries to prevent blocking UI for too long
         const { data, error } = await fetchWithTimeout(
           supabase
             .from('profiles')
@@ -91,11 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           15000
         );
 
+        if (!isMountedRef.current) return;
+
         if (data) {
           const role = data.role as 'admin' | 'user' | 'operativo';
           setRealRole(role);
 
-          // Update cache & timestamp
           if (typeof window !== 'undefined') {
             const oldRole = localStorage.getItem(STORAGE_KEY_ROLE);
             localStorage.setItem(STORAGE_KEY_ROLE, role);
@@ -107,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else {
-          // Default to user if no profile
+          // Default to user if no profile found
           setRealRole('user');
           if (typeof window !== 'undefined') {
             localStorage.setItem(STORAGE_KEY_ROLE, 'user');
@@ -116,20 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        console.error(`Error fetching user role (attempts left: ${currentRetries}):`, error);
-        if (currentRetries > 0) {
-          const delay = Math.pow(2, 3 - currentRetries) * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
-          // Recursive call... but we need to be careful with refs. 
-          // We'll just let the outer promise chain handle it conceptually? 
-          // Recursive calling here is tricky with the ref pattern.
-          // Simpler: Just allow the error to bubble or set default, allow retry NEXT time.
-          // Or: retry logic INSIDE this fetcher scope?
-          // Let's stick to fail-fast. If it fails, we default to user and try again next time ttl expires.
-          return fetcher(currentRetries - 1); // Retry within the fetcher
-        }
-        // Fallback: keep existing role or default to 'user' if nothing set
-        if (!realRole) setRealRole('user');
+        console.error("Error fetching user role:", error);
+        // Fallback to user on error to allow app usage
+        if (isMountedRef.current && !realRole) setRealRole('user');
       } finally {
         fetchPromiseRef.current = null;
       }
