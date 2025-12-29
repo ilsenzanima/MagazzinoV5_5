@@ -1959,18 +1959,15 @@ export const attendanceApi = {
   },
 
   upsert: async (record: Partial<Attendance>) => {
-    const dbRecord = mapAttendanceToDb(record);
-    const query = supabase.from('attendance');
+    // We use upsert with onConflict to handle unique constraint on (worker_id, date)
+    const { data, error } = await supabase
+      .from('attendance')
+      .upsert(mapAttendanceToDb(record), { onConflict: 'worker_id, date' })
+      .select('*, workers(first_name, last_name), jobs(code, description)')
+      .single();
 
-    if (record.id) {
-      const { data, error } = await query.update(dbRecord).eq('id', record.id).select('*, workers(first_name, last_name), jobs(code, description)').single();
-      if (error) throw error;
-      return mapDbToAttendance(data);
-    } else {
-      const { data, error } = await query.insert(dbRecord).select('*, workers(first_name, last_name), jobs(code, description)').single();
-      if (error) throw error;
-      return mapDbToAttendance(data);
-    }
+    if (error) throw error;
+    return mapDbToAttendance(data);
   },
 
   delete: async (id: string) => {
