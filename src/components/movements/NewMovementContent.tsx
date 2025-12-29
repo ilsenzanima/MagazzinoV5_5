@@ -331,7 +331,7 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
         if (qty <= 0) return;
 
         // Check availability for EXIT or SALE
-        if (activeTab === 'exit' || activeTab === 'sale') {
+        if ((activeTab === 'exit' || activeTab === 'sale') && !currentLine.isFictitious) {
             const batch = availableBatches.find(b => b.id === currentLine.purchaseItemId);
 
             // If we have a selected batch, check its limits
@@ -358,7 +358,7 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
         }
 
         // Check availability for ENTRY (Return from Job)
-        if (activeTab === 'entry' && selectedJob && currentLine.purchaseItemId) {
+        if (activeTab === 'entry' && selectedJob && currentLine.purchaseItemId && !currentLine.isFictitious) {
             const batch = jobBatchAvailability.find(b => b.purchaseItemId === currentLine.purchaseItemId);
             if (batch) {
                 if (qty > batch.quantity) {
