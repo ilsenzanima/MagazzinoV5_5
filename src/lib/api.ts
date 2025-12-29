@@ -1915,7 +1915,7 @@ export interface Attendance {
   jobDescription?: string; // For display
   date: string;
   hours: number;
-  status: 'presence' | 'absence' | 'sick' | 'holiday' | 'permit';
+  status: 'presence' | 'absence' | 'sick' | 'holiday' | 'permit' | 'injury' | 'transfer';
   notes?: string;
   createdAt?: string;
 }
