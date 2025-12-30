@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const STORAGE_KEY_ROLE = 'fireblock_user_role';
   const STORAGE_KEY_ROLE_TS = 'fireblock_role_ts';
   const STORAGE_KEY_SIMULATED_ROLE = 'fireblock_simulated_role';
-  const MIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  const MIN_CACHE_TTL = 30 * 60 * 1000; // 30 minutes (optimized from 5 min)
 
   // Effective role is simulatedRole if present, otherwise realRole
   const userRole = simulatedRole || realRole;
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         */
         const { data, error } = await fetchWithTimeout(
           supabase.rpc('get_my_role'),
-          20000
+          5000 // Reduced from 20s to 5s for faster failure fallback
         );
 
         if (!isMountedRef.current) return;
