@@ -18,30 +18,30 @@ export function ConnectionManager() {
       try {
         // 1. Check Auth Session first (local check, very fast)
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (!sessionError && session) {
-            // 2. If we have a session, check if token is close to expiry (e.g. within 5 mins)
-            const expiresAt = session.expires_at || 0;
-            const now = Math.floor(Date.now() / 1000);
-            const timeUntilExpiry = expiresAt - now;
 
-            if (timeUntilExpiry < 300 && timeUntilExpiry > 0) {
-                console.log(`Token expiring in ${timeUntilExpiry}s, refreshing...`);
-                const { error: refreshError } = await supabase.auth.refreshSession();
-                if (refreshError) {
-                    console.warn("Manual token refresh failed:", refreshError);
-                } else {
-                    console.log("Token refreshed successfully");
-                }
+        if (!sessionError && session) {
+          // 2. If we have a session, check if token is close to expiry (e.g. within 5 mins)
+          const expiresAt = session.expires_at || 0;
+          const now = Math.floor(Date.now() / 1000);
+          const timeUntilExpiry = expiresAt - now;
+
+          if (timeUntilExpiry < 300 && timeUntilExpiry > 0) {
+            console.log(`Token expiring in ${timeUntilExpiry}s, refreshing...`);
+            const { error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError) {
+              console.warn("Manual token refresh failed:", refreshError);
+            } else {
+              console.log("Token refreshed successfully");
             }
+          }
         }
 
         // 3. Network status check only (no DB query to avoid lag on navigation)
         if (!navigator.onLine) {
-             setIsOnline(false);
+          setIsOnline(false);
         } else if (!isOnline) {
-             setIsOnline(true);
-             console.log("Connection restored");
+          setIsOnline(true);
+          console.log("Connection restored");
         }
 
       } catch (err) {
@@ -59,12 +59,12 @@ export function ConnectionManager() {
 
     // Only check on online/offline events, avoid aggressive focus checks
     const handleOnline = () => {
-        console.log("Device online, checking connection...");
-        checkConnection();
+      console.log("Device online, checking connection...");
+      checkConnection();
     }
-    
+
     const handleOffline = () => {
-        setIsOnline(false);
+      setIsOnline(false);
     }
 
     window.addEventListener("online", handleOnline);
@@ -75,7 +75,7 @@ export function ConnectionManager() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [isOnline]); // removed supabase dependency as it is singleton
+  }, []); // Empty dependency array - effect runs once on mount
 
   // This component is invisible
   return null;

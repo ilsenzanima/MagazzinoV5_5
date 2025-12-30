@@ -225,15 +225,24 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
     useEffect(() => {
         // If Job Changes and we are in ENTRY mode, fetch Job Inventory
         if (activeTab === 'entry' && selectedJob) {
-            // Fetch detailed batch availability
-            inventoryApi.getJobBatchAvailability(selectedJob.id).then(data => {
-                setJobBatchAvailability(data);
-            }).catch(err => console.error("Failed to load job batches", err));
-
-            // Keep fetching legacy job inventory just in case (optional, maybe used for dialogItems)
-            inventoryApi.getJobInventory(selectedJob.id).then(data => {
-                setJobInventory(data);
-            }).catch(err => console.error("Failed to load job inventory", err));
+            // Fetch both in parallel for better performance
+            Promise.allSettled([
+                inventoryApi.getJobBatchAvailability(selectedJob.id),
+                inventoryApi.getJobInventory(selectedJob.id)
+            ]).then(([batchResult, inventoryResult]) => {
+                if (batchResult.status === 'fulfilled') {
+                    setJobBatchAvailability(batchResult.value || []);
+                } else {
+                    console.error("Failed to load job batches", batchResult.reason);
+                    setJobBatchAvailability([]);
+                }
+                if (inventoryResult.status === 'fulfilled') {
+                    setJobInventory(inventoryResult.value || []);
+                } else {
+                    console.error("Failed to load job inventory", inventoryResult.reason);
+                    setJobInventory([]);
+                }
+            });
         } else {
             setJobInventory([]);
             setJobBatchAvailability([]);
