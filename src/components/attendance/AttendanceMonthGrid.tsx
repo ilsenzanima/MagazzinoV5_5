@@ -13,13 +13,14 @@ interface MonthGridProps {
 }
 
 const statusConfig: Record<string, { color: string; letter: string }> = {
-    'presence': { color: 'bg-green-500 text-white', letter: 'w' },
+    'presence': { color: 'bg-green-500 text-white', letter: 'w' }, // Default letter, overridden below
     'absence': { color: 'bg-black text-white', letter: 'a' },
     'sick': { color: 'bg-yellow-400 text-black', letter: 'm' },
     'holiday': { color: 'bg-red-600 text-white', letter: 'f' },
-    'permit': { color: 'bg-blue-600 text-white', letter: 'p' },
+    'permit': { color: 'bg-red-600 text-white', letter: 'p' }, // Same color as holiday
     'injury': { color: 'bg-amber-700 text-white', letter: 'i' },
     'transfer': { color: 'bg-purple-700 text-white', letter: 't' },
+    'course': { color: 'bg-blue-500 text-white', letter: 'c' },
 };
 
 export default function AttendanceMonthGrid({
@@ -80,13 +81,16 @@ export default function AttendanceMonthGrid({
                                 if (assignment) {
                                     const config = statusConfig[assignment.status] || statusConfig['presence'];
                                     cellClass = config.color;
-                                    // Show hours if presence and not 8? Or just checkmark/letter?
-                                    // User asked for letters like 'w', 'f', 'm'
-                                    content = config.letter;
 
-                                    // Show hours if presence and != 8
-                                    if (assignment.status === 'presence' && assignment.hours !== 8) {
+                                    if (assignment.status === 'presence') {
+                                        // For presence, show hours
                                         content = `${assignment.hours}`;
+                                    } else if (assignment.status === 'permit') {
+                                        // For permit, might explicitly show hours if variable?
+                                        // User said "F/P x", so showing hours for permit as well is good practice
+                                        content = `${assignment.hours}h`; // "4h"
+                                    } else {
+                                        content = config.letter;
                                     }
                                 }
 
