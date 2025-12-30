@@ -1,11 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react";
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
-import { fetchWithTimeout } from "@/lib/api";
 import { ArrowDownRight, ArrowUpRight, Clock, User } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -28,7 +25,7 @@ interface RecentMovementsProps {
   data: Movement[];
 }
 
-export function RecentMovements({ data }: RecentMovementsProps) {
+export const RecentMovements = memo(function RecentMovements({ data }: RecentMovementsProps) {
   // Safe fallback if data is undefined/null
   const movements = data || [];
 
@@ -91,4 +88,4 @@ export function RecentMovements({ data }: RecentMovementsProps) {
       </CardContent>
     </Card>
   );
-}
+});
