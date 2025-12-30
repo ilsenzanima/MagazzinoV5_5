@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import { fetchWithTimeout } from "@/lib/api";
@@ -20,7 +20,7 @@ interface ActiveJobsWidgetProps {
   stats: JobStats;
 }
 
-export function ActiveJobsWidget({ stats }: ActiveJobsWidgetProps) {
+export const ActiveJobsWidget = memo(function ActiveJobsWidget({ stats }: ActiveJobsWidgetProps) {
   // Use passed stats or defaults
   const currentStats = stats || { active: 0, completed: 0, suspended: 0, total: 0 };
 
@@ -91,4 +91,4 @@ export function ActiveJobsWidget({ stats }: ActiveJobsWidgetProps) {
       </CardContent>
     </Card>
   );
-}
+});

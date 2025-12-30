@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -12,7 +12,7 @@ const MONTHS = [
   "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
 ];
 
-export function CalendarView() {
+export const CalendarView = memo(function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const getDaysInMonth = (date: Date) => {
@@ -46,14 +46,14 @@ export function CalendarView() {
 
   // Days of current month
   for (let i = 1; i <= daysInMonth; i++) {
-    const isToday = 
-      i === today.getDate() && 
-      currentDate.getMonth() === today.getMonth() && 
+    const isToday =
+      i === today.getDate() &&
+      currentDate.getMonth() === today.getMonth() &&
       currentDate.getFullYear() === today.getFullYear();
 
     days.push(
-      <div 
-        key={i} 
+      <div
+        key={i}
         className={cn(
           "h-24 p-2 border border-slate-100 relative group hover:bg-slate-50 transition-colors",
           isToday && "bg-blue-50/50"
@@ -65,20 +65,20 @@ export function CalendarView() {
         )}>
           {i}
         </span>
-        
+
         {/* Mock Events/Attendance Dots */}
         {i % 5 === 0 && (
           <div className="mt-2 space-y-1">
-             <div className="text-[10px] bg-green-100 text-green-700 px-1 py-0.5 rounded truncate">
-               Mario: Presente
-             </div>
+            <div className="text-[10px] bg-green-100 text-green-700 px-1 py-0.5 rounded truncate">
+              Mario: Presente
+            </div>
           </div>
         )}
         {i % 12 === 0 && (
           <div className="mt-2 space-y-1">
-             <div className="text-[10px] bg-red-100 text-red-700 px-1 py-0.5 rounded truncate">
-               Luigi: Malattia
-             </div>
+            <div className="text-[10px] bg-red-100 text-red-700 px-1 py-0.5 rounded truncate">
+              Luigi: Malattia
+            </div>
           </div>
         )}
       </div>
@@ -114,4 +114,4 @@ export function CalendarView() {
       </CardContent>
     </Card>
   );
-}
+});
