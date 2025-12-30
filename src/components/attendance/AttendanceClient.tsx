@@ -74,29 +74,52 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const handleToday = () => setCurrentDate(new Date());
 
     const handleCellClick = async (worker: Worker, date: Date, assignment?: Attendance) => {
-        // If a tool is selected, apply it immediately ("Paint Mode")
+        // PAINT MODE
         if (selectedTool) {
-            // If clicking on same status, maybe clear it? For now just overwrite.
+            // Toggle Logic: If clicking same status, delete (deselect)
+            if (assignment && assignment.status === selectedTool) {
+                try {
+                    await attendanceApi.delete(assignment.id);
+                    toast.success("Rimosso", { duration: 1000, position: 'bottom-center' });
+                    loadData();
+                } catch (e) {
+                    toast.error("Errore cancellazione");
+                }
+                return;
+            }
+
+            // Permit Logic: Ask for hours
+            let hours = 8;
+            if (selectedTool === 'permit') {
+                const input = window.prompt("Quante ore di permesso?", "4");
+                // If cancelled, do nothing
+                if (input === null) return;
+                const h = parseFloat(input);
+                if (isNaN(h) || h < 0 || h > 24) {
+                    toast.error("Ore non valide");
+                    return;
+                }
+                hours = h;
+            }
+
             const dateStr = format(date, 'yyyy-MM-dd');
             const payload: Partial<Attendance> = {
                 workerId: worker.id,
                 date: dateStr,
                 status: selectedTool,
-                hours: 8, // Default
-                jobId: undefined // Clear job if switching to simple status like Holiday? Or keep?
-                // User requirement: "simple". Usually holiday/sick means no job.
+                hours: hours,
+                jobId: undefined
             };
 
-            // Optimistic Update (Optional) - skipped for reliability first
             try {
                 await attendanceApi.upsert(payload);
-                toast.success("Aggiornato", { duration: 1000, position: 'bottom-center' }); // Unobtrusive toast
-                loadData(); // Refresh to ensure sync
+                toast.success("Aggiornato", { duration: 1000, position: 'bottom-center' });
+                loadData();
             } catch (e) {
                 toast.error("Errore salvataggio");
             }
         } else {
-            // Normal Mode: Open Modal
+            // NORMAL MODE: Open Modal
             setSelectedWorker(worker);
             setSelectedDate(date);
             setCurrentAssignment(assignment || null);

@@ -2,27 +2,34 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, Info } from "lucide-react";
 
-export type AttendanceStatus = 'presence' | 'absence' | 'sick' | 'holiday' | 'permit' | 'injury' | 'transfer';
+export type AttendanceStatus = 'presence' | 'absence' | 'sick' | 'holiday' | 'permit' | 'injury' | 'transfer' | 'course';
 
 interface ToolbarProps {
     selectedTool: AttendanceStatus | null;
     onSelectTool: (tool: AttendanceStatus | null) => void;
 }
 
+// User Requirements:
+// - Remove 'presence' button.
+// - Holiday (Ferie) -> "F/P 8" (Red)
+// - Permit (Permesso) -> "F/P x" (Red)
+// - Add Course (Corso) -> "Corso" (Blue? Or distinct?)
+
 const tools: { id: AttendanceStatus; label: string; color: string; letter: string }[] = [
-    { id: 'presence', label: 'Presenza / Week', color: 'bg-green-500', letter: 'w' },
-    { id: 'absence', label: 'Assenza Ing.', color: 'bg-black text-white', letter: 'a' },
+    // { id: 'presence', label: 'Presenza / Week', color: 'bg-green-500', letter: 'w' }, // Removed
+    { id: 'holiday', label: 'F/P 8', color: 'bg-red-600 text-white', letter: 'f' },
+    { id: 'permit', label: 'F/P x', color: 'bg-red-600 text-white', letter: 'p' },
     { id: 'sick', label: 'Malattia', color: 'bg-yellow-400 text-black', letter: 'm' },
-    { id: 'holiday', label: 'Ferie', color: 'bg-red-600 text-white', letter: 'f' },
-    { id: 'permit', label: 'Permesso', color: 'bg-blue-600 text-white', letter: 'p' },
     { id: 'injury', label: 'Infortunio', color: 'bg-amber-700 text-white', letter: 'i' },
     { id: 'transfer', label: 'Trasferta', color: 'bg-purple-700 text-white', letter: 't' },
+    { id: 'course', label: 'Corso', color: 'bg-blue-500 text-white', letter: 'c' },
+    { id: 'absence', label: 'Assenza Ing.', color: 'bg-black text-white', letter: 'a' },
 ];
 
 export function AttendanceToolbar({ selectedTool, onSelectTool }: ToolbarProps) {
     return (
         <div className="flex flex-wrap items-center gap-2 p-2 bg-white rounded-lg shadow-sm border mb-4">
-            <div className="text-sm font-medium mr-2 text-gray-500">Strumenti:</div>
+            <div className="text-sm font-medium mr-2 text-gray-500">Scelta Rapida:</div>
             {tools.map(tool => (
                 <button
                     key={tool.id}
@@ -45,7 +52,7 @@ export function AttendanceToolbar({ selectedTool, onSelectTool }: ToolbarProps) 
             {selectedTool && (
                 <div className="ml-auto flex items-center text-sm text-blue-600 animate-pulse">
                     <Info className="h-4 w-4 mr-1" />
-                    Modalità inserimento attiva
+                    Modalità inserimento attiva (riclicca per annullare)
                 </div>
             )}
         </div>

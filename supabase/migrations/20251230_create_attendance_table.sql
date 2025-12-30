@@ -1,3 +1,6 @@
+-- Enable moddatetime extension if not exists
+create extension if not exists moddatetime schema extensions;
+
 -- Create Attendance table
 create table if not exists public.attendance (
     id uuid default gen_random_uuid() primary key,
@@ -10,7 +13,7 @@ create table if not exists public.attendance (
     created_at timestamp with time zone default timezone('utc'::text, now()) not null,
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
 
-    -- Prevent duplicate entries for the same worker on the same date?
+    -- Prevent duplicate entries for the same worker on the same date? 
     -- Maybe we want to allow splitting the day between two jobs?
     -- For now, let's NOT enforce unique(worker_id, date) to allow split shifts,
     -- but we might want a UI warning.
