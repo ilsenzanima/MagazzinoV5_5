@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatsCards } from "@/components/dashboard/StatsCards";
@@ -16,7 +16,7 @@ interface DashboardStats {
   totalItems: number;
 }
 
-export function DashboardClient({
+export const DashboardClient = memo(function DashboardClient({
   initialStats,
   recentMovements,
   jobStats
@@ -70,4 +70,4 @@ export function DashboardClient({
       </div>
     </DashboardLayout>
   );
-}
+});

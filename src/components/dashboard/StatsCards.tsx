@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Package, AlertTriangle, Euro } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -8,7 +9,7 @@ interface StatsCardsProps {
   totalItems: number;
 }
 
-export function StatsCards({ totalValue, lowStockCount, totalItems }: StatsCardsProps) {
+export const StatsCards = memo(function StatsCards({ totalValue, lowStockCount, totalItems }: StatsCardsProps) {
   const { userRole } = useAuth();
 
   const formatCurrency = (value: number) => {
@@ -57,4 +58,4 @@ export function StatsCards({ totalValue, lowStockCount, totalItems }: StatsCards
       </Card>
     </div>
   );
-}
+});

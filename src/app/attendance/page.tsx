@@ -9,22 +9,22 @@ export const metadata = {
 export default async function AttendancePage() {
     const supabase = await createClient();
 
-    // Fetch Active Workers
-    const { data: workersData } = await supabase
-        .from('workers')
-        .select('*')
-        .eq('is_active', true)
-        .order('last_name');
+    // Fetch Active Workers and Jobs in PARALLEL for better performance
+    const [workersResult, jobsResult] = await Promise.all([
+        supabase
+            .from('workers')
+            .select('*')
+            .eq('is_active', true)
+            .order('last_name'),
+        supabase
+            .from('jobs')
+            .select('*, clients(name, street, city)')
+            .eq('status', 'active')
+            .order('code')
+    ]);
 
-    // Fetch Active Jobs (Commesse)
-    const { data: jobsData } = await supabase
-        .from('jobs')
-        .select('*, clients(name, street, city)')
-        .eq('status', 'active')
-        .order('code');
-
-    const workers = (workersData || []).map(mapDbToWorker);
-    const jobs = (jobsData || []).map(mapDbToJob);
+    const workers = (workersResult.data || []).map(mapDbToWorker);
+    const jobs = (jobsResult.data || []).map(mapDbToJob);
 
     return (
         <div className="container mx-auto py-6">
