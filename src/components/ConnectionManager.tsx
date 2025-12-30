@@ -54,8 +54,8 @@ export function ConnectionManager() {
     // Run immediately on mount
     checkConnection();
 
-    // Run every 60 seconds
-    const intervalId = setInterval(checkConnection, 60000);
+    // Run every 120 seconds (optimized from 60s to reduce overhead)
+    const intervalId = setInterval(checkConnection, 120000);
 
     // Only check on online/offline events, avoid aggressive focus checks
     const handleOnline = () => {
