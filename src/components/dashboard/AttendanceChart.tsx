@@ -1,13 +1,12 @@
-"use client"
-
+import { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   Legend
 } from 'recharts';
@@ -21,7 +20,7 @@ const data = [
   { name: 'Dic', presenze: 140, ferie: 15, malattia: 10 },
 ];
 
-export function AttendanceChart() {
+export const AttendanceChart = memo(function AttendanceChart() {
   return (
     <Card className="w-full h-[400px]">
       <CardHeader>
@@ -51,4 +50,4 @@ export function AttendanceChart() {
       </CardContent>
     </Card>
   );
-}
+});
