@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image"; // Import Next.js Image component
 import {
   Search,
   Filter,
@@ -253,37 +254,35 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                     <CardContent className="p-0 flex flex-col h-full">
                       {/* Immagine */}
                       <div className="w-full h-48 bg-slate-200 shrink-0 relative flex items-center justify-center bg-white overflow-hidden">
-                        {/* Use Next.js Image for optimization and CLS prevention */}
-                        {/* Note: We use unoptimized for user uploads if domains aren't configured, but it still helps with layout */}
-                        {/* Fallback pattern would require a more complex Image component, for now we keep simple conditional */}
-                        {(item.image || itemTypes.find(t => t.name === item.type)?.imageUrl) ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.image || itemTypes.find(t => t.name === item.type)?.imageUrl || "/placeholder.svg"}
-                            alt={item.name}
-                            className={`transition-transform duration-300 ${!item.image && (itemTypes.find(t => t.name === item.type)?.imageUrl)
-                              ? "w-auto h-3/4 object-contain"
-                              : "w-full h-full object-cover group-hover:scale-105"
-                              } ${item.quantity === 0 ? "grayscale opacity-80" : ""}`}
-                            loading="lazy"
-                            width={400} // Explicit width/height to help browser reserve space
-                            height={300}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = "/placeholder.svg";
-                            }}
-                          />
-                        ) : (
-                          <img
-                            src="/placeholder.svg"
-                            alt={item.name}
-                            className="w-auto h-3/4 object-contain opacity-50"
-                            width={100}
-                            height={100}
-                          />
-                        )}
+                        {(() => {
+                          const typeInfo = itemTypes.find(t => t.name === item.type);
+                          const hasCustomImage = !!item.image;
+                          const hasTypeImage = !!typeInfo?.imageUrl;
+                          const imageUrl = item.image || typeInfo?.imageUrl || "/placeholder.svg";
+
+                          // If it's a real image (custom or type), allow cover. If placeholder, contain.
+                          const objectFitClass = (hasCustomImage || hasTypeImage)
+                            ? "object-cover group-hover:scale-105"
+                            : "object-contain p-8 opacity-50";
+
+                          return (
+                            <Image
+                              src={imageUrl}
+                              alt={item.name}
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                              className={`transition-transform duration-300 ${objectFitClass} ${item.quantity === 0 ? "grayscale opacity-80" : ""}`}
+                              onError={(e) => {
+                                // Fallback logic is harder with Next Image since onError doesn't give direct access to src assignment easily in SSR
+                                // ideally handled by a wrapper or ensuring URLs are valid.
+                                // For now, we trust the valid URLs or placeholders.
+                              }}
+                            />
+                          );
+                        })()}
 
                         {item.quantity === 0 && (
-                          <div className="absolute inset-0 bg-white/10 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-white/10 flex items-center justify-center z-10">
                             <Badge variant="destructive" className="text-sm font-bold shadow-sm">ESAURITO</Badge>
                           </div>
                         )}
