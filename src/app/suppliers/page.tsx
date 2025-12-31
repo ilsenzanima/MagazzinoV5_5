@@ -112,7 +112,7 @@ export default function SuppliersPage() {
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
             placeholder="Cerca Fornitore (Nome, P.IVA, Email...)"
             className="pl-9 bg-slate-100 dark:bg-muted border-none"
@@ -125,15 +125,15 @@ export default function SuppliersPage() {
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2 text-slate-500">Caricamento fornitori...</span>
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento fornitori...</span>
         </div>
       ) : error ? (
         <div className="flex flex-col justify-center items-center py-12 text-center">
-          <div className="bg-red-50 text-red-600 p-4 rounded-full mb-4">
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-full mb-4">
             <Building2 className="h-8 w-8" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Errore di Caricamento</h3>
-          <p className="text-slate-500 mb-6 max-w-md">{error}</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Errore di Caricamento</h3>
+          <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md">{error}</p>
           <Button onClick={() => loadSuppliers(currentPage, searchTerm)} variant="outline">
             Riprova
           </Button>
@@ -142,7 +142,7 @@ export default function SuppliersPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {suppliers.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-slate-400">
+              <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
                 <p>Nessun fornitore trovato</p>
               </div>
@@ -174,9 +174,9 @@ export default function SuppliersPage() {
                       </div>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="text-sm space-y-2 text-slate-600">
+                  <CardContent className="text-sm space-y-2 text-slate-600 dark:text-slate-400">
                     {supplier.vatNumber && (
-                      <div className="font-mono text-xs bg-slate-100 p-1 rounded w-fit">
+                      <div className="font-mono text-xs bg-slate-100 dark:bg-muted p-1 rounded w-fit">
                         P.IVA: {supplier.vatNumber}
                       </div>
                     )}
@@ -195,12 +195,12 @@ export default function SuppliersPage() {
                     {supplier.email && (
                       <div className="flex items-center gap-2">
                         <Mail className="h-4 w-4 shrink-0" />
-                        <a href={`mailto:${supplier.email}`} className="text-blue-600 hover:underline">
+                        <a href={`mailto:${supplier.email}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                           {supplier.email}
                         </a>
                       </div>
                     )}
-                    <div className="pt-2 mt-2 border-t flex justify-end">
+                    <div className="pt-2 mt-2 border-t dark:border-slate-700 flex justify-end">
                       <Link href={`/purchases?supplierId=${supplier.id}`}>
                         <Button variant="outline" size="sm">
                           <ShoppingCart className="mr-2 h-3 w-3" />
@@ -225,7 +225,7 @@ export default function SuppliersPage() {
               >
                 Precedente
               </Button>
-              <span className="text-sm text-slate-600">
+              <span className="text-sm text-slate-600 dark:text-slate-400">
                 Pagina {currentPage} di {totalPages}
               </span>
               <Button

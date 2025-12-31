@@ -23,12 +23,12 @@ export const StatsCards = memo(function StatsCards({ totalValue, lowStockCount, 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
       <Card>
         <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-          <div className="text-slate-500 text-xs font-medium mb-1">Valore Magazzino</div>
+          <div className="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">Valore Magazzino</div>
           <div className="flex items-center gap-2">
             <Euro className="h-5 w-5 text-emerald-500" />
-            <span className="text-2xl font-bold text-slate-900">
+            <span className="text-2xl font-bold text-slate-900 dark:text-white">
               {userRole === 'user' ? (
-                <span className="text-slate-400 italic text-lg">Non disponibile</span>
+                <span className="text-slate-400 dark:text-slate-500 italic text-lg">Non disponibile</span>
               ) : (
                 formatCurrency(totalValue)
               )}
@@ -36,23 +36,23 @@ export const StatsCards = memo(function StatsCards({ totalValue, lowStockCount, 
           </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-          <div className="text-slate-500 text-xs font-medium mb-1">Articoli in Scorta Minima</div>
+          <div className="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">Articoli in Scorta Minima</div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <span className="text-2xl font-bold text-slate-900">{lowStockCount}</span>
+            <span className="text-2xl font-bold text-slate-900 dark:text-white">{lowStockCount}</span>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-          <div className="text-slate-500 text-xs font-medium mb-1">Totale Articoli</div>
+          <div className="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">Totale Articoli</div>
           <div className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-500" />
-            <span className="text-2xl font-bold text-slate-900">{totalItems}</span>
+            <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalItems}</span>
           </div>
         </CardContent>
       </Card>
