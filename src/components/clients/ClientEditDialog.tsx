@@ -112,7 +112,8 @@ export function ClientEditDialog({
                 const jobIds = jobs.map(j => j.id);
 
                 if (jobIds.length > 0) {
-                    const updatedCount = await deliveryNotesApi.updateLocationBatch(jobIds, newAddress);
+                    // Pass the new client name along with the address
+                    const updatedCount = await deliveryNotesApi.updateLocationBatch(jobIds, newAddress, editForm.name);
                     if (updatedCount !== null && updatedCount !== undefined) {
                         messages.push(`Aggiornate ${updatedCount} bolle esistenti.`);
                     }
