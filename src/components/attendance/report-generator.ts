@@ -39,7 +39,7 @@ export const generateMonthlyReport = (
         // Let's add standard columns: "Ferie", "Permessi", "Malattia", "Altro".
 
         const standardColumns = ['Ferie', 'Perm.', 'Mal.', 'Altro'];
-        const columns = ['Giorno', ...jobIds.map(id => jobMap.get(id)), ...standardColumns];
+        const columns: string[] = ['Giorno', ...jobIds.map(id => jobMap.get(id) || 'N/D'), ...standardColumns];
 
         // Prepare Body
         const body = days.map(day => {
