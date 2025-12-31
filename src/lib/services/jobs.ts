@@ -192,7 +192,8 @@ export const jobsApi = {
         const { data, error } = await supabase.from('jobs').update(mapJobToDb(job)).eq('id', id).select().single();
         if (error) throw error;
 
-        if (updateMovements && (job.cig || job.cup)) {
+        // Update CIG/CUP in delivery notes if requested
+        if (updateMovements) {
             const { data: notes } = await supabase
                 .from('delivery_notes')
                 .select('id, notes')
@@ -205,8 +206,17 @@ export const jobsApi = {
 
                 const updates = notes.map(note => {
                     let currentNotes = note.notes || '';
-                    currentNotes = currentNotes.replace(/CIG:\s*[^\s\n]+(\s|$)/g, '').replace(/CUP:\s*[^\s\n]+(\s|$)/g, '');
-                    const updatedNotes = (newCodes + '\n' + currentNotes).trim();
+                    // Remove existing CIG/CUP patterns more robustly
+                    currentNotes = currentNotes
+                        .replace(/CIG:\s*\S+/gi, '')
+                        .replace(/CUP:\s*\S+/gi, '')
+                        .replace(/\n{2,}/g, '\n')
+                        .trim();
+
+                    // Add new codes at the beginning if any
+                    const updatedNotes = newCodes
+                        ? (newCodes + (currentNotes ? '\n' + currentNotes : '')).trim()
+                        : currentNotes;
 
                     return {
                         id: note.id,
@@ -219,6 +229,7 @@ export const jobsApi = {
                 );
 
                 await Promise.all(updatePromises);
+                console.log(`Updated CIG/CUP in ${notes.length} delivery notes`);
             }
         }
 

@@ -31,6 +31,7 @@ export function ClientEditDialog({
 }: ClientEditDialogProps) {
     const [editForm, setEditForm] = useState<Partial<Client>>({});
     const [shouldUpdateActiveJobs, setShouldUpdateActiveJobs] = useState(false);
+    const [shouldUpdateDeliveryNotes, setShouldUpdateDeliveryNotes] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     // Reset form when client changes
@@ -48,6 +49,7 @@ export function ClientEditDialog({
                 province: client.province
             });
             setShouldUpdateActiveJobs(false);
+            setShouldUpdateDeliveryNotes(false);
         }
         onOpenChange(isOpen);
     };
@@ -70,7 +72,7 @@ export function ClientEditDialog({
             // 1. Calculate new address
             const newAddress = constructAddress(editForm);
 
-            // 2. Update Client
+            // 2. Update Client (with delivery notes update option)
             await clientsApi.update(client.id, {
                 name: editForm.name,
                 vatNumber: editForm.vatNumber,
@@ -82,19 +84,15 @@ export function ClientEditDialog({
                 city: editForm.city,
                 province: editForm.province,
                 address: newAddress
-            });
+            }, { updateDeliveryNotes: shouldUpdateDeliveryNotes });
 
             // 3. Update Job Addresses if requested
             if (shouldUpdateActiveJobs && newAddress) {
                 console.log('Updating active jobs to new address:', newAddress);
-                // Fetch all jobs for this client
                 const jobs = await jobsApi.getByClientId(client.id);
-
-                // Filter for active jobs
                 const activeJobs = jobs.filter(job => job.status === 'active');
                 console.log(`Found ${activeJobs.length} active jobs to update out of ${jobs.length} total`);
 
-                // Update them
                 const updatePromises = activeJobs.map(job => {
                     console.log(`Updating job ${job.code} address to "${newAddress}"`);
                     return jobsApi.update(job.id, { siteAddress: newAddress });
@@ -206,15 +204,27 @@ export function ClientEditDialog({
                         </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 pt-2">
-                        <Checkbox
-                            id="update-jobs"
-                            checked={shouldUpdateActiveJobs}
-                            onCheckedChange={(checked) => setShouldUpdateActiveJobs(checked as boolean)}
-                        />
-                        <Label htmlFor="update-jobs" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                            Aggiorna l'indirizzo anche nelle commesse attive associate
-                        </Label>
+                    <div className="space-y-3 pt-2 border-t">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="update-jobs"
+                                checked={shouldUpdateActiveJobs}
+                                onCheckedChange={(checked) => setShouldUpdateActiveJobs(checked as boolean)}
+                            />
+                            <Label htmlFor="update-jobs" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                                Aggiorna l'indirizzo nelle commesse attive
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="update-delivery-notes"
+                                checked={shouldUpdateDeliveryNotes}
+                                onCheckedChange={(checked) => setShouldUpdateDeliveryNotes(checked as boolean)}
+                            />
+                            <Label htmlFor="update-delivery-notes" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                                Aggiorna l'indirizzo nelle bolle esistenti
+                            </Label>
+                        </div>
                     </div>
                 </div>
 
