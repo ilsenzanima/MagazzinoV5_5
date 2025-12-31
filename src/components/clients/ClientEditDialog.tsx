@@ -107,20 +107,36 @@ export function ClientEditDialog({
 
             const messages: string[] = ["Committente aggiornato con successo."];
 
-            // 3. Update Job Addresses if requested
+            // 3. Update Job Addresses if requested (only for jobs using client address)
             if (shouldUpdateActiveJobs && newAddress) {
-                console.log('Updating active jobs to new address:', newAddress);
-                const jobs = await jobsApi.getByClientId(client.id);
-                const activeJobs = jobs.filter(job => job.status === 'active');
-                console.log(`Found ${activeJobs.length} active jobs to update out of ${jobs.length} total`);
+                // Get old client address to compare
+                const oldClientAddress = client.address || constructAddress(client);
 
-                const updatePromises = activeJobs.map(job => {
+                console.log('Updating active jobs from old address:', oldClientAddress, 'to new address:', newAddress);
+                const jobs = await jobsApi.getByClientId(client.id);
+
+                // Only update active jobs that have siteAddress equal to old client address or empty/null
+                const jobsToUpdate = jobs.filter(job => {
+                    if (job.status !== 'active') return false;
+
+                    // Normalize addresses for comparison
+                    const normalize = (s: string | undefined | null) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+                    const jobSiteNorm = normalize(job.siteAddress);
+                    const oldAddrNorm = normalize(oldClientAddress);
+
+                    // Update if: empty or matches old client address
+                    return !jobSiteNorm || jobSiteNorm === oldAddrNorm;
+                });
+
+                console.log(`Found ${jobsToUpdate.length} jobs to update out of ${jobs.length} total`);
+
+                const updatePromises = jobsToUpdate.map(job => {
                     return jobsApi.update(job.id, { siteAddress: newAddress });
                 });
 
                 await Promise.all(updatePromises);
-                if (activeJobs.length > 0) {
-                    messages.push(`Aggiornati ${activeJobs.length} cantieri attivi.`);
+                if (jobsToUpdate.length > 0) {
+                    messages.push(`Aggiornati ${jobsToUpdate.length} cantieri attivi.`);
                 }
             }
 
