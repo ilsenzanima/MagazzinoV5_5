@@ -224,13 +224,71 @@ export const deliveryNotesApi = {
         if (error) throw error;
     },
 
-    updateLocationBatch: async (jobIds: string[], newLocation: string) => {
-        const { error, count } = await supabase
-            .from('delivery_notes')
-            .update({ delivery_location: newLocation }, { count: 'exact' })
-            .in('job_id', jobIds);
+    updateLocationBatch: async (jobIds: string[], newAddress: string, newClientName?: string) => {
+        // If we have a new client name, we need to update each note individually
+        // because we need to replace the client name pattern in the existing delivery_location
+        if (newClientName) {
+            // First, fetch all notes to update
+            const { data: notes, error: fetchError } = await supabase
+                .from('delivery_notes')
+                .select('id, delivery_location')
+                .in('job_id', jobIds);
 
-        if (error) throw error;
-        return count;
+            if (fetchError) throw fetchError;
+            if (!notes || notes.length === 0) return 0;
+
+            // Update each note with the new client name and address
+            const updatePromises = notes.map(note => {
+                let currentLocation = note.delivery_location || '';
+
+                // Replace the client name line (CLIENTE: old name - address)
+                // Pattern: CLIENTE: ... followed by newline or end of string
+                const clientLinePattern = /^CLIENTE:.*?(?:\n|$)/i;
+
+                // Build the new client line
+                let newClientLine = `CLIENTE: ${newClientName}`;
+                if (newAddress) {
+                    newClientLine += ` - ${newAddress}`;
+                }
+                newClientLine += '\n';
+
+                // Check if there's an existing client line to replace
+                if (clientLinePattern.test(currentLocation)) {
+                    currentLocation = currentLocation.replace(clientLinePattern, newClientLine);
+                } else {
+                    // No existing client line, prepend the new one
+                    currentLocation = newClientLine + currentLocation;
+                }
+
+                // Also update the DESTINAZIONE line address if present
+                const destLinePattern = /(DESTINAZIONE:\s*)([^\n]*)/i;
+                if (destLinePattern.test(currentLocation) && newAddress) {
+                    // Only update if it's not "Stessa"
+                    currentLocation = currentLocation.replace(destLinePattern, (match: string, prefix: string, addr: string) => {
+                        if (addr.toLowerCase().trim() === 'stessa') {
+                            return match; // Keep as is
+                        }
+                        return `${prefix}${newAddress}`;
+                    });
+                }
+
+                return supabase
+                    .from('delivery_notes')
+                    .update({ delivery_location: currentLocation.trim() })
+                    .eq('id', note.id);
+            });
+
+            await Promise.all(updatePromises);
+            return notes.length;
+        } else {
+            // Simple batch update for address only (original behavior)
+            const { error, count } = await supabase
+                .from('delivery_notes')
+                .update({ delivery_location: newAddress }, { count: 'exact' })
+                .in('job_id', jobIds);
+
+            if (error) throw error;
+            return count;
+        }
     }
 };
