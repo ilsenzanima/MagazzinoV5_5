@@ -351,7 +351,7 @@ export default function InventoryDetailPage() {
   const handleResetRealQty = async () => {
     if (!item) return;
     if (!confirm("Vuoi resettare la verifica inventario?")) return;
-    
+
     try {
       await inventoryApi.update(item.id, { realQuantity: null });
       // Refresh item locally
@@ -442,11 +442,11 @@ export default function InventoryDetailPage() {
     return (
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
-          <h2 className="text-2xl font-bold text-slate-900">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
             {error ? "Errore di Caricamento" : "Articolo non trovato"}
           </h2>
           {error && (
-            <p className="text-red-600 bg-red-50 px-4 py-2 rounded-md max-w-md text-center">
+            <p className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-4 py-2 rounded-md max-w-md text-center">
               {error}
             </p>
           )}
@@ -488,10 +488,10 @@ export default function InventoryDetailPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                {item.name} {item.model && <span className="font-normal text-slate-500">({item.model})</span>}
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                {item.name} {item.model && <span className="font-normal text-slate-500 dark:text-slate-400">({item.model})</span>}
               </h1>
-              <p className="text-sm text-slate-500 font-mono">{item.code}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-mono">{item.code}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -526,7 +526,7 @@ export default function InventoryDetailPage() {
             <Card>
               <CardContent className="p-4 space-y-4">
                 {/* Image Section */}
-                <div className="aspect-square relative rounded-md overflow-hidden bg-slate-100 border flex items-center justify-center group">
+                <div className="aspect-square relative rounded-md overflow-hidden bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center group">
                   <img
                     src={item.image || "/placeholder.svg"}
                     alt={item.name}
@@ -568,23 +568,23 @@ export default function InventoryDetailPage() {
                     <Label>Quantità Disponibile</Label>
                     <div className="flex flex-col gap-2">
                       {/* Calculated Quantity (Main) */}
-                      <div className="p-3 bg-blue-50 border border-blue-100 rounded-md text-center">
-                        <div className="text-2xl font-bold text-blue-700">
-                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-blue-500">{item.unit}</span>
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-md text-center">
+                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
                         </div>
-                        <div className="text-xs text-blue-400 font-medium">Quantità Totale</div>
+                        <div className="text-xs text-blue-400 dark:text-blue-500 font-medium">Quantità Totale</div>
                       </div>
 
                       {/* Stock Value */}
-                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-center">
-                        <div className="text-2xl font-bold text-slate-700">
+                      <div className="p-3 bg-slate-50 dark:bg-muted border border-slate-200 dark:border-slate-700 rounded-md text-center">
+                        <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
                           {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
                         </div>
-                        <div className="text-xs text-slate-500 font-medium">Valore Stock Attuale</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Valore Stock Attuale</div>
                       </div>
 
                       {!isStockValueComplete && (
-                        <div className="p-2 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-xs flex items-center gap-2 justify-center">
+                        <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2 justify-center">
                           <AlertTriangle className="h-4 w-4 shrink-0" />
                           <span>Dati costo incompleti (Valore parziale)</span>
                         </div>
@@ -593,13 +593,13 @@ export default function InventoryDetailPage() {
                       {/* Real Pieces (Secondary) */}
                       {item.coefficient !== 1 && (
                         <div className="text-center">
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-slate-400 dark:text-slate-500">
                             {item.pieces ?? item.quantity} Pezzi fisici
                           </span>
                         </div>
                       )}
                       {item.coefficient === 1 && (
-                        <div className="text-center text-[10px] text-slate-400">
+                        <div className="text-center text-[10px] text-slate-400 dark:text-slate-500">
                           1 {item.unit} = 1 Pezzo
                         </div>
                       )}
@@ -608,7 +608,7 @@ export default function InventoryDetailPage() {
 
                   {/* Audit Section - Visible only to admin/operativo */}
                   {(userRole === 'admin' || userRole === 'operativo') && (
-                    <div className="pt-4 border-t space-y-3">
+                    <div className="pt-4 border-t dark:border-slate-700 space-y-3">
                       <Label className="text-blue-600 font-semibold">Verifica Inventario (Reale)</Label>
                       <div className="flex gap-2">
                         <Input
@@ -616,22 +616,22 @@ export default function InventoryDetailPage() {
                           value={realQtyInput}
                           onChange={(e) => setRealQtyInput(e.target.value)}
                           placeholder="Q.tà fisica"
-                          className="bg-white"
+                          className="bg-white dark:bg-card"
                         />
                         <Button size="icon" variant="outline" onClick={handleUpdateRealQty} title="Salva quantità reale">
-                              <Save className="h-4 w-4" />
+                          <Save className="h-4 w-4" />
+                        </Button>
+                        {item.realQuantity !== null && item.realQuantity !== undefined && (
+                          <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500">
+                            <RotateCcw className="h-4 w-4" />
                           </Button>
-                          {item.realQuantity !== null && item.realQuantity !== undefined && (
-                              <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="text-slate-500 hover:text-red-600">
-                                  <RotateCcw className="h-4 w-4" />
-                              </Button>
-                          )}
+                        )}
                       </div>
 
                       {item.realQuantity !== null && item.realQuantity !== undefined && (
                         <div className={`text-sm p-2 rounded-md flex justify-between items-center ${(item.realQuantity - item.quantity) === 0
-                            ? "bg-green-50 text-green-700 border border-green-200"
-                            : "bg-red-50 text-red-700 border border-red-200"
+                          ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
+                          : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
                           }`}>
                           <span className="font-medium">Differenza:</span>
                           <span className="font-bold">
@@ -640,7 +640,7 @@ export default function InventoryDetailPage() {
                           </span>
                         </div>
                       )}
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500">
                         Visibile solo a Admin e Operativi. Indica discrepanze tra sistema e realtà.
                       </p>
                     </div>
@@ -648,14 +648,14 @@ export default function InventoryDetailPage() {
                 </div>
 
                 {/* QR Code & Barcode */}
-                <div className="pt-4 border-t flex flex-col items-center gap-4">
+                <div className="pt-4 border-t dark:border-slate-700 flex flex-col items-center gap-4">
                   <div className="w-full">
                     <Label className="mb-2 block text-center">Codice Identificativo</Label>
                     <div className="flex flex-col items-center gap-4">
-                      <div className="bg-white p-2 rounded border">
+                      <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700">
                         <QRCode value={item.code} size={128} />
                       </div>
-                      <div className="bg-white p-2 rounded border overflow-hidden max-w-full">
+                      <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700 overflow-hidden max-w-full">
                         <Barcode value={item.code} width={1.5} height={50} fontSize={12} />
                       </div>
                     </div>
@@ -675,8 +675,8 @@ export default function InventoryDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="code">Codice Articolo</Label>
-                    <Input id="code" value={item.code} readOnly className="bg-slate-50 text-slate-500" />
-                    <p className="text-[10px] text-slate-400">Generato Automaticamente</p>
+                    <Input id="code" value={item.code} readOnly className="bg-slate-50 dark:bg-muted text-slate-500 dark:text-slate-400" />
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Generato Automaticamente</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="brand">Marca</Label>
@@ -695,7 +695,7 @@ export default function InventoryDetailPage() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input id="brand" value={item.brand} readOnly className="bg-slate-50" />
+                      <Input id="brand" value={item.brand} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
                 </div>
@@ -711,23 +711,23 @@ export default function InventoryDetailPage() {
                     />
                   ) : (
                     item.supplierCode ? (
-                      <Input id="supplierCode" value={item.supplierCode} readOnly className="bg-slate-50" />
+                      <Input id="supplierCode" value={item.supplierCode} readOnly className="bg-slate-50 dark:bg-muted" />
                     ) : (
-                      <p className="text-sm text-slate-400 italic py-2">Nessun codice fornitore specificato</p>
+                      <p className="text-sm text-slate-400 dark:text-slate-500 italic py-2">Nessun codice fornitore specificato</p>
                     )
                   )}
                 </div>
 
                 {/* Additional Supplier Codes */}
                 {!isEditing && (
-                  <div className="space-y-2 pt-2 border-t">
+                  <div className="space-y-2 pt-2 border-t dark:border-slate-700">
                     <Label>Altri Codici Fornitore</Label>
                     <div className="space-y-2">
                       {supplierCodes.map(code => (
-                        <div key={code.id} className="flex items-center justify-between p-2 bg-slate-50 rounded border text-sm">
+                        <div key={code.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-muted rounded border dark:border-slate-700 text-sm">
                           <div className="flex flex-col">
                             <span className="font-mono font-bold">{code.code}</span>
-                            {code.supplierName && <span className="text-xs text-slate-500">{code.supplierName}</span>}
+                            {code.supplierName && <span className="text-xs text-slate-500 dark:text-slate-400">{code.supplierName}</span>}
                           </div>
                           {(userRole === 'admin' || userRole === 'operativo') && (
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteSupplierCode(code.id)}>
@@ -779,7 +779,7 @@ export default function InventoryDetailPage() {
                       onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                     />
                   ) : (
-                    <Input id="name" value={item.name} readOnly className="bg-slate-50" />
+                    <Input id="name" value={item.name} readOnly className="bg-slate-50 dark:bg-muted" />
                   )}
                 </div>
 
@@ -788,7 +788,7 @@ export default function InventoryDetailPage() {
                     <Label htmlFor="model">Modello / Variante</Label>
                     {!isEditing && (
                       <Link href={`/inventory/new?cloneId=${item.id}`} title="Crea variante da questo articolo">
-                        <Button variant="ghost" size="sm" className="h-6 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2">
+                        <Button variant="ghost" size="sm" className="h-6 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2">
                           <Copy className="h-3 w-3 mr-1" />
                           Crea Variante
                         </Button>
@@ -803,7 +803,7 @@ export default function InventoryDetailPage() {
                       onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
                     />
                   ) : (
-                    <Input id="model" value={item.model || ""} readOnly className="bg-slate-50" placeholder="-" />
+                    <Input id="model" value={item.model || ""} readOnly className="bg-slate-50 dark:bg-muted" placeholder="-" />
                   )}
                 </div>
 
@@ -825,7 +825,7 @@ export default function InventoryDetailPage() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input id="type" value={item.type} readOnly className="bg-slate-50" />
+                      <Input id="type" value={item.type} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
                   <div className="space-y-2">
@@ -839,7 +839,7 @@ export default function InventoryDetailPage() {
                         onChange={(e) => setEditForm({ ...editForm, minStock: parseFloat(e.target.value) })}
                       />
                     ) : (
-                      <Input id="minStock" type="number" step="0.01" value={item.minStock} readOnly className="bg-slate-50" />
+                      <Input id="minStock" type="number" step="0.01" value={item.minStock} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
                 </div>
@@ -862,7 +862,7 @@ export default function InventoryDetailPage() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input id="unit" value={item.unit} readOnly className="bg-slate-50" />
+                      <Input id="unit" value={item.unit} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
                   <div className="space-y-2">
@@ -876,14 +876,14 @@ export default function InventoryDetailPage() {
                           value={editForm.coefficient || 1}
                           onChange={(e) => setEditForm({ ...editForm, coefficient: parseFloat(e.target.value) })}
                           disabled={userRole !== 'admin'}
-                          className={userRole !== 'admin' ? "bg-slate-100" : ""}
+                          className={userRole !== 'admin' ? "bg-slate-100 dark:bg-muted" : ""}
                         />
                         {userRole !== 'admin' && (
-                          <p className="text-[10px] text-red-400">Modificabile solo da Admin</p>
+                          <p className="text-[10px] text-red-400 dark:text-red-500">Modificabile solo da Admin</p>
                         )}
                       </div>
                     ) : (
-                      <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50" />
+                      <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
                 </div>
@@ -902,7 +902,7 @@ export default function InventoryDetailPage() {
                       id="description"
                       value={item.description}
                       readOnly
-                      className="min-h-[100px] bg-slate-50"
+                      className="min-h-[100px] bg-slate-50 dark:bg-muted"
                     />
                   )}
                 </div>

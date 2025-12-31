@@ -130,18 +130,18 @@ export function JobStock({ movements }: JobStockProps) {
             {/* Current Stock Section */}
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
+                    <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                         <Package className="h-5 w-5 text-blue-600" />
                         Giacenza Attuale in Cantiere
                     </h2>
-                    <Badge variant="outline" className="text-slate-500">
+                    <Badge variant="outline" className="text-slate-500 dark:text-slate-400">
                         {currentStock.length} Articoli presenti
                     </Badge>
                 </div>
 
                 <div className="grid gap-4 md:hidden">
                     {currentStock.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-lg border border-dashed">
+                        <div className="text-center py-8 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700">
                             Nessun materiale attualmente in cantiere.
                         </div>
                     ) : (
@@ -150,37 +150,37 @@ export function JobStock({ movements }: JobStockProps) {
                                 <CardContent className="p-4 space-y-3">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <div className="font-medium text-slate-900">
+                                            <div className="font-medium text-slate-900 dark:text-white">
                                                 {item.name}
-                                                {item.model && <span className="text-slate-500 font-normal ml-1">({item.model})</span>}
+                                                {item.model && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({item.model})</span>}
                                             </div>
-                                            <div className="text-xs text-slate-500 font-mono mt-0.5">{item.code}</div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{item.code}</div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="font-bold text-slate-900">{item.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}</div>
+                                            <div className="font-bold text-slate-900 dark:text-white">{item.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}</div>
                                             {Math.abs(item.pieces) > 0.01 && (
-                                                <div className="text-xs text-slate-500">{item.pieces.toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz</div>
+                                                <div className="text-xs text-slate-500 dark:text-slate-400">{item.pieces.toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz</div>
                                             )}
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t">
+                                    <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t dark:border-slate-700">
                                         <div>
-                                            <span className="text-xs text-slate-500 block">Riferimento</span>
+                                            <span className="text-xs text-slate-500 dark:text-slate-400 block">Riferimento</span>
                                             {item.deliveryNoteId ? (
-                                                <Link href={`/movements/${item.deliveryNoteId}`} className="text-blue-600 hover:underline">
+                                                <Link href={`/movements/${item.deliveryNoteId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                                                     {item.reference || '-'}
                                                 </Link>
                                             ) : (
-                                                <span className="text-slate-700">{item.reference || '-'}</span>
+                                                <span className="text-slate-700 dark:text-slate-300">{item.reference || '-'}</span>
                                             )}
                                         </div>
                                         <div className="text-right">
-                                            <span className="text-xs text-slate-500 block">Valore</span>
+                                            <span className="text-xs text-slate-500 dark:text-slate-400 block">Valore</span>
                                             {userRole === 'user' ? (
                                                 <span className="text-slate-400 italic text-xs">Riservato</span>
                                             ) : (
-                                                <span className="font-medium text-slate-700">
+                                                <span className="font-medium text-slate-700 dark:text-slate-300">
                                                     € {(item.qty * item.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                                                 </span>
                                             )}
@@ -207,7 +207,7 @@ export function JobStock({ movements }: JobStockProps) {
                         <TableBody>
                             {currentStock.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8 text-slate-400">
+                                    <TableCell colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-500">
                                         Nessun materiale attualmente in cantiere.
                                     </TableCell>
                                 </TableRow>
@@ -217,47 +217,47 @@ export function JobStock({ movements }: JobStockProps) {
                                         <TableCell className="font-mono text-xs">{item.code}</TableCell>
                                         <TableCell className="font-medium">
                                             {item.name}
-                                            {item.model && <span className="text-slate-500 font-normal ml-1">({item.model})</span>}
+                                            {item.model && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({item.model})</span>}
                                             {item.isFictitious && (
-                                                <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5 px-1.5">
+                                                <Badge variant="outline" className="ml-2 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-[10px] h-5 px-1.5">
                                                     Fittizio
                                                 </Badge>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-slate-600 dark:text-slate-400">
                                             {/* Bolla Reference */}
                                             {item.deliveryNoteId ? (
-                                                <Link href={`/movements/${item.deliveryNoteId}`} className="text-blue-600 hover:underline">
+                                                <Link href={`/movements/${item.deliveryNoteId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                                                     {item.reference || '-'}
                                                 </Link>
                                             ) : (
                                                 item.reference || '-'
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-slate-600 dark:text-slate-400">
                                             {/* Purchase Info */}
                                             {item.isFictitious ? (
-                                                <span className="text-slate-400 italic">Fittizio</span>
+                                                <span className="text-slate-400 dark:text-slate-500 italic">Fittizio</span>
                                             ) : item.purchaseId ? (
-                                                <Link href={`/purchases/${item.purchaseId}`} className="group flex flex-col hover:bg-slate-50 p-1 rounded -ml-1 transition-colors">
-                                                    <span className="font-medium text-blue-600 group-hover:underline">
+                                                <Link href={`/purchases/${item.purchaseId}`} className="group flex flex-col hover:bg-slate-50 dark:hover:bg-slate-800 p-1 rounded -ml-1 transition-colors">
+                                                    <span className="font-medium text-blue-600 dark:text-blue-400 group-hover:underline">
                                                         Bolla {item.purchaseNumber || '?'}
                                                     </span>
-                                                    <span className="text-xs text-slate-500">
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
                                                         {item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString() : ''} - {item.supplierName || 'Fornitore'}
                                                     </span>
                                                 </Link>
                                             ) : (
-                                                <span className="text-slate-400 italic">Magazzino</span>
+                                                <span className="text-slate-400 dark:text-slate-500 italic">Magazzino</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-slate-600">
+                                        <TableCell className="text-right font-mono text-slate-600 dark:text-slate-400">
                                             {Math.abs(item.pieces) > 0.01 ? item.pieces.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : '-'}
                                         </TableCell>
-                                        <TableCell className="text-right font-bold text-slate-700">
+                                        <TableCell className="text-right font-bold text-slate-700 dark:text-slate-300">
                                             {item.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
                                         </TableCell>
-                                        <TableCell className="text-right text-slate-500">
+                                        <TableCell className="text-right text-slate-500 dark:text-slate-400">
                                             <div className="flex items-center justify-end gap-2">
                                                 {userRole === 'user' ? (
                                                     <span className="text-slate-400 italic text-xs">Riservato</span>
@@ -285,12 +285,12 @@ export function JobStock({ movements }: JobStockProps) {
             </div>
 
             {/* Movement History Section */}
-            <div className="space-y-4 pt-4 border-t">
-                <h2 className="text-lg font-semibold text-slate-800">Storico Movimenti</h2>
+            <div className="space-y-4 pt-4 border-t dark:border-slate-700">
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Storico Movimenti</h2>
 
                 <div className="grid gap-4 md:hidden">
                     {movements.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-lg border border-dashed">
+                        <div className="text-center py-8 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700">
                             Nessun movimento registrato.
                         </div>
                     ) : (
@@ -303,12 +303,12 @@ export function JobStock({ movements }: JobStockProps) {
                                     <CardContent className="p-4 space-y-3">
                                         <div className="flex justify-between items-start">
                                             <div className="space-y-1">
-                                                <div className="text-xs text-slate-500 font-mono">
+                                                <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                                                     {new Date(move.date).toLocaleDateString()}
                                                 </div>
-                                                <div className="font-medium text-slate-900">
+                                                <div className="font-medium text-slate-900 dark:text-white">
                                                     {move.itemName || 'Articolo Cancellato'}
-                                                    {move.itemModel && <span className="text-slate-500 font-normal ml-1">({move.itemModel})</span>}
+                                                    {move.itemModel && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({move.itemModel})</span>}
                                                 </div>
                                             </div>
                                             <div className={`font-bold ${isSiteIn ? 'text-green-700' : 'text-orange-700'}`}>
@@ -318,29 +318,29 @@ export function JobStock({ movements }: JobStockProps) {
 
                                         <div className="flex flex-wrap gap-2">
                                             {isSiteIn ? (
-                                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex w-fit gap-1 items-center text-xs">
+                                                <Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 flex w-fit gap-1 items-center text-xs">
                                                     <ArrowDownLeft className="h-3 w-3" /> In Ingresso
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 flex w-fit gap-1 items-center text-xs">
+                                                <Badge variant="outline" className="bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 flex w-fit gap-1 items-center text-xs">
                                                     <ArrowUpRight className="h-3 w-3" /> Reso
                                                 </Badge>
                                             )}
                                             {move.isFictitious && (
-                                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                                                <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-xs">
                                                     Fittizio
                                                 </Badge>
                                             )}
                                         </div>
 
-                                        <div className="text-sm pt-2 border-t text-slate-600">
-                                            <span className="text-xs text-slate-400 block mb-1">Riferimento</span>
+                                        <div className="text-sm pt-2 border-t dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                                            <span className="text-xs text-slate-400 dark:text-slate-500 block mb-1">Riferimento</span>
                                             {move.deliveryNoteId ? (
-                                                <Link href={`/movements/${move.deliveryNoteId}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                                                <Link href={`/movements/${move.deliveryNoteId}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
                                                     {move.reference || '-'}
                                                 </Link>
                                             ) : move.purchaseId && move.type === 'purchase' ? (
-                                                <Link href={`/purchases/${move.purchaseId}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                                                <Link href={`/purchases/${move.purchaseId}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
                                                     {move.reference || '-'}
                                                 </Link>
                                             ) : (
@@ -369,7 +369,7 @@ export function JobStock({ movements }: JobStockProps) {
                         <TableBody>
                             {movements.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8 text-slate-400">
+                                    <TableCell colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-500">
                                         Nessun movimento registrato.
                                     </TableCell>
                                 </TableRow>
@@ -385,58 +385,58 @@ export function JobStock({ movements }: JobStockProps) {
                                             </TableCell>
                                             <TableCell>
                                                 {isSiteIn ? (
-                                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex w-fit gap-1 items-center">
+                                                    <Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 flex w-fit gap-1 items-center">
                                                         <ArrowDownLeft className="h-3 w-3" /> In Ingresso
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 flex w-fit gap-1 items-center">
+                                                    <Badge variant="outline" className="bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 flex w-fit gap-1 items-center">
                                                         <ArrowUpRight className="h-3 w-3" /> Reso
                                                     </Badge>
                                                 )}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col">
-                                                    <span className="font-medium text-slate-900 flex items-center gap-2">
+                                                    <span className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
                                                         {move.itemName || 'Articolo Cancellato'}
-                                                        {move.itemModel && <span className="text-slate-500 font-normal">({move.itemModel})</span>}
+                                                        {move.itemModel && <span className="text-slate-500 dark:text-slate-400 font-normal">({move.itemModel})</span>}
                                                         {move.isFictitious && (
-                                                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5 px-1.5">
+                                                            <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-[10px] h-5 px-1.5">
                                                                 Fittizio
                                                             </Badge>
                                                         )}
                                                     </span>
-                                                    <span className="text-xs text-slate-500 font-mono">{move.itemCode}</span>
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{move.itemCode}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-sm">
                                                 {move.deliveryNoteId ? (
-                                                    <Link href={`/movements/${move.deliveryNoteId}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                                                    <Link href={`/movements/${move.deliveryNoteId}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
                                                         {move.reference || '-'}
                                                     </Link>
                                                 ) : move.purchaseId && move.type === 'purchase' ? (
-                                                    <Link href={`/purchases/${move.purchaseId}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                                                    <Link href={`/purchases/${move.purchaseId}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
                                                         {move.reference || '-'}
                                                     </Link>
                                                 ) : (
                                                     move.reference || '-'
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-sm text-slate-600">
+                                            <TableCell className="text-sm text-slate-600 dark:text-slate-400">
                                                 {move.isFictitious ? (
-                                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                                    <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">
                                                         Fittizio
                                                     </Badge>
                                                 ) : move.purchaseId ? (
-                                                    <Link href={`/purchases/${move.purchaseId}`} className="group flex flex-col hover:bg-slate-50 p-1 rounded -ml-1 transition-colors">
-                                                        <span className="font-medium text-blue-600 group-hover:underline">
+                                                    <Link href={`/purchases/${move.purchaseId}`} className="group flex flex-col hover:bg-slate-50 dark:hover:bg-slate-800 p-1 rounded -ml-1 transition-colors">
+                                                        <span className="font-medium text-blue-600 dark:text-blue-400 group-hover:underline">
                                                             Bolla {move.purchaseNumber || '?'}
                                                         </span>
-                                                        <span className="text-xs text-slate-500">
+                                                        <span className="text-xs text-slate-500 dark:text-slate-400">
                                                             {move.purchaseDate ? new Date(move.purchaseDate).toLocaleDateString() : ''} - {move.supplierName || 'Fornitore sconosciuto'}
                                                         </span>
                                                     </Link>
                                                 ) : (
-                                                    <span className="text-slate-400 italic">Magazzino</span>
+                                                    <span className="text-slate-400 dark:text-slate-500 italic">Magazzino</span>
                                                 )}
                                             </TableCell>
                                             <TableCell className={`text-right font-bold ${isSiteIn ? 'text-green-700' : 'text-orange-700'}`}>

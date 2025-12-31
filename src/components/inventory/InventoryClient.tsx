@@ -194,7 +194,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         {/* Search Bar */}
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             <Label htmlFor="inventory-search" className="sr-only">Cerca articoli</Label>
             <Input
               id="inventory-search"
@@ -226,15 +226,15 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2 text-slate-500">Caricamento inventario...</span>
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento inventario...</span>
         </div>
       ) : error ? (
         <div className="flex flex-col justify-center items-center py-12 text-center">
-          <div className="bg-red-50 text-red-600 p-4 rounded-full mb-4">
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-full mb-4">
             <Package className="h-8 w-8" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Errore di Caricamento</h3>
-          <p className="text-slate-500 mb-6 max-w-md">{error}</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Errore di Caricamento</h3>
+          <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md">{error}</p>
           <Button onClick={loadItems} variant="outline">
             Riprova
           </Button>
@@ -243,7 +243,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {items.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-slate-400">
+              <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
                 <p>Nessun articolo trovato</p>
               </div>
@@ -253,7 +253,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                   <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group h-full">
                     <CardContent className="p-0 flex flex-col h-full">
                       {/* Immagine */}
-                      <div className="w-full h-48 bg-slate-200 shrink-0 relative flex items-center justify-center bg-white overflow-hidden">
+                      <div className="w-full h-48 bg-slate-200 dark:bg-slate-700 shrink-0 relative flex items-center justify-center bg-white dark:bg-card overflow-hidden">
                         {(() => {
                           const typeInfo = itemTypes.find(t => t.name === item.type);
                           const hasCustomImage = !!item.image;
@@ -292,25 +292,25 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       <div className="flex-1 p-4 flex flex-col gap-2">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="text-xs text-slate-500 font-mono mb-1">{item.code}</p>
-                            <h3 className="font-bold text-slate-900 line-clamp-2 leading-tight" title={item.name}>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mb-1">{item.code}</p>
+                            <h3 className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-tight" title={item.name}>
                               {item.name}
-                              {item.model && <span className="text-slate-500 font-medium ml-1">({item.model})</span>}
+                              {item.model && <span className="text-slate-500 dark:text-slate-400 font-medium ml-1">({item.model})</span>}
                             </h3>
                           </div>
                         </div>
 
                         <div className="flex flex-wrap gap-1 mt-auto pt-2">
-                          <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
+                          <Badge variant="secondary" className="text-[10px] font-normal text-slate-600 dark:text-slate-400">
                             {item.brand}
                           </Badge>
-                          <Badge variant="secondary" className="text-[10px] font-normal text-slate-600">
+                          <Badge variant="secondary" className="text-[10px] font-normal text-slate-600 dark:text-slate-400">
                             {item.type}
                           </Badge>
                           <div className="ml-auto text-right flex flex-col items-end">
                             {item.coefficient !== 1 ? (
                               <>
-                                <span className="text-[10px] text-slate-500 font-medium mb-1 mr-1">
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1 mr-1">
                                   {(item.pieces ?? (item.quantity / item.coefficient)).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz =
                                 </span>
                                 <Badge variant="outline" className={
@@ -343,7 +343,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
           {/* Pagination Controls */}
           {items.length > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between mt-8 border-t pt-4 dark:border-border gap-4">
-              <div className="text-sm text-slate-500 order-2 sm:order-1">
+              <div className="text-sm text-slate-500 dark:text-slate-400 order-2 sm:order-1">
                 Pagina {page} di {totalPages} ({totalItems} articoli)
               </div>
               <div className="flex gap-2 order-1 sm:order-2">
@@ -391,7 +391,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
               Inquadra il codice a barre o il QR code per cercare l&apos;articolo.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center justify-center p-4 bg-slate-50 rounded-lg">
+          <div className="flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
             <div id="reader" className="w-full"></div>
           </div>
         </DialogContent>

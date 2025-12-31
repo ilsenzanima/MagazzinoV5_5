@@ -509,13 +509,13 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                         </Button>
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
                             {movement.type === 'entry' && <ArrowDownRight className="h-6 w-6 text-green-600" />}
                             {movement.type === 'exit' && <ArrowUpRight className="h-6 w-6 text-orange-600" />}
                             {movement.type === 'sale' && <ShoppingBag className="h-6 w-6 text-blue-600" />}
                             DDT {movement.number}
                         </h1>
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
                             Data: {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
                         </p>
                     </div>
@@ -559,7 +559,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-sm font-medium text-slate-500">Dettagli Documento</CardTitle>
+                        <CardTitle className="text-sm font-medium text-slate-500 dark:text-slate-400">Dettagli Documento</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {isEditing ? (
@@ -591,16 +591,16 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                             </>
                         ) : (
                             <div className="space-y-3">
-                                <div className="flex justify-between border-b pb-2">
-                                    <span className="text-slate-500">Causale</span>
+                                <div className="flex justify-between border-b dark:border-slate-700 pb-2">
+                                    <span className="text-slate-500 dark:text-slate-400">Causale</span>
                                     <span className="font-medium">{movement.causal}</span>
                                 </div>
-                                <div className="flex justify-between border-b pb-2">
-                                    <span className="text-slate-500">Luogo Ritiro</span>
+                                <div className="flex justify-between border-b dark:border-slate-700 pb-2">
+                                    <span className="text-slate-500 dark:text-slate-400">Luogo Ritiro</span>
                                     <span className="font-medium truncate max-w-[200px]">{movement.pickupLocation}</span>
                                 </div>
-                                <div className="flex justify-between border-b pb-2">
-                                    <span className="text-slate-500">Destinazione</span>
+                                <div className="flex justify-between border-b dark:border-slate-700 pb-2">
+                                    <span className="text-slate-500 dark:text-slate-400">Destinazione</span>
                                     <span className="font-medium truncate max-w-[200px]">{movement.deliveryLocation}</span>
                                 </div>
                             </div>
@@ -610,7 +610,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-sm font-medium text-slate-500">Trasporto e Note</CardTitle>
+                        <CardTitle className="text-sm font-medium text-slate-500 dark:text-slate-400">Trasporto e Note</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {isEditing ? (
@@ -632,17 +632,17 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                             </>
                         ) : (
                             <div className="space-y-3">
-                                <div className="flex justify-between border-b pb-2">
-                                    <span className="text-slate-500">Aspetto Beni</span>
+                                <div className="flex justify-between border-b dark:border-slate-700 pb-2">
+                                    <span className="text-slate-500 dark:text-slate-400">Aspetto Beni</span>
                                     <span className="font-medium">{movement.appearance}</span>
                                 </div>
-                                <div className="flex justify-between border-b pb-2">
-                                    <span className="text-slate-500">N. Colli</span>
+                                <div className="flex justify-between border-b dark:border-slate-700 pb-2">
+                                    <span className="text-slate-500 dark:text-slate-400">N. Colli</span>
                                     <span className="font-medium">{movement.packagesCount}</span>
                                 </div>
                                 <div>
-                                    <span className="text-slate-500 block mb-1">Note</span>
-                                    <p className="text-sm bg-slate-50 p-2 rounded">{movement.notes || "-"}</p>
+                                    <span className="text-slate-500 dark:text-slate-400 block mb-1">Note</span>
+                                    <p className="text-sm bg-slate-50 dark:bg-muted p-2 rounded">{movement.notes || "-"}</p>
                                 </div>
                             </div>
                         )}
@@ -674,7 +674,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                         <TableBody>
                             {items.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-8 text-slate-400">
+                                    <TableCell colSpan={4} className="text-center py-8 text-slate-400 dark:text-slate-500">
                                         Nessun articolo inserito
                                     </TableCell>
                                 </TableRow>
@@ -685,7 +685,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                         <TableCell>
                                             <div>
                                                 <span className="block font-medium">{item.inventoryName}</span>
-                                                <span className="text-xs text-slate-500">{item.inventoryDescription}</span>
+                                                <span className="text-xs text-slate-500 dark:text-slate-400">{item.inventoryDescription}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell>

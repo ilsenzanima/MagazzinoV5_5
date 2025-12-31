@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Search, 
-  Plus, 
+import {
+  Search,
+  Plus,
   Loader2,
   Building2,
   Phone,
@@ -40,7 +40,7 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Pagination
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -48,7 +48,7 @@ export default function ClientsPage() {
 
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  
+
   // Edit state
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -66,20 +66,20 @@ export default function ClientsPage() {
 
   const loadClients = async () => {
     try {
-        setLoading(true);
-        setError(null);
-        const { data, total } = await clientsApi.getPaginated({
-          page,
-          limit: LIMIT,
-          search: debouncedSearch
-        });
-        setClients(data);
-        setTotalItems(total);
+      setLoading(true);
+      setError(null);
+      const { data, total } = await clientsApi.getPaginated({
+        page,
+        limit: LIMIT,
+        search: debouncedSearch
+      });
+      setClients(data);
+      setTotalItems(total);
     } catch (error: any) {
-        console.error("Failed to load clients:", error);
-        setError(error.message || "Errore sconosciuto durante il caricamento");
+      console.error("Failed to load clients:", error);
+      setError(error.message || "Errore sconosciuto durante il caricamento");
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -98,10 +98,10 @@ export default function ClientsPage() {
 
   const handleUpdateClient = async () => {
     if (!clientToEdit || !editForm.name) return;
-    
+
     try {
       setIsSaving(true);
-      
+
       // Helper to construct address
       const constructAddress = (c: Partial<Client>) => {
         return `${c.street || ''} ${c.streetNumber || ''}, ${c.postalCode || ''} ${c.city || ''} ${c.province ? '(' + c.province + ')' : ''}`
@@ -113,7 +113,7 @@ export default function ClientsPage() {
 
       // 1. Calculate new address
       const newAddress = constructAddress(editForm);
-      
+
       // 2. Update Client
       await clientsApi.update(clientToEdit.id, {
         name: editForm.name,
@@ -133,17 +133,17 @@ export default function ClientsPage() {
         console.log('Updating active jobs to new address:', newAddress);
         // Fetch all jobs for this client
         const jobs = await jobsApi.getByClientId(clientToEdit.id);
-        
+
         // Filter for active jobs
         const activeJobs = jobs.filter(job => job.status === 'active');
         console.log(`Found ${activeJobs.length} active jobs to update out of ${jobs.length} total`);
-        
+
         // Update them
         const updatePromises = activeJobs.map(job => {
-           console.log(`Updating job ${job.code} address to "${newAddress}"`);
-           return jobsApi.update(job.id, { siteAddress: newAddress });
+          console.log(`Updating job ${job.code} address to "${newAddress}"`);
+          return jobsApi.update(job.id, { siteAddress: newAddress });
         });
-        
+
         await Promise.all(updatePromises);
       }
 
@@ -194,9 +194,9 @@ export default function ClientsPage() {
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Cerca Committente (Nome, P.IVA, Email...)" 
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+          <Input
+            placeholder="Cerca Committente (Nome, P.IVA, Email...)"
             className="pl-9 bg-slate-100 dark:bg-muted border-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -206,25 +206,25 @@ export default function ClientsPage() {
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            <span className="ml-2 text-slate-500">Caricamento committenti...</span>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento committenti...</span>
         </div>
       ) : error ? (
         <div className="flex flex-col justify-center items-center py-12 text-center">
-            <div className="bg-red-50 text-red-600 p-4 rounded-full mb-4">
-                <Building2 className="h-8 w-8" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Errore di Caricamento</h3>
-            <p className="text-slate-500 mb-6 max-w-md">{error}</p>
-            <Button onClick={loadClients} variant="outline">
-                Riprova
-            </Button>
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-full mb-4">
+            <Building2 className="h-8 w-8" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Errore di Caricamento</h3>
+          <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md">{error}</p>
+          <Button onClick={loadClients} variant="outline">
+            Riprova
+          </Button>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {clients.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-slate-400">
+              <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
                 <p>Nessun committente trovato</p>
               </div>
@@ -236,17 +236,17 @@ export default function ClientsPage() {
                       <span className="truncate">{client.name}</span>
                       {(userRole === 'admin' || userRole === 'operativo') && (
                         <div className="flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-slate-400 hover:text-blue-600 h-8 w-8"
                             onClick={() => openEditDialog(client)}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-slate-400 hover:text-red-600 h-8 w-8"
                             onClick={() => {
                               setClientToDelete(client);
@@ -279,30 +279,30 @@ export default function ClientsPage() {
                     {client.email && (
                       <div className="flex items-center gap-2">
                         <Mail className="h-4 w-4 shrink-0" />
-                        <a href={`mailto:${client.email}`} className="hover:underline text-blue-600">
+                        <a href={`mailto:${client.email}`} className="hover:underline text-blue-600 dark:text-blue-400">
                           {client.email}
                         </a>
                       </div>
                     )}
                     {client.phone && (
-                       <div className="flex items-center gap-2">
-                         <Phone className="h-4 w-4 shrink-0" />
-                         <a href={`tel:${client.phone}`} className="hover:underline">
-                           {client.phone}
-                         </a>
-                       </div>
-                     )}
-                     <div className="pt-2 mt-2 border-t flex justify-end">
-                        <Link href={`/jobs?clientId=${client.id}`}>
-                           <Button variant="outline" size="sm">Vedi Commesse</Button>
-                        </Link>
-                     </div>
-                   </CardContent>
-                 </Card>
-               ))
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 shrink-0" />
+                        <a href={`tel:${client.phone}`} className="hover:underline">
+                          {client.phone}
+                        </a>
+                      </div>
+                    )}
+                    <div className="pt-2 mt-2 border-t dark:border-slate-700 flex justify-end">
+                      <Link href={`/jobs?clientId=${client.id}`}>
+                        <Button variant="outline" size="sm">Vedi Commesse</Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
             )}
           </div>
-          
+
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-8">
@@ -355,7 +355,7 @@ export default function ClientsPage() {
               Modifica i dati del committente. Se cambi l'indirizzo, le commesse associate a questo indirizzo verranno aggiornate.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -363,7 +363,7 @@ export default function ClientsPage() {
                 <Input
                   id="name"
                   value={editForm.name || ""}
-                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -371,7 +371,7 @@ export default function ClientsPage() {
                 <Input
                   id="vatNumber"
                   value={editForm.vatNumber || ""}
-                  onChange={(e) => setEditForm({...editForm, vatNumber: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, vatNumber: e.target.value })}
                 />
               </div>
             </div>
@@ -383,7 +383,7 @@ export default function ClientsPage() {
                   id="email"
                   type="email"
                   value={editForm.email || ""}
-                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -391,7 +391,7 @@ export default function ClientsPage() {
                 <Input
                   id="phone"
                   value={editForm.phone || ""}
-                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />
               </div>
             </div>
@@ -400,50 +400,50 @@ export default function ClientsPage() {
               <Label>Indirizzo Sede Legale</Label>
               <div className="grid grid-cols-12 gap-2">
                 <div className="col-span-8">
-                  <Input 
-                    placeholder="Via/Piazza" 
-                    value={editForm.street || ""} 
-                    onChange={(e) => setEditForm({...editForm, street: e.target.value})}
+                  <Input
+                    placeholder="Via/Piazza"
+                    value={editForm.street || ""}
+                    onChange={(e) => setEditForm({ ...editForm, street: e.target.value })}
                   />
                 </div>
                 <div className="col-span-4">
-                  <Input 
-                    placeholder="N. Civico" 
-                    value={editForm.streetNumber || ""} 
-                    onChange={(e) => setEditForm({...editForm, streetNumber: e.target.value})}
+                  <Input
+                    placeholder="N. Civico"
+                    value={editForm.streetNumber || ""}
+                    onChange={(e) => setEditForm({ ...editForm, streetNumber: e.target.value })}
                   />
                 </div>
                 <div className="col-span-3">
-                  <Input 
-                    placeholder="CAP" 
-                    value={editForm.postalCode || ""} 
-                    onChange={(e) => setEditForm({...editForm, postalCode: e.target.value})}
+                  <Input
+                    placeholder="CAP"
+                    value={editForm.postalCode || ""}
+                    onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })}
                   />
                 </div>
                 <div className="col-span-6">
-                  <Input 
-                    placeholder="Città" 
-                    value={editForm.city || ""} 
-                    onChange={(e) => setEditForm({...editForm, city: e.target.value})}
+                  <Input
+                    placeholder="Città"
+                    value={editForm.city || ""}
+                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
                   />
                 </div>
                 <div className="col-span-3">
-                  <Input 
-                    placeholder="Prov" 
-                    maxLength={2} 
+                  <Input
+                    placeholder="Prov"
+                    maxLength={2}
                     className="uppercase"
-                    value={editForm.province || ""} 
-                    onChange={(e) => setEditForm({...editForm, province: e.target.value})}
+                    value={editForm.province || ""}
+                    onChange={(e) => setEditForm({ ...editForm, province: e.target.value })}
                   />
                 </div>
               </div>
             </div>
 
             <div className="flex items-center space-x-2 pt-2">
-              <Checkbox 
-                id="update-jobs" 
-                checked={shouldUpdateActiveJobs} 
-                onCheckedChange={(checked) => setShouldUpdateActiveJobs(checked as boolean)} 
+              <Checkbox
+                id="update-jobs"
+                checked={shouldUpdateActiveJobs}
+                onCheckedChange={(checked) => setShouldUpdateActiveJobs(checked as boolean)}
               />
               <Label htmlFor="update-jobs" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
                 Aggiorna l'indirizzo anche nelle commesse attive associate

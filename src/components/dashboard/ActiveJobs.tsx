@@ -38,23 +38,23 @@ export const ActiveJobsWidget = memo(function ActiveJobsWidget({ stats }: Active
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-blue-500" />
-                <span className="text-sm text-slate-600">Attive</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Attive</span>
               </div>
-              <span className="font-bold text-slate-900">{currentStats.active}</span>
+              <span className="font-bold text-slate-900 dark:text-white">{currentStats.active}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-sm text-slate-600">Completate</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Completate</span>
               </div>
-              <span className="font-bold text-slate-900">{currentStats.completed}</span>
+              <span className="font-bold text-slate-900 dark:text-white">{currentStats.completed}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-amber-500" />
-                <span className="text-sm text-slate-600">Sospese</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Sospese</span>
               </div>
-              <span className="font-bold text-slate-900">{currentStats.suspended}</span>
+              <span className="font-bold text-slate-900 dark:text-white">{currentStats.suspended}</span>
             </div>
           </div>
 
@@ -77,7 +77,7 @@ export const ActiveJobsWidget = memo(function ActiveJobsWidget({ stats }: Active
                 <Tooltip />
               </PieChart>
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-xs text-slate-400">
+              <div className="h-full w-full flex items-center justify-center text-xs text-slate-400 dark:text-slate-500">
                 N/A
               </div>
             )}

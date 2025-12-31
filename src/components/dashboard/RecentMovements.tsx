@@ -37,7 +37,7 @@ export const RecentMovements = memo(function RecentMovements({ data }: RecentMov
       <CardContent>
         <div className="space-y-6">
           {movements.length === 0 ? (
-            <div className="text-center text-sm text-slate-500 py-4">
+            <div className="text-center text-sm text-slate-500 dark:text-slate-400 py-4">
               Nessun movimento recente
             </div>
           ) : (
@@ -45,8 +45,8 @@ export const RecentMovements = memo(function RecentMovements({ data }: RecentMov
               <div key={movement.id} className="flex items-start justify-between group">
                 <div className="flex items-start gap-4">
                   <div className={`p-2 rounded-full ${movement.type === 'load'
-                      ? 'bg-emerald-100 text-emerald-600'
-                      : 'bg-amber-100 text-amber-600'
+                    ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400'
                     }`}>
                     {movement.type === 'load' ? (
                       <ArrowDownRight className="h-4 w-4" />
@@ -55,29 +55,29 @@ export const RecentMovements = memo(function RecentMovements({ data }: RecentMov
                     )}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
                       {movement.inventory?.name || 'Articolo sconosciuto'}
                       {movement.inventory?.model && (
-                        <span className="text-slate-500 font-normal ml-1">
+                        <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">
                           ({movement.inventory.model})
                         </span>
                       )}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${movement.type === 'load'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-amber-50 text-amber-700'
+                        ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
                         }`}>
                         {movement.type === 'load' ? '+' : '-'}{movement.quantity} {movement.inventory?.unit}
                       </span>
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
                         <User className="h-3 w-3" />
                         {movement.profiles?.full_name || 'Utente'}
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="text-xs text-slate-400 flex items-center gap-1 mt-1 sm:mt-0 sm:whitespace-nowrap">
+                <div className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-1 sm:mt-0 sm:whitespace-nowrap">
                   <Clock className="h-3 w-3 flex-shrink-0" />
                   {formatDistanceToNow(new Date(movement.created_at), { addSuffix: true, locale: it })}
                 </div>

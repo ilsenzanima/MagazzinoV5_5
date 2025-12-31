@@ -145,7 +145,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
             placeholder="Cerca Commessa (Codice, Nome, CIG, CUP, Indirizzo...)"
             className="pl-9 bg-slate-100 dark:bg-muted border-none"
@@ -159,15 +159,15 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2 text-slate-500">Caricamento commesse...</span>
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento commesse...</span>
         </div>
       ) : error ? (
         <div className="flex flex-col justify-center items-center py-12 text-center">
-          <div className="bg-red-50 text-red-600 p-4 rounded-full mb-4">
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-full mb-4">
             <Briefcase className="h-8 w-8" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Errore di Caricamento</h3>
-          <p className="text-slate-500 mb-6 max-w-md">{error}</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Errore di Caricamento</h3>
+          <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md">{error}</p>
           <Button onClick={loadJobs} variant="outline">
             Riprova
           </Button>
@@ -176,7 +176,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {jobs.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-slate-400">
+              <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />
                 <p>Nessuna commessa trovata</p>
               </div>
@@ -215,7 +215,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                   </CardHeader>
                   <CardContent className="text-sm space-y-3 text-slate-600 dark:text-muted-foreground flex-1">
                     <div className="flex items-center gap-2">
-                      <Building className="h-4 w-4 shrink-0 text-slate-400" />
+                      <Building className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
                       <span className="font-medium text-slate-700 dark:text-foreground">{job.clientName || 'N/A'}</span>
                     </div>
 
@@ -236,13 +236,13 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
 
                     {job.siteAddress && (
                       <div className="flex items-start gap-2 text-xs">
-                        <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400" />
+                        <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400 dark:text-slate-500" />
                         <span>{job.siteAddress}</span>
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 text-xs pt-2 mt-auto border-t">
-                      <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div className="flex items-center gap-2 text-xs pt-2 mt-auto border-t dark:border-slate-700">
+                      <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
                       <span>
                         {job.startDate ? new Date(job.startDate).toLocaleDateString() : 'N/D'}
                         {' - '}
@@ -258,7 +258,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between mt-8 border-t pt-4 dark:border-border gap-4">
-              <div className="text-sm text-slate-500 order-2 sm:order-1">
+              <div className="text-sm text-slate-500 dark:text-slate-400 order-2 sm:order-1">
                 Pagina {page} di {totalPages} ({totalItems} commesse)
               </div>
               <div className="flex gap-2 order-1 sm:order-2">
