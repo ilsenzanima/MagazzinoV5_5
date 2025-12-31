@@ -1,5 +1,5 @@
 import { Worker, Attendance } from "@/lib/api";
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, getDay, isWeekend, isToday } from "date-fns";
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, isToday, isWeekend } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { AttendanceStatus } from "./AttendanceToolbar";
@@ -7,20 +7,21 @@ import { AttendanceStatus } from "./AttendanceToolbar";
 interface MonthGridProps {
     currentDate: Date;
     workers: Worker[];
-    attendanceMap: Record<string, Record<string, Attendance>>;
-    onCellClick: (worker: Worker, date: Date, currentAssignment?: Attendance) => void;
-    selectedTool: AttendanceStatus | null;
+    attendanceMap: Record<string, Record<string, Attendance[]>>;
+    onCellClick: (worker: Worker, date: Date, assignments: Attendance[]) => void;
+    selectedTool: AttendanceStatus | 'delete' | null;
 }
 
 const statusConfig: Record<string, { color: string; letter: string }> = {
-    'presence': { color: 'bg-green-500 text-white', letter: 'w' }, // Default letter, overridden below
+    'presence': { color: 'bg-green-500 text-white', letter: 'w' },
     'absence': { color: 'bg-black text-white', letter: 'a' },
     'sick': { color: 'bg-yellow-400 text-black', letter: 'm' },
     'holiday': { color: 'bg-red-600 text-white', letter: 'f' },
-    'permit': { color: 'bg-red-600 text-white', letter: 'p' }, // Same color as holiday
+    'permit': { color: 'bg-red-600 text-white', letter: 'p' },
     'injury': { color: 'bg-amber-700 text-white', letter: 'i' },
     'transfer': { color: 'bg-purple-700 text-white', letter: 't' },
     'course': { color: 'bg-blue-500 text-white', letter: 'c' },
+    'strike': { color: 'bg-gray-800 text-white', letter: 's' },
 };
 
 export default function AttendanceMonthGrid({
@@ -45,7 +46,7 @@ export default function AttendanceMonthGrid({
                         </th>
                         {days.map(day => {
                             const dayNum = format(day, "d");
-                            const dayName = format(day, "EEEEEE", { locale: it }); // 2 letters
+                            const dayName = format(day, "EEEEEE", { locale: it });
                             const isWknd = isWeekend(day);
 
                             return (
@@ -71,41 +72,52 @@ export default function AttendanceMonthGrid({
                             </td>
                             {days.map(day => {
                                 const dateKey = format(day, "yyyy-MM-dd");
-                                const assignment = attendanceMap[worker.id]?.[dateKey];
+                                const assignments = attendanceMap[worker.id]?.[dateKey] || [];
                                 const isWknd = isWeekend(day);
 
-                                // Determine style based on status
-                                let cellClass = isWknd ? "bg-gray-50 dark:bg-slate-800" : "bg-white dark:bg-card";
-                                let content = "";
-
-                                if (assignment) {
-                                    const config = statusConfig[assignment.status] || statusConfig['presence'];
-                                    cellClass = config.color;
-
-                                    if (assignment.status === 'presence') {
-                                        // For presence, show hours
-                                        content = `${assignment.hours}`;
-                                    } else if (assignment.status === 'permit') {
-                                        // For permit, might explicitly show hours if variable?
-                                        // User said "F/P x", so showing hours for permit as well is good practice
-                                        content = `${assignment.hours}h`; // "4h"
-                                    } else {
-                                        content = config.letter;
-                                    }
-                                }
+                                // Tooltip content
+                                const tooltipText = assignments.map(a => {
+                                    const jobCode = a.jobCode || (a.status === 'presence' ? 'Presenza' : a.status);
+                                    return `${jobCode}: ${a.hours}h`;
+                                }).join('\n');
 
                                 return (
                                     <td
                                         key={`${worker.id}-${dateKey}`}
                                         className={cn(
                                             "border p-0 cursor-pointer transition-colors relative h-8 text-center align-middle",
-                                            cellClass,
-                                            selectedTool && "hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-gray-400 dark:hover:ring-slate-500",
-                                            !assignment && !isWknd && "hover:bg-gray-100 dark:hover:bg-slate-700"
+                                            !assignments.length && isWknd ? "bg-gray-50 dark:bg-slate-800" : "bg-white dark:bg-card",
+                                            !assignments.length && !isWknd && "hover:bg-gray-100 dark:hover:bg-slate-700",
+                                            selectedTool && "hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-gray-400 dark:hover:ring-slate-500"
                                         )}
-                                        onClick={() => onCellClick(worker, day, assignment)}
+                                        onClick={() => onCellClick(worker, day, assignments)}
+                                        title={tooltipText || undefined}
                                     >
-                                        <span className="font-semibold select-none">{content}</span>
+                                        <div className="flex w-full h-full">
+                                            {assignments.map((assignment, idx) => {
+                                                const config = statusConfig[assignment.status] || statusConfig['presence'];
+                                                let content = "";
+                                                if (assignment.status === 'presence' || assignment.status === 'permit') {
+                                                    content = `${assignment.hours}`; // "4"
+                                                } else {
+                                                    content = config.letter;
+                                                }
+                                                // If status is holiday/permit/strike/etc with specific override logic
+                                                if (assignment.status === 'holiday') content = 'F';
+
+                                                return (
+                                                    <div
+                                                        key={assignment.id}
+                                                        className={cn(
+                                                            "flex-1 flex items-center justify-center h-full text-[10px] sm:text-xs font-semibold select-none overflow-hidden",
+                                                            config.color
+                                                        )}
+                                                    >
+                                                        {content}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </td>
                                 );
                             })}

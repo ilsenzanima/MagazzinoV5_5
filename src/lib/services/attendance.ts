@@ -26,6 +26,7 @@ const mapAttendanceToDb = (att: Partial<Attendance>) => ({
 });
 
 export const attendanceApi = {
+    // Modified to return all records (no change strictly needed in query, but mapping usage on frontend changes)
     getByDateRange: async (startDate: string, endDate: string) => {
         const { data, error } = await fetchWithTimeout(
             supabase
@@ -40,11 +41,11 @@ export const attendanceApi = {
         return (data || []).map(mapDbToAttendance);
     },
 
-    upsert: async (record: Partial<Attendance>) => {
-        // We use upsert with onConflict to handle unique constraint on (worker_id, date)
+    // New: Add a SINGLE entry (append)
+    addAttendance: async (record: Partial<Attendance>) => {
         const { data, error } = await supabase
             .from('attendance')
-            .upsert(mapAttendanceToDb(record), { onConflict: 'worker_id, date' })
+            .insert(mapAttendanceToDb(record))
             .select('*, workers(first_name, last_name), jobs(code, description)')
             .single();
 
@@ -52,6 +53,31 @@ export const attendanceApi = {
         return mapDbToAttendance(data);
     },
 
+    // New: Clear all entries for a specific worker on a specific day
+    deleteAllForDay: async (workerId: string, date: string) => {
+        const { error } = await supabase
+            .from('attendance')
+            .delete()
+            .eq('worker_id', workerId)
+            .eq('date', date);
+
+        if (error) throw error;
+    },
+
+    // New: Update existing record by ID
+    update: async (id: string, record: Partial<Attendance>) => {
+        const { data, error } = await supabase
+            .from('attendance')
+            .update(mapAttendanceToDb(record))
+            .eq('id', id)
+            .select('*, workers(first_name, last_name), jobs(code, description)')
+            .single();
+
+        if (error) throw error;
+        return mapDbToAttendance(data);
+    },
+
+    // Kept for backward compatibility if needed, but likely replaced by addAttendance
     delete: async (id: string) => {
         const { error } = await supabase.from('attendance').delete().eq('id', id);
         if (error) throw error;
