@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Client, clientsApi, jobsApi, deliveryNotesApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,25 @@ export function ClientEditDialog({
     const [shouldUpdateActiveJobs, setShouldUpdateActiveJobs] = useState(false);
     const [shouldUpdateDeliveryNotes, setShouldUpdateDeliveryNotes] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+
+    // Initialize form when dialog opens with client data
+    useEffect(() => {
+        if (open && client) {
+            setEditForm({
+                name: client.name,
+                vatNumber: client.vatNumber,
+                email: client.email,
+                phone: client.phone,
+                street: client.street,
+                streetNumber: client.streetNumber,
+                postalCode: client.postalCode,
+                city: client.city,
+                province: client.province
+            });
+            setShouldUpdateActiveJobs(false);
+            setShouldUpdateDeliveryNotes(false);
+        }
+    }, [open, client]);
 
     // Reset form when client changes
     const handleOpenChange = (isOpen: boolean) => {
