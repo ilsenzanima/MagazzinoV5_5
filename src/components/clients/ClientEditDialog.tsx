@@ -105,15 +105,15 @@ export function ClientEditDialog({
                 }
             }
 
-            // 4. Update Delivery Notes if requested (NEW)
-            if (shouldUpdateDeliveryNotes && newAddress) {
+            // 4. Update Delivery Notes if requested
+            if (shouldUpdateDeliveryNotes) {
                 // Fetch ALL jobs for the client to capture historical notes too
                 const jobs = await jobsApi.getByClientId(client.id);
                 const jobIds = jobs.map(j => j.id);
 
                 if (jobIds.length > 0) {
-                    // Pass the new client name along with the address
-                    const updatedCount = await deliveryNotesApi.updateLocationBatch(jobIds, newAddress, editForm.name);
+                    // Pass the new client name along with the address (address may be empty)
+                    const updatedCount = await deliveryNotesApi.updateLocationBatch(jobIds, newAddress || '', editForm.name);
                     if (updatedCount !== null && updatedCount !== undefined) {
                         messages.push(`Aggiornate ${updatedCount} bolle esistenti.`);
                     }
@@ -244,7 +244,7 @@ export function ClientEditDialog({
                                 onCheckedChange={(checked) => setShouldUpdateDeliveryNotes(checked as boolean)}
                             />
                             <Label htmlFor="update-delivery-notes" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                                Aggiorna l'indirizzo nelle bolle esistenti
+                                Aggiorna il committente e l'indirizzo nelle bolle esistenti
                             </Label>
                         </div>
                     </div>
