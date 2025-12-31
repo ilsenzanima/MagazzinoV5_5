@@ -222,5 +222,15 @@ export const deliveryNotesApi = {
             .delete()
             .eq('id', id);
         if (error) throw error;
+    },
+
+    updateLocationBatch: async (jobIds: string[], newLocation: string) => {
+        const { error, count } = await supabase
+            .from('delivery_notes')
+            .update({ delivery_location: newLocation }, { count: 'exact' })
+            .in('job_id', jobIds);
+
+        if (error) throw error;
+        return count;
     }
 };

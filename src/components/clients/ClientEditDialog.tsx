@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Client, clientsApi, jobsApi } from "@/lib/api";
+import { Client, clientsApi, jobsApi, deliveryNotesApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,7 +72,7 @@ export function ClientEditDialog({
             // 1. Calculate new address
             const newAddress = constructAddress(editForm);
 
-            // 2. Update Client (with delivery notes update option)
+            // 2. Update Client (basic update)
             await clientsApi.update(client.id, {
                 name: editForm.name,
                 vatNumber: editForm.vatNumber,
@@ -84,7 +84,9 @@ export function ClientEditDialog({
                 city: editForm.city,
                 province: editForm.province,
                 address: newAddress
-            }, { updateDeliveryNotes: shouldUpdateDeliveryNotes });
+            });
+
+            const messages: string[] = ["Committente aggiornato con successo."];
 
             // 3. Update Job Addresses if requested
             if (shouldUpdateActiveJobs && newAddress) {
@@ -94,12 +96,31 @@ export function ClientEditDialog({
                 console.log(`Found ${activeJobs.length} active jobs to update out of ${jobs.length} total`);
 
                 const updatePromises = activeJobs.map(job => {
-                    console.log(`Updating job ${job.code} address to "${newAddress}"`);
                     return jobsApi.update(job.id, { siteAddress: newAddress });
                 });
 
                 await Promise.all(updatePromises);
+                if (activeJobs.length > 0) {
+                    messages.push(`Aggiornati ${activeJobs.length} cantieri attivi.`);
+                }
             }
+
+            // 4. Update Delivery Notes if requested (NEW)
+            if (shouldUpdateDeliveryNotes && newAddress) {
+                // Fetch ALL jobs for the client to capture historical notes too
+                const jobs = await jobsApi.getByClientId(client.id);
+                const jobIds = jobs.map(j => j.id);
+
+                if (jobIds.length > 0) {
+                    const updatedCount = await deliveryNotesApi.updateLocationBatch(jobIds, newAddress);
+                    if (updatedCount !== null && updatedCount !== undefined) {
+                        messages.push(`Aggiornate ${updatedCount} bolle esistenti.`);
+                    }
+                }
+            }
+
+            // Show feedback
+            alert(messages.join("\n"));
 
             onSaved();
             onOpenChange(false);

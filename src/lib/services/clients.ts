@@ -83,35 +83,9 @@ export const clientsApi = {
         if (error) throw error;
         return mapDbToClient(data);
     },
-    update: async (id: string, client: Partial<Client>, options?: { updateDeliveryNotes?: boolean }) => {
+    update: async (id: string, client: Partial<Client>) => {
         const { data, error } = await supabase.from('clients').update(mapClientToDb(client)).eq('id', id).select().single();
         if (error) throw error;
-
-        // Update delivery_location in existing delivery notes if requested
-        if (options?.updateDeliveryNotes && client.address) {
-            // Get all jobs for this client
-            const { data: jobs } = await supabase
-                .from('jobs')
-                .select('id')
-                .eq('client_id', id);
-
-            if (jobs && jobs.length > 0) {
-                const jobIds = jobs.map(j => j.id);
-
-                // Update all delivery notes for these jobs
-                const { error: updateError, count } = await supabase
-                    .from('delivery_notes')
-                    .update({ delivery_location: client.address })
-                    .in('job_id', jobIds);
-
-                if (updateError) {
-                    console.error('Failed to update delivery notes:', updateError);
-                } else {
-                    console.log(`Updated delivery_location in ${count || 0} delivery notes for client ${id}`);
-                }
-            }
-        }
-
         return mapDbToClient(data);
     },
     delete: async (id: string) => {
