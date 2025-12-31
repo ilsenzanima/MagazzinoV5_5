@@ -1,33 +1,7 @@
-export interface InventoryItem {
-  id: string;
-  code: string;
-  name: string;
-  brand: string;
-  type: string;
-  quantity: number;
-  minStock: number;
-  status?: 'in_stock' | 'low_stock' | 'out_of_stock'; // Optional as it can be calculated
-  image?: string;
-  description?: string;
-  price?: number;
-  location?: string;
-  unit: string;
-  coefficient: number;
-  pieces?: number;
-  supplierCode?: string;
-  realQuantity?: number | null;
-  model?: string;
-}
+import { InventoryItem, Movement, User } from './types';
+export type { InventoryItem, Movement, User };
 
-export interface Movement {
-  id: string;
-  itemId: string;
-  date: string;
-  type: 'load' | 'unload';
-  quantity: number;
-  reference: string; // Bolla or Order ID
-  notes?: string;
-}
+// Movement interface imported from ./types
 
 // Deprecated: Use brandsApi.getAll()
 export const mockBrands = [
@@ -49,15 +23,7 @@ export const mockMovements: Movement[] = [
   { id: 'm4', itemId: '2', date: '2023-12-15', type: 'unload', quantity: 6, reference: 'ORD-125' },
 ];
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user' | 'operativo';
-  avatar?: string;
-  status: 'active' | 'inactive';
-  lastLogin?: string;
-}
+// User interface imported from ./types
 
 export const mockUsers: User[] = [
   { id: '1', name: 'Mario Rossi', email: 'admin@magazzino.it', role: 'admin', status: 'active', lastLogin: '2023-12-20 10:30' },
