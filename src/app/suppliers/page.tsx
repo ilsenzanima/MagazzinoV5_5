@@ -3,30 +3,17 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Search,
   Plus,
   Loader2,
   Building2,
-  Phone,
-  Mail,
-  MapPin,
-  Trash2,
-  ShoppingCart
 } from "lucide-react";
 import Link from "next/link";
 import { Supplier, suppliersApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useAuth } from "@/components/auth-provider";
+import { SupplierCard, SupplierDeleteDialog } from "@/components/suppliers";
 
 export default function SuppliersPage() {
   const { userRole } = useAuth();
@@ -79,7 +66,6 @@ export default function SuppliersPage() {
     if (!supplierToDelete) return;
     try {
       await suppliersApi.delete(supplierToDelete.id);
-      // Reload current page
       await loadSuppliers(currentPage, searchTerm);
       setIsDeleteDialogOpen(false);
       setSupplierToDelete(null);
@@ -96,12 +82,20 @@ export default function SuppliersPage() {
     }
   };
 
+  const openDeleteDialog = (supplier: Supplier) => {
+    setSupplierToDelete(supplier);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const canEdit = userRole === 'admin' || userRole === 'operativo';
+
   return (
     <DashboardLayout>
+      {/* Header */}
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Fornitori</h1>
-          {(userRole === 'admin' || userRole === 'operativo') && (
+          {canEdit && (
             <Link href="/suppliers/new">
               <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
@@ -122,6 +116,7 @@ export default function SuppliersPage() {
         </div>
       </div>
 
+      {/* Content */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -140,6 +135,7 @@ export default function SuppliersPage() {
         </div>
       ) : (
         <>
+          {/* Supplier Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {suppliers.length === 0 ? (
               <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
@@ -148,68 +144,12 @@ export default function SuppliersPage() {
               </div>
             ) : (
               suppliers.map((supplier) => (
-                <Card key={supplier.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center justify-between">
-                      <span className="truncate">{supplier.name}</span>
-                      <div className="flex gap-2">
-                        <Link href={`/suppliers/${supplier.id}`}>
-                          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-blue-600 h-8 w-8">
-                            <Building2 className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        {(userRole === 'admin' || userRole === 'operativo') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-slate-400 hover:text-red-600 h-8 w-8"
-                            onClick={() => {
-                              setSupplierToDelete(supplier);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm space-y-2 text-slate-600 dark:text-slate-400">
-                    {supplier.vatNumber && (
-                      <div className="font-mono text-xs bg-slate-100 dark:bg-muted p-1 rounded w-fit">
-                        P.IVA: {supplier.vatNumber}
-                      </div>
-                    )}
-                    {supplier.address && (
-                      <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span>{supplier.address}</span>
-                      </div>
-                    )}
-                    {supplier.phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 shrink-0" />
-                        <span>{supplier.phone}</span>
-                      </div>
-                    )}
-                    {supplier.email && (
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 shrink-0" />
-                        <a href={`mailto:${supplier.email}`} className="text-blue-600 dark:text-blue-400 hover:underline">
-                          {supplier.email}
-                        </a>
-                      </div>
-                    )}
-                    <div className="pt-2 mt-2 border-t dark:border-slate-700 flex justify-end">
-                      <Link href={`/purchases?supplierId=${supplier.id}`}>
-                        <Button variant="outline" size="sm">
-                          <ShoppingCart className="mr-2 h-3 w-3" />
-                          Vedi Acquisti
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
+                <SupplierCard
+                  key={supplier.id}
+                  supplier={supplier}
+                  canEdit={canEdit}
+                  onDelete={openDeleteDialog}
+                />
               ))
             )}
           </div>
@@ -241,22 +181,13 @@ export default function SuppliersPage() {
         </>
       )}
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Elimina Fornitore</DialogTitle>
-            <DialogDescription>
-              Sei sicuro di voler eliminare il fornitore <strong>{supplierToDelete?.name}</strong>?
-              <br />
-              Se ci sono acquisti collegati, l'operazione verrà bloccata.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Annulla</Button>
-            <Button variant="destructive" onClick={handleDeleteSupplier}>Elimina</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delete Dialog */}
+      <SupplierDeleteDialog
+        supplier={supplierToDelete}
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDeleteSupplier}
+      />
     </DashboardLayout>
   );
 }
