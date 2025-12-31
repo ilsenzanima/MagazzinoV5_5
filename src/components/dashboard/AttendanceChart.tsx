@@ -27,7 +27,7 @@ export const AttendanceChart = memo(function AttendanceChart() {
         <CardTitle>Presenze Semestrali per Commessa (Mock)</CardTitle>
       </CardHeader>
       <CardContent className="h-[320px] min-h-[320px] min-w-[100px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="99%" height="100%">
           <BarChart
             data={data}
             margin={{
