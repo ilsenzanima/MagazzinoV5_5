@@ -11,9 +11,9 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
     if (jobBatchAvailability.length === 0) return null;
 
     return (
-        <Card className="bg-slate-50 border-blue-100">
+        <Card className="bg-slate-50 dark:bg-muted border-blue-100 dark:border-blue-900">
             <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-blue-800">Materiale in Carico sulla Commessa</CardTitle>
+                <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-300">Materiale in Carico sulla Commessa</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="max-h-60 overflow-y-auto overflow-x-auto">
@@ -28,12 +28,12 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
                         </TableHeader>
                         <TableBody>
                             {jobBatchAvailability.map((batch, idx) => (
-                                <TableRow key={idx} className="hover:bg-white">
+                                <TableRow key={idx} className="hover:bg-white dark:hover:bg-card">
                                     <TableCell className="py-2">
                                         <div className="text-xs font-medium">{batch.itemCode}</div>
-                                        <div className="text-[10px] text-slate-500 truncate max-w-[150px]">{batch.itemName}</div>
+                                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]">{batch.itemName}</div>
                                     </TableCell>
-                                    <TableCell className="py-2 text-xs text-slate-500">
+                                    <TableCell className="py-2 text-xs text-slate-500 dark:text-slate-400">
                                         {batch.purchaseRef || "-"}
                                     </TableCell>
                                     <TableCell className="py-2 text-xs text-right font-bold">

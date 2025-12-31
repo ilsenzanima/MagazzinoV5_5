@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Search, 
-  Plus, 
+import {
+  Search,
+  Plus,
   Loader2,
   MapPin,
   Briefcase,
@@ -35,25 +35,25 @@ export default function SitesContent() {
 
   const loadSites = async () => {
     try {
-        setLoading(true);
-        const data = await sitesApi.getAll();
-        if (filterJobId) {
-            setSites(data.filter(s => s.jobId === filterJobId));
-        } else {
-            setSites(data);
-        }
+      setLoading(true);
+      const data = await sitesApi.getAll();
+      if (filterJobId) {
+        setSites(data.filter(s => s.jobId === filterJobId));
+      } else {
+        setSites(data);
+      }
     } catch (error) {
-        console.error("Failed to load sites:", error);
+      console.error("Failed to load sites:", error);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   const filteredSites = useMemo(() => {
     const term = deferredSearchTerm.toLowerCase();
     if (!term) return sites;
-    
-    return sites.filter((site) => 
+
+    return sites.filter((site) =>
       site.name.toLowerCase().includes(term) ||
       site.address?.toLowerCase().includes(term) ||
       site.jobDescription?.toLowerCase().includes(term) ||
@@ -63,18 +63,18 @@ export default function SitesContent() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-        case 'active': return <Badge className="bg-green-600">Attivo</Badge>;
-        case 'inactive': return <Badge variant="secondary">Inattivo</Badge>;
-        case 'completed': return <Badge variant="outline">Completato</Badge>;
-        default: return <Badge variant="outline">{status}</Badge>;
+      case 'active': return <Badge className="bg-green-600">Attivo</Badge>;
+      case 'inactive': return <Badge variant="secondary">Inattivo</Badge>;
+      case 'completed': return <Badge variant="outline">Completato</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
   };
 
   return (
     <>
-      <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
+      <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900">Gestione Cantieri</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Cantieri</h1>
           <Link href="/sites/new">
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="mr-2 h-4 w-4" />
@@ -84,10 +84,10 @@ export default function SitesContent() {
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Cerca Cantiere (Nome, Indirizzo, Capocantiere...)" 
-            className="pl-9 bg-slate-100 border-none"
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+          <Input
+            placeholder="Cerca Cantiere (Nome, Indirizzo, Capocantiere...)"
+            className="pl-9 bg-slate-100 dark:bg-muted border-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             aria-label="Cerca cantiere"
@@ -97,13 +97,13 @@ export default function SitesContent() {
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            <span className="ml-2 text-slate-500">Caricamento cantieri...</span>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento cantieri...</span>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredSites.length === 0 ? (
-            <div className="col-span-full text-center py-10 text-slate-400">
+            <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
               <HardHat className="h-12 w-12 mx-auto mb-2 opacity-20" />
               <p>Nessun cantiere trovato</p>
             </div>
@@ -112,27 +112,27 @@ export default function SitesContent() {
               <Card key={site.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
-                      <CardTitle className="text-base leading-tight">{site.name}</CardTitle>
-                      {getStatusBadge(site.status)}
+                    <CardTitle className="text-base leading-tight">{site.name}</CardTitle>
+                    {getStatusBadge(site.status)}
                   </div>
                 </CardHeader>
-                <CardContent className="text-sm space-y-3 text-slate-600">
+                <CardContent className="text-sm space-y-3 text-slate-600 dark:text-slate-400">
                   <div className="flex items-center gap-2">
-                    <Briefcase className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span className="font-medium text-slate-700 truncate">{site.jobDescription || 'N/A'}</span>
+                    <Briefcase className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+                    <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{site.jobDescription || 'N/A'}</span>
                   </div>
-                  
+
                   {site.address && (
                     <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span>{site.address}</span>
+                      <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>{site.address}</span>
                     </div>
                   )}
 
                   {site.manager && (
                     <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 shrink-0" />
-                        <span>Capocantiere: {site.manager}</span>
+                      <User className="h-4 w-4 shrink-0" />
+                      <span>Capocantiere: {site.manager}</span>
                     </div>
                   )}
                 </CardContent>

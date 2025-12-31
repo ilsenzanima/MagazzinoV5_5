@@ -29,8 +29,8 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
     if (userRole === 'user') {
         return (
             <div className="flex flex-col items-center justify-center h-full py-20">
-                <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
-                <p className="text-slate-500 mb-6">Non hai i permessi necessari per creare nuovi movimenti.</p>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Accesso Negato</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">Non hai i permessi necessari per creare nuovi movimenti.</p>
                 <Link href="/movements">
                     <Button variant="outline">
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -51,7 +51,7 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
                     </Link>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">Nuovo Movimento</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Nuovo Movimento</h1>
                 </div>
                 <Button onClick={form.handleSubmit} disabled={form.loading} className="bg-[#003366] hover:bg-[#002244]">
                     {form.loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -167,8 +167,8 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                     */}
                     <div className="space-y-6">
                         {/* Potential place for Totals or Instructions */}
-                        <div className="bg-slate-50 p-4 rounded-lg border text-sm text-slate-500">
-                            <h4 className="font-semibold text-slate-800 mb-2">Riepilogo</h4>
+                        <div className="bg-slate-50 dark:bg-muted p-4 rounded-lg border dark:border-border text-sm text-slate-500 dark:text-slate-400">
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Riepilogo</h4>
                             <p>Righe inserite: {form.lines.length}</p>
                             <p>Pezzi totali: {form.lines.reduce((acc, l) => acc + (l.pieces || 0), 0)}</p>
                             <p>Quantità totale: {form.lines.reduce((acc, l) => acc + l.quantity, 0)}</p>

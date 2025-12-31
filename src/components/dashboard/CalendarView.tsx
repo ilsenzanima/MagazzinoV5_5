@@ -41,7 +41,7 @@ export const CalendarView = memo(function CalendarView() {
   const days = [];
   // Padding for previous month
   for (let i = 0; i < firstDay; i++) {
-    days.push(<div key={`empty-${i}`} className="h-24 bg-slate-50/50 border border-slate-100" />);
+    days.push(<div key={`empty-${i}`} className="h-24 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700" />);
   }
 
   // Days of current month
@@ -55,13 +55,13 @@ export const CalendarView = memo(function CalendarView() {
       <div
         key={i}
         className={cn(
-          "h-24 p-2 border border-slate-100 relative group hover:bg-slate-50 transition-colors",
-          isToday && "bg-blue-50/50"
+          "h-24 p-2 border border-slate-100 dark:border-slate-700 relative group hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors",
+          isToday && "bg-blue-50/50 dark:bg-blue-900/30"
         )}
       >
         <span className={cn(
           "text-sm font-medium h-6 w-6 flex items-center justify-center rounded-full",
-          isToday ? "bg-blue-600 text-white" : "text-slate-700"
+          isToday ? "bg-blue-600 text-white" : "text-slate-700 dark:text-slate-300"
         )}>
           {i}
         </span>
@@ -69,14 +69,14 @@ export const CalendarView = memo(function CalendarView() {
         {/* Mock Events/Attendance Dots */}
         {i % 5 === 0 && (
           <div className="mt-2 space-y-1">
-            <div className="text-[10px] bg-green-100 text-green-700 px-1 py-0.5 rounded truncate">
+            <div className="text-[10px] bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 px-1 py-0.5 rounded truncate">
               Mario: Presente
             </div>
           </div>
         )}
         {i % 12 === 0 && (
           <div className="mt-2 space-y-1">
-            <div className="text-[10px] bg-red-100 text-red-700 px-1 py-0.5 rounded truncate">
+            <div className="text-[10px] bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-1 py-0.5 rounded truncate">
               Luigi: Malattia
             </div>
           </div>
@@ -103,12 +103,12 @@ export const CalendarView = memo(function CalendarView() {
       <CardContent>
         <div className="grid grid-cols-7 mb-2">
           {DAYS.map((day) => (
-            <div key={day} className="text-center text-sm font-medium text-slate-500 py-2">
+            <div key={day} className="text-center text-sm font-medium text-slate-500 dark:text-slate-400 py-2">
               {day}
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 bg-white rounded-lg overflow-hidden border border-slate-200">
+        <div className="grid grid-cols-7 bg-white dark:bg-card rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
           {days}
         </div>
       </CardContent>

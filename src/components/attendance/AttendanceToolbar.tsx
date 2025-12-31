@@ -28,8 +28,8 @@ const tools: { id: AttendanceStatus; label: string; color: string; letter: strin
 
 export function AttendanceToolbar({ selectedTool, onSelectTool }: ToolbarProps) {
     return (
-        <div className="flex flex-wrap items-center gap-2 p-2 bg-white rounded-lg shadow-sm border mb-4">
-            <div className="text-sm font-medium mr-2 text-gray-500">Scelta Rapida:</div>
+        <div className="flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border mb-4">
+            <div className="text-sm font-medium mr-2 text-gray-500 dark:text-gray-400">Scelta Rapida:</div>
             {tools.map(tool => (
                 <button
                     key={tool.id}
@@ -39,7 +39,7 @@ export function AttendanceToolbar({ selectedTool, onSelectTool }: ToolbarProps) 
                         "flex items-center gap-2 px-3 py-1.5 rounded-md transition-all border-2 text-sm font-medium",
                         tool.color,
                         selectedTool === tool.id
-                            ? "border-gray-900 ring-2 ring-offset-1 ring-gray-400 scale-105"
+                            ? "border-gray-900 dark:border-white ring-2 ring-offset-1 ring-gray-400 dark:ring-slate-500 scale-105"
                             : "border-transparent opacity-90 hover:opacity-100 hover:scale-105"
                     )}
                 >
@@ -50,7 +50,7 @@ export function AttendanceToolbar({ selectedTool, onSelectTool }: ToolbarProps) 
             ))}
 
             {selectedTool && (
-                <div className="ml-auto flex items-center text-sm text-blue-600 animate-pulse">
+                <div className="ml-auto flex items-center text-sm text-blue-600 dark:text-blue-400 animate-pulse">
                     <Info className="h-4 w-4 mr-1" />
                     Modalità inserimento attiva (riclicca per annullare)
                 </div>
