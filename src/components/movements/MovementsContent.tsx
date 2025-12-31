@@ -81,15 +81,15 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
       case 'sale':
         return { label: 'Vendita', color: 'bg-blue-100 text-blue-700 hover:bg-blue-100', icon: ShoppingBag };
       default:
-        return { label: type, color: 'bg-slate-100 text-slate-700', icon: FileText };
+        return { label: type, color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300', icon: FileText };
     }
   };
 
   return (
     <>
-      <div className="bg-white p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6">
+      <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900">Movimentazione Merce</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Movimentazione Merce</h1>
           {(userRole === 'admin' || userRole === 'operativo') && (
             <Link href="/movements/new">
               <Button className="bg-blue-600 hover:bg-blue-700">
@@ -101,10 +101,10 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
             placeholder="Cerca Movimento (Bolla, Commessa, Causale...)"
-            className="pl-9 bg-slate-100 border-none"
+            className="pl-9 bg-slate-100 dark:bg-muted border-none"
             value={searchTerm}
             onChange={handleSearchChange}
           />
@@ -114,15 +114,15 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
       {loading && movements.length === 0 ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2 text-slate-500">Caricamento movimenti...</span>
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento movimenti...</span>
         </div>
       ) : error ? (
         <div className="flex flex-col justify-center items-center py-12 text-center">
-          <div className="bg-red-50 text-red-600 p-4 rounded-full mb-4">
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-full mb-4">
             <FileText className="h-8 w-8" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Errore di Caricamento</h3>
-          <p className="text-slate-500 mb-6 max-w-md">{error}</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Errore di Caricamento</h3>
+          <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md">{error}</p>
           <Button onClick={loadMovements} variant="outline">
             Riprova
           </Button>
@@ -131,7 +131,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {movements.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-slate-400">
+              <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Truck className="h-12 w-12 mx-auto mb-2 opacity-20" />
                 <p>Nessun movimento trovato</p>
               </div>
@@ -142,15 +142,15 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
 
                 return (
                   <Link href={`/movements/${movement.id}`} key={movement.id}>
-                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200">
+                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200 dark:border-slate-700">
                       <CardContent className="p-5">
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                               <FileText className="h-4 w-4 text-blue-600" />
                               Bolla: {movement.number}
                             </h3>
-                            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
                             </p>
@@ -162,18 +162,18 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                         </div>
 
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between py-1 border-b border-slate-50">
-                            <span className="text-slate-500">Causale</span>
+                          <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-700">
+                            <span className="text-slate-500 dark:text-slate-400">Causale</span>
                             <span className="font-medium truncate max-w-[150px]">{movement.causal}</span>
                           </div>
                           {movement.jobCode && (
-                            <div className="flex justify-between py-1 border-b border-slate-50">
-                              <span className="text-slate-500">Commessa</span>
-                              <span className="font-medium text-blue-600">{movement.jobCode}</span>
+                            <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-700">
+                              <span className="text-slate-500 dark:text-slate-400">Commessa</span>
+                              <span className="font-medium text-blue-600 dark:text-blue-400">{movement.jobCode}</span>
                             </div>
                           )}
                           <div className="flex justify-between py-1">
-                            <span className="text-slate-500">Articoli</span>
+                            <span className="text-slate-500 dark:text-slate-400">Articoli</span>
                             <span className="font-medium">
                               {/* Fallback per compatibilità con i dati che arrivano dal backend */}
                               {movement.itemCount ?? movement.items?.length ?? 0} righe
@@ -199,7 +199,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm text-slate-600">
+              <span className="text-sm text-slate-600 dark:text-slate-400">
                 Pagina {page} di {totalPages}
               </span>
               <Button

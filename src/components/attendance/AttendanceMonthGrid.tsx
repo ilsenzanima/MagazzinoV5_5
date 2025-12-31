@@ -37,10 +37,10 @@ export default function AttendanceMonthGrid({
 
     return (
         <div className="border rounded-md overflow-x-auto">
-            <table className="w-full text-xs md:text-sm border-collapse bg-white">
+            <table className="w-full text-xs md:text-sm border-collapse bg-white dark:bg-card">
                 <thead>
                     <tr>
-                        <th className="sticky left-0 z-20 bg-gray-100 p-2 text-left font-semibold border min-w-[150px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                        <th className="sticky left-0 z-20 bg-gray-100 dark:bg-slate-800 p-2 text-left font-semibold border dark:border-slate-700 min-w-[150px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                             Dipendenti
                         </th>
                         {days.map(day => {
@@ -51,8 +51,8 @@ export default function AttendanceMonthGrid({
                             return (
                                 <th key={day.toString()} className={cn(
                                     "p-1 border text-center min-w-[30px]",
-                                    isWknd ? "bg-gray-100 text-gray-400" : "bg-white",
-                                    isToday(day) && "bg-blue-50 text-blue-600 font-bold"
+                                    isWknd ? "bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500" : "bg-white dark:bg-card",
+                                    isToday(day) && "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-bold"
                                 )}>
                                     <div className="flex flex-col items-center justify-center">
                                         <span className="text-[10px] uppercase font-normal mb-0.5">{dayName}</span>
@@ -65,8 +65,8 @@ export default function AttendanceMonthGrid({
                 </thead>
                 <tbody>
                     {workers.map(worker => (
-                        <tr key={worker.id} className="group hover:bg-gray-50">
-                            <td className="sticky left-0 z-10 p-2 font-medium bg-white group-hover:bg-gray-50 border-r border-b shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">
+                        <tr key={worker.id} className="group hover:bg-gray-50 dark:hover:bg-slate-800">
+                            <td className="sticky left-0 z-10 p-2 font-medium bg-white dark:bg-card group-hover:bg-gray-50 dark:group-hover:bg-slate-800 border-r dark:border-slate-700 border-b shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">
                                 {worker.lastName} {worker.firstName}
                             </td>
                             {days.map(day => {
@@ -75,7 +75,7 @@ export default function AttendanceMonthGrid({
                                 const isWknd = isWeekend(day);
 
                                 // Determine style based on status
-                                let cellClass = isWknd ? "bg-gray-50" : "bg-white";
+                                let cellClass = isWknd ? "bg-gray-50 dark:bg-slate-800" : "bg-white dark:bg-card";
                                 let content = "";
 
                                 if (assignment) {
@@ -100,8 +100,8 @@ export default function AttendanceMonthGrid({
                                         className={cn(
                                             "border p-0 cursor-pointer transition-colors relative h-8 text-center align-middle",
                                             cellClass,
-                                            selectedTool && "hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-gray-400",
-                                            !assignment && !isWknd && "hover:bg-gray-100"
+                                            selectedTool && "hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-gray-400 dark:hover:ring-slate-500",
+                                            !assignment && !isWknd && "hover:bg-gray-100 dark:hover:bg-slate-700"
                                         )}
                                         onClick={() => onCellClick(worker, day, assignment)}
                                     >

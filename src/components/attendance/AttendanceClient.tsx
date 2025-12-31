@@ -196,7 +196,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     return (
         <div className="space-y-6">
             {/* Header Controls */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-card p-4 rounded-lg shadow-sm border dark:border-border">
 
                 {/* Date Nav */}
                 <div className="flex items-center space-x-2">
@@ -216,7 +216,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
                 {/* Right Actions */}
                 <div className="flex items-center space-x-4">
-                    {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+                    {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
 
                     <Button onClick={() => setIsBulkModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
                         <Users className="mr-2 h-4 w-4" />
@@ -229,7 +229,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             <AttendanceToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />
 
             {/* Monthly Grid */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-card rounded-lg shadow-sm overflow-hidden border dark:border-border">
                 <AttendanceMonthGrid
                     currentDate={currentDate}
                     workers={initialWorkers}
@@ -239,7 +239,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 />
             </div>
 
-            <div className="text-xs text-gray-400 mt-2">
+            <div className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                 * Clicca su uno strumento per attivare la modalità inserimento rapido. Clicca di nuovo per disattivarla.
                 <br />
                 * Doppio click o click senza strumento apre i dettagli per assegnare cantieri specifici.

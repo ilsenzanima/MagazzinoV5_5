@@ -11,9 +11,9 @@ interface MovementLinesListProps {
 
 export function MovementLinesList({ lines, onRemove }: MovementLinesListProps) {
     return (
-        <div className="bg-white rounded-lg border shadow-sm overflow-hidden overflow-x-auto">
+        <div className="bg-white dark:bg-card rounded-lg border dark:border-border shadow-sm overflow-hidden overflow-x-auto">
             <Table>
-                <TableHeader className="bg-slate-50">
+                <TableHeader className="bg-slate-50 dark:bg-muted">
                     <TableRow>
                         <TableHead>Codice</TableHead>
                         <TableHead>Descrizione</TableHead>
@@ -25,7 +25,7 @@ export function MovementLinesList({ lines, onRemove }: MovementLinesListProps) {
                 <TableBody>
                     {lines.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                            <TableCell colSpan={5} className="text-center py-8 text-slate-400 dark:text-slate-500">
                                 Nessuna riga inserita
                             </TableCell>
                         </TableRow>
@@ -35,7 +35,7 @@ export function MovementLinesList({ lines, onRemove }: MovementLinesListProps) {
                                 <TableCell className="font-medium text-xs">{line.itemCode}</TableCell>
                                 <TableCell>
                                     <div className="text-sm font-medium truncate max-w-[200px]">{line.itemName}</div>
-                                    <div className="text-xs text-slate-500">{line.itemDescription}</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">{line.itemDescription}</div>
                                     {line.purchaseRef && (
                                         <Badge variant="outline" className="text-[10px] mt-1">
                                             Lotto: {line.purchaseRef}
@@ -52,7 +52,7 @@ export function MovementLinesList({ lines, onRemove }: MovementLinesListProps) {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-slate-400 hover:text-red-500"
+                                        className="h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-red-500"
                                         onClick={() => onRemove(line.tempId)}
                                     >
                                         <Trash2 className="h-4 w-4" />

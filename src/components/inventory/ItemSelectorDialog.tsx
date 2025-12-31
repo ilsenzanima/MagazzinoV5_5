@@ -42,7 +42,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
 
     const term = deferredSearchTerm.toLowerCase();
     if (!term) return items;
-    
+
     return items.filter(
       (item) =>
         item.code.toLowerCase().includes(term) ||
@@ -64,7 +64,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
         </DialogHeader>
 
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
             placeholder="Cerca per codice, nome, marca o tipologia..."
             className="pl-9"
@@ -88,32 +88,32 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-400 dark:text-slate-500">
                     <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
                     <p>Caricamento...</p>
                   </TableCell>
                 </TableRow>
               ) : filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-400 dark:text-slate-500">
                     <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
                     <p>Nessun articolo trovato</p>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredItems.map((item) => (
-                  <TableRow key={item.id} className="cursor-pointer hover:bg-slate-50" onClick={() => onSelect(item)}>
+                  <TableRow key={item.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => onSelect(item)}>
                     <TableCell className="font-mono text-xs">{item.code}</TableCell>
                     <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="text-xs text-slate-500">{item.brand}</TableCell>
+                    <TableCell className="text-xs text-slate-500 dark:text-slate-400">{item.brand}</TableCell>
                     <TableCell className="text-right">
-                        <Badge variant="outline" className={
-                            item.quantity <= 0 ? "text-red-600 border-red-200 bg-red-50" :
-                            item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
-                            "text-slate-600"
-                        }>
-                            {item.quantity} {item.unit}
-                        </Badge>
+                      <Badge variant="outline" className={
+                        item.quantity <= 0 ? "text-red-600 border-red-200 bg-red-50" :
+                          item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
+                            "text-slate-600 dark:text-slate-400"
+                      }>
+                        {item.quantity} {item.unit}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
