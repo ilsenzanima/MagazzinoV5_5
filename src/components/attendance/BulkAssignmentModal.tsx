@@ -125,12 +125,18 @@ export default function BulkAssignmentModal({
         if (selectedWorkers.length === 0) return;
         setIsLoading(true);
         try {
-            const attendanceEntries = entries.map(entry => ({
-                jobId: entry.jobId === 'none' || !entry.jobId ? undefined : entry.jobId,
-                hours: entry.hours,
-                status: entry.status as any,
-                notes: entry.notes
-            }));
+            const attendanceEntries = entries.map(entry => {
+                // Check if jobId is actually a warehouse ID
+                const isWarehouse = warehouses.some(w => w.id === entry.jobId);
+
+                return {
+                    jobId: (!entry.jobId || entry.jobId === 'none' || isWarehouse) ? undefined : entry.jobId,
+                    warehouseId: isWarehouse ? entry.jobId : undefined,
+                    hours: entry.hours,
+                    status: entry.status as any,
+                    notes: entry.notes
+                };
+            });
 
             await onSave(
                 selectedWorkers,

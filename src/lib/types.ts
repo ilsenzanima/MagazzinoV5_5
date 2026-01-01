@@ -295,6 +295,8 @@ export interface Attendance {
     jobId?: string;
     jobCode?: string; // For display
     jobDescription?: string; // For display
+    warehouseId?: string;
+    warehouseName?: string; // For display
     date: string;
     hours: number;
     status: 'presence' | 'absence' | 'sick' | 'holiday' | 'permit' | 'injury' | 'transfer' | 'course' | 'strike';
