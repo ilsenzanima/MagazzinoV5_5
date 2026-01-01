@@ -227,7 +227,7 @@ export default function BulkAssignmentModal({
                                         </Select>
                                     </div>
 
-                                    {(entry.status === 'presence' || entry.status === 'holiday') && (
+                                    {(entry.status === 'presence' || entry.status === 'holiday' || entry.status === 'transfer') && (
                                         <div className="space-y-2">
                                             <Label>Cantiere</Label>
                                             <Select value={entry.jobId || 'none'} onValueChange={(val) => updateEntry(index, 'jobId', val)}>

@@ -1,8 +1,9 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Worker, Attendance } from "@/lib/api";
-import { format, eachDayOfInterval, isWeekend, getDay } from "date-fns";
+import { format, eachDayOfInterval, isWeekend } from "date-fns";
 import { it } from "date-fns/locale";
+import { isItalianHoliday } from "@/lib/utils";
 
 export const generateMonthlyReport = (
     currentDate: Date,
@@ -19,63 +20,79 @@ export const generateMonthlyReport = (
     workers.forEach((worker, index) => {
         if (index > 0) doc.addPage();
 
-        // 1. Gather all jobs worked by this worker this month to define columns
+        // Filter worker attendance
         const workerAttendance = attendanceList.filter(a => a.workerId === worker.id);
-        const jobMap = new Map<string, string>(); // id -> code/desc
+        const jobMap = new Map<string, string>();
 
+        // Collect all worked jobs (presence or transfer)
         workerAttendance.forEach(a => {
-            if (a.jobId) {
+            if (a.jobId && (a.status === 'presence' || a.status === 'transfer')) {
                 const label = a.jobCode || a.jobDescription || 'N/D';
                 jobMap.set(a.jobId, label);
             }
         });
 
         const jobIds = Array.from(jobMap.keys());
-        // If no jobs, we might still want basic columns for presence types? 
-        // User asked for "Columns: Job Name". 
-        // We probably also need columns for "Ferie", "Permessi", "Malattia", etc.?
-        // Or should those be rows? User said "Rows: Days". 
-        // So standard attendance (Ferie, Malattia) should probably be columns too or just marked in a specific column?
-        // Let's add standard columns: "Ferie", "Permessi", "Malattia", "Altro".
+        const columns = ['Data', 'Giorno', ...jobIds.map(id => jobMap.get(id) || 'Commessa'), 'Note/Assenze'];
 
-        const standardColumns = ['Ferie', 'Perm.', 'Mal.', 'Altro'];
-        const columns: string[] = ['Giorno', ...jobIds.map(id => jobMap.get(id) || 'N/D'), ...standardColumns];
-
-        // Prepare Body
         const body = days.map(day => {
             const dateKey = format(day, 'yyyy-MM-dd');
             const dayAtts = workerAttendance.filter(a => a.date === dateKey);
+            const isHoliday = isItalianHoliday(day);
+            const hasWork = dayAtts.some(a => a.status === 'presence' || a.status === 'transfer');
 
-            const row: any[] = [format(day, 'dd/MM')];
+            const rowStr: any[] = [
+                format(day, 'dd/MM/yyyy'),
+                format(day, 'EEE', { locale: it }).toUpperCase()
+            ];
+
+            // If Holiday and NO Work, fill "FESTIVO"
+            if (isHoliday && !hasWork) {
+                rowStr.push({
+                    content: 'FESTIVO',
+                    colSpan: jobIds.length + 1,
+                    styles: { halign: 'center', textColor: [200, 0, 0], fontStyle: 'bold' }
+                });
+                return rowStr;
+            }
 
             // Job Columns
             jobIds.forEach(jid => {
-                const att = dayAtts.find(a => a.jobId === jid);
-                row.push(att ? `${att.hours}` : '');
+                const att = dayAtts.find(a => a.jobId === jid && (a.status === 'presence' || a.status === 'transfer'));
+                if (att) {
+                    if (att.status === 'transfer') {
+                        rowStr.push(`${att.hours} (Trasferta)`);
+                    } else {
+                        rowStr.push(`${att.hours}`);
+                    }
+                } else {
+                    rowStr.push('');
+                }
             });
 
-            // Standard Columns
-            // Ferie
-            const holiday = dayAtts.find(a => a.status === 'holiday');
-            row.push(holiday ? '8' : '');
+            // Note/Assenze Column
+            const absences = dayAtts.filter(a =>
+                !['presence', 'transfer'].includes(a.status)
+            );
 
-            // Permessi
-            const permit = dayAtts.find(a => a.status === 'permit');
-            row.push(permit ? `${permit.hours}` : '');
+            const absenceLabels = absences.map(a => {
+                let type = '';
+                switch (a.status) {
+                    case 'holiday': type = 'Ferie'; break;
+                    case 'permit': type = 'Permesso'; break;
+                    case 'sick': type = 'Malattia'; break;
+                    case 'injury': type = 'Infortunio'; break;
+                    case 'course': type = 'Corso'; break;
+                    case 'strike': type = 'Sciopero'; break;
+                    case 'absence': type = 'Ass. Ing.'; break;
+                    default: type = a.status;
+                }
+                return `${a.hours} (${type})`;
+            });
 
-            // Malattia
-            const sick = dayAtts.find(a => a.status === 'sick');
-            row.push(sick ? '8' : '');
+            rowStr.push(absenceLabels.join(', '));
 
-            // Altro (Others)
-            const other = dayAtts.find(a => !['holiday', 'permit', 'sick', 'presence'].includes(a.status));
-            row.push(other ? `${other.status.substring(0, 3)}` : '');
-
-            // Return row object with style info if needed
-            // highligh weekends
-            // We can't pass style in simple array, used didParseCell hook later? 
-            // actually autotable allows object rows? No, simplest is hook.
-            return row;
+            return rowStr;
         });
 
         doc.setFontSize(16);
@@ -91,12 +108,12 @@ export const generateMonthlyReport = (
             headStyles: { fillColor: [41, 128, 185], textColor: 255 },
             styles: { fontSize: 8, cellPadding: 1 },
             didParseCell: (data) => {
-                // Highlight Weekends
                 const rowIndex = data.row.index;
-                // data.row.index corresponds to body array index?
                 if (rowIndex >= 0 && rowIndex < days.length) {
                     const day = days[rowIndex];
-                    if (isWeekend(day)) {
+                    if (isItalianHoliday(day) || data.cell.raw === 'FESTIVO') {
+                        data.cell.styles.fillColor = [255, 240, 240];
+                    } else if (isWeekend(day)) {
                         data.cell.styles.fillColor = [240, 240, 240];
                     }
                 }
