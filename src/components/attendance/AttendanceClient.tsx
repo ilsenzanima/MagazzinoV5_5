@@ -187,6 +187,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             await loadData(); // Ensure data is reloaded before closing
         } catch (error) {
             console.error('❌ Error during bulk save:', error);
+            console.error('❌ Error details:', JSON.stringify(error, null, 2));
             toast.error("Errore salvataggio multiplo");
         }
     }
