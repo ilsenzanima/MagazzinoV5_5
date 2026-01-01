@@ -13,6 +13,7 @@ interface AttendanceInfoPopupProps {
     assignments: Attendance[];
     onEdit: (assignment: Attendance) => void;
     onDelete: (id: string) => void;
+    onAddPresence?: () => void;
 }
 
 export default function AttendanceInfoPopup({
@@ -22,7 +23,8 @@ export default function AttendanceInfoPopup({
     date,
     assignments,
     onEdit,
-    onDelete
+    onDelete,
+    onAddPresence
 }: AttendanceInfoPopupProps) {
     if (!worker || !date) return null;
 
@@ -40,9 +42,16 @@ export default function AttendanceInfoPopup({
 
                 <div className="space-y-3 py-4">
                     {assignments.length === 0 ? (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                            Nessuna presenza registrata
-                        </p>
+                        <div className="text-center py-6 space-y-4">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Nessuna presenza registrata
+                            </p>
+                            {onAddPresence && (
+                                <Button onClick={onAddPresence} className="bg-blue-600 hover:bg-blue-700">
+                                    Aggiungi Presenza
+                                </Button>
+                            )}
+                        </div>
                     ) : (
                         assignments.map((assignment) => (
                             <div

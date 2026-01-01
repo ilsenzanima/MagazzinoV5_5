@@ -12,7 +12,7 @@ interface ToolbarProps {
 const tools: { id: AttendanceStatus; label: string; color: string; icon: React.ReactElement }[] = [
     {
         id: 'holiday',
-        label: 'Ferie/Perm. 8h',
+        label: 'Ferie/Perm.',
         color: 'bg-red-600 text-white',
         icon: <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V7H1v10h22V7h-2v4h-2z" /></svg>
     },

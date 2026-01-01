@@ -29,7 +29,7 @@ import { useToast } from "@/components/ui/use-toast";
 const formSchema = z.object({
     firstName: z.string().min(2, "Il nome deve avere almeno 2 caratteri"),
     lastName: z.string().min(2, "Il cognome deve avere almeno 2 caratteri"),
-    email: z.string().email("Inserisci un'email valida"),
+    email: z.string().email("Inserisci un'email valida").optional().or(z.literal("")),
 });
 
 interface WorkerDialogProps {
@@ -147,7 +147,7 @@ export function WorkerDialog({
                             name="email"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Email</FormLabel>
+                                    <FormLabel>Email (opzionale)</FormLabel>
                                     <FormControl>
                                         <Input placeholder="mario.rossi@example.com" {...field} />
                                     </FormControl>
