@@ -28,12 +28,7 @@ const tools: { id: AttendanceStatus; label: string; color: string; icon: React.R
         color: 'bg-amber-700 text-white',
         icon: <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z" /></svg>
     },
-    {
-        id: 'transfer',
-        label: 'Trasferta',
-        color: 'bg-purple-700 text-white',
-        icon: <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>
-    },
+
     {
         id: 'course',
         label: 'Corso',

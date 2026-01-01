@@ -1,7 +1,7 @@
 import { Worker, Attendance } from "@/lib/api";
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, isToday, isWeekend } from "date-fns";
 import { it } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, isItalianHoliday } from "@/lib/utils";
 import { AttendanceStatus } from "./AttendanceToolbar";
 
 interface MonthGridProps {
@@ -48,11 +48,13 @@ export default function AttendanceMonthGrid({
                             const dayNum = format(day, "d");
                             const dayName = format(day, "EEEEEE", { locale: it });
                             const isWknd = isWeekend(day);
+                            const isHoliday = isItalianHoliday(day);
 
                             return (
                                 <th key={day.toString()} className={cn(
                                     "p-1 border text-center min-w-[30px]",
-                                    isWknd ? "bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500" : "bg-white dark:bg-card",
+                                    isWknd || isHoliday ? "bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500" : "bg-white dark:bg-card",
+                                    isHoliday && "bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 font-semibold",
                                     isToday(day) && "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-bold"
                                 )}>
                                     <div className="flex flex-col items-center justify-center">
@@ -86,21 +88,21 @@ export default function AttendanceMonthGrid({
                                         key={`${worker.id}-${dateKey}`}
                                         className={cn(
                                             "border p-0 cursor-pointer transition-colors relative h-8 text-center align-middle",
-                                            !assignments.length && isWknd ? "bg-gray-50 dark:bg-slate-800" : "bg-white dark:bg-card",
-                                            !assignments.length && !isWknd && "hover:bg-gray-100 dark:hover:bg-slate-700",
+                                            !assignments.length && (isWknd || isItalianHoliday(day)) ? "bg-gray-50 dark:bg-slate-800" : "bg-white dark:bg-card",
+                                            !assignments.length && !isWknd && !isItalianHoliday(day) && "hover:bg-gray-100 dark:hover:bg-slate-700",
                                             selectedTool && "hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-gray-400 dark:hover:ring-slate-500"
                                         )}
                                         onClick={() => onCellClick(worker, day, assignments)}
                                         title={tooltipText || undefined}
                                     >
                                         {(() => {
-                                            // Calculate total work hours (presence entries)
+                                            // Calculate total work hours (presence entries + transfer)
                                             const workHours = assignments
-                                                .filter(a => a.status === 'presence')
+                                                .filter(a => a.status === 'presence' || a.status === 'transfer')
                                                 .reduce((sum, a) => sum + (a.hours || 0), 0);
 
                                             // Get non-work statuses
-                                            const nonWorkStatuses = assignments.filter(a => a.status !== 'presence');
+                                            const nonWorkStatuses = assignments.filter(a => a.status !== 'presence' && a.status !== 'transfer');
 
                                             // Helper to render status icon
                                             const getStatusIcon = (status: string) => {
@@ -130,8 +132,8 @@ export default function AttendanceMonthGrid({
                                                 return null;
                                             }
 
-                                            // Get work entries (presence)
-                                            const workEntries = assignments.filter(a => a.status === 'presence');
+                                            // Get work entries (presence + transfer)
+                                            const workEntries = assignments.filter(a => a.status === 'presence' || a.status === 'transfer');
 
                                             // If only work hours
                                             if (workEntries.length > 0 && nonWorkStatuses.length === 0) {
