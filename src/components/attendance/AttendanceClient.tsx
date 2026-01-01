@@ -161,6 +161,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     const handleBulkSave = async (workerIds: string[], startDate: Date, endDate: Date, entries: Partial<Attendance>[]) => {
         try {
+            console.log('🔵 Starting bulk save with entries:', entries);
             const promises = [];
             for (const wId of workerIds) {
                 let runnerDate = new Date(startDate);
@@ -173,16 +174,19 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                             workerId: wId,
                             date: dateStr
                         };
+                        console.log('📝 Saving entry:', payload);
                         promises.push(attendanceApi.addAttendance(payload));
                     }
                     runnerDate.setDate(runnerDate.getDate() + 1);
                 }
             }
-            await Promise.all(promises);
+            console.log(`🔵 Total promises to execute: ${promises.length}`);
+            const results = await Promise.all(promises);
+            console.log('✅ All entries saved:', results);
             toast.success(`Assegnazione completata`);
             await loadData(); // Ensure data is reloaded before closing
         } catch (error) {
-            console.error(error);
+            console.error('❌ Error during bulk save:', error);
             toast.error("Errore salvataggio multiplo");
         }
     }
