@@ -23,22 +23,36 @@ export const generateMonthlyReport = (
         // Filter worker attendance
         const workerAttendance = attendanceList.filter(a => a.workerId === worker.id);
         const jobMap = new Map<string, string>();
+        const warehouseMap = new Map<string, string>();
 
-        // Collect all worked jobs AND warehouses (presence or transfer)
+        // Collect jobs and warehouses separately
         workerAttendance.forEach(a => {
             if (a.jobId && (a.status === 'presence' || a.status === 'transfer')) {
-                const label = a.jobCode || a.jobDescription || 'N/D';
+                // Use DESCRIPTION (name) instead of code
+                const label = a.jobDescription || a.jobCode || 'N/D';
                 jobMap.set(a.jobId, label);
             }
             if (a.warehouseId && (a.status === 'presence' || a.status === 'transfer')) {
                 const label = a.warehouseName || 'Magazzino';
-                jobMap.set(a.warehouseId, label);
+                warehouseMap.set(a.warehouseId, label);
             }
         });
 
+        // Jobs first, then warehouses at the end
         const jobIds = Array.from(jobMap.keys());
-        // Use job/warehouse descriptions (names) for column headers
-        const columns = ['Data', 'Giorno', ...jobIds.map(id => jobMap.get(id) || 'Commessa'), 'Note/Assenze'];
+        const warehouseIds = Array.from(warehouseMap.keys());
+        const allIds = [...jobIds, ...warehouseIds];
+
+        const columns = [
+            'Data',
+            'Giorno',
+            ...jobIds.map(id => jobMap.get(id) || 'Commessa'),
+            ...warehouseIds.map(id => warehouseMap.get(id) || 'Magazzino'),
+            'Note/Assenze'
+        ];
+
+        // Track totals for each column
+        const totals = new Array(allIds.length).fill(0);
 
         const body = days.map(day => {
             const dateKey = format(day, 'yyyy-MM-dd');
@@ -55,19 +69,22 @@ export const generateMonthlyReport = (
             if (isHoliday && !hasWork) {
                 rowStr.push({
                     content: 'FESTIVO',
-                    colSpan: jobIds.length + 1,
+                    colSpan: allIds.length + 1,
                     styles: { halign: 'center', textColor: [200, 0, 0], fontStyle: 'bold' }
                 });
                 return rowStr;
             }
 
             // Job/Warehouse Columns
-            jobIds.forEach(jid => {
+            allIds.forEach((id, colIndex) => {
                 const att = dayAtts.find(a =>
-                    (a.jobId === jid || a.warehouseId === jid) &&
+                    (a.jobId === id || a.warehouseId === id) &&
                     (a.status === 'presence' || a.status === 'transfer')
                 );
                 if (att) {
+                    // Add to totals (extract numeric value only)
+                    totals[colIndex] += att.hours;
+
                     if (att.status === 'transfer') {
                         rowStr.push(`${att.hours} (Trasferta)`);
                     } else {
@@ -103,28 +120,50 @@ export const generateMonthlyReport = (
             return rowStr;
         });
 
-        doc.setFontSize(16);
-        doc.text(`Report Presenze - ${monthName}`, 14, 15);
-        doc.setFontSize(12);
-        doc.text(`Dipendente: ${worker.lastName} ${worker.firstName}`, 14, 22);
+        // Add totals row
+        const totalsRow = ['', 'TOTALE', ...totals.map(t => t > 0 ? t.toString() : ''), ''];
+        body.push(totalsRow);
+
+        // Compact header: title and worker name on same line
+        doc.setFontSize(11);
+        doc.text(`Report Presenze - ${monthName}`, 14, 12);
+        doc.setFontSize(10);
+        doc.text(`Dipendente: ${worker.lastName} ${worker.firstName}`, 150, 12);
 
         autoTable(doc, {
-            startY: 25,
+            startY: 16,
             head: [columns],
             body: body,
             theme: 'grid',
-            headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-            styles: { fontSize: 8, cellPadding: 1 },
+            headStyles: {
+                fillColor: [41, 128, 185],
+                textColor: 255,
+                fontSize: 7,
+                cellPadding: 0.5
+            },
+            styles: {
+                fontSize: 6.5,
+                cellPadding: 0.8,
+                minCellHeight: 4
+            },
             columnStyles: {
-                0: { cellWidth: 22 }, // Data - fixed width
-                1: { cellWidth: 12 }, // Giorno - fixed width
-                // Job/Warehouse columns - fixed width
+                0: { cellWidth: 20 }, // Data
+                1: { cellWidth: 11 }, // Giorno
+                // Job/Warehouse columns
                 ...Object.fromEntries(
-                    Array.from({ length: jobIds.length }, (_, i) => [i + 2, { cellWidth: 25 }])
+                    Array.from({ length: allIds.length }, (_, i) => [i + 2, { cellWidth: 22 }])
                 ),
-                [columns.length - 1]: { cellWidth: 35 } // Note/Assenze - fixed width
+                [columns.length - 1]: { cellWidth: 32 } // Note/Assenze
             },
             didParseCell: (data) => {
+                // Totals row styling
+                if (data.row.index === body.length - 1) {
+                    data.cell.styles.fillColor = [220, 230, 241];
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.fontSize = 7;
+                    return;
+                }
+
                 // Only apply colors to body rows, not header
                 if (data.section !== 'body') return;
 
