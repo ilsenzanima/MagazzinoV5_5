@@ -9,7 +9,7 @@ interface ToolbarProps {
     onSelectTool: (tool: AttendanceStatus | 'delete' | null) => void;
 }
 
-const tools: { id: AttendanceStatus; label: string; color: string; icon: JSX.Element }[] = [
+const tools: { id: AttendanceStatus; label: string; color: string; icon: React.ReactElement }[] = [
     {
         id: 'holiday',
         label: 'Ferie/Perm. 8h',
