@@ -98,25 +98,12 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
         // PAINT MODE (Insert/Append)
         if (selectedTool) {
-            // Permit Logic: Ask for hours
-            let hours = 8;
-            if (selectedTool === 'permit') {
-                const input = window.prompt("Quante ore di permesso?", "4");
-                // If cancelled, do nothing
-                if (input === null) return;
-                const h = parseFloat(input);
-                if (isNaN(h) || h < 0 || h > 24) {
-                    toast.error("Ore non valide");
-                    return;
-                }
-                hours = h;
-            }
-
+            // All quick-select tools use 8 hours by default
             const payload: Partial<Attendance> = {
                 workerId: worker.id,
                 date: dateStr,
                 status: selectedTool,
-                hours: hours,
+                hours: 8,
                 jobId: undefined
             };
 
@@ -171,19 +158,23 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         }
     };
 
-    const handleBulkSave = async (workerIds: string[], startDate: Date, endDate: Date, assignment: Partial<Attendance>) => {
+
+    const handleBulkSave = async (workerIds: string[], startDate: Date, endDate: Date, entries: Partial<Attendance>[]) => {
         try {
             const promises = [];
             for (const wId of workerIds) {
                 let runnerDate = new Date(startDate);
                 while (runnerDate <= endDate) {
                     const dateStr = format(runnerDate, 'yyyy-MM-dd');
-                    const payload = {
-                        ...assignment,
-                        workerId: wId,
-                        date: dateStr
-                    };
-                    promises.push(attendanceApi.addAttendance(payload));
+                    // Create one attendance record for EACH entry
+                    for (const entry of entries) {
+                        const payload = {
+                            ...entry,
+                            workerId: wId,
+                            date: dateStr
+                        };
+                        promises.push(attendanceApi.addAttendance(payload));
+                    }
                     runnerDate.setDate(runnerDate.getDate() + 1);
                 }
             }
