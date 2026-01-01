@@ -107,7 +107,14 @@ export const generateMonthlyReport = (
             theme: 'grid',
             headStyles: { fillColor: [41, 128, 185], textColor: 255 },
             styles: { fontSize: 8, cellPadding: 1 },
+            columnStyles: {
+                0: { cellWidth: 22 }, // Data - fixed width
+                1: { cellWidth: 12 }  // Giorno - fixed width
+            },
             didParseCell: (data) => {
+                // Only apply colors to body rows, not header
+                if (data.section !== 'body') return;
+
                 const rowIndex = data.row.index;
                 if (rowIndex >= 0 && rowIndex < days.length) {
                     const day = days[rowIndex];
