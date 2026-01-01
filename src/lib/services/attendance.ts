@@ -9,6 +9,8 @@ export const mapDbToAttendance = (db: any): Attendance => ({
     jobId: db.job_id,
     jobCode: db.jobs?.code,
     jobDescription: db.jobs?.description,
+    warehouseId: db.warehouse_id,
+    warehouseName: db.warehouses?.name,
     date: db.date,
     hours: Number(db.hours),
     status: db.status,
@@ -19,6 +21,7 @@ export const mapDbToAttendance = (db: any): Attendance => ({
 const mapAttendanceToDb = (att: Partial<Attendance>) => ({
     worker_id: att.workerId,
     job_id: att.jobId || null,
+    warehouse_id: att.warehouseId || null,
     date: att.date,
     hours: att.hours,
     status: att.status,
@@ -27,15 +30,16 @@ const mapAttendanceToDb = (att: Partial<Attendance>) => ({
 
 export const attendanceApi = {
     // Modified to return all records (no change strictly needed in query, but mapping usage on frontend changes)
-    getByDateRange: async (startDate: string, endDate: string) => {
-        const { data, error } = await fetchWithTimeout(
-            supabase
-                .from('attendance')
-                .select('*, workers(first_name, last_name), jobs(code, description)')
-                .gte('date', startDate)
-                .lte('date', endDate)
-                .order('date', { ascending: true })
-        );
+    getByMonth: async (year: number, month: number): Promise<Attendance[]> => {
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
+
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name)')
+            .gte('date', startDate)
+            .lte('date', endDate)
+            .order('date', { ascending: true });
 
         if (error) throw error;
         return (data || []).map(mapDbToAttendance);
@@ -46,7 +50,7 @@ export const attendanceApi = {
         const { data, error } = await supabase
             .from('attendance')
             .insert(mapAttendanceToDb(record))
-            .select('*, workers(first_name, last_name), jobs(code, description)')
+            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name)')
             .single();
 
         if (error) throw error;
@@ -70,7 +74,7 @@ export const attendanceApi = {
             .from('attendance')
             .update(mapAttendanceToDb(record))
             .eq('id', id)
-            .select('*, workers(first_name, last_name), jobs(code, description)')
+            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name)')
             .single();
 
         if (error) throw error;
