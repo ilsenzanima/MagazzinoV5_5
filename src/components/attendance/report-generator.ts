@@ -24,16 +24,20 @@ export const generateMonthlyReport = (
         const workerAttendance = attendanceList.filter(a => a.workerId === worker.id);
         const jobMap = new Map<string, string>();
 
-        // Collect all worked jobs (presence or transfer)
+        // Collect all worked jobs AND warehouses (presence or transfer)
         workerAttendance.forEach(a => {
             if (a.jobId && (a.status === 'presence' || a.status === 'transfer')) {
                 const label = a.jobCode || a.jobDescription || 'N/D';
                 jobMap.set(a.jobId, label);
             }
+            if (a.warehouseId && (a.status === 'presence' || a.status === 'transfer')) {
+                const label = a.warehouseName || 'Magazzino';
+                jobMap.set(a.warehouseId, label);
+            }
         });
 
         const jobIds = Array.from(jobMap.keys());
-        // Use job descriptions (names) for column headers
+        // Use job/warehouse descriptions (names) for column headers
         const columns = ['Data', 'Giorno', ...jobIds.map(id => jobMap.get(id) || 'Commessa'), 'Note/Assenze'];
 
         const body = days.map(day => {
@@ -57,9 +61,12 @@ export const generateMonthlyReport = (
                 return rowStr;
             }
 
-            // Job Columns
+            // Job/Warehouse Columns
             jobIds.forEach(jid => {
-                const att = dayAtts.find(a => a.jobId === jid && (a.status === 'presence' || a.status === 'transfer'));
+                const att = dayAtts.find(a =>
+                    (a.jobId === jid || a.warehouseId === jid) &&
+                    (a.status === 'presence' || a.status === 'transfer')
+                );
                 if (att) {
                     if (att.status === 'transfer') {
                         rowStr.push(`${att.hours} (Trasferta)`);
@@ -111,6 +118,10 @@ export const generateMonthlyReport = (
             columnStyles: {
                 0: { cellWidth: 22 }, // Data - fixed width
                 1: { cellWidth: 12 }, // Giorno - fixed width
+                // Job/Warehouse columns - fixed width
+                ...Object.fromEntries(
+                    Array.from({ length: jobIds.length }, (_, i) => [i + 2, { cellWidth: 25 }])
+                ),
                 [columns.length - 1]: { cellWidth: 35 } // Note/Assenze - fixed width
             },
             didParseCell: (data) => {

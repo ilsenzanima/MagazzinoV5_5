@@ -62,7 +62,7 @@ export default function AttendanceInfoPopup({
                                     {(assignment.status === 'presence' || assignment.status === 'transfer') ? (
                                         <>
                                             <p className="font-medium text-sm">
-                                                {assignment.jobCode || assignment.jobDescription || 'Cantiere'}
+                                                {assignment.warehouseName || assignment.jobCode || assignment.jobDescription || 'Cantiere'}
                                                 {assignment.status === 'transfer' && (
                                                     <span className="ml-2 text-xs text-purple-600 dark:text-purple-400">(Trasferta)</span>
                                                 )}
