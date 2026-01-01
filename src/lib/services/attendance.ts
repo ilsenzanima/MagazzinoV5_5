@@ -85,5 +85,78 @@ export const attendanceApi = {
     delete: async (id: string) => {
         const { error } = await supabase.from('attendance').delete().eq('id', id);
         if (error) throw error;
+    },
+
+    // Get attendance records for a specific job
+    getByJobId: async (jobId: string): Promise<Attendance[]> => {
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name)')
+            .eq('job_id', jobId)
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        return (data || []).map(mapDbToAttendance);
+    },
+
+    // Get aggregated statistics for the last N months (for dashboard chart)
+    getAggregatedStats: async (months: number = 6): Promise<{ name: string; presenze: number; ferie: number; malattia: number; corso: number }[]> => {
+        const now = new Date();
+        const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
+        const startDateStr = startDate.toISOString().split('T')[0];
+
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('date, status, hours')
+            .gte('date', startDateStr)
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+
+        // Aggregate by month
+        const monthlyStats = new Map<string, { presenze: number; ferie: number; malattia: number; corso: number }>();
+
+        (data || []).forEach((record: any) => {
+            const date = new Date(record.date);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+            if (!monthlyStats.has(monthKey)) {
+                monthlyStats.set(monthKey, { presenze: 0, ferie: 0, malattia: 0, corso: 0 });
+            }
+
+            const stats = monthlyStats.get(monthKey)!;
+            const hours = Number(record.hours) || 0;
+
+            switch (record.status) {
+                case 'presence':
+                    stats.presenze += hours;
+                    break;
+                case 'holiday':
+                case 'permit':
+                    stats.ferie += hours;
+                    break;
+                case 'sick':
+                    stats.malattia += hours;
+                    break;
+                case 'course':
+                    stats.corso += hours;
+                    break;
+            }
+        });
+
+        // Convert to array format for chart
+        const monthNames = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+        const result = Array.from(monthlyStats.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([key, stats]) => {
+                const [year, month] = key.split('-');
+                const monthIndex = parseInt(month) - 1;
+                return {
+                    name: monthNames[monthIndex],
+                    ...stats
+                };
+            });
+
+        return result;
     }
 };

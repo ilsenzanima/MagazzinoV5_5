@@ -1,4 +1,6 @@
-import { memo } from 'react';
+"use client";
+
+import { memo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart,
@@ -10,44 +12,68 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
-
-const data = [
-  { name: 'Lug', presenze: 120, ferie: 20, malattia: 5 },
-  { name: 'Ago', presenze: 90, ferie: 80, malattia: 2 },
-  { name: 'Set', presenze: 150, ferie: 10, malattia: 8 },
-  { name: 'Ott', presenze: 160, ferie: 5, malattia: 12 },
-  { name: 'Nov', presenze: 155, ferie: 2, malattia: 15 },
-  { name: 'Dic', presenze: 140, ferie: 15, malattia: 10 },
-];
+import { attendanceApi } from '@/lib/api';
+import { Loader2 } from 'lucide-react';
 
 export const AttendanceChart = memo(function AttendanceChart() {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        setLoading(true);
+        const stats = await attendanceApi.getAggregatedStats(6);
+        setData(stats);
+      } catch (error) {
+        console.error("Error loading attendance stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStats();
+  }, []);
+
   return (
     <Card className="w-full h-[400px]">
       <CardHeader>
-        <CardTitle>Presenze Semestrali per Commessa (Mock)</CardTitle>
+        <CardTitle>Presenze Semestrali</CardTitle>
       </CardHeader>
       <CardContent className="h-[320px] min-h-[320px] min-w-[100px]">
-        <ResponsiveContainer width="99%" height="100%">
-          <BarChart
-            data={data}
-            margin={{
-              top: 20,
-              right: 30,
-              left: 20,
-              bottom: 5,
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="presenze" name="Presenze" fill="#3b82f6" stackId="a" />
-            <Bar dataKey="ferie" name="Ferie" fill="#f59e0b" stackId="a" />
-            <Bar dataKey="malattia" name="Malattia" fill="#ef4444" stackId="a" />
-          </BarChart>
-        </ResponsiveContainer>
+        {loading ? (
+          <div className="flex justify-center items-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        ) : data.length === 0 ? (
+          <div className="flex justify-center items-center h-full text-slate-500">
+            Nessun dato disponibile
+          </div>
+        ) : (
+          <ResponsiveContainer width="99%" height="100%">
+            <BarChart
+              data={data}
+              margin={{
+                top: 20,
+                right: 30,
+                left: 20,
+                bottom: 5,
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="presenze" name="Presenze" fill="#3b82f6" stackId="a" />
+              <Bar dataKey="ferie" name="Ferie/Permessi" fill="#f59e0b" stackId="a" />
+              <Bar dataKey="malattia" name="Malattia" fill="#ef4444" stackId="a" />
+              <Bar dataKey="corso" name="Corso" fill="#8b5cf6" stackId="a" />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   );
 });
+
