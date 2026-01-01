@@ -13,6 +13,7 @@ import { generateMonthlyReport } from "./report-generator";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2, Users, FileDown } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/components/auth-provider";
 
 interface AttendanceClientProps {
     initialWorkers: Worker[];
@@ -20,6 +21,9 @@ interface AttendanceClientProps {
 }
 
 export default function AttendanceClient({ initialWorkers, initialJobs }: AttendanceClientProps) {
+    const { userRole } = useAuth();
+    const canEdit = userRole === 'admin' || userRole === 'operativo';
+
     // State
     const [currentDate, setCurrentDate] = useState(new Date());
     const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
@@ -85,6 +89,14 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     const handleCellClick = async (worker: Worker, date: Date, assignments: Attendance[]) => {
         const dateStr = format(date, 'yyyy-MM-dd');
+
+        // Regular users can only view details, not edit
+        if (!canEdit) {
+            setSelectedWorker(worker);
+            setSelectedDate(date);
+            setIsInfoPopupOpen(true);
+            return;
+        }
 
         // DELETE MODE
         if (selectedTool === 'delete') {
@@ -236,14 +248,16 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                         PDF
                     </Button>
 
-                    <Button onClick={() => setIsBulkModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                        <Users className="mr-2 h-4 w-4" />
-                        Inserisci Presenze
-                    </Button>
+                    {canEdit && (
+                        <Button onClick={() => setIsBulkModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+                            <Users className="mr-2 h-4 w-4" />
+                            Inserisci Presenze
+                        </Button>
+                    )}
                 </div>
             </div>
 
-            <AttendanceToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />
+            {canEdit && <AttendanceToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />}
 
             <div className="bg-white dark:bg-card rounded-lg shadow-sm overflow-hidden border dark:border-border">
                 <AttendanceMonthGrid

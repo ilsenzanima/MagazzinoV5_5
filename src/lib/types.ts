@@ -287,6 +287,17 @@ export interface Worker {
     createdAt: string;
 }
 
+// Worker Courses
+export interface WorkerCourse {
+    id: string;
+    workerId: string;
+    courseName: string;
+    completionDate: string; // ISO date format
+    validityYears: number;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
 // Attendance
 export interface Attendance {
     id: string;
@@ -301,5 +312,7 @@ export interface Attendance {
     hours: number;
     status: 'presence' | 'absence' | 'sick' | 'holiday' | 'permit' | 'injury' | 'transfer' | 'course' | 'strike';
     notes?: string;
+    courseId?: string; // Reference to worker_courses when status='course'
+    courseName?: string; // For display
     createdAt?: string;
 }

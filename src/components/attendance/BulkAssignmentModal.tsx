@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Job, Worker, Attendance } from "@/lib/api";
+import { Job, Worker, Attendance, workerCoursesApi } from "@/lib/api";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
 import { useState, useEffect } from "react";
@@ -16,6 +16,8 @@ interface AttendanceEntry {
     jobId?: string;
     hours: number;
     notes?: string;
+    courseId?: string;
+    courseName?: string; // For new course creation
 }
 
 interface BulkAssignmentModalProps {
@@ -49,6 +51,8 @@ export default function BulkAssignmentModal({
     }]);
     const [isLoading, setIsLoading] = useState(false);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [courseNames, setCourseNames] = useState<string[]>([]);
+    const [customCourse, setCustomCourse] = useState<{ [key: number]: boolean }>({});
 
     // Preselect worker and date when opening from info popup
     useEffect(() => {
@@ -80,9 +84,10 @@ export default function BulkAssignmentModal({
         }
     }, [isOpen, preselectedWorkerId, preselectedDate]);
 
-    // Load warehouses
+    // Load warehouses and course names
     useEffect(() => {
         warehousesApi.getAll().then(setWarehouses).catch(console.error);
+        workerCoursesApi.getAllCourseNames().then(setCourseNames).catch(console.error);
     }, []);
 
     // Toggle worker selection
@@ -134,7 +139,9 @@ export default function BulkAssignmentModal({
                     warehouseId: isWarehouse ? entry.jobId : undefined,
                     hours: entry.hours,
                     status: entry.status as any,
-                    notes: entry.notes
+                    notes: entry.notes,
+                    courseId: entry.courseId,
+                    courseName: entry.courseName // Will be used to create new course if needed
                 };
             });
 
@@ -267,6 +274,52 @@ export default function BulkAssignmentModal({
                                                     )}
                                                 </SelectContent>
                                             </Select>
+                                        </div>
+                                    )}
+
+                                    {entry.status === 'course' && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Label>Corso</Label>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 text-xs"
+                                                    onClick={() => setCustomCourse(prev => ({ ...prev, [index]: !prev[index] }))}
+                                                >
+                                                    {customCourse[index] ? "Seleziona esistente" : "+ Nuovo corso"}
+                                                </Button>
+                                            </div>
+                                            {customCourse[index] ? (
+                                                <Input
+                                                    placeholder="Nome nuovo corso..."
+                                                    value={entry.courseName || ''}
+                                                    onChange={(e) => updateEntry(index, 'courseName', e.target.value)}
+                                                />
+                                            ) : (
+                                                <Select
+                                                    value={entry.courseName || ''}
+                                                    onValueChange={(val) => updateEntry(index, 'courseName', val)}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Seleziona corso..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {courseNames.length === 0 ? (
+                                                            <SelectItem value="" disabled>
+                                                                Nessun corso disponibile
+                                                            </SelectItem>
+                                                        ) : (
+                                                            courseNames.map(name => (
+                                                                <SelectItem key={name} value={name}>
+                                                                    {name}
+                                                                </SelectItem>
+                                                            ))
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
                                         </div>
                                     )}
 
