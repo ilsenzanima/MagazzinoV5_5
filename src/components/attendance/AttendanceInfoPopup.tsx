@@ -59,10 +59,13 @@ export default function AttendanceInfoPopup({
                                 className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
                             >
                                 <div className="flex-1">
-                                    {assignment.status === 'presence' ? (
+                                    {(assignment.status === 'presence' || assignment.status === 'transfer') ? (
                                         <>
                                             <p className="font-medium text-sm">
                                                 {assignment.jobCode || assignment.jobDescription || 'Cantiere'}
+                                                {assignment.status === 'transfer' && (
+                                                    <span className="ml-2 text-xs text-purple-600 dark:text-purple-400">(Trasferta)</span>
+                                                )}
                                             </p>
                                             <p className="text-xs text-gray-500 dark:text-gray-400">
                                                 {assignment.hours} ore
