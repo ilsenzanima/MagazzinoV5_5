@@ -137,30 +137,32 @@ export default function AttendanceMonthGrid({
 
                                             // If only work hours
                                             if (workEntries.length > 0 && nonWorkStatuses.length === 0) {
-                                                const config = statusConfig['presence'];
-
                                                 // Multiple jobs: show them split
                                                 if (workEntries.length > 1) {
                                                     return (
                                                         <div className="flex w-full h-full">
-                                                            {workEntries.map((entry, idx) => (
-                                                                <div
-                                                                    key={entry.id}
-                                                                    className={cn("flex-1 flex items-center justify-center text-[10px] sm:text-xs font-semibold", config.color)}
-                                                                    style={{
-                                                                        borderRight: idx < workEntries.length - 1 ? '1px solid rgba(255,255,255,0.3)' : 'none'
-                                                                    }}
-                                                                >
-                                                                    {entry.hours}
-                                                                </div>
-                                                            ))}
+                                                            {workEntries.map((entry, idx) => {
+                                                                const entryConfig = statusConfig[entry.status] || statusConfig['presence'];
+                                                                return (
+                                                                    <div
+                                                                        key={entry.id}
+                                                                        className={cn("flex-1 flex items-center justify-center text-[10px] sm:text-xs font-semibold", entryConfig.color)}
+                                                                        style={{
+                                                                            borderRight: idx < workEntries.length - 1 ? '1px solid rgba(255,255,255,0.3)' : 'none'
+                                                                        }}
+                                                                    >
+                                                                        {entry.hours}
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     );
                                                 }
 
-                                                // Single job: show just hours
+                                                // Single job: show just hours with correct color
+                                                const singleConfig = statusConfig[workEntries[0].status] || statusConfig['presence'];
                                                 return (
-                                                    <div className={cn("flex items-center justify-center h-full w-full text-[10px] sm:text-xs font-semibold", config.color)}>
+                                                    <div className={cn("flex items-center justify-center h-full w-full text-[10px] sm:text-xs font-semibold", singleConfig.color)}>
                                                         {workEntries[0].hours}
                                                     </div>
                                                 );
