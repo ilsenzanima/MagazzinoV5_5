@@ -49,12 +49,31 @@ export default function BulkAssignmentModal({
 
     // Preselect worker and date when opening from info popup
     useEffect(() => {
-        if (isOpen && preselectedWorkerId) {
-            setSelectedWorkers([preselectedWorkerId]);
-        }
-        if (isOpen && preselectedDate) {
-            setStartDate(preselectedDate);
-            setEndDate(preselectedDate);
+        if (isOpen) {
+            // Reset or preselect workers
+            if (preselectedWorkerId) {
+                setSelectedWorkers([preselectedWorkerId]);
+            } else {
+                setSelectedWorkers([]);
+            }
+
+            // Reset or preselect dates
+            if (preselectedDate) {
+                setStartDate(preselectedDate);
+                setEndDate(preselectedDate);
+            } else {
+                const today = format(new Date(), 'yyyy-MM-dd');
+                setStartDate(today);
+                setEndDate(today);
+            }
+
+            // Reset entries
+            setEntries([{
+                status: 'presence',
+                jobId: '',
+                hours: 8,
+                notes: ''
+            }]);
         }
     }, [isOpen, preselectedWorkerId, preselectedDate]);
 
