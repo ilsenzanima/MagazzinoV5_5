@@ -53,6 +53,7 @@ export const generateMonthlyReport = (
 
         // Track totals for each column
         const totals = new Array(allIds.length).fill(0);
+        let totalAbsences = 0; // Track total absence hours
 
         const body = days.map(day => {
             const dateKey = format(day, 'yyyy-MM-dd');
@@ -101,6 +102,9 @@ export const generateMonthlyReport = (
             );
 
             const absenceLabels = absences.map(a => {
+                // Add to absence total
+                totalAbsences += a.hours;
+
                 let type = '';
                 switch (a.status) {
                     case 'holiday': type = 'Ferie'; break;
@@ -120,8 +124,16 @@ export const generateMonthlyReport = (
             return rowStr;
         });
 
-        // Add totals row
-        const totalsRow = ['', 'TOTALE', ...totals.map(t => t > 0 ? t.toString() : ''), ''];
+        // Calculate grand total (all work hours + absences)
+        const grandTotal = totals.reduce((sum, t) => sum + t, 0) + totalAbsences;
+
+        // Add totals row: TOTALE in Data, grand total in Giorno, individual totals, absence total in Note/Assenze
+        const totalsRow = [
+            'TOTALE',
+            grandTotal.toString(),
+            ...totals.map(t => t > 0 ? t.toString() : ''),
+            totalAbsences > 0 ? totalAbsences.toString() : ''
+        ];
         body.push(totalsRow);
 
         // Compact header: title and worker name on same line
@@ -161,6 +173,12 @@ export const generateMonthlyReport = (
                     data.cell.styles.fillColor = [220, 230, 241];
                     data.cell.styles.fontStyle = 'bold';
                     data.cell.styles.fontSize = 7;
+
+                    // Special highlight for grand total (Giorno column)
+                    if (data.column.index === 1) {
+                        data.cell.styles.fillColor = [255, 200, 100]; // Orange highlight
+                        data.cell.styles.textColor = [0, 0, 0];
+                    }
                     return;
                 }
 
