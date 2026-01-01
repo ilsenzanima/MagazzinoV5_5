@@ -19,6 +19,7 @@ import { Worker, workersApi } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
+import { WorkerCoursesList } from "./worker-courses-list";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -201,19 +202,7 @@ export function WorkerDetailsDialog({
                     </TabsContent>
 
                     <TabsContent value="certs" className="py-4">
-                        <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                            <Award className="h-12 w-12 text-slate-300 mb-4" />
-                            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
-                                Sezione in Sviluppo
-                            </h3>
-                            <p className="text-sm text-slate-500 max-w-sm mt-2">
-                                Qui sarà possibile gestire i corsi di formazione, le scadenze e i certificati caricati per {worker.firstName}.
-                            </p>
-                            <Button variant="outline" className="mt-6" disabled>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Carica Certificato
-                            </Button>
-                        </div>
+                        <WorkerCoursesList workerId={worker.id} workerName={worker.firstName} />
                     </TabsContent>
                 </Tabs>
 

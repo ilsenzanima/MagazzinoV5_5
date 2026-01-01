@@ -9,3 +9,4 @@ export * from './movements';
 export * from './delivery-notes';
 export * from './workers';
 export * from './attendance';
+export * from './worker-courses';

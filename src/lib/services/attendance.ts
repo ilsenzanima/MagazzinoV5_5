@@ -15,6 +15,8 @@ export const mapDbToAttendance = (db: any): Attendance => ({
     hours: Number(db.hours),
     status: db.status,
     notes: db.notes,
+    courseId: db.course_id,
+    courseName: db.worker_courses?.course_name,
     createdAt: db.created_at
 });
 
@@ -25,7 +27,8 @@ const mapAttendanceToDb = (att: Partial<Attendance>) => ({
     date: att.date,
     hours: att.hours,
     status: att.status,
-    notes: att.notes
+    notes: att.notes,
+    course_id: att.courseId || null
 });
 
 export const attendanceApi = {
@@ -36,7 +39,7 @@ export const attendanceApi = {
 
         const { data, error } = await supabase
             .from('attendance')
-            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name)')
+            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name), worker_courses(course_name)')
             .gte('date', startDate)
             .lte('date', endDate)
             .order('date', { ascending: true });
