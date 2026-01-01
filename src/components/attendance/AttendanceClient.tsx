@@ -8,6 +8,7 @@ import AttendanceMonthGrid from "./AttendanceMonthGrid"; // New grid
 import { AttendanceToolbar, AttendanceStatus } from "./AttendanceToolbar"; // New toolbar
 import AssignmentModal from "./AssignmentModal";
 import BulkAssignmentModal from "./BulkAssignmentModal";
+import AttendanceInfoPopup from "./AttendanceInfoPopup";
 import { generateMonthlyReport } from "./report-generator";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2, Users, FileDown } from "lucide-react";
@@ -28,6 +29,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     // Modals State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+    const [isInfoPopupOpen, setIsInfoPopupOpen] = useState(false);
 
     const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -129,19 +131,10 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 toast.error("Errore salvataggio");
             }
         } else {
-            // NORMAL MODE: Open Modal
-            // If multiple assignments, which one to edit? 
-            // Current AssignmentModal only supports one.
-            // TODO: Enhance Modal to list entries. For now, open empty or first?
-            // "Double click or click without tool opens details". 
-            // Let's pass the first one for now or null if empty strings.
+            // NORMAL MODE: Open Info Popup
             setSelectedWorker(worker);
             setSelectedDate(date);
-            // If there's at least one assignment, pass it for editing. 
-            // Limitation: Can only edit the first one via modal currently until we refactor modal.
-            // But this satisfies the "scelta rapida" requirement.
-            setCurrentAssignment(assignments[0] || null);
-            setIsModalOpen(true);
+            setIsInfoPopupOpen(true);
         }
     };
 
@@ -245,7 +238,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
                     <Button onClick={() => setIsBulkModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
                         <Users className="mr-2 h-4 w-4" />
-                        Assegnazione Squadra
+                        Inserisci Presenze
                     </Button>
                 </div>
             </div>
@@ -285,6 +278,24 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 onSave={handleBulkSave}
                 workers={initialWorkers}
                 jobs={initialJobs}
+            />
+
+            <AttendanceInfoPopup
+                isOpen={isInfoPopupOpen}
+                onClose={() => setIsInfoPopupOpen(false)}
+                worker={selectedWorker}
+                date={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null}
+                assignments={
+                    selectedWorker && selectedDate
+                        ? attendanceMap[selectedWorker.id]?.[format(selectedDate, 'yyyy-MM-dd')] || []
+                        : []
+                }
+                onEdit={(assignment) => {
+                    setCurrentAssignment(assignment);
+                    setIsInfoPopupOpen(false);
+                    setIsModalOpen(true);
+                }}
+                onDelete={handleDelete}
             />
         </div>
     );
