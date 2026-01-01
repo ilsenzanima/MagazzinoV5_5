@@ -45,7 +45,9 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         try {
             const startStr = format(monthStart, 'yyyy-MM-dd');
             const endStr = format(monthEnd, 'yyyy-MM-dd');
+            console.log('🔄 Loading data for:', startStr, 'to', endStr);
             const data = await attendanceApi.getByDateRange(startStr, endStr);
+            console.log('📊 Loaded attendance data:', data);
             setAttendanceList(data);
         } catch (error) {
             console.error("Failed to load attendance:", error);
