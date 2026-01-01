@@ -43,10 +43,10 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const startStr = format(monthStart, 'yyyy-MM-dd');
-            const endStr = format(monthEnd, 'yyyy-MM-dd');
-            console.log('🔄 Loading data for:', startStr, 'to', endStr);
-            const data = await attendanceApi.getByDateRange(startStr, endStr);
+            const year = monthStart.getFullYear();
+            const month = monthStart.getMonth() + 1; // getMonth() is 0-indexed
+            console.log('🔄 Loading data for:', year, 'month', month);
+            const data = await attendanceApi.getByMonth(year, month);
             console.log('📊 Loaded attendance data:', data);
             const transfers = data.filter(a => a.status === 'transfer');
             console.log('🚗 Transfer entries:', transfers);
