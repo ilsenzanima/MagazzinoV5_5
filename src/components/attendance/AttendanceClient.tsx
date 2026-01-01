@@ -48,6 +48,8 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             console.log('🔄 Loading data for:', startStr, 'to', endStr);
             const data = await attendanceApi.getByDateRange(startStr, endStr);
             console.log('📊 Loaded attendance data:', data);
+            const transfers = data.filter(a => a.status === 'transfer');
+            console.log('🚗 Transfer entries:', transfers);
             setAttendanceList(data);
         } catch (error) {
             console.error("Failed to load attendance:", error);
