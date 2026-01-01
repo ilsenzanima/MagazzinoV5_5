@@ -3,7 +3,8 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { inventoryApi } from "@/lib/services/inventory";
 import { jobsApi } from "@/lib/services/jobs";
-import { InventoryItem, Job } from "@/lib/types";
+import { warehousesApi } from "@/lib/services/warehouses";
+import { InventoryItem, Job, Warehouse } from "@/lib/types";
 import { createMovement } from "@/app/movements/actions";
 
 export interface MovementLine {
@@ -35,6 +36,8 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
     // Data Sources
     const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
     const [jobs, setJobs] = useState<Job[]>(initialJobs);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [primaryWarehouse, setPrimaryWarehouse] = useState<Warehouse | null>(null);
 
     // Dialog States
     const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
@@ -82,6 +85,12 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
     const yearSuffix = date ? new Date(date).getFullYear().toString().slice(-2) : new Date().getFullYear().toString().slice(-2);
     const fullNumber = numberPart ? `${numberPart}/PP${yearSuffix}` : `/PP${yearSuffix}`;
 
+    // Load warehouses
+    useEffect(() => {
+        warehousesApi.getAll().then(setWarehouses).catch(console.error);
+        warehousesApi.getPrimary().then(setPrimaryWarehouse).catch(console.error);
+    }, []);
+
     // Effects
     useEffect(() => {
         // Auto-fill logic
@@ -105,7 +114,9 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
             jobAddress += `DESTINAZIONE: ${destinationText}`;
         }
 
-        const warehouseAddress = "OPI FIRESAFE S.R.L. MAGAZZINO\nVia A. Malignani, 9 - 33010 - REANA DEL ROJALE (UD)";
+        const warehouseAddress = primaryWarehouse?.address
+            ? `${primaryWarehouse.name}\n${primaryWarehouse.address}`
+            : "OPI FIRESAFE S.R.L. MAGAZZINO\nVia A. Malignani, 9 - 33010 - REANA DEL ROJALE (UD)";
 
         if (activeTab === 'entry') {
             setCausal("Rientro da cantiere");
@@ -130,7 +141,7 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
         } else {
             setNotes("");
         }
-    }, [activeTab, selectedJob]);
+    }, [activeTab, selectedJob, primaryWarehouse]);
 
     useEffect(() => {
         // Fetch Job Inventory for Return

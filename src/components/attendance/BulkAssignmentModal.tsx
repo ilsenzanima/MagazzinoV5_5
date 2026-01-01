@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Job, Worker, Attendance } from "@/lib/api";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 import { useState, useEffect } from "react";
 import { format, eachDayOfInterval, addDays } from "date-fns";
 import { it } from "date-fns/locale";
@@ -46,6 +48,7 @@ export default function BulkAssignmentModal({
         notes: ''
     }]);
     const [isLoading, setIsLoading] = useState(false);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
     // Preselect worker and date when opening from info popup
     useEffect(() => {
@@ -76,6 +79,11 @@ export default function BulkAssignmentModal({
             }]);
         }
     }, [isOpen, preselectedWorkerId, preselectedDate]);
+
+    // Load warehouses
+    useEffect(() => {
+        warehousesApi.getAll().then(setWarehouses).catch(console.error);
+    }, []);
 
     // Toggle worker selection
     const toggleWorker = (id: string) => {
@@ -229,7 +237,7 @@ export default function BulkAssignmentModal({
 
                                     {(entry.status === 'presence' || entry.status === 'holiday' || entry.status === 'transfer') && (
                                         <div className="space-y-2">
-                                            <Label>Cantiere</Label>
+                                            <Label>Cantiere / Magazzino</Label>
                                             <Select value={entry.jobId || 'none'} onValueChange={(val) => updateEntry(index, 'jobId', val)}>
                                                 <SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger>
                                                 <SelectContent>
@@ -239,6 +247,18 @@ export default function BulkAssignmentModal({
                                                             {job.code} - {job.description}
                                                         </SelectItem>
                                                     ))}
+                                                    {warehouses.length > 0 && (
+                                                        <>
+                                                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1">
+                                                                MAGAZZINI
+                                                            </div>
+                                                            {warehouses.map(warehouse => (
+                                                                <SelectItem key={`warehouse-${warehouse.id}`} value={warehouse.id}>
+                                                                    📦 {warehouse.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </>
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                         </div>

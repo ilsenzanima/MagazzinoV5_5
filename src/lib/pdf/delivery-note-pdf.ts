@@ -111,7 +111,7 @@ export async function generateDeliveryNotePDF(
     currentY += rowBHeight;
 
     // -- Row C: Number & Pickup --
-    // Header strip for Pickup
+    // Header strip for Pickup (from selected warehouse)
     drawHeaderBox(margin + col1W, currentY, col2W, 6, "LUOGO DI RITIRO MERCE:", 7, false);
     // Number box (spans header + content height of pickup) needs to wait for pickup content height
     const pickupY = currentY + 6;
