@@ -33,6 +33,7 @@ export const generateMonthlyReport = (
         });
 
         const jobIds = Array.from(jobMap.keys());
+        // Use job descriptions (names) for column headers
         const columns = ['Data', 'Giorno', ...jobIds.map(id => jobMap.get(id) || 'Commessa'), 'Note/Assenze'];
 
         const body = days.map(day => {
@@ -109,7 +110,8 @@ export const generateMonthlyReport = (
             styles: { fontSize: 8, cellPadding: 1 },
             columnStyles: {
                 0: { cellWidth: 22 }, // Data - fixed width
-                1: { cellWidth: 12 }  // Giorno - fixed width
+                1: { cellWidth: 12 }, // Giorno - fixed width
+                [columns.length - 1]: { cellWidth: 35 } // Note/Assenze - fixed width
             },
             didParseCell: (data) => {
                 // Only apply colors to body rows, not header

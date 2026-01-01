@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, X, Loader2, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemType, Unit } from "@/lib/api";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 
 export default function SettingsInventoryPage() {
     // Units State
@@ -35,11 +37,20 @@ export default function SettingsInventoryPage() {
     const [newTypeName, setNewTypeName] = useState("");
     const [addingType, setAddingType] = useState(false);
 
+    // Warehouses State
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [loadingWarehouses, setLoadingWarehouses] = useState(true);
+    const [newWarehouseName, setNewWarehouseName] = useState("");
+    const [newWarehouseAddress, setNewWarehouseAddress] = useState("");
+    const [newWarehouseIsPrimary, setNewWarehouseIsPrimary] = useState(false);
+    const [addingWarehouse, setAddingWarehouse] = useState(false);
+
     useEffect(() => {
         loadSuppliers();
         loadBrands();
         loadTypes();
         loadUnits();
+        loadWarehouses();
     }, []);
 
     const loadSuppliers = async () => {
@@ -138,7 +149,7 @@ export default function SettingsInventoryPage() {
             await suppliersApi.delete(id);
             setSuppliers(suppliers.filter(s => s.id !== id));
         } catch (error) {
-             console.error("Failed to delete supplier", error);
+            console.error("Failed to delete supplier", error);
         }
     };
 
@@ -148,7 +159,7 @@ export default function SettingsInventoryPage() {
             await brandsApi.delete(id);
             setBrands(brands.filter(b => b.id !== id));
         } catch (error) {
-             console.error("Failed to delete brand", error);
+            console.error("Failed to delete brand", error);
         }
     };
 
@@ -158,7 +169,7 @@ export default function SettingsInventoryPage() {
             await itemTypesApi.delete(id);
             setTypes(types.filter(t => t.id !== id));
         } catch (error) {
-             console.error("Failed to delete type", error);
+            console.error("Failed to delete type", error);
         }
     };
 
@@ -182,229 +193,374 @@ export default function SettingsInventoryPage() {
             await unitsApi.delete(id);
             setUnits(units.filter(u => u.id !== id));
         } catch (error) {
-             console.error("Failed to delete unit", error);
+            console.error("Failed to delete unit", error);
         }
     };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium">Impostazioni Inventario</h3>
-        <p className="text-sm text-muted-foreground">
-          Gestisci le liste predefinite per i prodotti e i fornitori.
-        </p>
-      </div>
-      <Separator />
+    const loadWarehouses = async () => {
+        try {
+            setLoadingWarehouses(true);
+            const data = await warehousesApi.getAll();
+            setWarehouses(data);
+        } catch (error) {
+            console.error("Failed to load warehouses", error);
+        } finally {
+            setLoadingWarehouses(false);
+        }
+    };
 
-      <Tabs defaultValue="suppliers">
-        <TabsList>
-            <TabsTrigger value="suppliers">Fornitori</TabsTrigger>
-            <TabsTrigger value="brands">Marche</TabsTrigger>
-            <TabsTrigger value="types">Tipologie</TabsTrigger>
-            <TabsTrigger value="units">Unità di Misura</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="suppliers" className="space-y-4 mt-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Gestione Fornitori</CardTitle>
-                    <CardDescription>Gestisci l'elenco dei fornitori approvati.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex gap-2">
-                        <Input 
-                            placeholder="Nuovo Fornitore..." 
-                            className="max-w-sm" 
-                            value={newSupplierName}
-                            onChange={(e) => setNewSupplierName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddSupplier()}
-                        />
-                        <Button 
-                            size="icon" 
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={handleAddSupplier}
-                            disabled={addingSupplier || !newSupplierName.trim()}
-                        >
-                            {addingSupplier ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                        </Button>
-                    </div>
-                    
-                    {loadingSuppliers ? (
-                        <div className="flex items-center gap-2 text-slate-500">
-                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento fornitori...
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap gap-2">
-                            {suppliers.map(supplier => (
-                                <Badge key={supplier.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
-                                    {supplier.name}
-                                    <button 
-                                        className="hover:bg-slate-200 rounded-full p-0.5 transition-colors" 
-                                        onClick={() => handleDeleteSupplier(supplier.id)}
-                                    >
-                                        <X className="h-3 w-3 text-slate-500" />
-                                    </button>
-                                </Badge>
-                            ))}
-                            {suppliers.length === 0 && (
-                                <p className="text-sm text-muted-foreground italic">Nessun fornitore presente.</p>
-                            )}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </TabsContent>
+    const handleAddWarehouse = async () => {
+        if (!newWarehouseName.trim()) return;
+        try {
+            setAddingWarehouse(true);
+            const newWarehouse = await warehousesApi.create({
+                name: newWarehouseName,
+                address: newWarehouseAddress || undefined,
+                isPrimary: newWarehouseIsPrimary
+            });
+            setWarehouses([...warehouses, newWarehouse]);
+            setNewWarehouseName("");
+            setNewWarehouseAddress("");
+            setNewWarehouseIsPrimary(false);
+        } catch (error) {
+            console.error("Failed to add warehouse", error);
+        } finally {
+            setAddingWarehouse(false);
+        }
+    };
 
-        <TabsContent value="brands" className="space-y-4 mt-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Gestione Marche</CardTitle>
-                    <CardDescription>Aggiungi o rimuovi le marche disponibili.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex gap-2">
-                        <Input 
-                            placeholder="Nuova Marca..." 
-                            className="max-w-sm" 
-                            value={newBrandName}
-                            onChange={(e) => setNewBrandName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()}
-                        />
-                        <Button 
-                            size="icon" 
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={handleAddBrand}
-                            disabled={addingBrand || !newBrandName.trim()}
-                        >
-                            {addingBrand ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                        </Button>
-                    </div>
-                    {loadingBrands ? (
-                        <div className="flex items-center gap-2 text-slate-500">
-                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento marche...
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap gap-2">
-                            {brands.map(brand => (
-                                <Badge key={brand.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
-                                    {brand.name}
-                                    <button 
-                                        className="hover:bg-slate-200 rounded-full p-0.5 transition-colors" 
-                                        onClick={() => handleDeleteBrand(brand.id)}
-                                    >
-                                        <X className="h-3 w-3 text-slate-500" />
-                                    </button>
-                                </Badge>
-                            ))}
-                            {brands.length === 0 && (
-                                <p className="text-sm text-muted-foreground italic">Nessuna marca presente.</p>
+    const handleDeleteWarehouse = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questo magazzino?")) return;
+        try {
+            await warehousesApi.delete(id);
+            setWarehouses(warehouses.filter(w => w.id !== id));
+        } catch (error) {
+            console.error("Failed to delete warehouse", error);
+        }
+    };
+
+    const handleTogglePrimary = async (id: string) => {
+        try {
+            await warehousesApi.update(id, { isPrimary: true });
+            await loadWarehouses(); // Reload to reflect trigger changes
+        } catch (error) {
+            console.error("Failed to update warehouse", error);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h3 className="text-lg font-medium">Impostazioni Elenchi</h3>
+                <p className="text-sm text-muted-foreground">
+                    Gestisci le liste predefinite per prodotti, fornitori e magazzini.
+                </p>
+            </div>
+            <Separator />
+
+            <Tabs defaultValue="suppliers">
+                <TabsList>
+                    <TabsTrigger value="suppliers">Fornitori</TabsTrigger>
+                    <TabsTrigger value="brands">Marche</TabsTrigger>
+                    <TabsTrigger value="types">Tipologie</TabsTrigger>
+                    <TabsTrigger value="units">Unità di Misura</TabsTrigger>
+                    <TabsTrigger value="warehouses">Magazzini</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="suppliers" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gestione Fornitori</CardTitle>
+                            <CardDescription>Gestisci l'elenco dei fornitori approvati.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuovo Fornitore..."
+                                    className="max-w-sm"
+                                    value={newSupplierName}
+                                    onChange={(e) => setNewSupplierName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSupplier()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddSupplier}
+                                    disabled={addingSupplier || !newSupplierName.trim()}
+                                >
+                                    {addingSupplier ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+
+                            {loadingSuppliers ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento fornitori...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {suppliers.map(supplier => (
+                                        <Badge key={supplier.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                            {supplier.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteSupplier(supplier.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {suppliers.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessun fornitore presente.</p>
+                                    )}
+                                </div>
                             )}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </TabsContent>
-        
-        <TabsContent value="types" className="space-y-4 mt-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Gestione Tipologie</CardTitle>
-                    <CardDescription>Categorie merceologiche dei prodotti.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex gap-2">
-                        <Input 
-                            placeholder="Nuova Tipologia..." 
-                            className="max-w-sm" 
-                            value={newTypeName}
-                            onChange={(e) => setNewTypeName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddType()}
-                        />
-                        <Button 
-                            size="icon" 
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={handleAddType}
-                            disabled={addingType || !newTypeName.trim()}
-                        >
-                            {addingType ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                        </Button>
-                    </div>
-                    {loadingTypes ? (
-                        <div className="flex items-center gap-2 text-slate-500">
-                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento tipologie...
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap gap-2">
-                            {types.map(type => (
-                                <Badge key={type.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
-                                    {type.name}
-                                    <button 
-                                        className="hover:bg-slate-200 rounded-full p-0.5 transition-colors" 
-                                        onClick={() => handleDeleteType(type.id)}
-                                    >
-                                        <X className="h-3 w-3 text-slate-500" />
-                                    </button>
-                                </Badge>
-                            ))}
-                            {types.length === 0 && (
-                                <p className="text-sm text-muted-foreground italic">Nessuna tipologia presente.</p>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="brands" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gestione Marche</CardTitle>
+                            <CardDescription>Aggiungi o rimuovi le marche disponibili.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuova Marca..."
+                                    className="max-w-sm"
+                                    value={newBrandName}
+                                    onChange={(e) => setNewBrandName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddBrand}
+                                    disabled={addingBrand || !newBrandName.trim()}
+                                >
+                                    {addingBrand ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingBrands ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento marche...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {brands.map(brand => (
+                                        <Badge key={brand.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                            {brand.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteBrand(brand.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {brands.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessuna marca presente.</p>
+                                    )}
+                                </div>
                             )}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </TabsContent>
-        
-        <TabsContent value="units" className="space-y-4 mt-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Unità di Misura</CardTitle>
-                    <CardDescription>Unità di misura disponibili per i prodotti.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex gap-2">
-                        <Input 
-                            placeholder="Nuova Unità..." 
-                            className="max-w-sm" 
-                            value={newUnitName}
-                            onChange={(e) => setNewUnitName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddUnit()}
-                        />
-                        <Button 
-                            size="icon" 
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={handleAddUnit}
-                            disabled={addingUnit || !newUnitName.trim()}
-                        >
-                            {addingUnit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                        </Button>
-                    </div>
-                    {loadingUnits ? (
-                        <div className="flex items-center gap-2 text-slate-500">
-                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento unità...
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap gap-2">
-                            {units.map(unit => (
-                                <Badge key={unit.id} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
-                                    {unit.name}
-                                    <button 
-                                        className="hover:bg-slate-100 rounded-full p-0.5 transition-colors" 
-                                        onClick={() => handleDeleteUnit(unit.id)}
-                                    >
-                                        <X className="h-3 w-3 text-slate-500" />
-                                    </button>
-                                </Badge>
-                            ))}
-                            {units.length === 0 && (
-                                <p className="text-sm text-muted-foreground italic">Nessuna unità presente.</p>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="types" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gestione Tipologie</CardTitle>
+                            <CardDescription>Categorie merceologiche dei prodotti.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuova Tipologia..."
+                                    className="max-w-sm"
+                                    value={newTypeName}
+                                    onChange={(e) => setNewTypeName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddType()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddType}
+                                    disabled={addingType || !newTypeName.trim()}
+                                >
+                                    {addingType ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingTypes ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento tipologie...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {types.map(type => (
+                                        <Badge key={type.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                            {type.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteType(type.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {types.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessuna tipologia presente.</p>
+                                    )}
+                                </div>
                             )}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="units" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Unità di Misura</CardTitle>
+                            <CardDescription>Unità di misura disponibili per i prodotti.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuova Unità..."
+                                    className="max-w-sm"
+                                    value={newUnitName}
+                                    onChange={(e) => setNewUnitName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddUnit()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddUnit}
+                                    disabled={addingUnit || !newUnitName.trim()}
+                                >
+                                    {addingUnit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingUnits ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento unità...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {units.map(unit => (
+                                        <Badge key={unit.id} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                            {unit.name}
+                                            <button
+                                                className="hover:bg-slate-100 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteUnit(unit.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {units.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessuna unità presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="warehouses" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gestione Magazzini</CardTitle>
+                            <CardDescription>Magazzini disponibili per presenze e bolle di consegna.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-3">
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Nome Magazzino..."
+                                        className="max-w-sm"
+                                        value={newWarehouseName}
+                                        onChange={(e) => setNewWarehouseName(e.target.value)}
+                                    />
+                                    <Input
+                                        placeholder="Indirizzo (opzionale)..."
+                                        className="flex-1"
+                                        value={newWarehouseAddress}
+                                        onChange={(e) => setNewWarehouseAddress(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="isPrimary"
+                                        checked={newWarehouseIsPrimary}
+                                        onChange={(e) => setNewWarehouseIsPrimary(e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300"
+                                    />
+                                    <label htmlFor="isPrimary" className="text-sm text-muted-foreground">
+                                        Imposta come principale
+                                    </label>
+                                    <Button
+                                        size="sm"
+                                        className="ml-auto bg-blue-600 hover:bg-blue-700"
+                                        onClick={handleAddWarehouse}
+                                        disabled={addingWarehouse || !newWarehouseName.trim()}
+                                    >
+                                        {addingWarehouse ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-2" /> Aggiungi</>}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {loadingWarehouses ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento magazzini...
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {warehouses.map(warehouse => (
+                                        <div key={warehouse.id} className="flex items-start justify-between p-3 border rounded-lg bg-white dark:bg-slate-800">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium">{warehouse.name}</span>
+                                                    {warehouse.isPrimary && (
+                                                        <Badge variant="default" className="bg-blue-600">Principale</Badge>
+                                                    )}
+                                                </div>
+                                                {warehouse.address && (
+                                                    <p className="text-sm text-muted-foreground mt-1">{warehouse.address}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {!warehouse.isPrimary && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleTogglePrimary(warehouse.id)}
+                                                    >
+                                                        Rendi principale
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteWarehouse(warehouse.id)}
+                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {warehouses.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessun magazzino presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
 }

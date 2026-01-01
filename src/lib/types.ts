@@ -49,6 +49,15 @@ export interface Unit {
     name: string;
 }
 
+export interface Warehouse {
+    id: string;
+    name: string;
+    address?: string;
+    isPrimary: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
 export interface InventorySupplierCode {
     id: string;
     inventoryId: string;
