@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Job, Worker, Attendance } from "@/lib/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, eachDayOfInterval, addDays } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -22,6 +22,8 @@ interface BulkAssignmentModalProps {
     onSave: (workerIds: string[], startDate: Date, endDate: Date, entries: Partial<Attendance>[]) => Promise<void>;
     workers: Worker[];
     jobs: Job[];
+    preselectedWorkerId?: string;
+    preselectedDate?: string;
 }
 
 export default function BulkAssignmentModal({
@@ -29,7 +31,9 @@ export default function BulkAssignmentModal({
     onClose,
     onSave,
     workers,
-    jobs
+    jobs,
+    preselectedWorkerId,
+    preselectedDate
 }: BulkAssignmentModalProps) {
     const [selectedWorkers, setSelectedWorkers] = useState<string[]>([]);
     const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -42,6 +46,17 @@ export default function BulkAssignmentModal({
         notes: ''
     }]);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Preselect worker and date when opening from info popup
+    useEffect(() => {
+        if (isOpen && preselectedWorkerId) {
+            setSelectedWorkers([preselectedWorkerId]);
+        }
+        if (isOpen && preselectedDate) {
+            setStartDate(preselectedDate);
+            setEndDate(preselectedDate);
+        }
+    }, [isOpen, preselectedWorkerId, preselectedDate]);
 
     // Toggle worker selection
     const toggleWorker = (id: string) => {

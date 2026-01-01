@@ -180,7 +180,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             }
             await Promise.all(promises);
             toast.success(`Assegnazione completata`);
-            loadData();
+            await loadData(); // Ensure data is reloaded before closing
         } catch (error) {
             console.error(error);
             toast.error("Errore salvataggio multiplo");
@@ -269,6 +269,8 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 onSave={handleBulkSave}
                 workers={initialWorkers}
                 jobs={initialJobs}
+                preselectedWorkerId={selectedWorker?.id}
+                preselectedDate={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined}
             />
 
             <AttendanceInfoPopup
@@ -287,6 +289,10 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     setIsModalOpen(true);
                 }}
                 onDelete={handleDelete}
+                onAddPresence={() => {
+                    setIsInfoPopupOpen(false);
+                    setIsBulkModalOpen(true);
+                }}
             />
         </div>
     );

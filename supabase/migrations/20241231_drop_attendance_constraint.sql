@@ -1,2 +1,15 @@
--- Drop the unique constraint to allow multiple attendance records per worker per day
-ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_worker_id_date_key;
+-- First, check if the constraint exists
+SELECT constraint_name 
+FROM information_schema.table_constraints 
+WHERE table_name = 'attendance' 
+AND constraint_type = 'UNIQUE';
+
+-- Then drop it with the exact name
+ALTER TABLE public.attendance 
+DROP CONSTRAINT IF EXISTS attendance_worker_id_date_key;
+
+-- Verify it's gone
+SELECT constraint_name 
+FROM information_schema.table_constraints 
+WHERE table_name = 'attendance' 
+AND constraint_type = 'UNIQUE';

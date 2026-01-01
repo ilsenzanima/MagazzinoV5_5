@@ -130,12 +130,36 @@ export default function AttendanceMonthGrid({
                                                 return null;
                                             }
 
+                                            // Get work entries (presence)
+                                            const workEntries = assignments.filter(a => a.status === 'presence');
+
                                             // If only work hours
-                                            if (workHours > 0 && nonWorkStatuses.length === 0) {
+                                            if (workEntries.length > 0 && nonWorkStatuses.length === 0) {
                                                 const config = statusConfig['presence'];
+
+                                                // Multiple jobs: show them split
+                                                if (workEntries.length > 1) {
+                                                    return (
+                                                        <div className="flex w-full h-full">
+                                                            {workEntries.map((entry, idx) => (
+                                                                <div
+                                                                    key={entry.id}
+                                                                    className={cn("flex-1 flex items-center justify-center text-[10px] sm:text-xs font-semibold", config.color)}
+                                                                    style={{
+                                                                        borderRight: idx < workEntries.length - 1 ? '1px solid rgba(255,255,255,0.3)' : 'none'
+                                                                    }}
+                                                                >
+                                                                    {entry.hours}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                }
+
+                                                // Single job: show just hours
                                                 return (
                                                     <div className={cn("flex items-center justify-center h-full w-full text-[10px] sm:text-xs font-semibold", config.color)}>
-                                                        {workHours}
+                                                        {workEntries[0].hours}
                                                     </div>
                                                 );
                                             }
