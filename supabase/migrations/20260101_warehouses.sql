@@ -48,9 +48,3 @@ AFTER INSERT OR UPDATE ON warehouses
 FOR EACH ROW
 WHEN (NEW.is_primary = TRUE)
 EXECUTE FUNCTION ensure_single_primary_warehouse();
-
--- Update timestamp trigger
-CREATE TRIGGER set_updated_at
-BEFORE UPDATE ON warehouses
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
