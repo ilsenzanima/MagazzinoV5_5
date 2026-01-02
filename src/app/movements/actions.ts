@@ -141,12 +141,15 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
 
   console.log('=== createMovement SUCCESS ===')
 
+  // Revalidate cache (safe, wrapped)
   try {
     revalidatePath('/movements')
   } catch (e) {
     console.warn('Revalidate failed, but save successful:', e)
   }
 
+  // Redirect MUST be called outside of try/catch because it throws NEXT_REDIRECT
+  // which is expected behavior and should propagate to the client
   redirect('/movements')
 }
 
