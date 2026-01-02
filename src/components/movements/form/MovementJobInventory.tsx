@@ -74,8 +74,8 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
                                     {filteredBatches.map((batch, idx) => (
                                         <TableRow key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                                             <TableCell className="py-2">
-                                                <div className="text-xs font-medium">{batch.itemCode}</div>
-                                                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{batch.itemName}</div>
+                                                <div className="text-sm font-medium">{batch.itemName}</div>
+                                                <div className="text-[10px] text-slate-500 dark:text-slate-400">{batch.itemCode}</div>
                                             </TableCell>
                                             <TableCell className="py-2 text-xs text-slate-500 dark:text-slate-400">
                                                 {batch.purchaseRef || "-"}
