@@ -1,6 +1,6 @@
 'use client';
 
-import { Worker, Job, Attendance, attendanceApi } from "@/lib/api";
+import { Worker, Job, Attendance, attendanceApi, workerCoursesApi } from "@/lib/api";
 import { useState, useEffect, useMemo } from "react";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from "date-fns";
 import { it } from "date-fns/locale";
@@ -9,6 +9,7 @@ import { AttendanceToolbar, AttendanceStatus } from "./AttendanceToolbar"; // Ne
 import AssignmentModal from "./AssignmentModal";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AttendanceInfoPopup from "./AttendanceInfoPopup";
+import { CourseQuickSelectDialog } from "./CourseQuickSelectDialog";
 import { generateMonthlyReport } from "./report-generator";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2, Users, FileDown } from "lucide-react";
@@ -38,6 +39,10 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [currentAssignment, setCurrentAssignment] = useState<Attendance | null>(null);
+
+    // Course quick-select dialog state
+    const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);
+    const [pendingCourseEntry, setPendingCourseEntry] = useState<{ workerId: string, date: string } | null>(null);
 
     // Computed
     const monthStart = startOfMonth(currentDate);
@@ -114,6 +119,13 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
         // PAINT MODE (Insert/Append)
         if (selectedTool) {
+            // For course status, show dialog to select course
+            if (selectedTool === 'course') {
+                setPendingCourseEntry({ workerId: worker.id, date: dateStr });
+                setIsCourseDialogOpen(true);
+                return;
+            }
+
             // All quick-select tools use 8 hours by default
             const payload: Partial<Attendance> = {
                 workerId: worker.id,
@@ -219,6 +231,39 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         }
     };
 
+    const handleCourseConfirm = async (courseName: string) => {
+        if (!pendingCourseEntry) return;
+
+        try {
+            // First, create/update the course in worker_courses table
+            // Use today's date as completion date, default 1 year validity
+            await workerCoursesApi.upsertByName(
+                pendingCourseEntry.workerId,
+                courseName,
+                pendingCourseEntry.date, // Use attendance date as completion date
+                5 // Default 5 years validity
+            );
+
+            // Then save the attendance record
+            const payload: Partial<Attendance> = {
+                workerId: pendingCourseEntry.workerId,
+                date: pendingCourseEntry.date,
+                status: 'course' as const,
+                hours: 8,
+                notes: `Corso: ${courseName}`
+            };
+
+            await attendanceApi.addAttendance(payload);
+            toast.success(`Corso "${courseName}" aggiunto e registrato`, { duration: 1500, position: 'bottom-center' });
+            loadData();
+        } catch (e) {
+            console.error(e);
+            toast.error("Errore salvataggio corso");
+        } finally {
+            setPendingCourseEntry(null);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-card p-4 rounded-lg shadow-sm border dark:border-border">
@@ -316,6 +361,15 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     setIsInfoPopupOpen(false);
                     setIsBulkModalOpen(true);
                 }}
+            />
+
+            <CourseQuickSelectDialog
+                open={isCourseDialogOpen}
+                onOpenChange={(open) => {
+                    setIsCourseDialogOpen(open);
+                    if (!open) setPendingCourseEntry(null);
+                }}
+                onConfirm={handleCourseConfirm}
             />
         </div>
     );
