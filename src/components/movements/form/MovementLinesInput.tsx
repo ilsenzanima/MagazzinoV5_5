@@ -97,6 +97,18 @@ export function MovementLinesInput({
                             <Label htmlFor="fictitious" className="text-xs cursor-pointer">Pezzi Fittizi (non scalare da magazzino)</Label>
                         </div>
                     </div>
+                )}\r
+                \r
+                {/* Checkbox Fittizi per Entrate */}\r
+                {activeTab === 'entry' && selectedItem && (\r
+                <div className="flex items-center space-x-2">\r
+                    <Checkbox\r
+                    id="fictitiousEntry"\r
+                    checked={currentLine.isFictitious || false}\r
+                    onCheckedChange={(c) => setCurrentLine({ ...currentLine, isFictitious: c as boolean })}\r
+                        />\r
+                    <Label htmlFor="fictitiousEntry" className="text-xs cursor-pointer">Fittizio (solo in bolla, non in giacenza)</Label>\r
+                </div>\r
                 )}
 
                 <div className="grid grid-cols-5 gap-4">

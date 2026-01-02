@@ -325,6 +325,31 @@ export const inventoryApi = {
         }));
     },
 
+    // Get job inventory detailed by batch with delivery notes aggregation
+    getJobBatchDetailed: async (jobId: string) => {
+        const { data, error } = await supabase
+            .from('job_batch_detailed')
+            .select('*')
+            .eq('job_id', jobId)
+            .order('item_name', { ascending: true });
+
+        if (error) throw error;
+        return data.map((b: any) => ({
+            itemId: b.item_id,
+            itemCode: b.item_code,
+            itemName: b.item_name,
+            itemUnit: b.item_unit,
+            purchaseItemId: b.purchase_item_id,
+            purchaseRef: b.purchase_ref,
+            purchaseDate: b.purchase_date,
+            supplierName: b.supplier_name,
+            exitDeliveryNotes: b.exit_delivery_notes,
+            entryDeliveryNotes: b.entry_delivery_notes,
+            currentQuantity: b.current_quantity,
+            currentPieces: b.current_pieces
+        }));
+    },
+
     // Seed database with mock data
     seed: async () => {
         // Check if data already exists

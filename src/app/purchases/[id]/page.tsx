@@ -738,7 +738,7 @@ export default function PurchaseDetailPage() {
                             <DialogHeader>
                                 <DialogTitle>Aggiungi Materiale</DialogTitle>
                             </DialogHeader>
-                            <div className="p-4 bg-slate-50 rounded-lg border space-y-4">
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border dark:border-slate-700 space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                     <div className="md:col-span-4 space-y-2">
                                         <Label>Materiale</Label>
