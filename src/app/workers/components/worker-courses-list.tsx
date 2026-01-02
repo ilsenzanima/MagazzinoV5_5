@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { WorkerCourse, workerCoursesApi } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,18 @@ export function WorkerCoursesList({ workerId, workerName }: WorkerCoursesListPro
         }
         return "valid"; // Valido
     };
+
+    // Compute which courses are the latest (most recent completionDate) per courseName
+    const latestCourseIds = useMemo(() => {
+        const latest = new Map<string, { id: string; date: string }>();
+        courses.forEach(course => {
+            const existing = latest.get(course.courseName);
+            if (!existing || course.completionDate > existing.date) {
+                latest.set(course.courseName, { id: course.id, date: course.completionDate });
+            }
+        });
+        return new Set(Array.from(latest.values()).map(v => v.id));
+    }, [courses]);
 
     const handleAddCourse = () => {
         setEditingCourse(null);
@@ -167,7 +179,9 @@ export function WorkerCoursesList({ workerId, workerName }: WorkerCoursesListPro
                         </thead>
                         <tbody>
                             {courses.map((course) => {
-                                const status = getExpirationStatus(course);
+                                // Only show expiration status for the LATEST entry of this course name
+                                const isLatest = latestCourseIds.has(course.id);
+                                const status = isLatest ? getExpirationStatus(course) : 'history';
                                 const expDate = getExpirationDate(course);
 
                                 return (
@@ -182,18 +196,24 @@ export function WorkerCoursesList({ workerId, workerName }: WorkerCoursesListPro
                                             {course.validityYears} {course.validityYears === 1 ? 'anno' : 'anni'}
                                         </td>
                                         <td className="p-3 text-center">
-                                            <Badge
-                                                variant={status === 'expired' ? 'destructive' : status === 'expiring' ? 'outline' : 'default'}
-                                                className={
-                                                    status === 'expiring'
-                                                        ? 'border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400'
-                                                        : status === 'valid'
-                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                            : ''
-                                                }
-                                            >
-                                                {format(expDate, 'dd/MM/yyyy', { locale: it })}
-                                            </Badge>
+                                            {isLatest ? (
+                                                <Badge
+                                                    variant={status === 'expired' ? 'destructive' : status === 'expiring' ? 'outline' : 'default'}
+                                                    className={
+                                                        status === 'expiring'
+                                                            ? 'border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400'
+                                                            : status === 'valid'
+                                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                : ''
+                                                    }
+                                                >
+                                                    {format(expDate, 'dd/MM/yyyy', { locale: it })}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-slate-400 dark:text-slate-500 text-sm">
+                                                    {format(expDate, 'dd/MM/yyyy', { locale: it })}
+                                                </span>
+                                            )}
                                         </td>
                                         {canEdit && (
                                             <td className="p-3 text-right">
