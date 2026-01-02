@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { Movement } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Package, ArrowRight, AlertTriangle, ArrowUpRight, ArrowDownLeft } from "lucide-react"
@@ -16,6 +17,7 @@ interface JobStockProps {
 export function JobStock({ movements }: JobStockProps) {
     const { userRole } = useAuth()
     const [searchTerm, setSearchTerm] = useState("")
+    const [fictitiousPrices, setFictitiousPrices] = useState<Record<string, number>>({})
 
     if (!movements) return null;
 
@@ -88,11 +90,9 @@ export function JobStock({ movements }: JobStockProps) {
                 current.qty += qtyChange
                 current.pieces += piecesChange
             } else if (m.itemCode) {
-                // Determine price
+                // Determine price - Fittizi sempre a 0
                 let price = 0
-                if (m.isFictitious) {
-                    price = lastPurchasePriceMap.get(m.itemCode) || 0
-                } else {
+                if (!m.isFictitious) {
                     price = m.itemPrice || 0
                 }
 
@@ -261,6 +261,22 @@ export function JobStock({ movements }: JobStockProps) {
                                             <div className="flex items-center justify-end gap-2">
                                                 {userRole === 'user' ? (
                                                     <span className="text-slate-400 italic text-xs">Riservato</span>
+                                                ) : item.isFictitious ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-xs">€</span>
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            className="w-24 h-7 text-right text-sm"
+                                                            value={fictitiousPrices[`${item.code}-${idx}`] ?? 0}
+                                                            onChange={(e) => setFictitiousPrices(prev => ({
+                                                                ...prev,
+                                                                [`${item.code}-${idx}`]: parseFloat(e.target.value) || 0
+                                                            }))}
+                                                            placeholder="0.00"
+                                                        />
+                                                    </div>
                                                 ) : (
                                                     <>
                                                         {(!item.price || item.price === 0) && (
