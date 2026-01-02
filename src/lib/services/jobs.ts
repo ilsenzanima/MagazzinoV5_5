@@ -28,7 +28,7 @@ export const mapDbToJob = (db: any): Job => ({
 
 const mapJobToDb = (job: Partial<Job>) => ({
     client_id: job.clientId,
-    client_id: job.clientId,
+
     code: job.code,
     name: job.name,
     description: job.description,
