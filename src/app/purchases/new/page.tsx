@@ -469,7 +469,7 @@ export default function NewPurchasePage() {
                             <div className="space-y-2">
                                 <Label>Commessa (Generale)</Label>
                                 <div
-                                    className="flex items-center justify-between border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 bg-white h-10"
+                                    className="flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 bg-white dark:bg-slate-800 h-10"
                                     onClick={() => setIsHeaderJobSelectorOpen(true)}
                                 >
                                     {selectedHeaderJob ? (
@@ -524,17 +524,17 @@ export default function NewPurchasePage() {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {/* Add Line Form */}
-                            <div className="p-4 bg-slate-50 rounded-lg border space-y-4">
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border dark:border-slate-700 space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                     <div className="md:col-span-4 space-y-2">
                                         <Label>Materiale</Label>
                                         <div
-                                            className="flex items-center justify-between bg-white border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 h-10"
+                                            className="flex items-center justify-between bg-white dark:bg-slate-700 border dark:border-slate-600 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-600 h-10"
                                             onClick={() => setIsItemSelectorOpen(true)}
                                         >
                                             {selectedItemForLine ? (
                                                 <div className="flex items-center gap-2 overflow-hidden">
-                                                    <span className="font-mono text-xs font-bold bg-slate-100 px-1 rounded">{selectedItemForLine.code}</span>
+                                                    <span className="font-mono text-xs font-bold bg-slate-100 dark:bg-slate-600 px-1 rounded">{selectedItemForLine.code}</span>
                                                     <span className="text-sm truncate">{selectedItemForLine.name}</span>
                                                 </div>
                                             ) : (
@@ -597,7 +597,7 @@ export default function NewPurchasePage() {
                                         <div className="space-y-2">
                                             <Label className="text-slate-900 dark:text-white">Seleziona Commessa</Label>
                                             <div
-                                                className="flex items-center justify-between border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 bg-white"
+                                                className="flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-600 bg-white dark:bg-slate-700"
                                                 onClick={() => setIsJobSelectorOpen(true)}
                                             >
                                                 {selectedJobForLine ? (
