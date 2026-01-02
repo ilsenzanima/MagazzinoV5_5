@@ -298,6 +298,18 @@ export interface WorkerCourse {
     updatedAt?: string;
 }
 
+// Worker Medical Exams
+export interface WorkerMedicalExam {
+    id: string;
+    workerId: string;
+    examDate: string; // ISO date format
+    nextExamDate: string; // Typically 6 months after examDate
+    doctorName?: string;
+    notes?: string;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
 // Attendance
 export interface Attendance {
     id: string;
@@ -310,9 +322,10 @@ export interface Attendance {
     warehouseName?: string; // For display
     date: string;
     hours: number;
-    status: 'presence' | 'absence' | 'sick' | 'holiday' | 'permit' | 'injury' | 'transfer' | 'course' | 'strike';
+    status: 'presence' | 'absence' | 'sick' | 'holiday' | 'permit' | 'injury' | 'transfer' | 'course' | 'strike' | 'medical_exam';
     notes?: string;
     courseId?: string; // Reference to worker_courses when status='course'
     courseName?: string; // For display
     createdAt?: string;
 }
+

@@ -14,12 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, Trash2, FileText, Award } from "lucide-react";
+import { AlertTriangle, Trash2, FileText, Award, Stethoscope } from "lucide-react";
 import { Worker, workersApi } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { WorkerCoursesList } from "./worker-courses-list";
+import { WorkerMedicalExamsList } from "./worker-medical-exams-list";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -117,9 +118,10 @@ export function WorkerDetailsDialog({
                 </DialogHeader>
 
                 <Tabs defaultValue="info" className="w-full mt-4">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="info">Informazioni</TabsTrigger>
-                        <TabsTrigger value="certs">Corsi & Certificati</TabsTrigger>
+                        <TabsTrigger value="certs">Corsi</TabsTrigger>
+                        <TabsTrigger value="medical">Visite Mediche</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="info" className="space-y-4 py-4">
@@ -203,6 +205,10 @@ export function WorkerDetailsDialog({
 
                     <TabsContent value="certs" className="py-4">
                         <WorkerCoursesList workerId={worker.id} workerName={worker.firstName} />
+                    </TabsContent>
+
+                    <TabsContent value="medical" className="py-4">
+                        <WorkerMedicalExamsList workerId={worker.id} workerName={worker.firstName} />
                     </TabsContent>
                 </Tabs>
 
