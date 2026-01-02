@@ -56,7 +56,7 @@ export default function JobDetailsPage() {
         doc.setFont("helvetica", "bold");
         doc.text("Descrizione:", 16, 38);
         doc.setFont("helvetica", "normal");
-        doc.text(job.description, 16, 44, { maxWidth: 178 });
+        doc.text(job.description || "", 16, 44, { maxWidth: 178 });
 
         doc.setFont("helvetica", "bold");
         doc.text("Cliente:", 16, 52);
