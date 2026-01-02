@@ -14,6 +14,7 @@ interface AttendanceInfoPopupProps {
     onEdit: (assignment: Attendance) => void;
     onDelete: (id: string) => void;
     onAddPresence?: () => void;
+    canEdit?: boolean; // Controls whether edit/delete/add buttons are shown
 }
 
 export default function AttendanceInfoPopup({
@@ -24,7 +25,8 @@ export default function AttendanceInfoPopup({
     assignments,
     onEdit,
     onDelete,
-    onAddPresence
+    onAddPresence,
+    canEdit = true
 }: AttendanceInfoPopupProps) {
     if (!worker || !date) return null;
 
@@ -46,7 +48,7 @@ export default function AttendanceInfoPopup({
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                                 Nessuna presenza registrata
                             </p>
-                            {onAddPresence && (
+                            {canEdit && onAddPresence && (
                                 <Button onClick={onAddPresence} className="bg-blue-600 hover:bg-blue-700">
                                     Aggiungi Presenza
                                 </Button>
@@ -88,24 +90,26 @@ export default function AttendanceInfoPopup({
                                     )}
                                 </div>
 
-                                <div className="flex gap-2 ml-4">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => onEdit(assignment)}
-                                        className="h-8 w-8 p-0"
-                                    >
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => onDelete(assignment.id)}
-                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                                {canEdit && (
+                                    <div className="flex gap-2 ml-4">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => onEdit(assignment)}
+                                            className="h-8 w-8 p-0"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => onDelete(assignment.id)}
+                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         ))
                     )}

@@ -87,12 +87,17 @@ export const workerCoursesApi = {
     // Create or update a course (upsert by worker_id + course_name)
     upsertByName: async (workerId: string, courseName: string, completionDate: string, validityYears: number): Promise<WorkerCourse> => {
         // Check if course exists for this worker
-        const { data: existing } = await supabase
+        const { data: existing, error: fetchError } = await supabase
             .from('worker_courses')
             .select('*')
             .eq('worker_id', workerId)
             .eq('course_name', courseName)
-            .single();
+            .maybeSingle(); // Use maybeSingle to avoid error when no rows found
+
+        // Ignore PGRST116 error (no rows found) - that just means we need to create
+        if (fetchError && fetchError.code !== 'PGRST116') {
+            throw fetchError;
+        }
 
         if (existing) {
             // Update existing course

@@ -12,9 +12,10 @@ import AttendanceInfoPopup from "./AttendanceInfoPopup";
 import { CourseQuickSelectDialog } from "./CourseQuickSelectDialog";
 import { generateMonthlyReport } from "./report-generator";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Users, FileDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Users, FileDown, Filter, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AttendanceClientProps {
     initialWorkers: Worker[];
@@ -43,6 +44,9 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     // Course quick-select dialog state
     const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);
     const [pendingCourseEntry, setPendingCourseEntry] = useState<{ workerId: string, date: string } | null>(null);
+
+    // Job filter state
+    const [filterJobId, setFilterJobId] = useState<string | null>(null);
 
     // Computed
     const monthStart = startOfMonth(currentDate);
@@ -86,6 +90,38 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         });
         return map;
     }, [attendanceList]);
+
+    // Get unique jobs that have attendance records this month
+    const jobsInMonth = useMemo(() => {
+        const jobMap = new Map<string, { id: string; code: string; description: string }>();
+        attendanceList.forEach(att => {
+            if (att.jobId && att.jobCode) {
+                jobMap.set(att.jobId, {
+                    id: att.jobId,
+                    code: att.jobCode,
+                    description: att.jobDescription || ''
+                });
+            }
+        });
+        return Array.from(jobMap.values()).sort((a, b) => a.code.localeCompare(b.code));
+    }, [attendanceList]);
+
+    // Filtered attendance map when job filter is active
+    const filteredAttendanceMap = useMemo(() => {
+        if (!filterJobId) return attendanceMap;
+
+        const filtered: Record<string, Record<string, Attendance[]>> = {};
+        Object.entries(attendanceMap).forEach(([workerId, dates]) => {
+            Object.entries(dates).forEach(([date, attendances]) => {
+                const matchingAttendances = attendances.filter(a => a.jobId === filterJobId);
+                if (matchingAttendances.length > 0) {
+                    if (!filtered[workerId]) filtered[workerId] = {};
+                    filtered[workerId][date] = matchingAttendances;
+                }
+            });
+        });
+        return filtered;
+    }, [attendanceMap, filterJobId]);
 
     // Handlers
     const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -304,11 +340,50 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
             {canEdit && <AttendanceToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />}
 
+            {/* Job Filter */}
+            <div className="flex items-center gap-3 bg-white dark:bg-card p-3 rounded-lg shadow-sm border dark:border-border">
+                <Filter className="h-4 w-4 text-slate-500" />
+                <span className="text-sm text-slate-600 dark:text-slate-400">Filtra per cantiere:</span>
+                <Select
+                    value={filterJobId || "all"}
+                    onValueChange={(val) => setFilterJobId(val === "all" ? null : val)}
+                >
+                    <SelectTrigger className="w-[300px]">
+                        <SelectValue placeholder="Tutti i cantieri" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Tutti i cantieri</SelectItem>
+                        {jobsInMonth.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                                Nessun cantiere nel mese
+                            </SelectItem>
+                        ) : (
+                            jobsInMonth.map(job => (
+                                <SelectItem key={job.id} value={job.id}>
+                                    {job.code} - {job.description}
+                                </SelectItem>
+                            ))
+                        )}
+                    </SelectContent>
+                </Select>
+                {filterJobId && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setFilterJobId(null)}
+                        className="gap-1 text-slate-600"
+                    >
+                        <X className="h-3 w-3" />
+                        Rimuovi filtro
+                    </Button>
+                )}
+            </div>
+
             <div className="bg-white dark:bg-card rounded-lg shadow-sm overflow-hidden border dark:border-border">
                 <AttendanceMonthGrid
                     currentDate={currentDate}
                     workers={initialWorkers}
-                    attendanceMap={attendanceMap}
+                    attendanceMap={filteredAttendanceMap}
                     onCellClick={handleCellClick}
                     selectedTool={selectedTool}
                 />
@@ -361,6 +436,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     setIsInfoPopupOpen(false);
                     setIsBulkModalOpen(true);
                 }}
+                canEdit={canEdit}
             />
 
             <CourseQuickSelectDialog
