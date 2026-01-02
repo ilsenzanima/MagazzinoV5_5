@@ -42,9 +42,9 @@ export function WorkerMedicalExamDialog({
             setNotes(exam.notes || "");
         } else {
             const today = format(new Date(), 'yyyy-MM-dd');
-            const sixMonthsLater = format(addMonths(new Date(), 6), 'yyyy-MM-dd');
+            const oneYearLater = format(addMonths(new Date(), 12), 'yyyy-MM-dd');
             setExamDate(today);
-            setNextExamDate(sixMonthsLater);
+            setNextExamDate(oneYearLater);
             setDoctorName("");
             setNotes("");
         }
@@ -54,7 +54,7 @@ export function WorkerMedicalExamDialog({
     const handleExamDateChange = (value: string) => {
         setExamDate(value);
         if (value) {
-            const nextDate = addMonths(new Date(value), 6);
+            const nextDate = addMonths(new Date(value), 12);
             setNextExamDate(format(nextDate, 'yyyy-MM-dd'));
         }
     };
@@ -104,7 +104,7 @@ export function WorkerMedicalExamDialog({
                             onChange={(e) => setNextExamDate(e.target.value)}
                         />
                         <p className="text-xs text-slate-500">
-                            Calcolato automaticamente a 6 mesi, modificabile se necessario.
+                            Calcolato automaticamente a 12 mesi, modificabile se necessario.
                         </p>
                     </div>
 

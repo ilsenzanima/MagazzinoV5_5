@@ -114,6 +114,7 @@ export const generateMonthlyReport = (
                     case 'course': type = 'Corso'; break;
                     case 'strike': type = 'Sciopero'; break;
                     case 'absence': type = 'Ass. Ing.'; break;
+                    case 'medical_exam': type = 'Visita Med.'; break;
                     default: type = a.status;
                 }
                 return `${a.hours} (${type})`;
