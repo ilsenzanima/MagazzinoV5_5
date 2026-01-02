@@ -1,6 +1,6 @@
 'use client';
 
-import { Worker, Job, Attendance, attendanceApi, workerCoursesApi } from "@/lib/api";
+import { Worker, Job, Attendance, attendanceApi, workerCoursesApi, workerMedicalExamsApi } from "@/lib/api";
 import { useState, useEffect, useMemo } from "react";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from "date-fns";
 import { it } from "date-fns/locale";
@@ -240,6 +240,29 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                         };
                         console.log('📝 Saving entry:', payload);
                         promises.push(attendanceApi.addAttendance(payload));
+
+                        // Auto-create medical exam record if status is medical_exam
+                        if (entry.status === 'medical_exam') {
+                            try {
+                                // Check if worker already has a medical exam for this date
+                                const existingExams = await workerMedicalExamsApi.getByWorkerId(wId);
+                                const alreadyExists = existingExams.some(e => e.examDate === dateStr);
+
+                                if (!alreadyExists) {
+                                    // Create new medical exam record with 12-month validity
+                                    const nextExamDate = format(addMonths(new Date(dateStr), 12), 'yyyy-MM-dd');
+                                    await workerMedicalExamsApi.create({
+                                        workerId: wId,
+                                        examDate: dateStr,
+                                        nextExamDate: nextExamDate
+                                    });
+                                    console.log('🏥 Created medical exam record for worker:', wId);
+                                }
+                            } catch (examError) {
+                                console.error('⚠️ Failed to create medical exam record:', examError);
+                                // Don't fail the whole operation, just log the error
+                            }
+                        }
                     }
                     runnerDate.setDate(runnerDate.getDate() + 1);
                 }
