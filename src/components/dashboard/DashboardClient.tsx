@@ -8,6 +8,8 @@ import { CalendarView } from "@/components/dashboard/CalendarView";
 import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
 import { RecentMovements } from "@/components/dashboard/RecentMovements";
 import { ActiveJobsWidget } from "@/components/dashboard/ActiveJobs";
+import { ExpiringCoursesCard } from "@/components/dashboard/ExpiringCoursesCard";
+import { ExpiringMedicalExamsCard } from "@/components/dashboard/ExpiringMedicalExamsCard";
 
 // Definiamo il tipo dei dati che ci aspettiamo dal Server
 interface DashboardStats {
@@ -56,6 +58,12 @@ export const DashboardClient = memo(function DashboardClient({
               <div className="col-span-3">
                 <ActiveJobsWidget stats={jobStats} />
               </div>
+            </div>
+
+            {/* Scadenze Corsi e Visite Mediche */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <ExpiringCoursesCard />
+              <ExpiringMedicalExamsCard />
             </div>
           </TabsContent>
 

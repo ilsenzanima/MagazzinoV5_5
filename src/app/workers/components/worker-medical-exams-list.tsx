@@ -161,8 +161,10 @@ export function WorkerMedicalExamsList({ workerId, workerName }: WorkerMedicalEx
                             </tr>
                         </thead>
                         <tbody>
-                            {exams.map((exam) => {
-                                const status = getExpirationStatus(exam);
+                            {exams.map((exam, index) => {
+                                // Only show expiration status badge for the LATEST exam (index 0)
+                                const isLatest = index === 0;
+                                const status = isLatest ? getExpirationStatus(exam) : 'history';
 
                                 return (
                                     <tr key={exam.id} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
@@ -170,18 +172,24 @@ export function WorkerMedicalExamsList({ workerId, workerName }: WorkerMedicalEx
                                             {format(new Date(exam.examDate), 'dd/MM/yyyy', { locale: it })}
                                         </td>
                                         <td className="p-3 text-center">
-                                            <Badge
-                                                variant={status === 'expired' ? 'destructive' : status === 'expiring' ? 'outline' : 'default'}
-                                                className={
-                                                    status === 'expiring'
-                                                        ? 'border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400'
-                                                        : status === 'valid'
-                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                            : ''
-                                                }
-                                            >
-                                                {format(new Date(exam.nextExamDate), 'dd/MM/yyyy', { locale: it })}
-                                            </Badge>
+                                            {isLatest ? (
+                                                <Badge
+                                                    variant={status === 'expired' ? 'destructive' : status === 'expiring' ? 'outline' : 'default'}
+                                                    className={
+                                                        status === 'expiring'
+                                                            ? 'border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400'
+                                                            : status === 'valid'
+                                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                : ''
+                                                    }
+                                                >
+                                                    {format(new Date(exam.nextExamDate), 'dd/MM/yyyy', { locale: it })}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-slate-400 dark:text-slate-500 text-sm">
+                                                    {format(new Date(exam.nextExamDate), 'dd/MM/yyyy', { locale: it })}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="p-3 text-slate-600 dark:text-slate-400">
                                             {exam.doctorName || '-'}
