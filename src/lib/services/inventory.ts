@@ -97,50 +97,38 @@ export const inventoryApi = {
         return data.map(mapDbItemToInventoryItem);
     },
 
+    // Modificato per usare RPC avanzata se c'è ricerca o filtri complessi
     getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string }) => {
-        // Special handling for 'low_stock' using RPC to avoid client-side filtering of large datasets
-        if (options.tab === 'low_stock') {
-            let rpcQuery = supabase.rpc('get_low_stock_inventory', {}, { count: 'estimated' });
+        const from = (options.page - 1) * options.limit;
 
-            if (options.search) {
-                const term = options.search;
-                rpcQuery = rpcQuery.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,category.ilike.%${term}%,supplier_code.ilike.%${term}%`);
+        // Se c'è una ricerca o tab specifici, usiamo la RPC get_inventory_search
+        // Nota: La RPC deve essere stata creata nel DB
+        if (options.search || options.tab) {
+            const { data, error } = await supabase.rpc('get_inventory_search', {
+                p_search: options.search || '',
+                p_status: options.tab || 'all',
+                p_limit: options.limit,
+                p_offset: from
+            });
+
+            if (error) {
+                console.error("RPC Error:", error);
+                throw error;
             }
 
-            // Pagination
-            const from = (options.page - 1) * options.limit;
-            const to = from + options.limit - 1;
-            rpcQuery = rpcQuery.range(from, to);
-
-            const { data, error, count } = await fetchWithTimeout(rpcQuery);
-            if (error) throw error;
+            // Estraiamo il total_count dal primo elemento (se esiste)
+            const total = data && data.length > 0 ? Number(data[0].total_count) : 0;
 
             return {
                 items: (data || []).map(mapDbItemToInventoryItem),
-                total: count || 0
+                total: total
             };
         }
 
+        // Fallback alla query standard per "Tutti" senza ricerca (più veloce se non serve join)
         let query = supabase.from('inventory').select('*', { count: 'estimated' });
-
-        // Filter by search term
-        if (options.search) {
-            const term = options.search;
-            query = query.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,category.ilike.%${term}%,supplier_code.ilike.%${term}%`);
-        }
-
-        // Filter by tab
-        if (options.tab === 'out_of_stock') {
-            query = query.eq('quantity', 0);
-        }
-
-        // Sort by name for paginated view (usually preferred over created_at)
         query = query.order('name');
-
-        // Pagination
-        const from = (options.page - 1) * options.limit;
-        const to = from + options.limit - 1;
-        query = query.range(from, to);
+        query = query.range(from, from + options.limit - 1);
 
         const { data, error, count } = await fetchWithTimeout(query);
         if (error) throw error;
@@ -149,6 +137,19 @@ export const inventoryApi = {
             items: data.map(mapDbItemToInventoryItem),
             total: count || 0
         };
+    },
+
+    // Check Duplicate
+    checkDuplicate: async (item: { name: string; brand: string; type: string; model: string }) => {
+        const { data, error } = await supabase.rpc('check_inventory_duplicate', {
+            p_name: item.name,
+            p_brand: item.brand,
+            p_type: item.type,
+            p_model: item.model
+        });
+
+        if (error) throw error;
+        return data as boolean;
     },
 
     // Get single item

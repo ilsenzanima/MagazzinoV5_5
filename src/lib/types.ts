@@ -101,7 +101,8 @@ export interface Job {
     clientName?: string;
     clientAddress?: string;
     code: string;
-    description: string;
+    name: string;
+    description?: string;
     status: 'active' | 'completed' | 'suspended';
     startDate: string;
     endDate: string;

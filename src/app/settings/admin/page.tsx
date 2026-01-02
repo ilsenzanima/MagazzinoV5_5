@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Shield, ShieldAlert, Trash2, UserCog, UserPlus } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
@@ -29,11 +29,11 @@ export default function SettingsAdminPage() {
     const { user: currentUser, setSimulatedRole, realRole } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
-    
+
     const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [newRole, setNewRole] = useState<'admin' | 'user' | 'operativo'>('user');
-    
+
     // Connection State
     const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -41,8 +41,8 @@ export default function SettingsAdminPage() {
 
     // Seed State
     const [seedLoading, setSeedLoading] = useState(false);
-    const [seedResult, setSeedResult] = useState<{success: boolean, message: string} | null>(null);
-    
+    const [seedResult, setSeedResult] = useState<{ success: boolean, message: string } | null>(null);
+
     const supabase = createClient();
 
     useEffect(() => {
@@ -62,11 +62,11 @@ export default function SettingsAdminPage() {
                 .from('inventory')
                 .select('id')
                 .limit(1);
-            
+
             if (error) throw error;
-            
+
             setConnectionStatus('connected');
-            
+
             if (currentUser) {
                 const { data: profile, error: profileError } = await supabase
                     .from('profiles')
@@ -80,18 +80,18 @@ export default function SettingsAdminPage() {
                     // We try to insert. If RLS allows, it works.
                     const { error: insertError } = await supabase
                         .from('profiles')
-                        .insert([{ 
-                            id: currentUser.id, 
+                        .insert([{
+                            id: currentUser.id,
                             role: 'admin',
                             email: currentUser.email // helpful for debugging
                         }]);
-                    
+
                     if (!insertError) {
                         setUserRole('admin');
                         return;
                     }
                 }
-                
+
                 setUserRole(profile?.role || 'user');
             }
         } catch (err: any) {
@@ -115,10 +115,10 @@ export default function SettingsAdminPage() {
 
     const handleUpdateRole = async () => {
         if (!selectedUser) return;
-        
+
         try {
             await usersApi.updateRole(selectedUser.id, newRole);
-            
+
             setUsers(users.map(u => u.id === selectedUser.id ? { ...u, role: newRole } : u));
             setIsEditRoleOpen(false);
         } catch (error: any) {
@@ -156,7 +156,7 @@ export default function SettingsAdminPage() {
     // BUT if realRole is Admin, we might want to allow them to use the simulator even if they are currently "User"
     // Wait, if I am simulating User, I can't see this page! 
     // So this page is only visible if I am effectively Admin.
-    
+
     return (
         <div className="space-y-6">
             <div>
@@ -170,15 +170,15 @@ export default function SettingsAdminPage() {
 
             {/* Connection Status */}
             <Card className={connectionStatus === 'connected' ? "border-green-500" : connectionStatus === 'error' ? "border-red-500" : ""}>
-                 <CardHeader className="pb-2">
+                <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center">
                         {connectionStatus === 'checking' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {connectionStatus === 'connected' && <Shield className="mr-2 h-4 w-4 text-green-500" />}
                         {connectionStatus === 'error' && <ShieldAlert className="mr-2 h-4 w-4 text-red-500" />}
                         Stato Connessione Supabase
                     </CardTitle>
-                 </CardHeader>
-                 <CardContent>
+                </CardHeader>
+                <CardContent>
                     <div className="text-sm">
                         {connectionStatus === 'checking' && "Verifica connessione in corso..."}
                         {connectionStatus === 'connected' && (
@@ -197,7 +197,7 @@ export default function SettingsAdminPage() {
                             </div>
                         )}
                     </div>
-                 </CardContent>
+                </CardContent>
             </Card>
 
             {/* ROLE SIMULATOR - Only for Real Admins */}
@@ -214,25 +214,25 @@ export default function SettingsAdminPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="flex gap-2">
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setSimulatedRole('user')}
                                 className="bg-white hover:bg-amber-100 border-amber-200 text-amber-800"
                             >
                                 Simula User (Sola Lettura)
                             </Button>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setSimulatedRole('operativo')}
                                 className="bg-white hover:bg-amber-100 border-amber-200 text-amber-800"
                             >
                                 Simula Operativo
                             </Button>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setSimulatedRole(null)}
                                 className="bg-white hover:bg-amber-100 border-amber-200 text-amber-800"
                             >
@@ -278,8 +278,8 @@ export default function SettingsAdminPage() {
                                                 <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
                                                     {user.role}
                                                 </Badge>
-                                                <Button 
-                                                    variant="ghost" 
+                                                <Button
+                                                    variant="ghost"
                                                     size="sm"
                                                     onClick={() => {
                                                         setSelectedUser(user);
@@ -289,11 +289,13 @@ export default function SettingsAdminPage() {
                                                 >
                                                     <UserCog className="h-4 w-4" />
                                                 </Button>
-                                                <Button 
-                                                    variant="ghost" 
+                                                <Button
+                                                    variant="ghost"
                                                     size="sm"
-                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onClick={() => handleDeleteUser(user.id)}
+                                                    disabled={user.role === 'admin'}
+                                                    title={user.role === 'admin' ? "Non puoi eliminare un admin. Cambia prima il ruolo." : "Elimina utente"}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -306,22 +308,22 @@ export default function SettingsAdminPage() {
                     </Card>
 
                     <Card>
-                         <CardHeader>
+                        <CardHeader>
                             <CardTitle>Operazioni Database</CardTitle>
                             <CardDescription>
                                 Azioni di manutenzione e setup iniziale.
                             </CardDescription>
-                         </CardHeader>
-                         <CardContent>
-                            <Button 
-                                onClick={handleSeedData} 
+                        </CardHeader>
+                        <CardContent>
+                            <Button
+                                onClick={handleSeedData}
                                 disabled={seedLoading}
                                 variant="outline"
                             >
                                 {seedLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Popola Database con Dati di Prova
                             </Button>
-                            
+
                             {seedResult && (
                                 <Alert className={`mt-4 ${seedResult.success ? "border-green-500 text-green-700 bg-green-50" : "border-red-500 text-red-700 bg-red-50"}`}>
                                     <AlertTitle>{seedResult.success ? "Successo" : "Errore"}</AlertTitle>
@@ -330,7 +332,7 @@ export default function SettingsAdminPage() {
                                     </AlertDescription>
                                 </Alert>
                             )}
-                         </CardContent>
+                        </CardContent>
                     </Card>
                 </>
             ) : (
@@ -356,8 +358,8 @@ export default function SettingsAdminPage() {
                             <Label htmlFor="role" className="text-right">
                                 Ruolo
                             </Label>
-                            <Select 
-                                value={newRole} 
+                            <Select
+                                value={newRole}
                                 onValueChange={(value: 'admin' | 'user' | 'operativo') => setNewRole(value)}
                             >
                                 <SelectTrigger className="col-span-3">

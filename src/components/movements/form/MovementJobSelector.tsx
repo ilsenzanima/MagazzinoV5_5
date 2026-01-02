@@ -34,7 +34,7 @@ export function MovementJobSelector({
                         <span className="truncate">
                             <span className="font-bold text-slate-900">{selectedJob.code}</span>
                             <span className="mx-2">-</span>
-                            {selectedJob.description}
+                            {selectedJob.name}
                         </span>
                     ) : (
                         "Seleziona Commessa..."
