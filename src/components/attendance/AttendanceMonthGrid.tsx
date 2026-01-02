@@ -22,6 +22,7 @@ const statusConfig: Record<string, { color: string; letter: string }> = {
     'transfer': { color: 'bg-purple-700 text-white', letter: 't' },
     'course': { color: 'bg-blue-500 text-white', letter: 'c' },
     'strike': { color: 'bg-gray-800 text-white', letter: 's' },
+    'medical_exam': { color: 'bg-teal-500 text-white', letter: 'v' },
 };
 
 export default function AttendanceMonthGrid({
@@ -123,6 +124,8 @@ export default function AttendanceMonthGrid({
                                                         return <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24"><path d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" /></svg>;
                                                     case 'absence':
                                                         return <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" /></svg>;
+                                                    case 'medical_exam':
+                                                        return <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24"><path d="M19.5 9.5c-1.03 0-1.9.62-2.29 1.5h-2.92c-.39-.88-1.26-1.5-2.29-1.5s-1.9.62-2.29 1.5H6.79c-.39-.88-1.26-1.5-2.29-1.5C3.12 9.5 2 10.62 2 12s1.12 2.5 2.5 2.5c1.03 0 1.9-.62 2.29-1.5h2.92c.39.88 1.26 1.5 2.29 1.5s1.9-.62 2.29-1.5h2.92c.39.88 1.26 1.5 2.29 1.5 1.38 0 2.5-1.12 2.5-2.5s-1.12-2.5-2.5-2.5z" /></svg>;
                                                     default:
                                                         return null;
                                                 }
