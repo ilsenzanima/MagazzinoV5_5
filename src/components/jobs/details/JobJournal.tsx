@@ -141,18 +141,18 @@ export function JobJournal({ jobId }: JobJournalProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Data</Label>
-                    <Input 
-                      type="date" 
+                    <Input
+                      type="date"
                       value={newLog.date}
-                      onChange={(e) => setNewLog({...newLog, date: e.target.value})}
+                      onChange={(e) => setNewLog({ ...newLog, date: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Meteo</Label>
                     <div className="flex gap-2">
-                      <Select 
-                        value={newLog.weather} 
-                        onValueChange={(val) => setNewLog({...newLog, weather: val})}
+                      <Select
+                        value={newLog.weather}
+                        onValueChange={(val) => setNewLog({ ...newLog, weather: val })}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -163,22 +163,22 @@ export function JobJournal({ jobId }: JobJournalProps) {
                           <SelectItem value="rainy">Piovoso</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Input 
-                        placeholder="°C" 
+                      <Input
+                        placeholder="°C"
                         className="w-20"
                         value={newLog.temp}
-                        onChange={(e) => setNewLog({...newLog, temp: e.target.value})}
+                        onChange={(e) => setNewLog({ ...newLog, temp: e.target.value })}
                       />
                     </div>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Note / Descrizione Lavori</Label>
-                  <Textarea 
-                    placeholder="Descrivi le attività svolte oggi..." 
+                  <Textarea
+                    placeholder="Descrivi le attività svolte oggi..."
                     className="min-h-[100px]"
                     value={newLog.content}
-                    onChange={(e) => setNewLog({...newLog, content: e.target.value})}
+                    onChange={(e) => setNewLog({ ...newLog, content: e.target.value })}
                   />
                 </div>
                 <div className="flex justify-end pt-4">
@@ -209,25 +209,25 @@ export function JobJournal({ jobId }: JobJournalProps) {
                       </span>
                     </div>
                   </div>
-                    <div className="flex items-center gap-2">
-                        {log.weatherInfo && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-1 rounded border dark:border-slate-700">
-                            {getWeatherIcon(log.weatherInfo.condition)}
-                            <span>{log.weatherInfo.tempMax}°C</span>
-                        </div>
-                        )}
-                        {(userRole === 'admin' || userRole === 'operativo') && (
-                            <div className="flex gap-1 ml-2">
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-blue-500" onClick={() => openEdit(log)}>
-                                    <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-red-500" onClick={() => handleDelete(log.id)}>
-                                    <Trash2 className="h-3 w-3" />
-                                </Button>
-                            </div>
-                        )}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    {log.weatherInfo && (
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-1 rounded border dark:border-slate-700">
+                        {getWeatherIcon(log.weatherInfo.condition)}
+                        <span>{log.weatherInfo.tempMax}°C</span>
+                      </div>
+                    )}
+                    {(userRole === 'admin' || userRole === 'operativo') && (
+                      <div className="flex gap-1 ml-2">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-blue-500" onClick={() => openEdit(log)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-red-500" onClick={() => handleDelete(log.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
+
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3">
                   <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{log.content}</p>
@@ -244,7 +244,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
 
       <div className="space-y-6">
         <JobWeatherWidget />
-        
+
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">Riepilogo Attività</CardTitle>
