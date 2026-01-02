@@ -14,6 +14,7 @@ export const mapDbToJob = (db: any): Job => ({
         db.clients?.province ? `(${db.clients.province})` : ''
     ].filter(Boolean).join(' - '),
     code: db.code,
+    name: db.name,
     description: db.description,
     status: db.status,
     startDate: db.start_date,
@@ -27,7 +28,9 @@ export const mapDbToJob = (db: any): Job => ({
 
 const mapJobToDb = (job: Partial<Job>) => ({
     client_id: job.clientId,
+    client_id: job.clientId,
     code: job.code,
+    name: job.name,
     description: job.description,
     status: job.status,
     start_date: job.startDate,
@@ -131,6 +134,7 @@ export const jobsApi = {
 
             let orConditions = [
                 `code.ilike.%${search}%`,
+                `name.ilike.%${search}%`,
                 `description.ilike.%${search}%`,
                 `cig.ilike.%${search}%`,
                 `cup.ilike.%${search}%`,
@@ -288,6 +292,23 @@ export const jobLogsApi = {
             .single();
         if (error) throw error;
         return mapDbToJobLog(data);
+    },
+    update: async (id: string, log: Partial<JobLog>) => {
+        const { data, error } = await supabase
+            .from('job_logs')
+            .update(mapJobLogToDb(log))
+            .eq('id', id)
+            .select('*, profiles:user_id(full_name)')
+            .single();
+        if (error) throw error;
+        return mapDbToJobLog(data);
+    },
+    delete: async (id: string) => {
+        const { error } = await supabase
+            .from('job_logs')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
     }
 };
 

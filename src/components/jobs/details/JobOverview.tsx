@@ -41,18 +41,19 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
   const router = useRouter()
   const { userRole } = useAuth()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  
+
   // Edit State
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Job>>({})
   const [updateExistingMovements, setUpdateExistingMovements] = useState(false)
 
-  const mockBudget = 0 
+  const mockBudget = 0
   const percentage = mockBudget > 0 ? Math.min(100, Math.round((totalCost / mockBudget) * 100)) : 0
 
   const handleEditClick = () => {
     setEditForm({
+      name: job.name,
       description: job.description,
       status: job.status,
       siteAddress: job.siteAddress || '',
@@ -100,32 +101,38 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-3xl font-bold text-slate-900">{job.description}</h1>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{job.name}</h1>
             <Badge className={
-              job.status === 'active' ? 'bg-green-600' : 
-              job.status === 'completed' ? 'bg-slate-500' : 'bg-yellow-500'
+              job.status === 'active' ? 'bg-green-600' :
+                job.status === 'completed' ? 'bg-slate-500' : 'bg-yellow-500'
             }>
               {job.status === 'active' ? 'In Lavorazione' : job.status === 'completed' ? 'Completata' : 'Sospesa'}
             </Badge>
           </div>
-          <div className="text-sm text-slate-500 flex items-center gap-2">
+          <div className="text-sm text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-2">
             <span className="font-mono">#{job.code}</span>
             <span>•</span>
             <span>Creata il {new Date(job.createdAt || new Date()).toLocaleDateString()}</span>
+            {job.description && (
+              <>
+                <span>•</span>
+                <span className="italic">{job.description}</span>
+              </>
+            )}
           </div>
         </div>
-        
+
         <div className="flex gap-2">
           {(userRole === 'admin' || userRole === 'operativo') && (
             <Button variant="outline" size="sm" onClick={handleEditClick}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Modifica
+              <Pencil className="mr-2 h-4 w-4" />
+              Modifica
             </Button>
           )}
           {(userRole === 'admin' || userRole === 'operativo') && (
-            <Button 
-              variant="destructive" 
-              size="sm" 
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={() => setIsDeleteDialogOpen(true)}
             >
               <Trash2 className="mr-2 h-4 w-4" />
@@ -146,119 +153,119 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
           </CardHeader>
           <CardContent>
             {userRole === 'user' ? (
-                <div className="text-xl font-bold text-slate-400 italic">Riservato</div>
+              <div className="text-xl font-bold text-slate-400 italic">Riservato</div>
             ) : (
-                <div className="text-2xl font-bold">€ {totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
+              <div className="text-2xl font-bold">€ {totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
             )}
             <div className="text-xs text-slate-500 mt-1">Calcolato su listino interno</div>
           </CardContent>
         </Card>
 
         <Card>
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Data Inizio
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">
-                    {job.startDate ? new Date(job.startDate).toLocaleDateString() : '-'}
-                </div>
-                <div className="text-xs text-slate-500 mt-1">
-                    Fine: {job.endDate ? new Date(job.endDate).toLocaleDateString() : 'In corso'}
-                </div>
-            </CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Data Inizio
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {job.startDate ? new Date(job.startDate).toLocaleDateString() : '-'}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Fine: {job.endDate ? new Date(job.endDate).toLocaleDateString() : 'In corso'}
+            </div>
+          </CardContent>
         </Card>
 
         <Card>
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Committente
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="text-lg font-bold truncate" title={job.clientName}>
-                    {job.clientName || '-'}
-                </div>
-                <div className="text-xs text-slate-500 mt-1 truncate" title={job.clientAddress}>
-                    {job.clientAddress || 'Indirizzo non disponibile'}
-                </div>
-            </CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Committente
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold truncate" title={job.clientName}>
+              {job.clientName || '-'}
+            </div>
+            <div className="text-xs text-slate-500 mt-1 truncate" title={job.clientAddress}>
+              {job.clientAddress || 'Indirizzo non disponibile'}
+            </div>
+          </CardContent>
         </Card>
 
         <Card>
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Cantiere
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="text-sm font-medium mb-1 truncate" title={job.siteAddress}>
-                    {job.siteAddress || 'Indirizzo cantiere mancante'}
-                </div>
-                {job.siteManager && (
-                    <div className="text-xs text-slate-500 flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        Resp: {job.siteManager}
-                    </div>
-                )}
-            </CardContent>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Cantiere
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm font-medium mb-1 truncate" title={job.siteAddress}>
+              {job.siteAddress || 'Indirizzo cantiere mancante'}
+            </div>
+            {job.siteManager && (
+              <div className="text-xs text-slate-500 flex items-center gap-1">
+                <User className="h-3 w-3" />
+                Resp: {job.siteManager}
+              </div>
+            )}
+          </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Additional Info Card */}
         <Card>
-            <CardHeader>
-                <CardTitle className="text-lg">Informazioni Amministrative</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <Label className="text-slate-500">Codice Commessa</Label>
-                        <div className="font-mono font-medium">{job.code}</div>
-                    </div>
-                    <div>
-                        <Label className="text-slate-500">Stato</Label>
-                        <div className="font-medium capitalize">{
-                            job.status === 'active' ? 'In Lavorazione' : 
-                            job.status === 'completed' ? 'Completata' : 'Sospesa'
-                        }</div>
-                    </div>
-                    <div>
-                        <Label className="text-slate-500">CIG</Label>
-                        <div className="font-medium">{job.cig || '-'}</div>
-                    </div>
-                    <div>
-                        <Label className="text-slate-500">CUP</Label>
-                        <div className="font-medium">{job.cup || '-'}</div>
-                    </div>
-                </div>
-            </CardContent>
+          <CardHeader>
+            <CardTitle className="text-lg">Informazioni Amministrative</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-500">Codice Commessa</Label>
+                <div className="font-mono font-medium">{job.code}</div>
+              </div>
+              <div>
+                <Label className="text-slate-500">Stato</Label>
+                <div className="font-medium capitalize">{
+                  job.status === 'active' ? 'In Lavorazione' :
+                    job.status === 'completed' ? 'Completata' : 'Sospesa'
+                }</div>
+              </div>
+              <div>
+                <Label className="text-slate-500">CIG</Label>
+                <div className="font-medium">{job.cig || '-'}</div>
+              </div>
+              <div>
+                <Label className="text-slate-500">CUP</Label>
+                <div className="font-medium">{job.cup || '-'}</div>
+              </div>
+            </div>
+          </CardContent>
         </Card>
 
         {/* Description Card */}
         <Card>
-            <CardHeader>
-                <CardTitle className="text-lg">Descrizione Lavori</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p className="text-slate-700 whitespace-pre-wrap">{job.description}</p>
-            </CardContent>
+          <CardHeader>
+            <CardTitle className="text-lg">Descrizione Lavori</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-slate-700 whitespace-pre-wrap">{job.description}</p>
+          </CardContent>
         </Card>
       </div>
 
       {job.siteAddress && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-            <div className="md:col-span-2 min-h-[300px]">
-                <JobMap address={job.siteAddress} />
-            </div>
-            <div>
-                <JobWeatherWidget address={job.siteAddress} />
-            </div>
+          <div className="md:col-span-2 min-h-[300px]">
+            <JobMap address={job.siteAddress} />
+          </div>
+          <div>
+            <JobWeatherWidget address={job.siteAddress} />
+          </div>
         </div>
       )}
 
@@ -271,23 +278,32 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
               Modifica i dettagli della commessa.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="description">Descrizione *</Label>
+              <Label htmlFor="name">Nome Commessa *</Label>
+              <Input
+                id="name"
+                value={editForm.name || ""}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrizione</Label>
               <Textarea
                 id="description"
                 value={editForm.description || ""}
-                onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="status">Stato</Label>
-                <Select 
-                  value={editForm.status} 
-                  onValueChange={(value: any) => setEditForm({...editForm, status: value})}
+                <Select
+                  value={editForm.status}
+                  onValueChange={(value: any) => setEditForm({ ...editForm, status: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleziona stato" />
@@ -299,13 +315,13 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="siteManager">Responsabile Cantiere</Label>
                 <Input
                   id="siteManager"
                   value={editForm.siteManager || ""}
-                  onChange={(e) => setEditForm({...editForm, siteManager: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, siteManager: e.target.value })}
                 />
               </div>
             </div>
@@ -315,7 +331,7 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
               <Input
                 id="siteAddress"
                 value={editForm.siteAddress || ""}
-                onChange={(e) => setEditForm({...editForm, siteAddress: e.target.value})}
+                onChange={(e) => setEditForm({ ...editForm, siteAddress: e.target.value })}
                 placeholder="Via, Città..."
               />
             </div>
@@ -327,7 +343,7 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
                   id="startDate"
                   type="date"
                   value={editForm.startDate ? (typeof editForm.startDate === 'string' ? editForm.startDate.split('T')[0] : '') : ""}
-                  onChange={(e) => setEditForm({...editForm, startDate: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -336,7 +352,7 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
                   id="endDate"
                   type="date"
                   value={editForm.endDate ? (typeof editForm.endDate === 'string' ? editForm.endDate.split('T')[0] : '') : ""}
-                  onChange={(e) => setEditForm({...editForm, endDate: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
                 />
               </div>
             </div>
@@ -347,7 +363,7 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
                 <Input
                   id="cig"
                   value={editForm.cig || ""}
-                  onChange={(e) => setEditForm({...editForm, cig: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, cig: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -355,14 +371,14 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
                 <Input
                   id="cup"
                   value={editForm.cup || ""}
-                  onChange={(e) => setEditForm({...editForm, cup: e.target.value})}
+                  onChange={(e) => setEditForm({ ...editForm, cup: e.target.value })}
                 />
               </div>
             </div>
 
             <div className="flex items-center space-x-2 pt-2 border-t mt-2">
-              <Checkbox 
-                id="updateMovements" 
+              <Checkbox
+                id="updateMovements"
                 checked={updateExistingMovements}
                 onCheckedChange={(checked) => setUpdateExistingMovements(checked as boolean)}
               />

@@ -66,7 +66,7 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
 
     try {
       setIsUploading(true)
-      
+
       // 1. Upload to Supabase Storage
       const fileExt = fileToUpload.name.split('.').pop()
       const fileName = `${jobId}/${Math.random().toString(36).substring(7)}_${fileToUpload.name}`
@@ -109,9 +109,9 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
       // Note: We are only deleting the record from DB for now. 
       // Ideally we should also delete from Storage, but we need the path.
       // The publicUrl might contain the path.
-      
+
       await jobDocumentsApi.delete(doc.id)
-      
+
       // Try to delete from storage if possible (optional for now)
       // const path = doc.fileUrl.split('/documents/')[1]
       // if (path) await supabase.storage.from('documents').remove([path])
@@ -126,12 +126,12 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
 
   const getFileIcon = (type?: string) => {
     if (!type) return <FileText className="h-8 w-8 text-slate-400" />
-    
+
     const t = type.toLowerCase()
     if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(t)) return <FileImage className="h-8 w-8 text-blue-500" />
     if (['pdf'].includes(t)) return <FileText className="h-8 w-8 text-red-500" />
     if (['xls', 'xlsx', 'csv'].includes(t)) return <FileSpreadsheet className="h-8 w-8 text-green-500" />
-    
+
     return <File className="h-8 w-8 text-slate-500" />
   }
 
@@ -180,11 +180,11 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
               <div className="space-y-2">
                 <Label>File</Label>
                 <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors"
-                     onClick={() => fileInputRef.current?.click()}>
-                  <input 
-                    type="file" 
-                    className="hidden" 
-                    ref={fileInputRef} 
+                  onClick={() => fileInputRef.current?.click()}>
+                  <input
+                    type="file"
+                    className="hidden"
+                    ref={fileInputRef}
                     onChange={handleFileChange}
                   />
                   <Upload className="h-8 w-8 text-slate-400 mb-2" />
@@ -218,8 +218,8 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
         <Card className="border-dashed">
           <CardContent className="py-12 text-center text-slate-500">
             <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <h3 className="text-lg font-medium text-slate-900 mb-1">Nessun documento</h3>
-            <p>Carica progetti, permessi, o foto del cantiere.</p>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Nessun documento</h3>
+            <p className="text-slate-500 dark:text-slate-400">Carica progetti, permessi, o foto del cantiere.</p>
           </CardContent>
         </Card>
       ) : (
@@ -234,22 +234,22 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
                   <div className="flex justify-between items-start">
                     <p className="font-medium truncate pr-2" title={doc.name}>{doc.name}</p>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" download>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                                <Download className="h-3 w-3 text-slate-500" />
-                            </Button>
-                        </a>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(doc)}>
-                            <Trash2 className="h-3 w-3 text-red-500" />
+                      <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" download>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <Download className="h-3 w-3 text-slate-500" />
                         </Button>
+                      </a>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(doc)}>
+                        <Trash2 className="h-3 w-3 text-red-500" />
+                      </Button>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] uppercase tracking-wider bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-semibold">
-                        {doc.category === 'project' ? 'Progetto' : 
-                         doc.category === 'contract' ? 'Contratto' : 
-                         doc.category === 'safety' ? 'Sicurezza' : 
-                         doc.category === 'photo' ? 'Foto' : 'Altro'}
+                      {doc.category === 'project' ? 'Progetto' :
+                        doc.category === 'contract' ? 'Contratto' :
+                          doc.category === 'safety' ? 'Sicurezza' :
+                            doc.category === 'photo' ? 'Foto' : 'Altro'}
                     </span>
                     <span className="text-xs text-slate-400">• {format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</span>
                   </div>

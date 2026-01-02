@@ -191,7 +191,8 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="text-xs font-mono text-slate-500 dark:text-muted-foreground mb-1">{job.code}</div>
-                        <CardTitle className="text-base leading-tight mb-1">{job.description}</CardTitle>
+                        <CardTitle className="text-lg font-bold text-slate-800 dark:text-white line-clamp-1" title={job.name}>{job.name}</CardTitle>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         {getStatusBadge(job.status)}

@@ -141,8 +141,41 @@ export function InventoryItemForm({
         }
     };
 
+    const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+
     const handleSubmit = async () => {
-        await onSubmit({ ...formData, code }, imageFile);
+        if (!isFormValid) return;
+
+        // Check duplicates
+        setIsCheckingDuplicate(true);
+        try {
+            // Solo se stiamo creando o se i campi chiave sono cambiati (difficile da tracciare qui, facciamo sempre check per sicurezza se non è troppo pesante, ma meglio solo in create per ora come richiesto per "protezione se creiamo")
+            // Se siamo in edit, potremmo star salvando lo stesso articolo, quindi il check tornerebbe true.
+            // La RPC check_inventory_duplicate non esclude l'ID corrente, quindi restituirà true per se stesso in edit.
+            // Per ora lo implemento SOLO per CREATE come richiesto ("se creiamo un articolo gia presente").
+
+            if (mode === 'create') {
+                const isDuplicate = await inventoryApi.checkDuplicate({
+                    name: formData.name,
+                    brand: formData.brand,
+                    type: formData.type,
+                    model: formData.model
+                });
+
+                if (isDuplicate) {
+                    alert("Articolo già presente! Specificare la variante per differenziarlo.");
+                    setIsCheckingDuplicate(false);
+                    return;
+                }
+            }
+
+            await onSubmit({ ...formData, code }, imageFile);
+        } catch (error) {
+            console.error("Error checking duplicate or submitting", error);
+            alert("Si è verificato un errore durante il salvataggio.");
+        } finally {
+            setIsCheckingDuplicate(false);
+        }
     };
 
     const isFormValid = formData.name && formData.brand && formData.type;
@@ -358,12 +391,12 @@ export function InventoryItemForm({
                             <Button
                                 className="bg-blue-600 hover:bg-blue-700"
                                 onClick={handleSubmit}
-                                disabled={!isFormValid || isSubmitting}
+                                disabled={!isFormValid || isSubmitting || isCheckingDuplicate}
                             >
-                                {isSubmitting ? (
+                                {isSubmitting || isCheckingDuplicate ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Salvataggio...
+                                        {isCheckingDuplicate ? "Verifica..." : "Salvataggio..."}
                                     </>
                                 ) : (
                                     <>
