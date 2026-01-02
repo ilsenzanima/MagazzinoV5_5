@@ -88,11 +88,11 @@ const mapJobDocumentToDb = (doc: Partial<JobDocument>) => ({
 
 const mapJobToSite = (job: Job): Site => ({
     id: job.id,
-    name: job.description,
+    name: job.name,
     address: job.siteAddress,
     manager: job.siteManager,
     jobId: job.id,
-    jobDescription: job.description,
+    jobDescription: job.description || job.name,
     status: job.status
 });
 
