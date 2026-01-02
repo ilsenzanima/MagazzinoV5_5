@@ -134,7 +134,8 @@ function getStatusLabel(status: string): string {
         injury: 'Infortunio',
         transfer: 'Trasferta',
         course: 'Corso',
-        absence: 'Assenza'
+        absence: 'Assenza',
+        medical_exam: 'Visita Medica'
     };
     return labels[status] || status;
 }

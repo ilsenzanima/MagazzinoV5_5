@@ -243,6 +243,7 @@ export default function BulkAssignmentModal({
                                                 <SelectItem value="injury">Infortunio</SelectItem>
                                                 <SelectItem value="transfer">Trasferta</SelectItem>
                                                 <SelectItem value="course">Corso</SelectItem>
+                                                <SelectItem value="medical_exam">Visita Medico del Lavoro</SelectItem>
                                                 <SelectItem value="strike">Sciopero</SelectItem>
                                             </SelectContent>
                                         </Select>

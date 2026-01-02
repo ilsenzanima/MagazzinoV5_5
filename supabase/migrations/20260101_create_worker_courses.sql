@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS public.worker_courses (
     updated_at timestamp with time zone DEFAULT timezone('utc', now()) NOT NULL
 );
 
--- Create index for faster lookups by worker
-CREATE INDEX idx_worker_courses_worker_id ON public.worker_courses(worker_id);
+-- Create index for faster lookups by worker (with IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_worker_courses_worker_id ON public.worker_courses(worker_id);
 
 -- Add course_id column to attendance table for tracking which course was attended
 ALTER TABLE public.attendance ADD COLUMN IF NOT EXISTS course_id uuid REFERENCES public.worker_courses(id) ON DELETE SET NULL;
@@ -18,7 +18,12 @@ ALTER TABLE public.attendance ADD COLUMN IF NOT EXISTS course_id uuid REFERENCES
 -- Enable RLS
 ALTER TABLE public.worker_courses ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies (same as workers table - authenticated users can access)
+-- RLS Policies (drop first if exists, then create)
+DROP POLICY IF EXISTS "Allow authenticated read" ON public.worker_courses;
+DROP POLICY IF EXISTS "Allow authenticated insert" ON public.worker_courses;
+DROP POLICY IF EXISTS "Allow authenticated update" ON public.worker_courses;
+DROP POLICY IF EXISTS "Allow authenticated delete" ON public.worker_courses;
+
 CREATE POLICY "Allow authenticated read" ON public.worker_courses
     FOR SELECT TO authenticated USING (true);
 
