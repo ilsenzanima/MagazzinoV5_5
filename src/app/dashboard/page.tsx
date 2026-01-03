@@ -26,14 +26,18 @@ export default async function DashboardPage() {
   const [statsResult, movementsResult, jobsResult] = await Promise.allSettled([
     supabase.rpc('get_dashboard_stats'),
     supabase
-      .from('movements')
+      .from('delivery_notes')
       .select(`
         id,
         type,
-        quantity,
+        number,
+        date,
         created_at,
-        inventory (name, model, unit),
-        profiles:user_id (full_name)
+        jobs(code, description),
+        delivery_note_items(
+          quantity,
+          inventory(name, model, unit)
+        )
       `)
       .order('created_at', { ascending: false })
       .limit(5),
