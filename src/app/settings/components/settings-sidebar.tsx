@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
-import { 
-  User, 
-  Bell, 
-  Settings, 
-  Shield, 
+import {
+  User,
+  Bell,
+  Settings,
+  Shield,
   Package
 } from "lucide-react";
 
@@ -29,7 +29,7 @@ const sidebarNavItems = [
     icon: Bell,
   },
   {
-    title: "Inventario",
+    title: "Dati",
     href: "/settings/inventory",
     icon: Package,
   },
@@ -40,7 +40,7 @@ const sidebarNavItems = [
   },
 ];
 
-interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {}
+interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> { }
 
 export function SidebarNav({ className, ...props }: SidebarNavProps) {
   const pathname = usePathname();

@@ -8,8 +8,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 function MovementDetailSkeleton() {
   return (
     <div className="flex justify-center items-center py-12 h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-slate-500">Caricamento dettagli movimento...</span>
+      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <span className="ml-2 text-slate-500">Caricamento dettagli movimento...</span>
     </div>
   );
 }
@@ -26,7 +26,10 @@ export default async function MovementDetailPage({ params }: { params: Promise<{
       delivery_note_items(
         *,
         inventory(name, code, unit, brand, category, description, price, model),
-        purchase_items(price)
+        purchase_items(
+          price,
+          purchases(id, delivery_note_number, delivery_note_date, suppliers(name))
+        )
       )
     `)
     .eq('id', id)
@@ -35,11 +38,11 @@ export default async function MovementDetailPage({ params }: { params: Promise<{
   if (error || !data) {
     console.error("Movement not found or error", error);
     return (
-        <DashboardLayout>
-            <div className="p-8 text-center">
-                <h2 className="text-xl font-bold text-slate-900">Movimento non trovato</h2>
-            </div>
-        </DashboardLayout>
+      <DashboardLayout>
+        <div className="p-8 text-center">
+          <h2 className="text-xl font-bold text-slate-900">Movimento non trovato</h2>
+        </div>
+      </DashboardLayout>
     );
   }
 

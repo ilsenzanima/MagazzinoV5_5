@@ -363,6 +363,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                             <TableRow>
                                 <TableHead>Codice</TableHead>
                                 <TableHead>Descrizione</TableHead>
+                                <TableHead>Rif. Acquisto</TableHead>
                                 <TableHead className="w-[100px]">Quantità</TableHead>
                                 {isEditing && <TableHead className="w-[50px]"></TableHead>}
                             </TableRow>
@@ -383,6 +384,20 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                                 <span className="block font-medium">{item.inventoryName}</span>
                                                 <span className="text-xs text-slate-500 dark:text-slate-400">{item.inventoryDescription}</span>
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {item.purchaseNumber ? (
+                                                <div className="text-xs">
+                                                    <span className="block font-medium text-blue-600 dark:text-blue-400">
+                                                        Bolla {item.purchaseNumber}
+                                                    </span>
+                                                    <span className="text-slate-500 dark:text-slate-400">
+                                                        {item.purchaseDate ? format(new Date(item.purchaseDate), 'dd/MM/yyyy') : '-'}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">-</span>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             {isEditing ? (
