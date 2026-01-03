@@ -306,34 +306,6 @@ export default function SettingsAdminPage() {
                             </div>
                         </CardContent>
                     </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Operazioni Database</CardTitle>
-                            <CardDescription>
-                                Azioni di manutenzione e setup iniziale.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Button
-                                onClick={handleSeedData}
-                                disabled={seedLoading}
-                                variant="outline"
-                            >
-                                {seedLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Popola Database con Dati di Prova
-                            </Button>
-
-                            {seedResult && (
-                                <Alert className={`mt-4 ${seedResult.success ? "border-green-500 text-green-700 bg-green-50" : "border-red-500 text-red-700 bg-red-50"}`}>
-                                    <AlertTitle>{seedResult.success ? "Successo" : "Errore"}</AlertTitle>
-                                    <AlertDescription>
-                                        {seedResult.message}
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                        </CardContent>
-                    </Card>
                 </>
             ) : (
                 <Alert>

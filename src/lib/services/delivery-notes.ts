@@ -32,7 +32,10 @@ export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
         inventoryBrand: i.inventory?.brand,
         inventoryCategory: i.inventory?.category,
         inventoryDescription: i.inventory?.description,
-        price: i.price || i.purchase_items?.price || i.inventory?.price || 0
+        price: i.price || i.purchase_items?.price || i.inventory?.price || 0,
+        purchaseNumber: i.purchase_items?.purchases?.delivery_note_number,
+        purchaseDate: i.purchase_items?.purchases?.delivery_note_date,
+        purchaseSupplier: i.purchase_items?.purchases?.suppliers?.name
     }))
 });
 
@@ -132,7 +135,10 @@ export const deliveryNotesApi = {
         delivery_note_items(
           *,
           inventory(name, code, unit, brand, category, description, price, model),
-          purchase_items(price)
+          purchase_items(
+            price,
+            purchases(id, delivery_note_number, delivery_note_date, suppliers(name))
+          )
         )
       `)
             .eq('id', id)

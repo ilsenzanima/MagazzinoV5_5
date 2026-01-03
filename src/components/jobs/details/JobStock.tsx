@@ -91,12 +91,12 @@ export function JobStock({ movements, jobId }: JobStockProps) {
             unit: string,
             price: number, // Specific or Average
             isFictitious: boolean,
-            reference: string,
+            references: Set<string>, // Multiple delivery notes
+            deliveryNoteIds: Set<string>,
             purchaseId?: string,
             purchaseNumber?: string,
             purchaseDate?: string,
-            supplierName?: string,
-            deliveryNoteId?: string
+            supplierName?: string
         }>()
 
         movements.forEach(m => {
@@ -128,17 +128,26 @@ export function JobStock({ movements, jobId }: JobStockProps) {
             const sourceKey = m.purchaseId || m.reference || 'unknown'
             const key = `${m.itemCode}-${!!m.isFictitious}-${sourceKey}`
 
+
             const current = map.get(key)
 
             if (current) {
                 current.qty += qtyChange
                 current.pieces += piecesChange
+                // Add reference to existing Set
+                if (m.reference) current.references.add(m.reference)
+                if (m.deliveryNoteId) current.deliveryNoteIds.add(m.deliveryNoteId)
             } else if (m.itemCode) {
                 // Determine price - Fittizi sempre a 0
                 let price = 0
                 if (!m.isFictitious) {
                     price = m.itemPrice || 0
                 }
+
+                const references = new Set<string>()
+                const deliveryNoteIds = new Set<string>()
+                if (m.reference) references.add(m.reference)
+                if (m.deliveryNoteId) deliveryNoteIds.add(m.deliveryNoteId)
 
                 map.set(key, {
                     itemId: m.itemId || '',
@@ -150,12 +159,12 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                     unit: m.itemUnit || 'PZ',
                     price: price,
                     isFictitious: !!m.isFictitious,
-                    reference: m.reference || '',
+                    references,
+                    deliveryNoteIds,
                     purchaseId: m.purchaseId,
                     purchaseNumber: m.purchaseNumber,
                     purchaseDate: m.purchaseDate,
-                    supplierName: m.supplierName,
-                    deliveryNoteId: m.deliveryNoteId
+                    supplierName: m.supplierName
                 })
             }
         })
@@ -212,12 +221,21 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                     <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t dark:border-slate-700">
                                         <div>
                                             <span className="text-xs text-slate-500 dark:text-slate-400 block">Riferimento</span>
-                                            {item.deliveryNoteId ? (
-                                                <Link href={`/movements/${item.deliveryNoteId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
-                                                    {item.reference || '-'}
-                                                </Link>
+                                            {item.references.size > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {Array.from(item.references).map((ref, refIdx) => {
+                                                        const noteId = Array.from(item.deliveryNoteIds)[refIdx]
+                                                        return noteId ? (
+                                                            <Link key={ref} href={`/movements/${noteId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                                                                {ref}
+                                                            </Link>
+                                                        ) : (
+                                                            <span key={ref} className="text-slate-700 dark:text-slate-300">{ref}</span>
+                                                        )
+                                                    })}
+                                                </div>
                                             ) : (
-                                                <span className="text-slate-700 dark:text-slate-300">{item.reference || '-'}</span>
+                                                <span className="text-slate-700 dark:text-slate-300">-</span>
                                             )}
                                         </div>
                                         <div className="text-right">
@@ -270,13 +288,22 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                                            {/* Bolla Reference */}
-                                            {item.deliveryNoteId ? (
-                                                <Link href={`/movements/${item.deliveryNoteId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
-                                                    {item.reference || '-'}
-                                                </Link>
+                                            {/* Bolla Reference - Multiple */}
+                                            {item.references.size > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {Array.from(item.references).map((ref, refIdx) => {
+                                                        const noteId = Array.from(item.deliveryNoteIds)[refIdx]
+                                                        return noteId ? (
+                                                            <Link key={ref} href={`/movements/${noteId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                                                                {ref}
+                                                            </Link>
+                                                        ) : (
+                                                            <span key={ref}>{ref}</span>
+                                                        )
+                                                    })}
+                                                </div>
                                             ) : (
-                                                item.reference || '-'
+                                                '-'
                                             )}
                                         </TableCell>
                                         <TableCell className="text-sm text-slate-600 dark:text-slate-400">
