@@ -236,7 +236,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="stock" className="space-y-6 focus-visible:outline-none">
-                            <JobStock movements={movements} />
+                            <JobStock movements={movements} jobId={job.id} />
                         </TabsContent>
 
                         <TabsContent value="journal" className="space-y-6 focus-visible:outline-none">
