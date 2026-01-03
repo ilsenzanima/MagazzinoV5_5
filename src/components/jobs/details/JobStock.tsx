@@ -345,21 +345,29 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                             <span className="text-slate-400 italic text-xs">Riservato</span>
                                                         ) : item.isFictitious ? (
                                                             (userRole === 'admin' || userRole === 'operativo') ? (
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className="text-xs">€</span>
-                                                                    <Input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        step="0.01"
-                                                                        className="w-24 h-7 text-right text-sm"
-                                                                        value={fictitiousPrices[item.itemId] ?? 0}
-                                                                        onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
-                                                                        placeholder="0.00"
-                                                                        disabled={loadingPrices}
-                                                                    />
+                                                                <div className="flex flex-col items-end gap-1">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-xs text-slate-400">P.U.</span>
+                                                                        <span className="text-xs">€</span>
+                                                                        <Input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            step="0.01"
+                                                                            className="w-20 h-7 text-right text-sm"
+                                                                            value={fictitiousPrices[item.itemId] ?? 0}
+                                                                            onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
+                                                                            placeholder="0.00"
+                                                                            disabled={loadingPrices}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                                                                        Tot: € {(item.qty * (fictitiousPrices[item.itemId] ?? 0)).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                    </span>
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-slate-400 italic text-xs">€ 0.00</span>
+                                                                <span className="text-slate-400 italic text-xs">
+                                                                    € {(item.qty * (fictitiousPrices[item.itemId] ?? 0)).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                </span>
                                                             )
                                                         ) : (
                                                             <>
