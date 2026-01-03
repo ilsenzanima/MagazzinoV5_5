@@ -521,7 +521,7 @@ export default function PurchaseDetailPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {items.map((item) => (
-                                        <TableRow key={item.id} className={item.price === 0 ? "bg-yellow-50/50" : ""}>
+                                        <TableRow key={item.id} className={item.price === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/20" : ""}>
                                             <TableCell>
                                                 <div className="font-medium">
                                                     {item.itemName}
@@ -697,18 +697,18 @@ export default function PurchaseDetailPage() {
                                         const remaining = batch ? batch.remainingQty : item.quantity;
                                         const original = item.quantity;
 
-                                        let statusColor = "bg-green-100 text-green-800";
+                                        let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
                                         let statusText = "Disponibile";
 
                                         if (remaining <= 0.001) {
-                                            statusColor = "bg-slate-100 text-slate-800";
+                                            statusColor = "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300";
                                             statusText = "Esaurito";
                                         } else if (remaining < original) {
-                                            statusColor = "bg-yellow-100 text-yellow-800";
+                                            statusColor = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300";
                                             statusText = "Parziale";
                                         } else if (remaining > original) {
                                             // Should not happen unless returns > exits
-                                            statusColor = "bg-blue-100 text-blue-800";
+                                            statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
                                             statusText = "Eccedenza";
                                         }
 

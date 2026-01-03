@@ -147,6 +147,7 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                             setPackagesCount={form.setPackagesCount}
                             notes={form.notes}
                             setNotes={form.setNotes}
+                            linesCount={form.lines.length}
                         />
 
                     </div>
