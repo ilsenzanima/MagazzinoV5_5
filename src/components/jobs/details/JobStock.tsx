@@ -56,10 +56,9 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         [jobId]
     )
 
-    const handlePriceChange = (itemId: string, itemCode: string, idx: number, value: string) => {
+    const handlePriceChange = (itemId: string, value: string) => {
         const price = parseFloat(value) || 0
-        const key = `${itemCode}-${idx}`
-        setFictitiousPrices(prev => ({ ...prev, [key]: price }))
+        setFictitiousPrices(prev => ({ ...prev, [itemId]: price }))
         savePriceDebounced(itemId, price)
     }
 
@@ -354,7 +353,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                         step="0.01"
                                                                         className="w-24 h-7 text-right text-sm"
                                                                         value={fictitiousPrices[item.itemId] ?? 0}
-                                                                        onChange={(e) => handlePriceChange(item.itemId, item.code, idx, e.target.value)}
+                                                                        onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
                                                                         placeholder="0.00"
                                                                         disabled={loadingPrices}
                                                                     />
