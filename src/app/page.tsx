@@ -1,8 +1,19 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
-export default function Home() {
+export default async function Home() {
+  // Check if user is already logged in
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // If logged in, redirect to dashboard
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center px-4">
 
@@ -12,10 +23,10 @@ export default function Home() {
         {/* Logo */}
         <div className="flex justify-center">
           <Image
-            src="/opi_logo.jpg"
+            src="/logo_header.png"
             alt="OPI Firesafe Logo"
-            width={180}
-            height={80}
+            width={200}
+            height={60}
             className="object-contain"
             priority
           />
