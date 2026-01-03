@@ -242,6 +242,9 @@ export interface DeliveryNoteItem {
     price?: number;
     purchaseItemId?: string;
     isFictitious?: boolean;
+    purchaseNumber?: string;
+    purchaseDate?: string;
+    purchaseSupplier?: string;
 }
 
 export interface DeliveryNote {
