@@ -91,8 +91,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
             unit: string,
             price: number, // Specific or Average
             isFictitious: boolean,
-            references: Set<string>, // Multiple delivery notes
-            deliveryNoteIds: Set<string>,
+            referenceMap: Map<string, { noteId: string, isReturn: boolean }>, // ref -> {noteId, isReturn}
             purchaseId?: string,
             purchaseNumber?: string,
             purchaseDate?: string,
@@ -134,9 +133,10 @@ export function JobStock({ movements, jobId }: JobStockProps) {
             if (current) {
                 current.qty += qtyChange
                 current.pieces += piecesChange
-                // Add reference to existing Set
-                if (m.reference) current.references.add(m.reference)
-                if (m.deliveryNoteId) current.deliveryNoteIds.add(m.deliveryNoteId)
+                // Add reference to existing Map with type info
+                if (m.reference && m.deliveryNoteId) {
+                    current.referenceMap.set(m.reference, { noteId: m.deliveryNoteId, isReturn: !isSiteIn })
+                }
             } else if (m.itemCode) {
                 // Determine price - Fittizi sempre a 0
                 let price = 0
@@ -144,10 +144,10 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                     price = m.itemPrice || 0
                 }
 
-                const references = new Set<string>()
-                const deliveryNoteIds = new Set<string>()
-                if (m.reference) references.add(m.reference)
-                if (m.deliveryNoteId) deliveryNoteIds.add(m.deliveryNoteId)
+                const referenceMap = new Map<string, { noteId: string, isReturn: boolean }>()
+                if (m.reference && m.deliveryNoteId) {
+                    referenceMap.set(m.reference, { noteId: m.deliveryNoteId, isReturn: !isSiteIn })
+                }
 
                 map.set(key, {
                     itemId: m.itemId || '',
@@ -159,8 +159,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                     unit: m.itemUnit || 'PZ',
                     price: price,
                     isFictitious: !!m.isFictitious,
-                    references,
-                    deliveryNoteIds,
+                    referenceMap,
                     purchaseId: m.purchaseId,
                     purchaseNumber: m.purchaseNumber,
                     purchaseDate: m.purchaseDate,
@@ -333,19 +332,22 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                                                    {/* Bolla Reference - Multiple */}
-                                                    {item.references.size > 0 ? (
+                                                    {/* Bolla Reference - Multiple with type colors */}
+                                                    {item.referenceMap.size > 0 ? (
                                                         <div className="flex flex-wrap gap-1">
-                                                            {Array.from(item.references).map((ref, refIdx) => {
-                                                                const noteId = Array.from(item.deliveryNoteIds)[refIdx]
-                                                                return noteId ? (
-                                                                    <Link key={ref} href={`/movements/${noteId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
-                                                                        {ref}
-                                                                    </Link>
-                                                                ) : (
-                                                                    <span key={ref}>{ref}</span>
-                                                                )
-                                                            })}
+                                                            {Array.from(item.referenceMap.entries()).map(([ref, info]) => (
+                                                                <Link
+                                                                    key={ref}
+                                                                    href={`/movements/${info.noteId}`}
+                                                                    className={`hover:underline ${info.isReturn
+                                                                            ? 'text-orange-600 dark:text-orange-400'
+                                                                            : 'text-blue-600 dark:text-blue-400'
+                                                                        }`}
+                                                                    title={info.isReturn ? 'Reso' : 'Uscita'}
+                                                                >
+                                                                    {ref}
+                                                                </Link>
+                                                            ))}
                                                         </div>
                                                     ) : (
                                                         '-'
