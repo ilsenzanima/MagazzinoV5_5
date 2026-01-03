@@ -659,7 +659,7 @@ export default function PurchaseDetailPage() {
                                             </TableCell>
                                         </TableRow>
                                     ))}
-                                    <TableRow className="bg-slate-50 font-bold text-lg">
+                                    <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold text-lg">
                                         <TableCell colSpan={5} className="text-right">TOTALE BOLLA</TableCell>
                                         <TableCell className="text-right">
                                             {(userRole === 'admin' || userRole === 'operativo') ? (
