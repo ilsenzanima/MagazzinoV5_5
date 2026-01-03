@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Movement } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,15 +9,58 @@ import { Badge } from "@/components/ui/badge"
 import { Package, ArrowRight, AlertTriangle, ArrowUpRight, ArrowDownLeft } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
+import { fictitiousPricesApi } from "@/lib/services/fictitiousPrices"
 
 interface JobStockProps {
     movements: Movement[]
+    jobId: string
 }
 
-export function JobStock({ movements }: JobStockProps) {
+export function JobStock({ movements, jobId }: JobStockProps) {
     const { userRole } = useAuth()
     const [searchTerm, setSearchTerm] = useState("")
     const [fictitiousPrices, setFictitiousPrices] = useState<Record<string, number>>({})
+    const [loadingPrices, setLoadingPrices] = useState(true)
+
+    // Load saved fictitious prices
+    useEffect(() => {
+        const loadPrices = async () => {
+            try {
+                const prices = await fictitiousPricesApi.getByJob(jobId)
+                setFictitiousPrices(prices)
+            } catch (error) {
+                console.error('Error loading fictitious prices:', error)
+            } finally {
+                setLoadingPrices(false)
+            }
+        }
+        loadPrices()
+    }, [jobId])
+
+    // Debounced save function
+    const savePriceDebounced = useCallback(
+        (() => {
+            let timeoutId: NodeJS.Timeout
+            return (itemId: string, price: number) => {
+                clearTimeout(timeoutId)
+                timeoutId = setTimeout(async () => {
+                    try {
+                        await fictitiousPricesApi.setPrice(jobId, itemId, price)
+                    } catch (error) {
+                        console.error('Error saving fictitious price:', error)
+                    }
+                }, 1000) // Save after 1 second of inactivity
+            }
+        })(),
+        [jobId]
+    )
+
+    const handlePriceChange = (itemId: string, itemCode: string, idx: number, value: string) => {
+        const price = parseFloat(value) || 0
+        const key = `${itemCode}-${idx}`
+        setFictitiousPrices(prev => ({ ...prev, [key]: price }))
+        savePriceDebounced(itemId, price)
+    }
 
     if (!movements) return null;
 
@@ -39,6 +82,7 @@ export function JobStock({ movements }: JobStockProps) {
     // Calculate Current Stock at Site - Memoized
     const stockMap = useMemo(() => {
         const map = new Map<string, {
+            itemId: string,
             name: string,
             model?: string,
             code: string,
@@ -97,6 +141,7 @@ export function JobStock({ movements }: JobStockProps) {
                 }
 
                 map.set(key, {
+                    itemId: m.itemId || '',
                     name: m.itemName || 'Sconosciuto',
                     model: m.itemModel,
                     code: m.itemCode,
@@ -262,21 +307,23 @@ export function JobStock({ movements }: JobStockProps) {
                                                 {userRole === 'user' ? (
                                                     <span className="text-slate-400 italic text-xs">Riservato</span>
                                                 ) : item.isFictitious ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-xs">€</span>
-                                                        <Input
-                                                            type="number"
-                                                            min="0"
-                                                            step="0.01"
-                                                            className="w-24 h-7 text-right text-sm"
-                                                            value={fictitiousPrices[`${item.code}-${idx}`] ?? 0}
-                                                            onChange={(e) => setFictitiousPrices(prev => ({
-                                                                ...prev,
-                                                                [`${item.code}-${idx}`]: parseFloat(e.target.value) || 0
-                                                            }))}
-                                                            placeholder="0.00"
-                                                        />
-                                                    </div>
+                                                    (userRole === 'admin' || userRole === 'operativo') ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-xs">€</span>
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                className="w-24 h-7 text-right text-sm"
+                                                                value={fictitiousPrices[item.itemId] ?? 0}
+                                                                onChange={(e) => handlePriceChange(item.itemId, item.code, idx, e.target.value)}
+                                                                placeholder="0.00"
+                                                                disabled={loadingPrices}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400 italic text-xs">€ 0.00</span>
+                                                    )
                                                 ) : (
                                                     <>
                                                         {(!item.price || item.price === 0) && (
