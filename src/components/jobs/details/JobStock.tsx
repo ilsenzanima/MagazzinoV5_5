@@ -179,8 +179,43 @@ export function JobStock({ movements, jobId }: JobStockProps) {
             .sort((a, b) => a.name.localeCompare(b.name))
     }, [stockMap])
 
+    // Calculate Total Value including fictitious items
+    const totalValue = useMemo(() => {
+        return currentStock.reduce((sum, item) => {
+            if (item.isFictitious) {
+                // Use fictitious price from state
+                const price = fictitiousPrices[item.itemId] ?? 0
+                return sum + (item.qty * price)
+            } else {
+                return sum + (item.qty * item.price)
+            }
+        }, 0)
+    }, [currentStock, fictitiousPrices])
+
     return (
         <div className="space-y-6">
+            {/* Summary Card */}
+            {(userRole === 'admin' || userRole === 'operativo') && (
+                <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+                    <CardContent className="py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Package className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                                <div>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">Valore Totale Cantiere</p>
+                                    <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                        € {totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right text-sm text-slate-500 dark:text-slate-400">
+                                <p>{currentStock.filter(i => !i.isFictitious).length} articoli reali</p>
+                                <p>{currentStock.filter(i => i.isFictitious).length} articoli fittizi</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
             <Tabs defaultValue="stock" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 max-w-md">
                     <TabsTrigger value="stock" className="flex items-center gap-2">
@@ -352,7 +387,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                         <Input
                                                                             type="number"
                                                                             min="0"
-                                                                            step="0.01"
+                                                                            step="0.00001"
                                                                             className="w-20 h-7 text-right text-sm"
                                                                             value={fictitiousPrices[item.itemId] ?? 0}
                                                                             onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
