@@ -59,6 +59,8 @@ import Barcode from "react-barcode";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ItemLots } from "@/components/inventory/ItemLots";
 
 export default function InventoryDetailPage() {
   const params = useParams();
@@ -96,6 +98,10 @@ export default function InventoryDetailPage() {
   const [submittingMovement, setSubmittingMovement] = useState(false);
   const [realQtyInput, setRealQtyInput] = useState<string>("");
 
+  // Lots State
+  const [lotsData, setLotsData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("movements");
+
   // Helper to handle pieces/quantity change
   const handleMovementPiecesChange = (val: string) => {
     setMovementPieces(val);
@@ -118,6 +124,17 @@ export default function InventoryDetailPage() {
     const q = parseFloat(val);
     if (!isNaN(q) && item && item.coefficient) {
       setMovementPieces((q / item.coefficient).toFixed(2));
+    }
+  };
+
+  // Load lots data
+  const loadLots = async () => {
+    if (!id) return;
+    try {
+      const data = await inventoryApi.getLotsForItem(id);
+      setLotsData(data);
+    } catch (err) {
+      console.error("Error loading lots:", err);
     }
   };
 
@@ -174,6 +191,9 @@ export default function InventoryDetailPage() {
         // Load history first as it is displayed immediately
         const movementsData = await inventoryApi.getHistory(id);
         setMovements(movementsData);
+
+        // Load lots data
+        loadLots();
 
         // Load auxiliary data for forms in background
         const [jobsData, brandsData, typesData, unitsData, supplierCodesData, suppliersData] = await Promise.all([
@@ -909,247 +929,166 @@ export default function InventoryDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Movements Section */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Storico Movimenti</CardTitle>
-                {(userRole === 'admin' || userRole === 'operativo') && (
-                  <Dialog open={isMovementOpen} onOpenChange={setIsMovementOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="bg-blue-600">
-                        <Plus className="mr-2 h-4 w-4" /> Nuovo Movimento
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Registra Movimento</DialogTitle>
-                        <DialogDescription>
-                          Inserisci i dettagli per registrare un nuovo movimento di magazzino.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label>Tipo Movimento</Label>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant={movementType === 'load' ? 'default' : 'outline'}
-                              className={movementType === 'load' ? 'bg-green-600 hover:bg-green-700 flex-1' : 'flex-1'}
-                              onClick={() => setMovementType('load')}
-                            >
-                              <Plus className="mr-2 h-4 w-4" /> Carico (Entrata)
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={movementType === 'unload' ? 'default' : 'outline'}
-                              className={movementType === 'unload' ? 'bg-red-600 hover:bg-red-700 flex-1' : 'flex-1'}
-                              onClick={() => setMovementType('unload')}
-                            >
-                              <Minus className="mr-2 h-4 w-4" /> Scarico (Uscita)
-                            </Button>
-                          </div>
-                        </div>
+            {/* Tabs: Lotti / Storico Movimenti */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="lots">Lotti</TabsTrigger>
+                <TabsTrigger value="movements">Storico Movimenti</TabsTrigger>
+              </TabsList>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="pieces">Pezzi</Label>
-                            <Input
-                              id="pieces"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={movementPieces}
-                              onChange={(e) => handleMovementPiecesChange(e.target.value)}
-                              placeholder="Pezzi"
-                            />
-                            {item.coefficient !== 1 && <span className="text-xs text-muted-foreground">Coeff: {item.coefficient}</span>}
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="qty">Quantità ({item.unit})</Label>
-                            <Input
-                              id="qty"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={movementQty}
-                              onChange={(e) => handleMovementQtyChange(e.target.value)}
-                              placeholder="Quantità"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="ref">Riferimento (Bolla / Ordine)</Label>
-                          <Input
-                            id="ref"
-                            placeholder="Es. BOL-2024-001"
-                            value={movementRef}
-                            onChange={(e) => setMovementRef(e.target.value)}
-                          />
-                        </div>
-
-                        {/* Show Job selection ONLY for Unload or if desired for Load too, but typically Unload */}
-                        <div className="space-y-2">
-                          <Label htmlFor="job">Commessa (Opzionale)</Label>
-                          <Select value={movementJob} onValueChange={setMovementJob}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleziona Commessa..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Nessuna Commessa</SelectItem>
-                              {activeJobs.map((job) => (
-                                <SelectItem key={job.id} value={job.id}>
-                                  {job.code} - {job.description}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="notes">Note</Label>
-                          <Textarea
-                            id="notes"
-                            placeholder="Note aggiuntive..."
-                            value={movementNotes}
-                            onChange={(e) => setMovementNotes(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsMovementOpen(false)}>Annulla</Button>
-                        <Button onClick={handleMovementSubmit} disabled={submittingMovement}>
-                          {submittingMovement ? "Salvataggio..." : "Registra"}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+              <TabsContent value="lots" className="mt-4">
+                {lotsData ? (
+                  <ItemLots
+                    itemId={id}
+                    itemUnit={item.unit}
+                    lots={lotsData.lots}
+                    untrackedQuantity={lotsData.untrackedQuantity}
+                    untrackedPieces={lotsData.untrackedPieces}
+                    onReassignComplete={() => {
+                      loadData();
+                      loadLots();
+                    }}
+                  />
+                ) : (
+                  <Card>
+                    <CardContent className="py-8 text-center text-slate-400 dark:text-slate-500">
+                      Caricamento lotti...
+                    </CardContent>
+                  </Card>
                 )}
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Riferimento</TableHead>
-                      <TableHead>Commessa</TableHead>
-                      <TableHead>Pezzi</TableHead>
-                      <TableHead className="text-right">Quantità</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {movements.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-slate-400 py-6">
-                          Nessun movimento registrato
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      movements.map((move) => {
-                        const isPositive = move.quantity > 0;
-                        let typeLabel: string = move.type;
-                        let typeColor: string = "bg-slate-500";
+              </TabsContent>
 
-                        switch (move.type) {
-                          case 'purchase':
-                            typeLabel = "Acquisto";
-                            typeColor = "bg-blue-600";
-                            if (move.jobId) {
-                              typeLabel = "Acquisto (Cantiere)";
-                              typeColor = "bg-purple-600";
-                            }
-                            break;
-                          case 'entry':
-                            typeLabel = "Entrata";
-                            typeColor = "bg-green-600";
-                            break;
-                          case 'load':
-                            typeLabel = "Carico";
-                            typeColor = "bg-green-600";
-                            break;
-                          case 'exit':
-                            typeLabel = "Uscita";
-                            typeColor = "bg-red-600";
-                            break;
-                          case 'unload':
-                            typeLabel = "Scarico";
-                            typeColor = "bg-red-600";
-                            break;
-                          case 'sale':
-                            typeLabel = "Vendita";
-                            typeColor = "bg-red-600";
-                            break;
-                          default:
-                            typeLabel = move.type;
-                            typeColor = "bg-slate-500";
-                            break;
-                        }
-
-                        if (move.isFictitious) {
-                          typeColor = "bg-orange-500";
-                        }
-
-                        return (
-                          <TableRow key={move.id} className={move.isFictitious ? "bg-orange-50/50" : ""}>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-medium">
-                                  {new Date(move.date).toLocaleDateString('it-IT')}
-                                </span>
-                                <span className="text-xs text-slate-400">
-                                  {new Date(move.date).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Badge className={`${typeColor} hover:${typeColor}`}>
-                                  {typeLabel}
-                                </Badge>
-                                {move.isFictitious && (
-                                  <Badge variant="outline" className="border-orange-500 text-orange-600 bg-orange-50 text-[10px] h-5 px-1">
-                                    Fittizio
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-mono text-sm">{move.reference}</div>
-                              {move.notes && <div className="text-xs text-slate-500 max-w-[200px] truncate" title={move.notes}>{move.notes}</div>}
-                            </TableCell>
-                            <TableCell>
-                              {move.jobCode ? (
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-sm text-blue-600">{move.jobCode}</span>
-                                  <span className="text-[10px] text-slate-500 truncate max-w-[150px]" title={move.jobDescription}>
-                                    {move.jobDescription}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-slate-300 text-xs">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {move.pieces ? (
-                                <span className="font-mono">{move.pieces}</span>
-                              ) : (
-                                <span className="text-slate-300">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <span className={`font-bold font-mono ${isPositive ? "text-green-600" : "text-red-600"}`}>
-                                {isPositive ? "+" : ""}{move.quantity.toFixed(2)}
-                              </span>
+              <TabsContent value="movements" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Storico Movimenti</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Riferimento</TableHead>
+                          <TableHead>Commessa</TableHead>
+                          <TableHead>Pezzi</TableHead>
+                          <TableHead className="text-right">Quantità</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {movements.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-slate-400 py-6">
+                              Nessun movimento registrato
                             </TableCell>
                           </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                        ) : (
+                          movements.map((move) => {
+                            const isPositive = move.quantity > 0;
+                            let typeLabel: string = move.type;
+                            let typeColor: string = "bg-slate-500";
+
+                            switch (move.type) {
+                              case 'purchase':
+                                typeLabel = "Acquisto";
+                                typeColor = "bg-blue-600";
+                                if (move.jobId) {
+                                  typeLabel = "Acquisto (Cantiere)";
+                                  typeColor = "bg-purple-600";
+                                }
+                                break;
+                              case 'entry':
+                                typeLabel = "Entrata";
+                                typeColor = "bg-green-600";
+                                break;
+                              case 'load':
+                                typeLabel = "Carico";
+                                typeColor = "bg-green-600";
+                                break;
+                              case 'exit':
+                                typeLabel = "Uscita";
+                                typeColor = "bg-red-600";
+                                break;
+                              case 'unload':
+                                typeLabel = "Scarico";
+                                typeColor = "bg-red-600";
+                                break;
+                              case 'sale':
+                                typeLabel = "Vendita";
+                                typeColor = "bg-red-600";
+                                break;
+                              default:
+                                typeLabel = move.type;
+                                typeColor = "bg-slate-500";
+                                break;
+                            }
+
+                            if (move.isFictitious) {
+                              typeColor = "bg-orange-500";
+                            }
+
+                            return (
+                              <TableRow key={move.id} className={move.isFictitious ? "bg-orange-50/50" : ""}>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {new Date(move.date).toLocaleDateString('it-IT')}
+                                    </span>
+                                    <span className="text-xs text-slate-400">
+                                      {new Date(move.date).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <Badge className={`${typeColor} hover:${typeColor}`}>
+                                      {typeLabel}
+                                    </Badge>
+                                    {move.isFictitious && (
+                                      <Badge variant="outline" className="border-orange-500 text-orange-600 bg-orange-50 text-[10px] h-5 px-1">
+                                        Fittizio
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="font-mono text-sm">{move.reference}</div>
+                                  {move.notes && <div className="text-xs text-slate-500 max-w-[200px] truncate" title={move.notes}>{move.notes}</div>}
+                                </TableCell>
+                                <TableCell>
+                                  {move.jobCode ? (
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-sm text-blue-600">{move.jobCode}</span>
+                                      <span className="text-[10px] text-slate-500 truncate max-w-[150px]" title={move.jobDescription}>
+                                        {move.jobDescription}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300 text-xs">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {move.pieces ? (
+                                    <span className="font-mono">{move.pieces}</span>
+                                  ) : (
+                                    <span className="text-slate-300">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className={`font-bold font-mono ${isPositive ? "text-green-600" : "text-red-600"}`}>
+                                    {isPositive ? "+" : ""}{move.quantity.toFixed(2)}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
 
           </div>
         </div>

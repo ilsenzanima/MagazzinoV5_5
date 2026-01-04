@@ -28,6 +28,7 @@ export interface InventoryItem {
     unit: string;
     coefficient: number;
     pieces?: number;
+    realPieces?: number;  // Real physical pieces count from inventory
     supplierCode?: string;
     realQuantity?: number | null;
     model?: string;
@@ -101,7 +102,8 @@ export interface Job {
     clientName?: string;
     clientAddress?: string;
     code: string;
-    description: string;
+    name: string;
+    description?: string;
     status: 'active' | 'completed' | 'suspended';
     startDate: string;
     endDate: string;
@@ -241,6 +243,9 @@ export interface DeliveryNoteItem {
     price?: number;
     purchaseItemId?: string;
     isFictitious?: boolean;
+    purchaseNumber?: string;
+    purchaseDate?: string;
+    purchaseSupplier?: string;
 }
 
 export interface DeliveryNote {

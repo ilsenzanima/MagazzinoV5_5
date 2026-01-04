@@ -46,7 +46,8 @@ export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenC
     return jobs.filter(
       (job) =>
         job.code.toLowerCase().includes(term) ||
-        job.description.toLowerCase().includes(term) ||
+        job.name.toLowerCase().includes(term) ||
+        job.description?.toLowerCase().includes(term) ||
         job.clientName?.toLowerCase().includes(term)
     );
   }, [jobs, deferredSearchTerm, onSearch]);
@@ -64,7 +65,7 @@ export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenC
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
-            placeholder="Cerca per codice, descrizione o cliente..."
+            placeholder="Cerca per codice, nome, descrizione o cliente..."
             className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -77,6 +78,7 @@ export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenC
             <TableHeader>
               <TableRow>
                 <TableHead>Codice</TableHead>
+                <TableHead>Nome</TableHead>
                 <TableHead>Descrizione</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Stato</TableHead>
@@ -86,14 +88,14 @@ export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenC
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-400 dark:text-slate-500">
+                  <TableCell colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-500">
                     <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
                     <p>Caricamento...</p>
                   </TableCell>
                 </TableRow>
               ) : filteredJobs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-400 dark:text-slate-500">
+                  <TableCell colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-500">
                     <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />
                     <p>Nessuna commessa trovata</p>
                   </TableCell>
@@ -102,7 +104,8 @@ export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenC
                 filteredJobs.map((job) => (
                   <TableRow key={job.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => onSelect(job)}>
                     <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{job.code}</TableCell>
-                    <TableCell className="font-medium">{job.description}</TableCell>
+                    <TableCell className="font-medium">{job.name}</TableCell>
+                    <TableCell className="text-sm text-slate-500">{job.description || '-'}</TableCell>
                     <TableCell className="text-sm text-slate-600 dark:text-slate-400">{job.clientName || '-'}</TableCell>
                     <TableCell>
                       <Badge variant={job.status === 'active' ? 'default' : 'secondary'} className="text-[10px]">

@@ -57,7 +57,7 @@ export default function SettingsInventoryPage() {
         try {
             setLoadingSuppliers(true);
             const data = await suppliersApi.getAll();
-            setSuppliers(data);
+            setSuppliers(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
             console.error("Failed to load suppliers", error);
         } finally {
@@ -69,7 +69,7 @@ export default function SettingsInventoryPage() {
         try {
             setLoadingBrands(true);
             const data = await brandsApi.getAll();
-            setBrands(data);
+            setBrands(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
             console.error("Failed to load brands", error);
         } finally {
@@ -81,7 +81,7 @@ export default function SettingsInventoryPage() {
         try {
             setLoadingTypes(true);
             const data = await itemTypesApi.getAll();
-            setTypes(data);
+            setTypes(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
             console.error("Failed to load types", error);
         } finally {
@@ -102,11 +102,20 @@ export default function SettingsInventoryPage() {
     };
 
     const handleAddSupplier = async () => {
-        if (!newSupplierName.trim()) return;
+        const nameToAdd = newSupplierName.trim();
+        if (!nameToAdd) return;
+
+        // Check for duplicates (case insensitive)
+        if (suppliers.some(s => s.name.toLowerCase() === nameToAdd.toLowerCase())) {
+            alert("Esiste già un fornitore con questo nome.");
+            return;
+        }
+
         try {
             setAddingSupplier(true);
-            const newSupplier = await suppliersApi.create({ name: newSupplierName });
-            setSuppliers([...suppliers, newSupplier]);
+            const newSupplier = await suppliersApi.create({ name: nameToAdd });
+            // Add and re-sort
+            setSuppliers([...suppliers, newSupplier].sort((a, b) => a.name.localeCompare(b.name)));
             setNewSupplierName("");
         } catch (error) {
             console.error("Failed to add supplier", error);
@@ -116,11 +125,20 @@ export default function SettingsInventoryPage() {
     };
 
     const handleAddBrand = async () => {
-        if (!newBrandName.trim()) return;
+        const nameToAdd = newBrandName.trim();
+        if (!nameToAdd) return;
+
+        // Check for duplicates (case insensitive)
+        if (brands.some(b => b.name.toLowerCase() === nameToAdd.toLowerCase())) {
+            alert("Esiste già una marca con questo nome.");
+            return;
+        }
+
         try {
             setAddingBrand(true);
-            const newBrand = await brandsApi.create(newBrandName);
-            setBrands([...brands, newBrand]);
+            const newBrand = await brandsApi.create(nameToAdd);
+            // Add and re-sort
+            setBrands([...brands, newBrand].sort((a, b) => a.name.localeCompare(b.name)));
             setNewBrandName("");
         } catch (error) {
             console.error("Failed to add brand", error);
@@ -130,11 +148,20 @@ export default function SettingsInventoryPage() {
     };
 
     const handleAddType = async () => {
-        if (!newTypeName.trim()) return;
+        const nameToAdd = newTypeName.trim();
+        if (!nameToAdd) return;
+
+        // Check for duplicates (case insensitive)
+        if (types.some(t => t.name.toLowerCase() === nameToAdd.toLowerCase())) {
+            alert("Esiste già una tipologia con questo nome.");
+            return;
+        }
+
         try {
             setAddingType(true);
-            const newType = await itemTypesApi.create(newTypeName);
-            setTypes([...types, newType]);
+            const newType = await itemTypesApi.create(nameToAdd);
+            // Add and re-sort
+            setTypes([...types, newType].sort((a, b) => a.name.localeCompare(b.name)));
             setNewTypeName("");
         } catch (error) {
             console.error("Failed to add type", error);
