@@ -22,6 +22,7 @@ export default async function MovementsPage() {
     .from('delivery_notes')
     .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'estimated' })
     .order('date', { ascending: false })
+    .order('number_int', { ascending: false })
     .range(0, 11);
 
   const initialMovements = dbMovements ? dbMovements.map((d: any) => ({
