@@ -135,8 +135,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Error fetching user role:", error);
-        // Fallback to user on error to allow app usage
-        if (isMountedRef.current && !realRole) setRealRole('user');
+        // On timeout/error: Keep existing role from cache, only fallback to 'user' if no cached role exists
+        if (isMountedRef.current) {
+          // Check if we have a cached role to use
+          const cachedRole = typeof window !== 'undefined'
+            ? localStorage.getItem(STORAGE_KEY_ROLE) as 'admin' | 'user' | 'operativo' | null
+            : null;
+
+          if (cachedRole) {
+            // Use cached role instead of degrading to 'user'
+            console.log("Using cached role on error:", cachedRole);
+            setRealRole(cachedRole);
+          } else if (!realRole) {
+            // Only fallback to 'user' if no cached role AND no current role
+            setRealRole('user');
+          }
+          // Don't update timestamps on error - let it retry next time
+        }
       } finally {
         fetchPromiseRef.current = null;
       }

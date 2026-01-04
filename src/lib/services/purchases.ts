@@ -37,7 +37,7 @@ export const purchasesApi = {
             supabase
                 .from('purchases')
                 .select('*, suppliers(name), purchase_items(price, quantity)')
-                .order('created_at', { ascending: false })
+                .order('delivery_note_date', { ascending: false })
         );
         if (error) throw error;
         return data.map(mapDbToPurchase);
@@ -77,7 +77,7 @@ export const purchasesApi = {
         }
 
         query = query
-            .order('created_at', { ascending: false })
+            .order('delivery_note_date', { ascending: false })
             .range(from, to);
 
         const { data, error, count } = await fetchWithTimeout(query);

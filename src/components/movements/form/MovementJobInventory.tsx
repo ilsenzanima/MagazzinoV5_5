@@ -66,6 +66,7 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
                                     <TableRow>
                                         <TableHead className="text-xs">Articolo</TableHead>
                                         <TableHead className="text-xs">Rif. Acq.</TableHead>
+                                        <TableHead className="text-xs text-right">Pezzi</TableHead>
                                         <TableHead className="text-xs text-right">Q.tà</TableHead>
                                         <TableHead></TableHead>
                                     </TableRow>
@@ -79,6 +80,9 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
                                             </TableCell>
                                             <TableCell className="py-2 text-xs text-slate-500 dark:text-slate-400">
                                                 {batch.purchaseRef || "-"}
+                                            </TableCell>
+                                            <TableCell className="py-2 text-xs text-right">
+                                                {batch.pieces ?? '-'}
                                             </TableCell>
                                             <TableCell className="py-2 text-xs text-right font-bold">
                                                 {batch.quantity} {batch.itemUnit}
