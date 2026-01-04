@@ -214,10 +214,11 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
         {/* Tabs */}
         <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-100 dark:bg-muted">
+          <TabsList className="grid w-full grid-cols-4 bg-slate-100 dark:bg-muted">
             <TabsTrigger value="all">Tutti</TabsTrigger>
             <TabsTrigger value="low_stock" className="data-[state=active]:text-amber-600">Basse Scorte</TabsTrigger>
             <TabsTrigger value="out_of_stock" className="data-[state=active]:text-red-600">Esauriti</TabsTrigger>
+            <TabsTrigger value="untracked_lots" className="data-[state=active]:text-orange-600">Lotti Mancanti</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
