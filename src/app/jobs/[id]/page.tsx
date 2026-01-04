@@ -56,7 +56,7 @@ export default function JobDetailsPage() {
         doc.setFont("helvetica", "bold");
         doc.text("Descrizione:", 16, 38);
         doc.setFont("helvetica", "normal");
-        doc.text(job.description, 16, 44, { maxWidth: 178 });
+        doc.text(job.description || "", 16, 44, { maxWidth: 178 });
 
         doc.setFont("helvetica", "bold");
         doc.text("Cliente:", 16, 52);
@@ -236,7 +236,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="stock" className="space-y-6 focus-visible:outline-none">
-                            <JobStock movements={movements} />
+                            <JobStock movements={movements} jobId={job.id} />
                         </TabsContent>
 
                         <TabsContent value="journal" className="space-y-6 focus-visible:outline-none">

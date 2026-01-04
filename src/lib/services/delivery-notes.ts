@@ -32,7 +32,10 @@ export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
         inventoryBrand: i.inventory?.brand,
         inventoryCategory: i.inventory?.category,
         inventoryDescription: i.inventory?.description,
-        price: i.price || i.purchase_items?.price || i.inventory?.price || 0
+        price: i.price || i.purchase_items?.price || i.inventory?.price || 0,
+        purchaseNumber: i.purchase_items?.purchases?.delivery_note_number,
+        purchaseDate: i.purchase_items?.purchases?.delivery_note_date,
+        purchaseSupplier: i.purchase_items?.purchases?.suppliers?.name
     }))
 });
 
@@ -60,6 +63,7 @@ export const deliveryNotesApi = {
                     .from('delivery_notes')
                     .select('*, jobs(code, description, site_address), delivery_note_items(quantity)')
                     .order('date', { ascending: false })
+                    .order('number_int', { ascending: false })
             );
 
             if (error) {
@@ -107,6 +111,7 @@ export const deliveryNotesApi = {
 
         query = query
             .order('date', { ascending: false })
+            .order('number_int', { ascending: false })
             .range(from, to);
 
         const { data, error, count } = await fetchWithTimeout(query);
@@ -132,7 +137,10 @@ export const deliveryNotesApi = {
         delivery_note_items(
           *,
           inventory(name, code, unit, brand, category, description, price, model),
-          purchase_items(price)
+          purchase_items(
+            price,
+            purchases(id, delivery_note_number, delivery_note_date, suppliers(name))
+          )
         )
       `)
             .eq('id', id)

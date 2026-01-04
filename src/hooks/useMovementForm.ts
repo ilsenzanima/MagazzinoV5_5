@@ -122,14 +122,17 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
             setCausal("Rientro da cantiere");
             setPickupLocation(jobAddress || "DESTINAZIONE");
             setDeliveryLocation(warehouseAddress);
+            setTransportTime("17:00"); // Default per entrate
         } else if (activeTab === 'exit') {
             setCausal("Uscita merce per cantiere");
             setPickupLocation(warehouseAddress);
             setDeliveryLocation(jobAddress || "DESTINAZIONE");
+            setTransportTime("08:00"); // Default per uscite
         } else if (activeTab === 'sale') {
             setCausal("Vendita");
             setPickupLocation(warehouseAddress);
             setDeliveryLocation("Cliente");
+            setTransportTime("08:00"); // Default per vendite
         }
 
         if (selectedJob) {
@@ -202,7 +205,7 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
             isFictitious: false
         });
 
-        if (activeTab === 'exit') {
+        if (activeTab === 'exit' || activeTab === 'sale') {
             inventoryApi.getAvailableBatches(item.id).then(batches => {
                 const validBatches = batches.filter((b: any) => {
                     if (b.remainingPieces !== undefined && b.remainingPieces !== null) return b.remainingPieces > 0.001;

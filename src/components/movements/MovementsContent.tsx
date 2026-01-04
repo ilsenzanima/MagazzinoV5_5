@@ -46,6 +46,27 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, deferredSearch]);
 
+  // Helper to extract numeric part from delivery note number (e.g., "4/PP26" -> 4)
+  const extractBollaNumber = (number: string): number => {
+    const match = number?.match(/^(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
+  // Sort movements by date (desc) then by bolla number (desc)
+  const sortMovements = (data: DeliveryNote[]): DeliveryNote[] => {
+    return [...data].sort((a, b) => {
+      // First compare by date (descending)
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      if (dateA !== dateB) return dateB - dateA;
+
+      // If same date, compare by bolla number (descending)
+      const numA = extractBollaNumber(a.number);
+      const numB = extractBollaNumber(b.number);
+      return numB - numA;
+    });
+  };
+
   const loadMovements = async () => {
     try {
       setLoading(true);
@@ -57,7 +78,8 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
         search: deferredSearch
       });
 
-      setMovements(data);
+      // Sort client-side for proper numeric ordering
+      setMovements(sortMovements(data));
       setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
     } catch (error: any) {
       console.error("Failed to load movements", error);

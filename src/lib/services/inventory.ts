@@ -19,6 +19,7 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     unit: dbItem.unit,
     coefficient: dbItem.coefficient ? Number(dbItem.coefficient) : 1,
     pieces: dbItem.pieces,
+    realPieces: dbItem.pieces,  // Real physical pieces count
     supplierCode: dbItem.supplier_code,
     realQuantity: dbItem.real_quantity,
     model: dbItem.model
@@ -97,50 +98,38 @@ export const inventoryApi = {
         return data.map(mapDbItemToInventoryItem);
     },
 
+    // Modificato per usare RPC avanzata se c'è ricerca o filtri complessi
     getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string }) => {
-        // Special handling for 'low_stock' using RPC to avoid client-side filtering of large datasets
-        if (options.tab === 'low_stock') {
-            let rpcQuery = supabase.rpc('get_low_stock_inventory', {}, { count: 'estimated' });
+        const from = (options.page - 1) * options.limit;
 
-            if (options.search) {
-                const term = options.search;
-                rpcQuery = rpcQuery.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,category.ilike.%${term}%,supplier_code.ilike.%${term}%`);
+        // Se c'è una ricerca o tab specifici, usiamo la RPC get_inventory_search
+        // Nota: La RPC deve essere stata creata nel DB
+        if (options.search || options.tab) {
+            const { data, error } = await supabase.rpc('get_inventory_search', {
+                p_search: options.search || '',
+                p_status: options.tab || 'all',
+                p_limit: options.limit,
+                p_offset: from
+            });
+
+            if (error) {
+                console.error("RPC Error:", error);
+                throw error;
             }
 
-            // Pagination
-            const from = (options.page - 1) * options.limit;
-            const to = from + options.limit - 1;
-            rpcQuery = rpcQuery.range(from, to);
-
-            const { data, error, count } = await fetchWithTimeout(rpcQuery);
-            if (error) throw error;
+            // Estraiamo il total_count dal primo elemento (se esiste)
+            const total = data && data.length > 0 ? Number(data[0].total_count) : 0;
 
             return {
                 items: (data || []).map(mapDbItemToInventoryItem),
-                total: count || 0
+                total: total
             };
         }
 
+        // Fallback alla query standard per "Tutti" senza ricerca (più veloce se non serve join)
         let query = supabase.from('inventory').select('*', { count: 'estimated' });
-
-        // Filter by search term
-        if (options.search) {
-            const term = options.search;
-            query = query.or(`name.ilike.%${term}%,code.ilike.%${term}%,brand.ilike.%${term}%,category.ilike.%${term}%,supplier_code.ilike.%${term}%`);
-        }
-
-        // Filter by tab
-        if (options.tab === 'out_of_stock') {
-            query = query.eq('quantity', 0);
-        }
-
-        // Sort by name for paginated view (usually preferred over created_at)
         query = query.order('name');
-
-        // Pagination
-        const from = (options.page - 1) * options.limit;
-        const to = from + options.limit - 1;
-        query = query.range(from, to);
+        query = query.range(from, from + options.limit - 1);
 
         const { data, error, count } = await fetchWithTimeout(query);
         if (error) throw error;
@@ -149,6 +138,19 @@ export const inventoryApi = {
             items: data.map(mapDbItemToInventoryItem),
             total: count || 0
         };
+    },
+
+    // Check Duplicate
+    checkDuplicate: async (item: { name: string; brand: string; type: string; model: string }) => {
+        const { data, error } = await supabase.rpc('check_inventory_duplicate', {
+            p_name: item.name,
+            p_brand: item.brand,
+            p_type: item.type,
+            p_model: item.model
+        });
+
+        if (error) throw error;
+        return data as boolean;
     },
 
     // Get single item
@@ -283,6 +285,52 @@ export const inventoryApi = {
         }));
     },
 
+    // Get all lots for an item (for Lots tab in item detail)
+    getLotsForItem: async (itemId: string) => {
+        // Get all lots from purchase_batch_availability
+        const { data: lots, error: lotsError } = await supabase
+            .from('purchase_batch_availability')
+            .select('*')
+            .eq('item_id', itemId)
+            .order('purchase_date', { ascending: false }); // Most recent first
+
+        if (lotsError) throw lotsError;
+
+        // Get total inventory quantity
+        const { data: item, error: itemError } = await supabase
+            .from('inventory')
+            .select('quantity, pieces')
+            .eq('id', itemId)
+            .single();
+
+        if (itemError) throw itemError;
+
+        // Calculate tracked quantity (sum of all lots)
+        const trackedQuantity = lots.reduce((sum, lot) => sum + (lot.remaining_quantity || 0), 0);
+        const trackedPieces = lots.reduce((sum, lot) => sum + (lot.remaining_pieces || 0), 0);
+
+        // Calculate untracked (difference between total and tracked)
+        const untrackedQuantity = Math.max(0, (item.quantity || 0) - trackedQuantity);
+        const untrackedPieces = Math.max(0, (item.pieces || 0) - trackedPieces);
+
+        return {
+            lots: lots.map((b: any) => ({
+                id: b.purchase_item_id,
+                purchaseRef: b.purchase_ref,
+                date: b.purchase_date,
+                originalQty: b.original_quantity,
+                remainingQty: b.remaining_quantity,
+                originalPieces: b.original_pieces,
+                remainingPieces: b.remaining_pieces,
+                price: b.unit_price
+            })),
+            untrackedQuantity,
+            untrackedPieces,
+            totalQuantity: item.quantity,
+            totalPieces: item.pieces
+        };
+    },
+
     // Get items currently at a specific job site (for Returns)
     getJobInventory: async (jobId: string) => {
         const { data, error } = await supabase
@@ -320,7 +368,34 @@ export const inventoryApi = {
             itemCategory: b.item_category,
             quantity: b.quantity,
             pieces: b.pieces,
-            coefficient: b.coefficient
+            coefficient: b.coefficient,
+            originalQuantity: b.original_quantity,
+            originalPieces: b.original_pieces
+        }));
+    },
+
+    // Get job inventory detailed by batch with delivery notes aggregation
+    getJobBatchDetailed: async (jobId: string) => {
+        const { data, error } = await supabase
+            .from('job_batch_detailed')
+            .select('*')
+            .eq('job_id', jobId)
+            .order('item_name', { ascending: true });
+
+        if (error) throw error;
+        return data.map((b: any) => ({
+            itemId: b.item_id,
+            itemCode: b.item_code,
+            itemName: b.item_name,
+            itemUnit: b.item_unit,
+            purchaseItemId: b.purchase_item_id,
+            purchaseRef: b.purchase_ref,
+            purchaseDate: b.purchase_date,
+            supplierName: b.supplier_name,
+            exitDeliveryNotes: b.exit_delivery_notes,
+            entryDeliveryNotes: b.entry_delivery_notes,
+            currentQuantity: b.current_quantity,
+            currentPieces: b.current_pieces
         }));
     },
 

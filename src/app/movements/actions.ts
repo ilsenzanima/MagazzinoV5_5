@@ -80,7 +80,7 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
     }
     console.log('Insert data:', JSON.stringify(insertData, null, 2))
 
-      const { data: result, error: noteError } = await supabase
+    const { data: result, error: noteError } = await supabase
       .from('delivery_notes')
       .insert(insertData)
       .select()
@@ -105,7 +105,7 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
       const itemsToInsert = lines.map(item => {
         const quantity = Number(item.quantity);
         if (isNaN(quantity)) throw new Error(`Quantità non valida per articolo ${item.inventoryId}`);
-        
+
         return {
           delivery_note_id: noteData.id,
           inventory_id: item.inventoryId,
@@ -133,7 +133,7 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
       // If items fail, we might want to rollback the note? 
       // Ideally we should delete the note we just created to avoid orphans
       await supabase.from('delivery_notes').delete().eq('id', noteData.id);
-      
+
       if (e instanceof Error) throw e;
       throw new Error('Errore sconosciuto durante inserimento articoli: ' + JSON.stringify(e));
     }
@@ -141,11 +141,15 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
 
   console.log('=== createMovement SUCCESS ===')
 
+  // Revalidate cache (safe, wrapped)
   try {
     revalidatePath('/movements')
   } catch (e) {
     console.warn('Revalidate failed, but save successful:', e)
   }
+
+  // Redirect MUST be called outside of try/catch because it throws NEXT_REDIRECT
+  // which is expected behavior and should propagate to the client
   redirect('/movements')
 }
 
@@ -209,7 +213,11 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
     }
   }
 
-  revalidatePath('/movements')
-  revalidatePath(`/movements/${id}`)
+  try {
+    revalidatePath('/movements')
+    revalidatePath(`/movements/${id}`)
+  } catch (e) {
+    console.warn('Revalidate failed:', e)
+  }
   redirect('/movements')
 }
