@@ -63,6 +63,7 @@ export const deliveryNotesApi = {
                     .from('delivery_notes')
                     .select('*, jobs(code, description, site_address), delivery_note_items(quantity)')
                     .order('date', { ascending: false })
+                    .order('number', { ascending: false })
             );
 
             if (error) {
@@ -110,6 +111,7 @@ export const deliveryNotesApi = {
 
         query = query
             .order('date', { ascending: false })
+            .order('number', { ascending: false })
             .range(from, to);
 
         const { data, error, count } = await fetchWithTimeout(query);
