@@ -66,34 +66,51 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
                                     <TableRow>
                                         <TableHead className="text-xs">Articolo</TableHead>
                                         <TableHead className="text-xs">Rif. Acq.</TableHead>
-                                        <TableHead className="text-xs text-right">Pezzi</TableHead>
-                                        <TableHead className="text-xs text-right">Q.tà</TableHead>
+                                        <TableHead className="text-xs text-right">In Cantiere</TableHead>
+                                        <TableHead className="text-xs text-right">Cap. Max</TableHead>
+                                        <TableHead className="text-xs text-right">Spazio</TableHead>
                                         <TableHead></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredBatches.map((batch, idx) => (
-                                        <TableRow key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                                            <TableCell className="py-2">
-                                                <div className="text-sm font-medium">{batch.itemName}</div>
-                                                <div className="text-[10px] text-slate-500 dark:text-slate-400">{batch.itemCode}</div>
-                                            </TableCell>
-                                            <TableCell className="py-2 text-xs text-slate-500 dark:text-slate-400">
-                                                {batch.purchaseRef || "-"}
-                                            </TableCell>
-                                            <TableCell className="py-2 text-xs text-right">
-                                                {batch.pieces ?? '-'}
-                                            </TableCell>
-                                            <TableCell className="py-2 text-xs text-right font-bold">
-                                                {batch.quantity} {batch.itemUnit}
-                                            </TableCell>
-                                            <TableCell className="py-2">
-                                                <Button size="sm" variant="secondary" className="h-6 text-xs" onClick={() => handleSelect(batch)}>
-                                                    Seleziona
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {filteredBatches.map((batch, idx) => {
+                                        const currentInWarehouse = (batch.originalQuantity || 0) - (batch.quantity || 0);
+                                        const availableSpace = batch.originalQuantity ? Math.max(0, batch.originalQuantity - currentInWarehouse) : 0;
+
+                                        return (
+                                            <TableRow key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                                                <TableCell className="py-2">
+                                                    <div className="text-sm font-medium">{batch.itemName}</div>
+                                                    <div className="text-[10px] text-slate-500 dark:text-slate-400">{batch.itemCode}</div>
+                                                </TableCell>
+                                                <TableCell className="py-2 text-xs text-slate-500 dark:text-slate-400">
+                                                    {batch.purchaseRef || "-"}
+                                                </TableCell>
+                                                <TableCell className="py-2 text-xs text-right">
+                                                    <div className="font-bold">{batch.quantity} {batch.itemUnit}</div>
+                                                    {batch.pieces !== null && batch.pieces !== undefined && (
+                                                        <div className="text-[10px] text-slate-400">{batch.pieces} pz</div>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="py-2 text-xs text-right text-blue-600 dark:text-blue-400">
+                                                    <div className="font-medium">{batch.originalQuantity || '-'} {batch.itemUnit}</div>
+                                                    {batch.originalPieces !== null && batch.originalPieces !== undefined && (
+                                                        <div className="text-[10px] text-blue-400">{batch.originalPieces} pz</div>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="py-2 text-xs text-right">
+                                                    <div className={`font-medium ${availableSpace > 0 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                                        {availableSpace > 0 ? `↓ ${availableSpace.toFixed(2)}` : 'Pieno'}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="py-2">
+                                                    <Button size="sm" variant="secondary" className="h-6 text-xs" onClick={() => handleSelect(batch)}>
+                                                        Seleziona
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                             {filteredBatches.length === 0 && (
