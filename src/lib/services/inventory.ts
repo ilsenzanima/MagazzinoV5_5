@@ -284,6 +284,52 @@ export const inventoryApi = {
         }));
     },
 
+    // Get all lots for an item (for Lots tab in item detail)
+    getLotsForItem: async (itemId: string) => {
+        // Get all lots from purchase_batch_availability
+        const { data: lots, error: lotsError } = await supabase
+            .from('purchase_batch_availability')
+            .select('*')
+            .eq('item_id', itemId)
+            .order('purchase_date', { ascending: false }); // Most recent first
+
+        if (lotsError) throw lotsError;
+
+        // Get total inventory quantity
+        const { data: item, error: itemError } = await supabase
+            .from('inventory')
+            .select('quantity, pieces')
+            .eq('id', itemId)
+            .single();
+
+        if (itemError) throw itemError;
+
+        // Calculate tracked quantity (sum of all lots)
+        const trackedQuantity = lots.reduce((sum, lot) => sum + (lot.remaining_quantity || 0), 0);
+        const trackedPieces = lots.reduce((sum, lot) => sum + (lot.remaining_pieces || 0), 0);
+
+        // Calculate untracked (difference between total and tracked)
+        const untrackedQuantity = Math.max(0, (item.quantity || 0) - trackedQuantity);
+        const untrackedPieces = Math.max(0, (item.pieces || 0) - trackedPieces);
+
+        return {
+            lots: lots.map((b: any) => ({
+                id: b.purchase_item_id,
+                purchaseRef: b.purchase_ref,
+                date: b.purchase_date,
+                originalQty: b.original_quantity,
+                remainingQty: b.remaining_quantity,
+                originalPieces: b.original_pieces,
+                remainingPieces: b.remaining_pieces,
+                price: b.unit_price
+            })),
+            untrackedQuantity,
+            untrackedPieces,
+            totalQuantity: item.quantity,
+            totalPieces: item.pieces
+        };
+    },
+
     // Get items currently at a specific job site (for Returns)
     getJobInventory: async (jobId: string) => {
         const { data, error } = await supabase
@@ -321,7 +367,9 @@ export const inventoryApi = {
             itemCategory: b.item_category,
             quantity: b.quantity,
             pieces: b.pieces,
-            coefficient: b.coefficient
+            coefficient: b.coefficient,
+            originalQuantity: b.original_quantity,
+            originalPieces: b.original_pieces
         }));
     },
 

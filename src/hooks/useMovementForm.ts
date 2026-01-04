@@ -205,7 +205,7 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
             isFictitious: false
         });
 
-        if (activeTab === 'exit') {
+        if (activeTab === 'exit' || activeTab === 'sale') {
             inventoryApi.getAvailableBatches(item.id).then(batches => {
                 const validBatches = batches.filter((b: any) => {
                     if (b.remainingPieces !== undefined && b.remainingPieces !== null) return b.remainingPieces > 0.001;
