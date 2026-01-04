@@ -28,6 +28,7 @@ export interface InventoryItem {
     unit: string;
     coefficient: number;
     pieces?: number;
+    realPieces?: number;  // Real physical pieces count from inventory
     supplierCode?: string;
     realQuantity?: number | null;
     model?: string;
