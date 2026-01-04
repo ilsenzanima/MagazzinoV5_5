@@ -33,12 +33,16 @@ export function MovementLinesInput({
     inventory, onItemSearch, itemsLoading
 }: MovementLinesInputProps) {
 
+    // For entry (reso), disable this input - user must use job inventory selector
+    const isEntryTab = activeTab === 'entry';
+
     return (
-        <Card>
+        <Card className={isEntryTab ? 'opacity-60' : ''}>
             <CardHeader>
                 <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     Inserimento Righe
+                    {isEntryTab && <span className="text-xs text-amber-600 dark:text-amber-400 font-normal">(usa selezione da cantiere sopra)</span>}
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -47,6 +51,7 @@ export function MovementLinesInput({
                         variant="outline"
                         className="flex-1 justify-start text-left"
                         onClick={() => setIsItemSelectorOpen(true)}
+                        disabled={isEntryTab}
                     >
                         {selectedItem ? (
                             <span className="truncate">
@@ -55,7 +60,9 @@ export function MovementLinesInput({
                                 {selectedItem.name}
                             </span>
                         ) : (
-                            <span className="text-slate-400">Seleziona Articolo...</span>
+                            <span className="text-slate-400">
+                                {isEntryTab ? 'Seleziona dal cantiere sopra...' : 'Seleziona Articolo...'}
+                            </span>
                         )}
                     </Button>
                 </div>
