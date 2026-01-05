@@ -93,12 +93,13 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     // Get unique jobs that have attendance records this month
     const jobsInMonth = useMemo(() => {
-        const jobMap = new Map<string, { id: string; code: string; description: string }>();
+        const jobMap = new Map<string, { id: string; code: string; name: string; description: string }>();
         attendanceList.forEach(att => {
             if (att.jobId && att.jobCode) {
                 jobMap.set(att.jobId, {
                     id: att.jobId,
                     code: att.jobCode,
+                    name: att.jobName || att.jobDescription || '',
                     description: att.jobDescription || ''
                 });
             }
