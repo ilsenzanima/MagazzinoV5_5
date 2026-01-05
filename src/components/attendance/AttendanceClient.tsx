@@ -383,7 +383,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                         ) : (
                             jobsInMonth.map(job => (
                                 <SelectItem key={job.id} value={job.id}>
-                                    {job.code} - {job.description}
+                                    {job.code} - {job.name}
                                 </SelectItem>
                             ))
                         )}

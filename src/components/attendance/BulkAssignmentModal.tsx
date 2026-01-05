@@ -258,7 +258,7 @@ export default function BulkAssignmentModal({
                                                     <SelectItem value="none">Nessun cantiere</SelectItem>
                                                     {jobs.map(job => (
                                                         <SelectItem key={job.id} value={job.id}>
-                                                            {job.code} - {job.description}
+                                                            {job.code} - {job.name}
                                                         </SelectItem>
                                                     ))}
                                                     {warehouses.length > 0 && (
