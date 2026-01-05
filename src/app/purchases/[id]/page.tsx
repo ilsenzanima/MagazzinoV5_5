@@ -346,7 +346,7 @@ export default function PurchaseDetailPage() {
                 return;
             }
 
-            if (isNaN(newQty) || newQty <= 0) {
+            if (isNaN(newQty) || newQty < 0) {
                 alert("Quantità non valida");
                 return;
             }
