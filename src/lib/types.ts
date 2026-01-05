@@ -322,6 +322,7 @@ export interface Attendance {
     workerName?: string;
     jobId?: string;
     jobCode?: string; // For display
+    jobName?: string; // For display
     jobDescription?: string; // For display
     warehouseId?: string;
     warehouseName?: string; // For display

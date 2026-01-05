@@ -8,6 +8,7 @@ export const mapDbToAttendance = (db: any): Attendance => ({
     workerName: db.workers?.first_name ? `${db.workers.first_name} ${db.workers.last_name || ''}` : undefined,
     jobId: db.job_id,
     jobCode: db.jobs?.code,
+    jobName: db.jobs?.name,
     jobDescription: db.jobs?.description,
     warehouseId: db.warehouse_id,
     warehouseName: db.warehouses?.name,
@@ -39,7 +40,7 @@ export const attendanceApi = {
 
         const { data, error } = await supabase
             .from('attendance')
-            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name), worker_courses(course_name)')
+            .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name), worker_courses(course_name)')
             .gte('date', startDate)
             .lte('date', endDate)
             .order('date', { ascending: true });
@@ -53,7 +54,7 @@ export const attendanceApi = {
         const { data, error } = await supabase
             .from('attendance')
             .insert(mapAttendanceToDb(record))
-            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name)')
+            .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name)')
             .single();
 
         if (error) throw error;
@@ -77,7 +78,7 @@ export const attendanceApi = {
             .from('attendance')
             .update(mapAttendanceToDb(record))
             .eq('id', id)
-            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name)')
+            .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name)')
             .single();
 
         if (error) throw error;
@@ -94,7 +95,7 @@ export const attendanceApi = {
     getByJobId: async (jobId: string): Promise<Attendance[]> => {
         const { data, error } = await supabase
             .from('attendance')
-            .select('*, workers(first_name, last_name), jobs(code, description), warehouses(name)')
+            .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name)')
             .eq('job_id', jobId)
             .order('date', { ascending: true });
 
