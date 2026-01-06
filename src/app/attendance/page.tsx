@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import AttendanceClient from "@/components/attendance/AttendanceClient";
 import { mapDbToWorker, mapDbToJob } from "@/lib/api";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export const metadata = {
     title: "Presenze / Assenze | Magazzino",
@@ -27,15 +28,18 @@ export default async function AttendancePage() {
     const jobs = (jobsResult.data || []).map(mapDbToJob);
 
     return (
-        <div className="container mx-auto py-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold tracking-tight">Presenze / Assenze</h1>
-            </div>
+        <DashboardLayout>
+            <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Presenze / Assenze</h1>
+                </div>
 
-            <AttendanceClient
-                initialWorkers={workers}
-                initialJobs={jobs}
-            />
-        </div>
+                <AttendanceClient
+                    initialWorkers={workers}
+                    initialJobs={jobs}
+                />
+            </div>
+        </DashboardLayout>
     );
 }
+
