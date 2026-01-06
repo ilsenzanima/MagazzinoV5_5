@@ -211,7 +211,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-background overflow-x-hidden max-w-full">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-background">
       {/* Simulation Banner */}
       {simulatedRole && (
         <div className="fixed top-0 left-0 right-0 h-10 bg-amber-500 text-white z-[60] flex items-center justify-center px-4 font-bold shadow-md">
