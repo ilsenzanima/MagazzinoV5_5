@@ -38,7 +38,7 @@ export default function AttendanceMonthGrid({
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
     return (
-        <div className="border rounded-md overflow-x-auto">
+        <div className="border rounded-md overflow-hidden scroll-shadow-x scroll-smooth-mobile">
             <table className="w-full text-xs md:text-sm border-collapse bg-white dark:bg-card">
                 <thead>
                     <tr>
