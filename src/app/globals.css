@@ -122,8 +122,6 @@
 
   body {
     @apply bg-background text-foreground;
-    overflow-x: hidden;
-    overflow-y: auto;
   }
 }
 
