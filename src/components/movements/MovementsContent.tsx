@@ -110,11 +110,11 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   return (
     <>
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Movimentazione Merce</h1>
           {(userRole === 'admin' || userRole === 'operativo') && (
-            <Link href="/movements/new">
-              <Button className="bg-blue-600 hover:bg-blue-700">
+            <Link href="/movements/new" className="w-full sm:w-auto">
+              <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Nuova Bolla
               </Button>

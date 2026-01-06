@@ -23,7 +23,7 @@ export default function SupplierDetailPage() {
   const [saving, setSaving] = useState(false);
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -101,20 +101,20 @@ export default function SupplierDetailPage() {
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <Link href="/suppliers" className="flex items-center text-slate-500 hover:text-slate-900 mb-2">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Torna ai Fornitori
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Torna ai Fornitori
             </Link>
-            <h1 className="text-2xl font-bold text-slate-900">
-                {isEditing ? "Modifica Fornitore" : supplier.name}
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              {isEditing ? "Modifica Fornitore" : supplier.name}
             </h1>
           </div>
           {!isEditing && (userRole === 'admin' || userRole === 'operativo') && (
-            <Button onClick={() => setIsEditing(true)} variant="outline">
-                <Pencil className="mr-2 h-4 w-4" />
-                Modifica
+            <Button onClick={() => setIsEditing(true)} variant="outline" className="w-full sm:w-auto">
+              <Pencil className="mr-2 h-4 w-4" />
+              Modifica
             </Button>
           )}
         </div>
@@ -127,11 +127,11 @@ export default function SupplierDetailPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="name">Ragione Sociale / Nome *</Label>
-                <Input 
-                  id="name" 
-                  required 
+                <Input
+                  id="name"
+                  required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Inserisci il nome dell'azienda o del fornitore"
                   disabled={!isEditing}
                 />
@@ -139,10 +139,10 @@ export default function SupplierDetailPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="address">Indirizzo Sede</Label>
-                <Textarea 
-                  id="address" 
+                <Textarea
+                  id="address"
                   value={formData.address}
-                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="Via Roma 10, 00100 Roma (RM)"
                   className="min-h-[80px]"
                   disabled={!isEditing}
@@ -152,20 +152,20 @@ export default function SupplierDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="vatNumber">Partita IVA / Codice Fiscale</Label>
-                  <Input 
-                    id="vatNumber" 
+                  <Input
+                    id="vatNumber"
                     value={formData.vatNumber}
-                    onChange={(e) => setFormData({...formData, vatNumber: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, vatNumber: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefono</Label>
-                  <Input 
-                    id="phone" 
+                  <Input
+                    id="phone"
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -173,29 +173,29 @@ export default function SupplierDetailPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
+                <Input
+                  id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   disabled={!isEditing}
                 />
               </div>
 
               {isEditing && (
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
+                  <Button
+                    type="button"
+                    variant="ghost"
                     onClick={() => {
-                        setIsEditing(false);
-                        setFormData({
-                            name: supplier.name,
-                            address: supplier.address || "",
-                            vatNumber: supplier.vatNumber || "",
-                            email: supplier.email || "",
-                            phone: supplier.phone || ""
-                        });
+                      setIsEditing(false);
+                      setFormData({
+                        name: supplier.name,
+                        address: supplier.address || "",
+                        vatNumber: supplier.vatNumber || "",
+                        email: supplier.email || "",
+                        phone: supplier.phone || ""
+                      });
                     }}
                   >
                     <X className="mr-2 h-4 w-4" />

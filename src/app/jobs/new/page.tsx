@@ -265,10 +265,9 @@ export default function NewJobPage() {
                 </div>
               </div>
 
-              {/* Sezione Cantiere */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-slate-700">Indirizzo Cantiere</h3>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <h3 className="font-semibold text-slate-700 dark:text-slate-200">Indirizzo Cantiere</h3>
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="useClientAddress"
