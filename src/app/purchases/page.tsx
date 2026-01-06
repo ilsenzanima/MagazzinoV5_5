@@ -57,19 +57,19 @@ function PurchasesContent() {
   return (
     <>
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">
             {initialSupplierId ? "Acquisti Fornitore" : "Gestione Acquisti"}
           </h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             {initialSupplierId && (
               <Link href="/purchases">
                 <Button variant="outline">Mostra Tutti</Button>
               </Link>
             )}
             {(userRole === 'admin' || userRole === 'operativo') && (
-              <Link href="/purchases/new">
-                <Button className="bg-blue-600 hover:bg-blue-700">
+              <Link href="/purchases/new" className="flex-1 sm:flex-none">
+                <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Nuovo Acquisto
                 </Button>
