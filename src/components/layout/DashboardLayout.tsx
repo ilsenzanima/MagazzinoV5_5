@@ -24,6 +24,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
 import { useEffect, useState } from "react";
+import { MobileNavBar } from "./MobileNavBar";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   onLinkClick?: () => void;
@@ -210,6 +211,7 @@ export default function DashboardLayout({
     return null;
   }
 
+
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-background">
       {/* Simulation Banner */}
@@ -239,32 +241,26 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className={cn(
-        "flex-1 md:pl-64 flex flex-col min-h-screen transition-all",
+        "flex-1 md:pl-64 flex flex-col min-h-screen transition-all pb-24 md:pb-0", // Added pb-24 for mobile nav space
         simulatedRole ? "pt-10" : ""
       )}>
 
-        {/* Mobile Header with Hamburger */}
-        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-white dark:bg-slate-900 dark:border-slate-800 p-4 shadow-sm">
-          <div className="font-bold text-lg text-slate-900 dark:text-white">Magazzino V5.5</div>
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 bg-slate-900 border-r-slate-800 text-white w-64">
-              <SheetHeader className="sr-only">
-                <SheetTitle>Menu di Navigazione</SheetTitle>
-                <SheetDescription>Navigazione principale dell'applicazione</SheetDescription>
-              </SheetHeader>
-              <Sidebar onLinkClick={() => setIsSheetOpen(false)} />
-            </SheetContent>
-          </Sheet>
-        </header>
+        {/* Mobile Sidebar Sheet (Controlled by Bottom Nav Action) */}
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <SheetContent side="left" className="p-0 bg-slate-900 border-r-slate-800 text-white w-64">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Menu di Navigazione</SheetTitle>
+              <SheetDescription>Navigazione principale dell'applicazione</SheetDescription>
+            </SheetHeader>
+            <Sidebar onLinkClick={() => setIsSheetOpen(false)} />
+          </SheetContent>
+        </Sheet>
 
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           {children}
         </main>
+
+        <MobileNavBar onOpenMenu={() => setIsSheetOpen(true)} />
       </div>
     </div>
   );

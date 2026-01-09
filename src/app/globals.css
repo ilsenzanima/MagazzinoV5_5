@@ -205,9 +205,13 @@
 }
 
 /* Smooth scrolling for mobile */
-@media (max-width: 768px) {
-  .scroll-smooth-mobile {
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-  }
+.scroll-smooth-mobile {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+
+/* Safe Area Utilities for Mobile Navigation */
+.pb-safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }
