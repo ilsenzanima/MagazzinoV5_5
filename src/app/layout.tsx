@@ -19,8 +19,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Magazzino V5.5",
   description: "Gestione Magazzino Intelligente",
+  manifest: "/manifest.json",
   icons: {
-    icon: '/favicon.ico',
+    icon: '/icons/icon-192x192.png',
+    apple: '/icons/icon-192x192.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Magazzino',
   },
 };
 
@@ -29,6 +36,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: '#0f172a',
 };
 
 export default function RootLayout({
