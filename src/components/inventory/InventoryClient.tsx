@@ -373,7 +373,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
       {/* Floating Action Button (FAB) */}
       {(userRole === 'admin' || userRole === 'operativo') && (
-        <div className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-20">
+        <div className="hidden md:block fixed bottom-10 right-10 z-20">
           <Link href="/inventory/new">
             <Button className="h-14 w-14 md:h-14 md:w-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 touch-target">
               <Plus className="h-8 w-8" />
