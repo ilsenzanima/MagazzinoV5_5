@@ -28,8 +28,8 @@ export const generateMonthlyReport = (
         // Collect jobs and warehouses separately
         workerAttendance.forEach(a => {
             if (a.jobId && (a.status === 'presence' || a.status === 'transfer')) {
-                // Use DESCRIPTION (name) instead of code
-                const label = a.jobDescription || a.jobCode || 'N/D';
+                // Use job name/description instead of code
+                const label = a.jobName || a.jobDescription || a.jobCode || 'N/D';
                 jobMap.set(a.jobId, label);
             }
             if (a.warehouseId && (a.status === 'presence' || a.status === 'transfer')) {
@@ -107,8 +107,8 @@ export const generateMonthlyReport = (
 
                 let type = '';
                 switch (a.status) {
-                    case 'holiday': type = 'Ferie'; break;
-                    case 'permit': type = 'Permesso'; break;
+                    case 'holiday':
+                    case 'permit': type = 'Ferie/Permessi'; break;
                     case 'sick': type = 'Malattia'; break;
                     case 'injury': type = 'Infortunio'; break;
                     case 'course': type = 'Corso'; break;
