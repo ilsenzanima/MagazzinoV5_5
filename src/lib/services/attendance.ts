@@ -36,7 +36,9 @@ export const attendanceApi = {
     // Modified to return all records (no change strictly needed in query, but mapping usage on frontend changes)
     getByMonth: async (year: number, month: number): Promise<Attendance[]> => {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-        const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
+        // Calculate actual last day of month (months are 0-indexed in JS Date, so month = next month, day 0 = last day of current month)
+        const lastDay = new Date(year, month, 0).getDate();
+        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
         console.log(`📅 Fetching attendance for ${startDate} to ${endDate}`);
 
