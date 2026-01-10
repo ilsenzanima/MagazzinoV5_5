@@ -1,10 +1,16 @@
 "use client"
 
+import { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Package, Users, ClipboardList } from "lucide-react";
+import ArticlesReport from "@/components/reports/articles-report";
+import AttendanceReport from "@/components/reports/attendance-report";
+import InventoryReport from "@/components/reports/inventory-report";
 
 export default function ReportsPage() {
+  const [activeTab, setActiveTab] = useState("articles");
+
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6">
@@ -13,17 +19,34 @@ export default function ReportsPage() {
           <p className="text-slate-500 dark:text-slate-400">Analisi e statistiche del magazzino.</p>
         </div>
 
-        <Card className="border-dashed">
-          <CardHeader className="text-center pb-2">
-            <div className="mx-auto bg-slate-100 dark:bg-slate-800 p-3 rounded-full w-fit mb-4">
-              <BarChart3 className="h-6 w-6 text-slate-500 dark:text-slate-400" />
-            </div>
-            <CardTitle>Modulo in Sviluppo</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center text-slate-500 dark:text-slate-400 pb-8">
-            <p>La sezione reportistica avanzata sarà disponibile a breve.</p>
-          </CardContent>
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[500px]">
+            <TabsTrigger value="articles" className="gap-2">
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Articoli</span>
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Presenze</span>
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="gap-2">
+              <ClipboardList className="h-4 w-4" />
+              <span className="hidden sm:inline">Inventario</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="articles" className="mt-6">
+            <ArticlesReport />
+          </TabsContent>
+
+          <TabsContent value="attendance" className="mt-6">
+            <AttendanceReport />
+          </TabsContent>
+
+          <TabsContent value="inventory" className="mt-6">
+            <InventoryReport />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
