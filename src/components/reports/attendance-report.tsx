@@ -93,7 +93,7 @@ export default function AttendanceReport() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400 dark:text-slate-500" />
             </div>
         );
     }
@@ -155,8 +155,8 @@ export default function AttendanceReport() {
             </Card>
 
             {error && (
-                <Card className="border-red-200 bg-red-50">
-                    <CardContent className="pt-4 text-center text-red-600">
+                <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                    <CardContent className="pt-4 text-center text-red-600 dark:text-red-400">
                         {error}
                     </CardContent>
                 </Card>
@@ -165,32 +165,32 @@ export default function AttendanceReport() {
             {/* Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <Card className="px-4 py-3">
-                    <p className="text-sm text-slate-500">Dipendenti Attivi</p>
-                    <p className="text-2xl font-bold">{workers.length}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Dipendenti Attivi</p>
+                    <p className="text-2xl font-bold dark:text-white">{workers.length}</p>
                 </Card>
                 <Card className="px-4 py-3">
-                    <p className="text-sm text-slate-500">Registrazioni</p>
-                    <p className="text-2xl font-bold">{attendance.length}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Registrazioni</p>
+                    <p className="text-2xl font-bold dark:text-white">{attendance.length}</p>
                 </Card>
-                <Card className="px-4 py-3 bg-emerald-50 border-emerald-200">
-                    <p className="text-sm text-emerald-600">Ore Lavorate</p>
-                    <p className="text-2xl font-bold text-emerald-700">{totalHours}</p>
+                <Card className="px-4 py-3 bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
+                    <p className="text-sm text-emerald-600 dark:text-emerald-400">Ore Lavorate</p>
+                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{totalHours}</p>
                 </Card>
-                <Card className="px-4 py-3 bg-amber-50 border-amber-200">
-                    <p className="text-sm text-amber-600">Ore Assenze</p>
-                    <p className="text-2xl font-bold text-amber-700">{absenceHours}</p>
+                <Card className="px-4 py-3 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+                    <p className="text-sm text-amber-600 dark:text-amber-400">Ore Assenze</p>
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{absenceHours}</p>
                 </Card>
             </div>
 
             {/* Workers Preview */}
             <Card>
                 <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Dipendenti - {monthLabel}</CardTitle>
+                    <CardTitle className="text-lg dark:text-white">Dipendenti - {monthLabel}</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {workers.length === 0 ? (
-                        <div className="text-center py-8 text-slate-500">
-                            <Users className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                            <Users className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
                             <p>Nessun dipendente attivo trovato.</p>
                         </div>
                     ) : (
@@ -202,9 +202,9 @@ export default function AttendanceReport() {
                                     .reduce((sum, a) => sum + a.hours, 0);
 
                                 return (
-                                    <div key={worker.id} className="p-3 border rounded-lg bg-slate-50">
-                                        <p className="font-medium">{worker.lastName} {worker.firstName}</p>
-                                        <p className="text-sm text-slate-500">
+                                    <div key={worker.id} className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-800 dark:border-slate-700">
+                                        <p className="font-medium dark:text-white">{worker.lastName} {worker.firstName}</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">
                                             {workerHours} ore lavorate
                                         </p>
                                     </div>
