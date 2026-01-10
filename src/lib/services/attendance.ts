@@ -38,6 +38,8 @@ export const attendanceApi = {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
 
+        console.log(`📅 Fetching attendance for ${startDate} to ${endDate}`);
+
         const { data, error } = await supabase
             .from('attendance')
             .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name), worker_courses(course_name)')
@@ -45,7 +47,11 @@ export const attendanceApi = {
             .lte('date', endDate)
             .order('date', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Attendance query error:', error);
+            console.error('❌ Error details:', JSON.stringify(error, null, 2));
+            throw error;
+        }
         return (data || []).map(mapDbToAttendance);
     },
 
