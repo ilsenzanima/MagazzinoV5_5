@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FileDown, Loader2, Users } from "lucide-react";
 import { attendanceApi, workersApi, Attendance, Worker } from "@/lib/api";
 import { generateMonthlyReport } from "@/components/attendance/report-generator";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
 const MONTHS = [
@@ -47,13 +47,9 @@ export default function AttendanceReport() {
             setLoading(true);
             setError(null);
 
-            const targetDate = new Date(selectedYear, selectedMonth, 1);
-            const start = format(startOfMonth(targetDate), 'yyyy-MM-dd');
-            const end = format(endOfMonth(targetDate), 'yyyy-MM-dd');
-
             const [workersData, attendanceData] = await Promise.all([
                 workersApi.getAll(),
-                attendanceApi.getByDateRange(start, end)
+                attendanceApi.getByMonth(selectedYear, selectedMonth + 1) // month is 1-indexed in API
             ]);
 
             // Filter only active workers
