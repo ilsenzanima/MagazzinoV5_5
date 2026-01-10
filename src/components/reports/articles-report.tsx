@@ -114,77 +114,79 @@ export default function ArticlesReport() {
                 <CardHeader className="pb-2">
                     <CardTitle className="text-lg dark:text-white">Dettaglio Articoli per Tipologia e Lotto</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="overflow-auto max-h-[600px] relative">
-                        <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-white dark:bg-slate-900">
-                                <TableRow className="border-b dark:border-slate-700">
-                                    <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Codice</TableHead>
-                                    <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Articolo</TableHead>
-                                    <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Marca</TableHead>
-                                    <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Lotto</TableHead>
-                                    <TableHead className="text-right bg-white dark:bg-slate-900 dark:text-slate-300">Prezzo €</TableHead>
-                                    <TableHead className="text-right bg-white dark:bg-slate-900 dark:text-slate-300">Pezzi Fisici</TableHead>
-                                    <TableHead className="text-right bg-white dark:bg-slate-900 dark:text-slate-300">Quantità</TableHead>
-                                    <TableHead className="text-center bg-white dark:bg-slate-900 dark:text-slate-300">U.M.</TableHead>
-                                    <TableHead className="text-right bg-white dark:bg-slate-900 dark:text-slate-300">Valore €</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700">
+                                <tr>
+                                    <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Codice</th>
+                                    <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Articolo</th>
+                                    <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Marca</th>
+                                    <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Lotto</th>
+                                    <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Prezzo €</th>
+                                    <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Pezzi Fisici</th>
+                                    <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Quantità</th>
+                                    <th className="text-center p-3 font-medium text-slate-700 dark:text-slate-300">U.M.</th>
+                                    <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Valore €</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                                 {Object.entries(groupedArticles).map(([type, articles]) => (
                                     <>
                                         {/* Type Header Row */}
-                                        <TableRow key={`type-${type}`} className="bg-slate-100 dark:bg-slate-800">
-                                            <TableCell colSpan={9} className="font-bold text-slate-700 dark:text-slate-200 py-2">
+                                        <tr key={`type-${type}`} className="bg-slate-200 dark:bg-slate-700">
+                                            <td colSpan={9} className="p-2 font-bold text-slate-700 dark:text-slate-200">
                                                 {type}
-                                            </TableCell>
-                                        </TableRow>
+                                            </td>
+                                        </tr>
                                         {/* Articles in this type */}
                                         {articles.map((article, idx) => (
-                                            <TableRow
+                                            <tr
                                                 key={`${article.itemId}-${article.lotRef}-${idx}`}
-                                                className="dark:border-slate-700"
+                                                className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                                             >
-                                                <TableCell className="font-mono text-sm dark:text-slate-300">{article.itemCode}</TableCell>
-                                                <TableCell className="max-w-[200px] truncate dark:text-slate-300">{article.itemName}</TableCell>
-                                                <TableCell className="dark:text-slate-300">{article.itemBrand}</TableCell>
-                                                <TableCell className="text-sm dark:text-slate-300">
+                                                <td className="p-3 font-mono text-sm dark:text-slate-300">{article.itemCode}</td>
+                                                <td className="p-3 max-w-[200px] truncate dark:text-slate-300">{article.itemName}</td>
+                                                <td className="p-3 dark:text-slate-300">{article.itemBrand}</td>
+                                                <td className="p-3 text-sm dark:text-slate-300">
                                                     <span className="font-medium">{article.lotRef}</span>
                                                     {article.lotDate && (
                                                         <span className="text-slate-400 dark:text-slate-500 ml-1">
                                                             ({format(new Date(article.lotDate), 'dd/MM/yy')})
                                                         </span>
                                                     )}
-                                                </TableCell>
-                                                <TableCell className="text-right dark:text-slate-300">
+                                                </td>
+                                                <td className="p-3 text-right dark:text-slate-300">
                                                     {article.price > 0 ? article.price.toFixed(2) : '-'}
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium dark:text-slate-300">{article.pieces}</TableCell>
-                                                <TableCell className="text-right dark:text-slate-300">{article.quantity.toFixed(2)}</TableCell>
-                                                <TableCell className="text-center text-sm dark:text-slate-300">{article.itemUnit}</TableCell>
-                                                <TableCell className="text-right font-medium dark:text-slate-300">
+                                                </td>
+                                                <td className="p-3 text-right font-medium dark:text-slate-300">{article.pieces}</td>
+                                                <td className="p-3 text-right dark:text-slate-300">{article.quantity.toFixed(2)}</td>
+                                                <td className="p-3 text-center text-sm dark:text-slate-300">{article.itemUnit}</td>
+                                                <td className="p-3 text-right font-medium dark:text-slate-300">
                                                     {article.totalValue > 0 ? article.totalValue.toFixed(2) : '-'}
-                                                </TableCell>
-                                            </TableRow>
+                                                </td>
+                                            </tr>
                                         ))}
                                     </>
                                 ))}
-                                {/* Totals Row */}
-                                <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold sticky bottom-0">
-                                    <TableCell colSpan={5} className="dark:text-white">TOTALE</TableCell>
-                                    <TableCell className="text-right dark:text-white">
+                            </tbody>
+                            {/* Totals Footer */}
+                            <tfoot className="sticky bottom-0 bg-slate-100 dark:bg-slate-800 border-t-2 dark:border-slate-600">
+                                <tr className="font-bold">
+                                    <td colSpan={5} className="p-3 dark:text-white">TOTALE</td>
+                                    <td className="p-3 text-right dark:text-white">
                                         {data.articles.reduce((sum, a) => sum + a.pieces, 0)}
-                                    </TableCell>
-                                    <TableCell className="text-right dark:text-white">
+                                    </td>
+                                    <td className="p-3 text-right dark:text-white">
                                         {data.articles.reduce((sum, a) => sum + a.quantity, 0).toFixed(2)}
-                                    </TableCell>
-                                    <TableCell></TableCell>
-                                    <TableCell className="text-right text-emerald-600 dark:text-emerald-400">
-                                        {data.totalValue.toFixed(2)}
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
+                                    </td>
+                                    <td className="p-3"></td>
+                                    <td className="p-3 text-right text-emerald-600 dark:text-emerald-400">
+                                        € {data.totalValue.toFixed(2)}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </CardContent>
             </Card>
