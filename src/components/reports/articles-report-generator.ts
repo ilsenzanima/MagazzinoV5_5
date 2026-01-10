@@ -60,7 +60,7 @@ export const generateArticlesReport = (data: ArticlesReportData) => {
             articleRowMap.set(rowIndex, article);
             body.push([
                 article.itemCode,
-                article.itemName.substring(0, 30),
+                (article.itemName + (article.itemModel ? ` (${article.itemModel})` : '')).substring(0, 35),
                 article.itemBrand,
                 article.lotRef.substring(0, 15),
                 article.lotDate ? format(new Date(article.lotDate), 'dd/MM/yy') : '-',

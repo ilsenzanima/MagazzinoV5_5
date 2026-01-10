@@ -4,6 +4,7 @@ export interface ArticleLot {
     itemId: string;
     itemCode: string;
     itemName: string;
+    itemModel: string; // variant/model
     itemBrand: string;
     itemType: string;
     itemUnit: string;
@@ -40,7 +41,7 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
         // Get all inventory items to get names and other details
         const { data: items, error: itemsError } = await supabase
             .from('inventory')
-            .select('id, code, name, brand, category, unit, coefficient, pieces');
+            .select('id, code, name, model, brand, category, unit, coefficient, pieces');
 
         if (itemsError) {
             console.error('Error fetching inventory:', itemsError);
@@ -69,6 +70,7 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
                 itemId: item.id,
                 itemCode: item.code || '',
                 itemName: item.name || '',
+                itemModel: item.model || '',
                 itemBrand: item.brand || '',
                 itemType: item.category || '',
                 itemUnit: item.unit || '',
@@ -94,6 +96,7 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
                     itemId: item.id,
                     itemCode: item.code || '',
                     itemName: item.name || '',
+                    itemModel: item.model || '',
                     itemBrand: item.brand || '',
                     itemType: item.category || '',
                     itemUnit: item.unit || '',
@@ -128,6 +131,7 @@ export interface InventoryCountItem {
     itemId: string;
     itemCode: string;
     itemName: string;
+    itemModel: string; // variant/model
     itemBrand: string;
     itemType: string;
     itemUnit: string;
@@ -160,7 +164,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
         // Get all inventory items
         const { data: items, error: itemsError } = await supabase
             .from('inventory')
-            .select('id, code, name, brand, category, unit, coefficient, pieces');
+            .select('id, code, name, model, brand, category, unit, coefficient, pieces');
 
         if (itemsError) {
             console.error('Error fetching inventory:', itemsError);
@@ -187,6 +191,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
                 itemId: item.id,
                 itemCode: item.code || '',
                 itemName: item.name || '',
+                itemModel: item.model || '',
                 itemBrand: item.brand || '',
                 itemType: item.category || '',
                 itemUnit: item.unit || '',
@@ -208,6 +213,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
                     itemId: item.id,
                     itemCode: item.code || '',
                     itemName: item.name || '',
+                    itemModel: item.model || '',
                     itemBrand: item.brand || '',
                     itemType: item.category || '',
                     itemUnit: item.unit || '',
