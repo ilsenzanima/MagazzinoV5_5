@@ -365,14 +365,14 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             {canEdit && <AttendanceToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />}
 
             {/* Job Filter */}
-            <div className="flex items-center gap-3 bg-white dark:bg-card p-3 rounded-lg shadow-sm border dark:border-border">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white dark:bg-card p-3 rounded-lg shadow-sm border dark:border-border">
                 <Filter className="h-4 w-4 text-slate-500" />
                 <span className="text-sm text-slate-600 dark:text-slate-400">Filtra per cantiere:</span>
                 <Select
                     value={filterJobId || "all"}
                     onValueChange={(val) => setFilterJobId(val === "all" ? null : val)}
                 >
-                    <SelectTrigger className="w-[300px]">
+                    <SelectTrigger className="w-full md:w-[300px]">
                         <SelectValue placeholder="Tutti i cantieri" />
                     </SelectTrigger>
                     <SelectContent>

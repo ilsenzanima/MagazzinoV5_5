@@ -198,34 +198,34 @@ export default function JobDetailsPage() {
                 {/* Printable Area */}
                 <div ref={printRef}>
                     <Tabs defaultValue="overview" className="space-y-6">
-                        <TabsList className="print:hidden w-full justify-start border-b rounded-none p-0 h-auto bg-transparent">
+                        <TabsList className="print:hidden w-full justify-start border-b rounded-none p-0 h-auto bg-transparent overflow-x-auto flex-nowrap scrollbar-hide">
                             <TabsTrigger
                                 value="overview"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-6 py-3"
+                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
                             >
-                                Dettagli & Costi
+                                Dettagli
                             </TabsTrigger>
                             <TabsTrigger
                                 value="stock"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-6 py-3"
+                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
                             >
-                                Materiali & Giacenza
+                                Materiali
                             </TabsTrigger>
                             <TabsTrigger
                                 value="journal"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-6 py-3"
+                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
                             >
-                                Giornale Lavori
+                                Giornale
                             </TabsTrigger>
                             <TabsTrigger
                                 value="documents"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-6 py-3"
+                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
                             >
                                 Documenti
                             </TabsTrigger>
                             <TabsTrigger
                                 value="attendance"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-6 py-3"
+                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
                             >
                                 Ore Lavoro
                             </TabsTrigger>
