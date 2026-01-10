@@ -41,7 +41,7 @@ export const generateInventoryCountReport = (data: InventoryCountData) => {
 
         body.push([
             item.itemCode,
-            item.itemName.substring(0, 40),
+            (item.itemName + (item.itemModel ? ` (${item.itemModel})` : '')).substring(0, 45),
             item.lotRef.substring(0, 15),
             item.systemPieces.toString(),
             '', // Empty cell for manual count

@@ -149,7 +149,10 @@ export default function ArticlesReport() {
                                                 className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                                             >
                                                 <td className="p-3 font-mono text-sm dark:text-slate-300">{article.itemCode}</td>
-                                                <td className="p-3 max-w-[200px] truncate dark:text-slate-300">{article.itemName}</td>
+                                                <td className="p-3 max-w-[200px] truncate dark:text-slate-300">
+                                                    {article.itemName}
+                                                    {article.itemModel && <span className="text-slate-400 dark:text-slate-500"> ({article.itemModel})</span>}
+                                                </td>
                                                 <td className="p-3 dark:text-slate-300">{article.itemBrand}</td>
                                                 <td className="p-3 text-sm dark:text-slate-300">
                                                     <span className="font-medium">{article.lotRef}</span>

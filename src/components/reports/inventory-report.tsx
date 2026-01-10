@@ -157,7 +157,10 @@ export default function InventoryReport() {
                                                 className="dark:border-slate-700"
                                             >
                                                 <TableCell className="font-mono text-sm dark:text-slate-300">{item.itemCode}</TableCell>
-                                                <TableCell className="max-w-[250px] truncate dark:text-slate-300">{item.itemName}</TableCell>
+                                                <TableCell className="max-w-[250px] truncate dark:text-slate-300">
+                                                    {item.itemName}
+                                                    {item.itemModel && <span className="text-slate-400 dark:text-slate-500"> ({item.itemModel})</span>}
+                                                </TableCell>
                                                 <TableCell className="text-sm dark:text-slate-300">{item.lotRef}</TableCell>
                                                 <TableCell className="text-center font-medium dark:text-slate-300">{item.systemPieces}</TableCell>
                                             </TableRow>
