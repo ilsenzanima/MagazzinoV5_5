@@ -177,20 +177,20 @@ export default function JobDetailsPage() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto space-y-6 pb-20 print:p-0 print:max-w-none">
+            <div className="max-w-6xl mx-auto space-y-6 pb-20 print:p-0 print:max-w-none overflow-x-hidden">
 
                 {/* Header Navigation - Hidden in print */}
-                <div className="flex items-center justify-between print:hidden">
+                <div className="flex items-center justify-between gap-2 print:hidden">
                     <Link href="/jobs">
-                        <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Torna alle Commesse
+                        <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900 px-2 md:px-4">
+                            <ArrowLeft className="h-4 w-4 md:mr-2" />
+                            <span className="hidden md:inline">Torna alle Commesse</span>
                         </Button>
                     </Link>
                     {(userRole === 'admin' || userRole === 'operativo') && (
-                        <Button variant="outline" size="sm" onClick={handlePrint}>
-                            <Printer className="mr-2 h-4 w-4" />
-                            Stampa Report
+                        <Button variant="outline" size="sm" onClick={handlePrint} className="px-2 md:px-4">
+                            <Printer className="h-4 w-4 md:mr-2" />
+                            <span className="hidden sm:inline">Stampa</span>
                         </Button>
                     )}
                 </div>

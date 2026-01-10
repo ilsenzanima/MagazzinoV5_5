@@ -96,54 +96,53 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       {/* Header Actions */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{job.name}</h1>
-            <Badge className={
-              job.status === 'active' ? 'bg-green-600' :
-                job.status === 'completed' ? 'bg-slate-500' : 'bg-yellow-500'
-            }>
-              {job.status === 'active' ? 'In Lavorazione' : job.status === 'completed' ? 'Completata' : 'Sospesa'}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-start gap-2 justify-between">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white truncate">{job.name}</h1>
+            <Badge className={`shrink-0 text-xs ${job.status === 'active' ? 'bg-green-600' :
+              job.status === 'completed' ? 'bg-slate-500' : 'bg-yellow-500'
+              }`}>
+              {job.status === 'active' ? 'Attiva' : job.status === 'completed' ? 'Completata' : 'Sospesa'}
             </Badge>
           </div>
-          <div className="text-sm text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-2">
-            <span className="font-mono">#{job.code}</span>
-            <span>•</span>
-            <span>Creata il {new Date(job.createdAt || new Date()).toLocaleDateString()}</span>
-            {job.description && (
-              <>
-                <span>•</span>
-                <span className="italic">{job.description}</span>
-              </>
+          <div className="flex gap-2 shrink-0">
+            {(userRole === 'admin' || userRole === 'operativo') && (
+              <Button variant="outline" size="sm" onClick={handleEditClick} className="px-2 md:px-4">
+                <Pencil className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Modifica</span>
+              </Button>
+            )}
+            {(userRole === 'admin' || userRole === 'operativo') && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="px-2 md:px-4"
+              >
+                <Trash2 className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Elimina</span>
+              </Button>
             )}
           </div>
         </div>
-
-        <div className="flex gap-2">
-          {(userRole === 'admin' || userRole === 'operativo') && (
-            <Button variant="outline" size="sm" onClick={handleEditClick}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Modifica
-            </Button>
-          )}
-          {(userRole === 'admin' || userRole === 'operativo') && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setIsDeleteDialogOpen(true)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Elimina
-            </Button>
+        <div className="text-xs md:text-sm text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1 md:gap-2">
+          <span className="font-mono">#{job.code}</span>
+          <span>•</span>
+          <span>Creata il {new Date(job.createdAt || new Date()).toLocaleDateString()}</span>
+          {job.description && (
+            <>
+              <span className="hidden md:inline">•</span>
+              <span className="italic hidden md:inline">{job.description}</span>
+            </>
           )}
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
