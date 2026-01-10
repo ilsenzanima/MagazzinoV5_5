@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, Job, Movement } from "@/lib/api";
 import jsPDF from 'jspdf';
@@ -198,36 +198,41 @@ export default function JobDetailsPage() {
                 {/* Printable Area */}
                 <div ref={printRef}>
                     <Tabs defaultValue="overview" className="space-y-6">
-                        <TabsList className="print:hidden w-full justify-start border-b rounded-none p-0 h-auto bg-transparent overflow-x-auto flex-nowrap scrollbar-hide">
+                        <TabsList className="print:hidden w-full justify-between border-b rounded-none p-0 h-auto bg-transparent">
                             <TabsTrigger
                                 value="overview"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
+                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
                             >
-                                Dettagli
+                                <Info className="h-4 w-4 md:mr-1" />
+                                <span className="hidden md:inline">Dettagli</span>
                             </TabsTrigger>
                             <TabsTrigger
                                 value="stock"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
+                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
                             >
-                                Materiali
+                                <Package className="h-4 w-4 md:mr-1" />
+                                <span className="hidden md:inline">Materiali</span>
                             </TabsTrigger>
                             <TabsTrigger
                                 value="journal"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
+                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
                             >
-                                Giornale
+                                <BookOpen className="h-4 w-4 md:mr-1" />
+                                <span className="hidden md:inline">Giornale</span>
                             </TabsTrigger>
                             <TabsTrigger
                                 value="documents"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
+                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
                             >
-                                Documenti
+                                <FileText className="h-4 w-4 md:mr-1" />
+                                <span className="hidden md:inline">Documenti</span>
                             </TabsTrigger>
                             <TabsTrigger
                                 value="attendance"
-                                className="rounded-t-lg data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-3 md:px-6 py-2 md:py-3 text-sm md:text-base whitespace-nowrap"
+                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
                             >
-                                Ore Lavoro
+                                <Clock className="h-4 w-4 md:mr-1" />
+                                <span className="hidden md:inline">Ore</span>
                             </TabsTrigger>
                         </TabsList>
 
