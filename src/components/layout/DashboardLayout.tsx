@@ -256,7 +256,7 @@ export default function DashboardLayout({
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <main className="flex-1 p-2 md:p-8 overflow-x-hidden overflow-y-auto">
           {children}
         </main>
 
