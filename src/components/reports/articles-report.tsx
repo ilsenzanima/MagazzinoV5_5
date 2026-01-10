@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileDown, Loader2, Package } from "lucide-react";
 import { getArticlesWithStock, ArticlesReportData, ArticleLot } from "@/lib/services/reports";
 import { generateArticlesReport } from "./articles-report-generator";
@@ -13,6 +12,7 @@ export default function ArticlesReport() {
     const [data, setData] = useState<ArticlesReportData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         loadData();
@@ -110,12 +110,15 @@ export default function ArticlesReport() {
             </div>
 
             {/* Articles Table - Grouped by Type */}
-            <Card>
-                <CardHeader className="pb-2">
+            <Card className="flex flex-col" style={{ height: 'calc(100vh - 280px)', minHeight: '400px' }}>
+                <CardHeader className="pb-2 flex-shrink-0 border-b dark:border-slate-700">
                     <CardTitle className="text-lg dark:text-white">Dettaglio Articoli per Tipologia e Lotto</CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
-                    <div className="overflow-x-auto">
+                <CardContent className="p-0 flex-1 overflow-hidden">
+                    <div
+                        ref={tableContainerRef}
+                        className="h-full overflow-auto"
+                    >
                         <table className="w-full text-sm">
                             <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 border-b dark:border-slate-700">
                                 <tr>

@@ -138,7 +138,6 @@ export default function InventoryReport() {
                                     <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Codice</TableHead>
                                     <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Articolo</TableHead>
                                     <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Lotto</TableHead>
-                                    <TableHead className="text-center bg-white dark:bg-slate-900 dark:text-slate-300">U.M.</TableHead>
                                     <TableHead className="text-center bg-white dark:bg-slate-900 dark:text-slate-300">Pezzi Fisici (Sistema)</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -147,7 +146,7 @@ export default function InventoryReport() {
                                     <>
                                         {/* Type Header Row */}
                                         <TableRow key={`type-${type}`} className="bg-slate-100 dark:bg-slate-800">
-                                            <TableCell colSpan={5} className="font-bold text-slate-700 dark:text-slate-200 py-2">
+                                            <TableCell colSpan={4} className="font-bold text-slate-700 dark:text-slate-200 py-2">
                                                 {type}
                                             </TableCell>
                                         </TableRow>
@@ -160,7 +159,6 @@ export default function InventoryReport() {
                                                 <TableCell className="font-mono text-sm dark:text-slate-300">{item.itemCode}</TableCell>
                                                 <TableCell className="max-w-[250px] truncate dark:text-slate-300">{item.itemName}</TableCell>
                                                 <TableCell className="text-sm dark:text-slate-300">{item.lotRef}</TableCell>
-                                                <TableCell className="text-center dark:text-slate-300">{item.itemUnit}</TableCell>
                                                 <TableCell className="text-center font-medium dark:text-slate-300">{item.systemPieces}</TableCell>
                                             </TableRow>
                                         ))}

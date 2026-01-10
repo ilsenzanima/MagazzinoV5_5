@@ -21,7 +21,6 @@ export const generateInventoryCountReport = (data: InventoryCountData) => {
         'Codice',
         'Articolo',
         'Lotto',
-        'U.M.',
         'Sistema',
         'Contati',
         'Diff.'
@@ -36,15 +35,14 @@ export const generateInventoryCountReport = (data: InventoryCountData) => {
         if (item.itemType !== currentType) {
             currentType = item.itemType;
             body.push([
-                { content: currentType.toUpperCase(), colSpan: 7, styles: { fillColor: [230, 230, 230], fontStyle: 'bold', fontSize: 8 } }
+                { content: currentType.toUpperCase(), colSpan: 6, styles: { fillColor: [230, 230, 230], fontStyle: 'bold', fontSize: 8 } }
             ]);
         }
 
         body.push([
             item.itemCode,
-            item.itemName.substring(0, 35),
-            item.lotRef.substring(0, 12),
-            item.itemUnit,
+            item.itemName.substring(0, 40),
+            item.lotRef.substring(0, 15),
             item.systemPieces.toString(),
             '', // Empty cell for manual count
             ''  // Difference to be calculated manually
@@ -68,17 +66,16 @@ export const generateInventoryCountReport = (data: InventoryCountData) => {
             minCellHeight: 8 // More space for writing
         },
         columnStyles: {
-            0: { cellWidth: 25 }, // Codice
-            1: { cellWidth: 55 }, // Articolo
-            2: { cellWidth: 25 }, // Lotto
-            3: { cellWidth: 15, halign: 'center' }, // U.M.
-            4: { cellWidth: 20, halign: 'center' }, // Sistema
-            5: { cellWidth: 25, halign: 'center' }, // Contati (bigger for writing)
-            6: { cellWidth: 20, halign: 'center' }  // Differenza
+            0: { cellWidth: 28 }, // Codice
+            1: { cellWidth: 60 }, // Articolo (bigger now)
+            2: { cellWidth: 28 }, // Lotto (bigger now)
+            3: { cellWidth: 22, halign: 'center' }, // Sistema
+            4: { cellWidth: 26, halign: 'center' }, // Contati (bigger for writing)
+            5: { cellWidth: 22, halign: 'center' }  // Differenza
         },
         didParseCell: (data) => {
             // Style empty cells for manual entry
-            if (data.section === 'body' && (data.column.index === 5 || data.column.index === 6)) {
+            if (data.section === 'body' && (data.column.index === 4 || data.column.index === 5)) {
                 data.cell.styles.fillColor = [255, 255, 240]; // Light yellow for entry cells
             }
         }
