@@ -40,7 +40,7 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
         // Get all inventory items to get names and other details
         const { data: items, error: itemsError } = await supabase
             .from('inventory')
-            .select('id, code, name, brand, type, unit, coefficient, pieces');
+            .select('id, code, name, brand, category, unit, coefficient, pieces');
 
         if (itemsError) {
             console.error('Error fetching inventory:', itemsError);
@@ -70,7 +70,7 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
                 itemCode: item.code || '',
                 itemName: item.name || '',
                 itemBrand: item.brand || '',
-                itemType: item.type || '',
+                itemType: item.category || '',
                 itemUnit: item.unit || '',
                 coefficient: coeff,
                 lotRef: lot.purchase_ref || 'N/D',
@@ -95,7 +95,7 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
                     itemCode: item.code || '',
                     itemName: item.name || '',
                     itemBrand: item.brand || '',
-                    itemType: item.type || '',
+                    itemType: item.category || '',
                     itemUnit: item.unit || '',
                     coefficient: coeff,
                     lotRef: 'Non tracciato',
@@ -160,7 +160,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
         // Get all inventory items
         const { data: items, error: itemsError } = await supabase
             .from('inventory')
-            .select('id, code, name, brand, type, unit, coefficient, pieces');
+            .select('id, code, name, brand, category, unit, coefficient, pieces');
 
         if (itemsError) {
             console.error('Error fetching inventory:', itemsError);
@@ -188,7 +188,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
                 itemCode: item.code || '',
                 itemName: item.name || '',
                 itemBrand: item.brand || '',
-                itemType: item.type || '',
+                itemType: item.category || '',
                 itemUnit: item.unit || '',
                 coefficient: coeff,
                 lotRef: lot.purchase_ref || 'N/D',
@@ -209,7 +209,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
                     itemCode: item.code || '',
                     itemName: item.name || '',
                     itemBrand: item.brand || '',
-                    itemType: item.type || '',
+                    itemType: item.category || '',
                     itemUnit: item.unit || '',
                     coefficient: coeff,
                     lotRef: 'Non tracciato',
