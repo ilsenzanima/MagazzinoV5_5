@@ -88,12 +88,19 @@ export const generateArticlesReport = (data: ArticlesReportData) => {
             8: { cellWidth: 12, halign: 'center' }, // U.M.
             9: { cellWidth: 22, halign: 'right' }  // Valore
         },
-        didParseCell: (data) => {
+        didParseCell: (cellData) => {
             // Totals row styling
-            if (data.row.index === body.length - 1) {
-                data.cell.styles.fillColor = [220, 230, 241];
-                data.cell.styles.fontStyle = 'bold';
-                data.cell.styles.fontSize = 7;
+            if (cellData.row.index === body.length - 1) {
+                cellData.cell.styles.fillColor = [220, 230, 241];
+                cellData.cell.styles.fontStyle = 'bold';
+                cellData.cell.styles.fontSize = 7;
+            }
+            // Highlight rows with missing price (price = 0)
+            else if (cellData.section === 'body' && cellData.row.index < body.length - 1) {
+                const article = data.articles[cellData.row.index];
+                if (article && article.price <= 0) {
+                    cellData.cell.styles.fillColor = [255, 235, 235]; // Light red/pink
+                }
             }
         }
     });
