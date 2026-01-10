@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Loader2, Save, RefreshCw } from "lucide-react";
 import Link from "next/link";
@@ -146,19 +147,18 @@ export default function NewJobPage() {
                 <h3 className="font-semibold text-slate-700">Committente</h3>
                 <div className="space-y-2">
                   <Label htmlFor="client">Seleziona Committente *</Label>
-                  <Select
+                  <SearchableSelect
+                    options={clients.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                      description: c.address || undefined
+                    }))}
                     value={formData.clientId}
                     onValueChange={handleClientChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Cerca committente..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Cerca committente..."
+                    searchPlaceholder="Digita per cercare..."
+                    emptyMessage="Nessun committente trovato."
+                  />
                 </div>
               </div>
 
