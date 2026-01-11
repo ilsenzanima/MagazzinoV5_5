@@ -715,7 +715,10 @@ export default function PurchaseDetailPage() {
                                         return (
                                             <TableRow key={item.id}>
                                                 <TableCell>
-                                                    <div className="font-medium">{item.itemName}</div>
+                                                    <div className="font-medium">
+                                                        {item.itemName}
+                                                        {item.itemModel && <span className="text-slate-500 font-normal ml-1">({item.itemModel})</span>}
+                                                    </div>
                                                     <div className="text-xs text-slate-500">{item.itemCode}</div>
                                                 </TableCell>
                                                 <TableCell className="text-right">{original}</TableCell>

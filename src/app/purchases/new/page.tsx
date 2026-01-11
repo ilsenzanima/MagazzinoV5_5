@@ -30,6 +30,7 @@ interface PurchaseLine {
     tempId: string;
     itemId: string;
     itemName: string;
+    itemModel?: string;
     itemBrand?: string;
     itemCategory?: string;
     itemDescription?: string;
@@ -256,6 +257,7 @@ export default function NewPurchasePage() {
             tempId: Math.random().toString(36).substr(2, 9),
             itemId: currentLine.itemId,
             itemName: selectedItem?.name || "Articolo sconosciuto",
+            itemModel: selectedItem?.model,
             itemBrand: selectedItem?.brand,
             itemCategory: selectedItem?.type,
             itemDescription: selectedItem?.description,
@@ -641,7 +643,10 @@ export default function NewPurchasePage() {
                                             {lines.map((line) => (
                                                 <TableRow key={line.tempId}>
                                                     <TableCell>
-                                                        <div className="font-medium">{line.itemName}</div>
+                                                        <div className="font-medium">
+                                                            {line.itemName}
+                                                            {line.itemModel && <span className="text-slate-400 font-normal ml-1">({line.itemModel})</span>}
+                                                        </div>
                                                         <div className="text-xs text-slate-500">{line.itemCategory} - {line.itemBrand}</div>
                                                         {line.itemDescription && <div className="text-xs text-slate-400 truncate max-w-[200px]">{line.itemDescription}</div>}
                                                     </TableCell>

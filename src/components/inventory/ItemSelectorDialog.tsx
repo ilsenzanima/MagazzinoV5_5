@@ -105,7 +105,10 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
                 filteredItems.map((item) => (
                   <TableRow key={item.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => onSelect(item)}>
                     <TableCell className="font-mono text-xs">{item.code}</TableCell>
-                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {item.name}
+                      {item.model && <span className="text-slate-400 dark:text-slate-500 font-normal"> ({item.model})</span>}
+                    </TableCell>
                     <TableCell className="text-xs text-slate-500 dark:text-slate-400">{item.brand}</TableCell>
                     <TableCell className="text-right">
                       <span className="text-sm text-slate-600 dark:text-slate-400">
