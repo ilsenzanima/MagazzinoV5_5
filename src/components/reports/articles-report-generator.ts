@@ -11,10 +11,14 @@ export const generateArticlesReport = (data: ArticlesReportData) => {
 
     // Header
     doc.setFontSize(14);
-    doc.text('REPORT ARTICOLI MAGAZZINO', 14, 15);
+    if (data.asOfDate) {
+        doc.text(`REPORT ARTICOLI MAGAZZINO - al ${format(new Date(data.asOfDate), 'dd/MM/yyyy', { locale: it })}`, 14, 15);
+    } else {
+        doc.text('REPORT ARTICOLI MAGAZZINO', 14, 15);
+    }
     doc.setFontSize(9);
     doc.text(`Generato il: ${dateStr}`, 14, 22);
-    doc.text(`Articoli con giacenza > 0`, 14, 27);
+    doc.text(`Articoli con giacenza > 0${data.asOfDate ? ' (storico)' : ''}`, 14, 27);
 
     const columns = [
         'Codice',
