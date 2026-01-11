@@ -381,7 +381,10 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                         <TableCell className="font-medium">{item.inventoryCode}</TableCell>
                                         <TableCell>
                                             <div>
-                                                <span className="block font-medium">{item.inventoryName}</span>
+                                                <span className="block font-medium">
+                                                    {item.inventoryName}
+                                                    {item.inventoryModel && <span className="text-slate-400 dark:text-slate-500 font-normal"> ({item.inventoryModel})</span>}
+                                                </span>
                                                 <span className="text-xs text-slate-500 dark:text-slate-400">{item.inventoryDescription}</span>
                                             </div>
                                         </TableCell>
