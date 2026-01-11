@@ -74,6 +74,7 @@ export default function InventoryDetailPage() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [stockValue, setStockValue] = useState<number>(0);
   const [isStockValueComplete, setIsStockValueComplete] = useState(true);
+  const [calculatedPieces, setCalculatedPieces] = useState<number>(0);
 
   // Edit Mode State
   const [isEditing, setIsEditing] = useState(false);
@@ -159,10 +160,7 @@ export default function InventoryDetailPage() {
           const batches = await inventoryApi.getAvailableBatches(id);
           let val = 0;
           let complete = true;
-
-          // EXACT CALCULATION based on traced batches
-          // We sum the value of all remaining quantities from purchases.
-          // This assumes strict traceability (exits must be linked to purchases).
+          let totalPieces = 0;
 
           batches.forEach(b => {
             if (b.remainingQty > 0) {
@@ -172,10 +170,15 @@ export default function InventoryDetailPage() {
                 complete = false; // Batch without price
               }
             }
+            // Sum pieces from all batches
+            if (b.remainingPieces !== undefined && b.remainingPieces !== null) {
+              totalPieces += b.remainingPieces;
+            }
           });
 
           setStockValue(val);
           setIsStockValueComplete(complete);
+          setCalculatedPieces(totalPieces);
         } catch (e) {
           console.error("Error calculating stock value", e);
           setIsStockValueComplete(false);
@@ -618,7 +621,7 @@ export default function InventoryDetailPage() {
                       {item.coefficient !== 1 && (
                         <div className="text-center">
                           <span className="text-xs text-slate-400 dark:text-slate-500">
-                            {item.pieces ?? item.quantity} Pezzi fisici
+                            {calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })} Pezzi fisici
                           </span>
                         </div>
                       )}

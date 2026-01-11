@@ -311,7 +311,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                             {item.coefficient !== 1 ? (
                               <>
                                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1 mr-1">
-                                  {(item.pieces ?? (item.quantity / item.coefficient)).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz =
+                                  {(item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz =
                                 </span>
                                 <Badge variant="outline" className={
                                   item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50" :
