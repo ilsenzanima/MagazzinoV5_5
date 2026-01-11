@@ -6,7 +6,7 @@ import { Job, jobsApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Euro, Trash2, Pencil, Building2, MapPin, User, FileText } from "lucide-react"
+import { Calendar, Euro, Trash2, Pencil, Building2, MapPin, User, FileText, Clock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,10 +34,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 interface JobOverviewProps {
   job: Job
   totalCost: number
+  totalHours?: number
   onJobUpdated?: () => void
 }
 
-export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) {
+export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: JobOverviewProps) {
   const router = useRouter()
   const { userRole } = useAuth()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -157,6 +158,19 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
               <div className="text-2xl font-bold">€ {totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
             )}
             <div className="text-xs text-slate-500 mt-1">Calcolato su listino interno</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Ore Lavoro
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalHours.toLocaleString('it-IT')} ore</div>
+            <div className="text-xs text-slate-500 mt-1">Totale tutte le presenze</div>
           </CardContent>
         </Card>
 

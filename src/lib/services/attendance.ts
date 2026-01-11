@@ -111,6 +111,17 @@ export const attendanceApi = {
         return (data || []).map(mapDbToAttendance);
     },
 
+    // Get total hours for a specific job (sum of all attendance hours)
+    getTotalHoursByJobId: async (jobId: string): Promise<number> => {
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('hours')
+            .eq('job_id', jobId);
+
+        if (error) throw error;
+        return (data || []).reduce((sum, record) => sum + (Number(record.hours) || 0), 0);
+    },
+
     // Get aggregated statistics for the last N months (for dashboard chart)
     getAggregatedStats: async (months: number = 6): Promise<{ name: string; presenze: number; ferie: number; malattia: number; corso: number }[]> => {
         const now = new Date();
