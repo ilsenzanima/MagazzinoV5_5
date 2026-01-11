@@ -95,31 +95,25 @@ export default function ArticlesReport() {
     if (!data || data.articles.length === 0) {
         return (
             <div className="space-y-4">
-                {/* Date Selector */}
-                <Card className="p-4">
-                    <div className="flex flex-wrap gap-4 items-end">
-                        <div className="space-y-1">
-                            <Label htmlFor="reportDate" className="text-sm flex items-center gap-1">
-                                <Calendar className="h-4 w-4" /> Data Report
-                            </Label>
-                            <Input
-                                id="reportDate"
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="w-40"
-                            />
-                        </div>
-                        <Button onClick={handleLoadHistorical} variant="outline" className="gap-2">
-                            Carica Storico
+                {/* Date Selector - inline */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-md">
+                    <Calendar className="h-4 w-4 text-slate-400" />
+                    <Input
+                        id="reportDate"
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="w-32 h-7 text-sm border-0 p-0 bg-transparent"
+                    />
+                    <Button onClick={handleLoadHistorical} variant="outline" size="sm" className="h-7 text-xs">
+                        Carica
+                    </Button>
+                    {isHistorical && (
+                        <Button onClick={handleResetToToday} variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                            <RotateCcw className="h-3 w-3" /> Oggi
                         </Button>
-                        {isHistorical && (
-                            <Button onClick={handleResetToToday} variant="ghost" className="gap-2">
-                                <RotateCcw className="h-4 w-4" /> Torna ad Oggi
-                            </Button>
-                        )}
-                    </div>
-                </Card>
+                    )}
+                </div>
                 <Card className="border-dashed">
                     <CardContent className="pt-6 text-center text-slate-500 dark:text-slate-400">
                         <Package className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
