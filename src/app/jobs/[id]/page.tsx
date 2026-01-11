@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock } from "lucide-react";
 import Link from "next/link";
-import { jobsApi, movementsApi, Job, Movement } from "@/lib/api";
+import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from "date-fns";
@@ -28,6 +28,7 @@ export default function JobDetailsPage() {
     const [job, setJob] = useState<Job | null>(null);
     const [movements, setMovements] = useState<Movement[]>([]);
     const [totalCost, setTotalCost] = useState(0);
+    const [totalHours, setTotalHours] = useState(0);
     const [loading, setLoading] = useState(true);
 
     // Ref for printing
@@ -132,15 +133,17 @@ export default function JobDetailsPage() {
         if (!id) return;
         try {
             setLoading(true);
-            // Parallel fetch: Job Details, Movements (for tabs), and Server-side Cost
-            const [jobData, movementsData, costData] = await Promise.all([
+            // Parallel fetch: Job Details, Movements (for tabs), Cost and Hours
+            const [jobData, movementsData, costData, hoursData] = await Promise.all([
                 jobsApi.getById(id),
                 movementsApi.getByJobId(id),
-                jobsApi.getCost(id)
+                jobsApi.getCost(id),
+                attendanceApi.getTotalHoursByJobId(id)
             ]);
             setJob(jobData);
             setMovements(movementsData);
             setTotalCost(costData);
+            setTotalHours(hoursData);
         } catch (error) {
             console.error("Error loading job details:", error);
         } finally {
@@ -237,7 +240,7 @@ export default function JobDetailsPage() {
                         </TabsList>
 
                         <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">
-                            <JobOverview job={job} totalCost={totalCost} onJobUpdated={loadData} />
+                            <JobOverview job={job} totalCost={totalCost} totalHours={totalHours} onJobUpdated={loadData} />
                         </TabsContent>
 
                         <TabsContent value="stock" className="space-y-6 focus-visible:outline-none">
