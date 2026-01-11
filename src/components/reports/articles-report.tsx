@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { FileDown, Loader2, Package, Calendar, RotateCcw } from "lucide-react";
 import { getArticlesWithStock, ArticlesReportData, ArticleLot } from "@/lib/services/reports";
 import { generateArticlesReport } from "./articles-report-generator";
@@ -134,51 +133,47 @@ export default function ArticlesReport() {
     return (
         <div className="space-y-4">
             {/* Date Selector and Summary */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center flex-wrap">
-                {/* Date Selector */}
-                <Card className="p-3">
-                    <div className="flex flex-wrap gap-3 items-end">
-                        <div className="space-y-1">
-                            <Label htmlFor="reportDate" className="text-xs flex items-center gap-1 text-slate-500 dark:text-slate-400">
-                                <Calendar className="h-3 w-3" /> Data Report
-                            </Label>
-                            <Input
-                                id="reportDate"
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="w-36 h-8 text-sm"
-                            />
-                        </div>
-                        <Button onClick={handleLoadHistorical} variant="outline" size="sm" className="h-8 gap-1">
-                            Carica
-                        </Button>
-                        {isHistorical && (
-                            <Button onClick={handleResetToToday} variant="ghost" size="sm" className="h-8 gap-1">
-                                <RotateCcw className="h-3 w-3" /> Oggi
-                            </Button>
-                        )}
-                    </div>
+            <div className="flex flex-wrap gap-2 items-center">
+                {/* Date Selector - inline */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-md">
+                    <Calendar className="h-4 w-4 text-slate-400" />
+                    <Input
+                        id="reportDate"
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="w-32 h-7 text-sm border-0 p-0 bg-transparent"
+                    />
+                    <Button onClick={handleLoadHistorical} variant="outline" size="sm" className="h-7 text-xs">
+                        Carica
+                    </Button>
                     {isHistorical && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                            ⚠️ Visualizzi lo stock al {format(new Date(selectedDate), 'dd/MM/yyyy')}
-                        </p>
+                        <Button onClick={handleResetToToday} variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                            <RotateCcw className="h-3 w-3" /> Oggi
+                        </Button>
                     )}
-                </Card>
+                </div>
+
+                {isHistorical && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-2 py-1 rounded">
+                        ⚠️ Stock al {format(new Date(selectedDate), 'dd/MM/yyyy')}
+                    </span>
+                )}
+
+                {/* Spacer */}
+                <div className="flex-1" />
 
                 {/* Summary Cards */}
-                <div className="flex gap-4">
-                    <Card className="px-4 py-2">
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Articoli</p>
-                        <p className="text-xl font-bold dark:text-white">{data.articles.length}</p>
-                    </Card>
-                    <Card className="px-4 py-2 bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
-                        <p className="text-sm text-emerald-600 dark:text-emerald-400">Valore Totale</p>
-                        <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-                            € {data.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                        </p>
-                    </Card>
-                </div>
+                <Card className="px-3 py-1.5">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Articoli</p>
+                    <p className="text-lg font-bold dark:text-white">{data.articles.length}</p>
+                </Card>
+                <Card className="px-3 py-1.5 bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">Valore Totale</p>
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                        € {data.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                    </p>
+                </Card>
 
                 <Button onClick={handleExportPDF} className="gap-2">
                     <FileDown className="h-4 w-4" />

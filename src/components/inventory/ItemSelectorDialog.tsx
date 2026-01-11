@@ -49,6 +49,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
         item.name.toLowerCase().includes(term) ||
         item.brand.toLowerCase().includes(term) ||
         item.type.toLowerCase().includes(term) ||
+        (item.model?.toLowerCase().includes(term) ?? false) ||
         (item.supplierCode?.toLowerCase().includes(term) ?? false)
     );
   }, [items, deferredSearchTerm, onSearch]);
@@ -66,7 +67,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
-            placeholder="Cerca per codice, nome, marca o tipologia..."
+            placeholder="Cerca per codice, nome, variante, marca..."
             className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -81,7 +82,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
                 <TableHead>Codice</TableHead>
                 <TableHead>Descrizione</TableHead>
                 <TableHead>Marca</TableHead>
-                <TableHead className="text-right">Pezzi</TableHead>
+                <TableHead className="text-center">Verifica Inv.</TableHead>
                 <TableHead className="text-right">Giacenza</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -110,10 +111,20 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
                       {item.model && <span className="text-slate-400 dark:text-slate-500 font-normal"> ({item.model})</span>}
                     </TableCell>
                     <TableCell className="text-xs text-slate-500 dark:text-slate-400">{item.brand}</TableCell>
-                    <TableCell className="text-right">
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
-                        {item.realPieces !== undefined && item.realPieces !== null ? `${item.realPieces} pz` : '-'}
-                      </span>
+                    <TableCell className="text-center">
+                      {item.realPieces !== undefined && item.realPieces !== null ? (
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-medium">{item.realPieces} pz</span>
+                          {item.pieces !== undefined && item.pieces !== null && item.realPieces !== item.pieces && (
+                            <span className={`text-xs font-bold ${item.realPieces > item.pieces ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                              {item.realPieces > item.pieces ? '+' : ''}{item.realPieces - item.pieces}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant="outline" className={
