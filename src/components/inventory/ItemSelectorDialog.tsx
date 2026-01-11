@@ -112,13 +112,13 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
                     </TableCell>
                     <TableCell className="text-xs text-slate-500 dark:text-slate-400">{item.brand}</TableCell>
                     <TableCell className="text-center">
-                      {item.realPieces !== undefined && item.realPieces !== null ? (
+                      {item.realQuantity !== undefined && item.realQuantity !== null ? (
                         <div className="flex flex-col items-center">
-                          <span className="text-sm font-medium">{item.realPieces} pz</span>
-                          {item.pieces !== undefined && item.pieces !== null && item.realPieces !== item.pieces && (
-                            <span className={`text-xs font-bold ${item.realPieces > item.pieces ? 'text-green-600' : 'text-red-600'
+                          <span className="text-sm font-medium">{item.realQuantity} pz</span>
+                          {item.quantity !== undefined && item.realQuantity !== item.quantity && (
+                            <span className={`text-xs font-bold ${item.realQuantity > item.quantity ? 'text-green-600' : 'text-red-600'
                               }`}>
-                              {item.realPieces > item.pieces ? '+' : ''}{item.realPieces - item.pieces}
+                              {item.realQuantity > item.quantity ? '+' : ''}{(item.realQuantity - item.quantity).toFixed(0)}
                             </span>
                           )}
                         </div>
