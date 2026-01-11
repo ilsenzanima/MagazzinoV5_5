@@ -30,6 +30,7 @@ interface PurchaseLine {
     tempId: string;
     itemId: string;
     itemName: string;
+    itemModel?: string;
     itemBrand?: string;
     itemCategory?: string;
     itemDescription?: string;
@@ -256,6 +257,7 @@ export default function NewPurchasePage() {
             tempId: Math.random().toString(36).substr(2, 9),
             itemId: currentLine.itemId,
             itemName: selectedItem?.name || "Articolo sconosciuto",
+            itemModel: selectedItem?.model,
             itemBrand: selectedItem?.brand,
             itemCategory: selectedItem?.type,
             itemDescription: selectedItem?.description,
@@ -641,7 +643,10 @@ export default function NewPurchasePage() {
                                             {lines.map((line) => (
                                                 <TableRow key={line.tempId}>
                                                     <TableCell>
-                                                        <div className="font-medium">{line.itemName}</div>
+                                                        <div className="font-medium">
+                                                            {line.itemName}
+                                                            {line.itemModel && <span className="text-slate-400 font-normal ml-1">({line.itemModel})</span>}
+                                                        </div>
                                                         <div className="text-xs text-slate-500">{line.itemCategory} - {line.itemBrand}</div>
                                                         {line.itemDescription && <div className="text-xs text-slate-400 truncate max-w-[200px]">{line.itemDescription}</div>}
                                                     </TableCell>
@@ -703,16 +708,16 @@ export default function NewPurchasePage() {
                                                             variant="ghost"
                                                             size="icon"
                                                             onClick={() => removeLine(line.tempId)}
-                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 h-8 w-8"
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
-                                            <TableRow className="bg-slate-50 font-bold">
-                                                <TableCell colSpan={5} className="text-right pr-4 text-lg">TOTALE BOLLA</TableCell>
-                                                <TableCell className="text-right text-lg">
+                                            <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold">
+                                                <TableCell colSpan={5} className="text-right pr-4 text-lg dark:text-white">TOTALE BOLLA</TableCell>
+                                                <TableCell className="text-right text-lg dark:text-white">
                                                     € {lines.reduce((acc, l) => acc + (l.quantity * l.price), 0).toFixed(2)}
                                                 </TableCell>
                                                 <TableCell colSpan={2}></TableCell>
