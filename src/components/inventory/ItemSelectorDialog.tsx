@@ -49,6 +49,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
         item.name.toLowerCase().includes(term) ||
         item.brand.toLowerCase().includes(term) ||
         item.type.toLowerCase().includes(term) ||
+        (item.model?.toLowerCase().includes(term) ?? false) ||
         (item.supplierCode?.toLowerCase().includes(term) ?? false)
     );
   }, [items, deferredSearchTerm, onSearch]);
@@ -66,7 +67,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
-            placeholder="Cerca per codice, nome, marca o tipologia..."
+            placeholder="Cerca per codice, nome, variante, marca..."
             className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -81,7 +82,7 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
                 <TableHead>Codice</TableHead>
                 <TableHead>Descrizione</TableHead>
                 <TableHead>Marca</TableHead>
-                <TableHead className="text-right">Pezzi</TableHead>
+                <TableHead className="text-center">Verifica Inv.</TableHead>
                 <TableHead className="text-right">Giacenza</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -105,12 +106,25 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
                 filteredItems.map((item) => (
                   <TableRow key={item.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => onSelect(item)}>
                     <TableCell className="font-mono text-xs">{item.code}</TableCell>
-                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {item.name}
+                      {item.model && <span className="text-slate-400 dark:text-slate-500 font-normal"> ({item.model})</span>}
+                    </TableCell>
                     <TableCell className="text-xs text-slate-500 dark:text-slate-400">{item.brand}</TableCell>
-                    <TableCell className="text-right">
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
-                        {item.realPieces !== undefined && item.realPieces !== null ? `${item.realPieces} pz` : '-'}
-                      </span>
+                    <TableCell className="text-center">
+                      {item.realQuantity !== undefined && item.realQuantity !== null ? (
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-medium">{item.realQuantity} pz</span>
+                          {item.quantity !== undefined && item.realQuantity !== item.quantity && (
+                            <span className={`text-xs font-bold ${item.realQuantity > item.quantity ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                              {item.realQuantity > item.quantity ? '+' : ''}{(item.realQuantity - item.quantity).toFixed(0)}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant="outline" className={

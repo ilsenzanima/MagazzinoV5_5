@@ -162,12 +162,15 @@ export async function generateDeliveryNotePDF(
     currentY += rowEHeight + 5; // Gap before table
 
     // --- 3. Table (Harmonized) ---
-    const tableBody = groupedItems.map(item => [
-        item.inventoryCategory || "-",
-        `${item.inventoryName || "Articolo"} ${item.inventoryDescription ? `- ${item.inventoryDescription}` : ""}`,
-        item.inventoryUnit || "PZ",
-        item.quantity.toString()
-    ]);
+    const tableBody = groupedItems.map(item => {
+        const nameWithModel = item.inventoryName + (item.inventoryModel ? ` (${item.inventoryModel})` : '');
+        return [
+            item.inventoryCategory || "-",
+            `${nameWithModel || "Articolo"} ${item.inventoryDescription ? `- ${item.inventoryDescription}` : ""}`,
+            item.inventoryUnit || "PZ",
+            item.quantity.toString()
+        ];
+    });
 
     // Footer Height Calculation (Dynamic)
     const notesText = movement.notes || "";
