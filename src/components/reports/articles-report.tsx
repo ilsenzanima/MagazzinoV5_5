@@ -3,7 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileDown, Loader2, Package } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FileDown, Loader2, Package, Calendar, RotateCcw } from "lucide-react";
 import { getArticlesWithStock, ArticlesReportData, ArticleLot } from "@/lib/services/reports";
 import { generateArticlesReport } from "./articles-report-generator";
 import { format } from "date-fns";
@@ -12,24 +14,39 @@ export default function ArticlesReport() {
     const [data, setData] = useState<ArticlesReportData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [isHistorical, setIsHistorical] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         loadData();
     }, []);
 
-    const loadData = async () => {
+    const loadData = async (targetDate?: string) => {
         try {
             setLoading(true);
             setError(null);
-            const result = await getArticlesWithStock();
+            const result = await getArticlesWithStock(targetDate);
             setData(result);
+            setIsHistorical(!!targetDate);
         } catch (err) {
             console.error("Error loading articles report:", err);
             setError("Errore nel caricamento dei dati");
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleLoadHistorical = () => {
+        if (selectedDate) {
+            loadData(selectedDate);
+        }
+    };
+
+    const handleResetToToday = () => {
+        const today = new Date().toISOString().split('T')[0];
+        setSelectedDate(today);
+        loadData(); // No date = current stock
     };
 
     const handleExportPDF = () => {
@@ -78,19 +95,78 @@ export default function ArticlesReport() {
 
     if (!data || data.articles.length === 0) {
         return (
-            <Card className="border-dashed">
-                <CardContent className="pt-6 text-center text-slate-500 dark:text-slate-400">
-                    <Package className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
-                    <p>Nessun articolo con giacenza superiore a 0.</p>
-                </CardContent>
-            </Card>
+            <div className="space-y-4">
+                {/* Date Selector */}
+                <Card className="p-4">
+                    <div className="flex flex-wrap gap-4 items-end">
+                        <div className="space-y-1">
+                            <Label htmlFor="reportDate" className="text-sm flex items-center gap-1">
+                                <Calendar className="h-4 w-4" /> Data Report
+                            </Label>
+                            <Input
+                                id="reportDate"
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
+                        <Button onClick={handleLoadHistorical} variant="outline" className="gap-2">
+                            Carica Storico
+                        </Button>
+                        {isHistorical && (
+                            <Button onClick={handleResetToToday} variant="ghost" className="gap-2">
+                                <RotateCcw className="h-4 w-4" /> Torna ad Oggi
+                            </Button>
+                        )}
+                    </div>
+                </Card>
+                <Card className="border-dashed">
+                    <CardContent className="pt-6 text-center text-slate-500 dark:text-slate-400">
+                        <Package className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+                        <p>Nessun articolo con giacenza superiore a 0{isHistorical ? ` alla data ${format(new Date(selectedDate), 'dd/MM/yyyy')}` : ''}.</p>
+                    </CardContent>
+                </Card>
+            </div>
         );
     }
 
     return (
         <div className="space-y-4">
-            {/* Summary Card */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+            {/* Date Selector and Summary */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center flex-wrap">
+                {/* Date Selector */}
+                <Card className="p-3">
+                    <div className="flex flex-wrap gap-3 items-end">
+                        <div className="space-y-1">
+                            <Label htmlFor="reportDate" className="text-xs flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                                <Calendar className="h-3 w-3" /> Data Report
+                            </Label>
+                            <Input
+                                id="reportDate"
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-36 h-8 text-sm"
+                            />
+                        </div>
+                        <Button onClick={handleLoadHistorical} variant="outline" size="sm" className="h-8 gap-1">
+                            Carica
+                        </Button>
+                        {isHistorical && (
+                            <Button onClick={handleResetToToday} variant="ghost" size="sm" className="h-8 gap-1">
+                                <RotateCcw className="h-3 w-3" /> Oggi
+                            </Button>
+                        )}
+                    </div>
+                    {isHistorical && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            ⚠️ Visualizzi lo stock al {format(new Date(selectedDate), 'dd/MM/yyyy')}
+                        </p>
+                    )}
+                </Card>
+
+                {/* Summary Cards */}
                 <div className="flex gap-4">
                     <Card className="px-4 py-2">
                         <p className="text-sm text-slate-500 dark:text-slate-400">Articoli</p>
@@ -103,6 +179,7 @@ export default function ArticlesReport() {
                         </p>
                     </Card>
                 </div>
+
                 <Button onClick={handleExportPDF} className="gap-2">
                     <FileDown className="h-4 w-4" />
                     Esporta PDF
@@ -110,9 +187,16 @@ export default function ArticlesReport() {
             </div>
 
             {/* Articles Table - Grouped by Type */}
-            <Card className="flex flex-col" style={{ height: 'calc(100vh - 280px)', minHeight: '400px' }}>
+            <Card className="flex flex-col" style={{ height: 'calc(100vh - 320px)', minHeight: '400px' }}>
                 <CardHeader className="pb-2 flex-shrink-0 border-b dark:border-slate-700">
-                    <CardTitle className="text-lg dark:text-white">Dettaglio Articoli per Tipologia e Lotto</CardTitle>
+                    <CardTitle className="text-lg dark:text-white">
+                        Dettaglio Articoli per Tipologia e Lotto
+                        {isHistorical && (
+                            <span className="text-sm font-normal text-amber-600 dark:text-amber-400 ml-2">
+                                (al {format(new Date(selectedDate), 'dd/MM/yyyy')})
+                            </span>
+                        )}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0 flex-1 overflow-hidden">
                     <div

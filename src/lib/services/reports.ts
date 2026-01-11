@@ -21,21 +21,38 @@ export interface ArticlesReportData {
     articles: ArticleLot[];
     totalValue: number;
     generatedAt: string;
+    asOfDate?: string; // Date for historical reports
 }
 
 // Get all articles with stock > 0, broken down by lot
-export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
+// If targetDate is provided, calculates stock as of that date using RPC function
+export const getArticlesWithStock = async (targetDate?: string): Promise<ArticlesReportData> => {
     try {
-        // First, get all lots with remaining pieces directly from the view
-        const { data: lots, error: lotsError } = await supabase
-            .from('purchase_batch_availability')
-            .select('*')
-            .gt('remaining_pieces', 0)
-            .order('purchase_date', { ascending: true });
+        let lots: any[] = [];
 
-        if (lotsError) {
-            console.error('Error fetching lots:', lotsError);
-            throw lotsError;
+        if (targetDate) {
+            // Use RPC function for historical calculation
+            const { data, error } = await supabase
+                .rpc('get_stock_at_date', { target_date: targetDate });
+
+            if (error) {
+                console.error('Error fetching historical lots:', error);
+                throw error;
+            }
+            lots = data || [];
+        } else {
+            // Use the current view for real-time data
+            const { data, error } = await supabase
+                .from('purchase_batch_availability')
+                .select('*')
+                .gt('remaining_pieces', 0)
+                .order('purchase_date', { ascending: true });
+
+            if (error) {
+                console.error('Error fetching lots:', error);
+                throw error;
+            }
+            lots = data || [];
         }
 
         // Get all inventory items to get names and other details
@@ -57,7 +74,7 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
         const articles: ArticleLot[] = [];
 
         // Process lots
-        for (const lot of lots || []) {
+        for (const lot of lots) {
             const item = itemMap.get(lot.item_id);
             if (!item) continue;
 
@@ -84,30 +101,32 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
             });
         }
 
-        // Also check for items with pieces but no tracked lots (legacy stock)
-        const trackedItemIds = new Set(articles.map(a => a.itemId));
-        for (const item of items || []) {
-            if (!trackedItemIds.has(item.id) && item.pieces && item.pieces > 0) {
-                const pieces = item.pieces || 0;
-                const coeff = item.coefficient || 1;
-                const quantity = pieces * coeff;
+        // For current date only: Also check for items with pieces but no tracked lots (legacy stock)
+        if (!targetDate) {
+            const trackedItemIds = new Set(articles.map(a => a.itemId));
+            for (const item of items || []) {
+                if (!trackedItemIds.has(item.id) && item.pieces && item.pieces > 0) {
+                    const pieces = item.pieces || 0;
+                    const coeff = item.coefficient || 1;
+                    const quantity = pieces * coeff;
 
-                articles.push({
-                    itemId: item.id,
-                    itemCode: item.code || '',
-                    itemName: item.name || '',
-                    itemModel: item.model || '',
-                    itemBrand: item.brand || '',
-                    itemType: item.category || '',
-                    itemUnit: item.unit || '',
-                    coefficient: coeff,
-                    lotRef: 'Non tracciato',
-                    lotDate: '',
-                    price: 0,
-                    pieces: pieces,
-                    quantity: quantity,
-                    totalValue: 0
-                });
+                    articles.push({
+                        itemId: item.id,
+                        itemCode: item.code || '',
+                        itemName: item.name || '',
+                        itemModel: item.model || '',
+                        itemBrand: item.brand || '',
+                        itemType: item.category || '',
+                        itemUnit: item.unit || '',
+                        coefficient: coeff,
+                        lotRef: 'Non tracciato',
+                        lotDate: '',
+                        price: 0,
+                        pieces: pieces,
+                        quantity: quantity,
+                        totalValue: 0
+                    });
+                }
             }
         }
 
@@ -119,7 +138,8 @@ export const getArticlesWithStock = async (): Promise<ArticlesReportData> => {
         return {
             articles,
             totalValue,
-            generatedAt: new Date().toISOString()
+            generatedAt: new Date().toISOString(),
+            asOfDate: targetDate
         };
     } catch (error) {
         console.error('getArticlesWithStock error:', error);
