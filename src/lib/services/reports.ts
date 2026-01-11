@@ -101,34 +101,9 @@ export const getArticlesWithStock = async (targetDate?: string): Promise<Article
             });
         }
 
-        // For current date only: Also check for items with pieces but no tracked lots (legacy stock)
-        if (!targetDate) {
-            const trackedItemIds = new Set(articles.map(a => a.itemId));
-            for (const item of items || []) {
-                if (!trackedItemIds.has(item.id) && item.pieces && item.pieces > 0) {
-                    const pieces = item.pieces || 0;
-                    const coeff = item.coefficient || 1;
-                    const quantity = pieces * coeff;
-
-                    articles.push({
-                        itemId: item.id,
-                        itemCode: item.code || '',
-                        itemName: item.name || '',
-                        itemModel: item.model || '',
-                        itemBrand: item.brand || '',
-                        itemType: item.category || '',
-                        itemUnit: item.unit || '',
-                        coefficient: coeff,
-                        lotRef: 'Non tracciato',
-                        lotDate: '',
-                        price: 0,
-                        pieces: pieces,
-                        quantity: quantity,
-                        totalValue: 0
-                    });
-                }
-            }
-        }
+        // NOTE: Removed legacy fallback to inventory.pieces
+        // All stock must come from tracked lots (purchase_items + delivery_notes)
+        // This ensures historical reports always show correct lot references and prices
 
         // Sort by code
         articles.sort((a, b) => a.itemCode.localeCompare(b.itemCode));
@@ -222,28 +197,8 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
             });
         }
 
-        // Also check for items with pieces but no tracked lots
-        const trackedItemIds = new Set(countItems.map(i => i.itemId));
-        for (const item of items || []) {
-            if (!trackedItemIds.has(item.id) && item.pieces && item.pieces > 0) {
-                const pieces = item.pieces || 0;
-                const coeff = item.coefficient || 1;
-
-                countItems.push({
-                    itemId: item.id,
-                    itemCode: item.code || '',
-                    itemName: item.name || '',
-                    itemModel: item.model || '',
-                    itemBrand: item.brand || '',
-                    itemType: item.category || '',
-                    itemUnit: item.unit || '',
-                    coefficient: coeff,
-                    lotRef: 'Non tracciato',
-                    systemPieces: pieces,
-                    systemQuantity: pieces * coeff
-                });
-            }
-        }
+        // NOTE: Removed legacy fallback to inventory.pieces
+        // All stock must come from tracked lots (purchase_items + delivery_notes)
 
         // Sort by type and code
         countItems.sort((a, b) => {
