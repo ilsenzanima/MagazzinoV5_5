@@ -595,19 +595,23 @@ export default function InventoryDetailPage() {
                         <div className="text-xs text-blue-400 dark:text-blue-500 font-medium">Quantità Totale</div>
                       </div>
 
-                      {/* Stock Value */}
-                      <div className="p-3 bg-slate-50 dark:bg-muted border border-slate-200 dark:border-slate-700 rounded-md text-center">
-                        <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-                          {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Valore Stock Attuale</div>
-                      </div>
+                      {/* Stock Value - Hidden for regular users */}
+                      {(userRole === 'admin' || userRole === 'operativo') && (
+                        <>
+                          <div className="p-3 bg-slate-50 dark:bg-muted border border-slate-200 dark:border-slate-700 rounded-md text-center">
+                            <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
+                              {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Valore Stock Attuale</div>
+                          </div>
 
-                      {!isStockValueComplete && (
-                        <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2 justify-center">
-                          <AlertTriangle className="h-4 w-4 shrink-0" />
-                          <span>Dati costo incompleti (Valore parziale)</span>
-                        </div>
+                          {!isStockValueComplete && (
+                            <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2 justify-center">
+                              <AlertTriangle className="h-4 w-4 shrink-0" />
+                              <span>Dati costo incompleti (Valore parziale)</span>
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {/* Real Pieces (Secondary) */}

@@ -196,7 +196,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         {getStatusBadge(job.status)}
-                        {(userRole === 'admin' || userRole === 'operativo') && (
+                        {userRole === 'admin' && (
                           <Button
                             variant="ghost"
                             size="icon"

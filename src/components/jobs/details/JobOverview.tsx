@@ -115,7 +115,7 @@ export function JobOverview({ job, totalCost, onJobUpdated }: JobOverviewProps) 
                 <span className="hidden md:inline">Modifica</span>
               </Button>
             )}
-            {(userRole === 'admin' || userRole === 'operativo') && (
+            {userRole === 'admin' && (
               <Button
                 variant="destructive"
                 size="sm"
