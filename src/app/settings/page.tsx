@@ -61,7 +61,7 @@ export default function SettingsPage() {
                         <div className="space-y-2">
                             <Label>Tema</Label>
                             <RadioGroup
-                                defaultValue={theme}
+                                value={theme}
                                 onValueChange={(value) => setTheme(value)}
                                 className="grid grid-cols-2 md:grid-cols-4 gap-4"
                             >
