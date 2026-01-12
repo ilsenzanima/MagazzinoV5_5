@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Truck, ArrowDownRight, ArrowUpRight, ShoppingBag, MapPin, Search, Package, Clock } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
     inventoryApi,
@@ -81,6 +81,9 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
     // Dialog States
     const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
     const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
+
+    // Loading States for Search
+    const [itemsLoading, setItemsLoading] = useState(false);
 
     // Form State
     const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale'>(initialNote.type);
@@ -234,6 +237,20 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
             }).catch(err => console.error("Failed to load job inventory", err));
         } else {
             setJobInventory([]);
+        }
+    }, [activeTab, selectedJob]);
+
+    // Handler for server-side item search
+    const handleItemSearch = useCallback(async (term: string) => {
+        if (activeTab === 'entry' && selectedJob) return; // Job inventory is already loaded
+        setItemsLoading(true);
+        try {
+            const { items } = await inventoryApi.getPaginated({ page: 1, limit: 50, search: term });
+            setInventory(items);
+        } catch (error) {
+            console.error("Failed to search items", error);
+        } finally {
+            setItemsLoading(false);
         }
     }, [activeTab, selectedJob]);
 
@@ -769,6 +786,8 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
                 onOpenChange={setIsItemSelectorOpen}
                 onSelect={handleItemSelect}
                 items={dialogItems}
+                onSearch={handleItemSearch}
+                loading={itemsLoading}
             />
         </div>
     );
