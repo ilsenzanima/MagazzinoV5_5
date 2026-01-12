@@ -1,6 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* OpenDyslexic - Font specifico per dislessia */
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/woff/OpenDyslexic-Regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/woff/OpenDyslexic-Bold.woff') format('woff');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -195,6 +212,22 @@
 .gray h6 {
   font-family: var(--font-inter), system-ui, sans-serif;
   font-weight: 600;
+}
+
+/* OpenDyslexic Theme - Variante con font OpenDyslexic */
+/* Per chi preferisce OpenDyslexic invece di Lexend */
+.gray.font-opendyslexic,
+.gray.font-opendyslexic * {
+  font-family: 'OpenDyslexic', system-ui, sans-serif !important;
+}
+
+.gray.font-opendyslexic h1,
+.gray.font-opendyslexic h2,
+.gray.font-opendyslexic h3,
+.gray.font-opendyslexic h4,
+.gray.font-opendyslexic h5,
+.gray.font-opendyslexic h6 {
+  font-weight: 700;
 }
 
 /* Animations */

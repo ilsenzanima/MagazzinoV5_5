@@ -6,15 +6,34 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
     const { setTheme, theme } = useTheme();
     const [mounted, setMounted] = useState(false);
+    const [useOpenDyslexic, setUseOpenDyslexic] = useState(false);
 
     // useEffect only runs on the client, so now we can safely show the UI
     useEffect(() => {
         setMounted(true);
+        // Load font preference from localStorage
+        const savedFont = localStorage.getItem('font-preference');
+        if (savedFont === 'opendyslexic') {
+            setUseOpenDyslexic(true);
+            document.body.classList.add('font-opendyslexic');
+        }
     }, []);
+
+    const toggleOpenDyslexic = (enabled: boolean) => {
+        setUseOpenDyslexic(enabled);
+        if (enabled) {
+            document.body.classList.add('font-opendyslexic');
+            localStorage.setItem('font-preference', 'opendyslexic');
+        } else {
+            document.body.classList.remove('font-opendyslexic');
+            localStorage.setItem('font-preference', 'lexend');
+        }
+    };
 
     if (!mounted) {
         return null;
@@ -103,6 +122,40 @@ export default function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Font Accessibility - Solo per tema grigio */}
+                {theme === 'gray' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Accessibilità Font</CardTitle>
+                            <CardDescription>
+                                Opzioni per migliorare la leggibilità del testo.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label>Usa OpenDyslexic</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        Font specifico per la dislessia con lettere pesate alla base
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={useOpenDyslexic}
+                                    onCheckedChange={toggleOpenDyslexic}
+                                />
+                            </div>
+                            <div className="p-4 rounded-lg bg-muted/50 border">
+                                <p className="text-sm">
+                                    <strong>Anteprima:</strong> Questo è un esempio di testo per vedere come appare il font selezionato.
+                                </p>
+                                <p className="text-sm mt-2">
+                                    I numeri: 0123456789 e le lettere: ABCDEFGabcdefg
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </div>
     );
