@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -45,6 +45,7 @@ export default function PurchaseDetailPage() {
     // Data Sources for Add Item
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
     // Add Item State
     const [isAddPopupOpen, setIsAddPopupOpen] = useState(false); // New state for popup
@@ -71,6 +72,12 @@ export default function PurchaseDetailPage() {
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [editValues, setEditValues] = useState<{ price: string, quantity: string, pieces: string }>({ price: "", quantity: "", pieces: "" });
 
+    // Edit Header State
+    const [isEditingHeader, setIsEditingHeader] = useState(false);
+    const [editNumber, setEditNumber] = useState("");
+    const [editDate, setEditDate] = useState("");
+    const [editSupplierId, setEditSupplierId] = useState("");
+
     useEffect(() => {
         if (id) {
             loadData();
@@ -80,12 +87,13 @@ export default function PurchaseDetailPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData] = await Promise.all([
+            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData] = await Promise.all([
                 purchasesApi.getById(id),
                 purchasesApi.getItems(id),
                 inventoryApi.getAll(),
                 jobsApi.getAll(),
-                purchasesApi.getPurchaseBatchAvailability(id)
+                purchasesApi.getPurchaseBatchAvailability(id),
+                suppliersApi.getAll()
             ]);
 
             setPurchase(purchaseData);
@@ -93,6 +101,7 @@ export default function PurchaseDetailPage() {
             setInventory(inventoryData);
             setJobs(jobsData.filter(j => j.status === 'active'));
             setBatchAvailability(availabilityData);
+            setSuppliers(suppliersData);
 
             if (purchaseData.jobId) {
                 const job = jobsData.find(j => j.id === purchaseData.jobId);
@@ -112,6 +121,39 @@ export default function PurchaseDetailPage() {
             alert("Errore nel caricamento dell'acquisto");
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Header Edit Functions
+    const startEditingHeader = () => {
+        if (!purchase) return;
+        setEditNumber(purchase.deliveryNoteNumber);
+        setEditDate(purchase.deliveryNoteDate.split('T')[0]);
+        setEditSupplierId(purchase.supplierId);
+        setIsEditingHeader(true);
+    };
+
+    const cancelEditingHeader = () => {
+        setIsEditingHeader(false);
+    };
+
+    const saveEditingHeader = async () => {
+        if (!editNumber || !editDate || !editSupplierId) {
+            alert("Compila tutti i campi");
+            return;
+        }
+        try {
+            await purchasesApi.update(id, {
+                deliveryNoteNumber: editNumber,
+                deliveryNoteDate: editDate,
+                supplierId: editSupplierId
+            });
+            // Refresh data
+            await loadData();
+            setIsEditingHeader(false);
+        } catch (error) {
+            console.error("Failed to update header", error);
+            alert("Errore durante il salvataggio");
         }
     };
 
@@ -439,13 +481,41 @@ export default function PurchaseDetailPage() {
                 <div className="grid gap-6">
                     {/* Header Info */}
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Informazioni Generali</CardTitle>
+                            {(userRole === 'admin' || userRole === 'operativo') && !isEditingHeader && (
+                                <Button variant="ghost" size="sm" onClick={startEditingHeader}>
+                                    <Pen className="h-4 w-4 mr-1" /> Modifica
+                                </Button>
+                            )}
+                            {isEditingHeader && (
+                                <div className="flex gap-2">
+                                    <Button variant="ghost" size="sm" onClick={cancelEditingHeader}>
+                                        Annulla
+                                    </Button>
+                                    <Button size="sm" onClick={saveEditingHeader}>
+                                        <Save className="h-4 w-4 mr-1" /> Salva
+                                    </Button>
+                                </div>
+                            )}
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <Label className="text-slate-500">Fornitore</Label>
-                                <div className="font-medium text-lg">{purchase.supplierName}</div>
+                                {isEditingHeader ? (
+                                    <Select value={editSupplierId} onValueChange={setEditSupplierId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleziona fornitore..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {suppliers.map(s => (
+                                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <div className="font-medium text-lg">{purchase.supplierName}</div>
+                                )}
                             </div>
                             <div>
                                 <Label className="text-slate-500">Registrato da</Label>
@@ -453,11 +523,27 @@ export default function PurchaseDetailPage() {
                             </div>
                             <div>
                                 <Label className="text-slate-500">Numero Bolla</Label>
-                                <div className="font-medium">{purchase.deliveryNoteNumber}</div>
+                                {isEditingHeader ? (
+                                    <Input
+                                        value={editNumber}
+                                        onChange={(e) => setEditNumber(e.target.value)}
+                                        placeholder="Numero bolla"
+                                    />
+                                ) : (
+                                    <div className="font-medium">{purchase.deliveryNoteNumber}</div>
+                                )}
                             </div>
                             <div>
                                 <Label className="text-slate-500">Data Bolla</Label>
-                                <div className="font-medium">{new Date(purchase.deliveryNoteDate).toLocaleDateString()}</div>
+                                {isEditingHeader ? (
+                                    <Input
+                                        type="date"
+                                        value={editDate}
+                                        onChange={(e) => setEditDate(e.target.value)}
+                                    />
+                                ) : (
+                                    <div className="font-medium">{new Date(purchase.deliveryNoteDate).toLocaleDateString()}</div>
+                                )}
                             </div>
                             <div className="md:col-span-2 border-t pt-4 mt-2">
                                 <Label className="text-slate-500 mb-1 block">Commessa (Generale)</Label>
@@ -475,7 +561,8 @@ export default function PurchaseDetailPage() {
                                     ) : (
                                         <span className="text-sm text-slate-500 truncate">Seleziona per applicare a nuovi articoli...</span>
                                     )}
-                                    {selectedHeaderJob ? (
+                                    {/* X button only visible in edit mode */}
+                                    {isEditingHeader && selectedHeaderJob ? (
                                         <div
                                             className="p-1 hover:bg-red-100 rounded-full"
                                             onClick={handleClearHeaderJob}
