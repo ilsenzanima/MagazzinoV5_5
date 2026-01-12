@@ -6,33 +6,46 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { Switch } from "@/components/ui/switch";
+
+type FontPreference = 'default' | 'lexend' | 'opendyslexic';
 
 export default function SettingsPage() {
-    const { setTheme, theme } = useTheme();
+    const { setTheme, theme, resolvedTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
-    const [useOpenDyslexic, setUseOpenDyslexic] = useState(false);
+    const [fontPreference, setFontPreference] = useState<FontPreference>('default');
 
-    // useEffect only runs on the client, so now we can safely show the UI
+    // Load settings on mount
     useEffect(() => {
         setMounted(true);
-        // Load font preference from localStorage
-        const savedFont = localStorage.getItem('font-preference');
-        if (savedFont === 'opendyslexic') {
-            setUseOpenDyslexic(true);
-            document.body.classList.add('font-opendyslexic');
+        const savedFont = localStorage.getItem('font-preference') as FontPreference;
+        if (savedFont) {
+            setFontPreference(savedFont);
+            applyFont(savedFont);
         }
     }, []);
 
-    const toggleOpenDyslexic = (enabled: boolean) => {
-        setUseOpenDyslexic(enabled);
-        if (enabled) {
+    const applyFont = (font: FontPreference) => {
+        // Remove all font classes first
+        document.body.classList.remove('font-lexend', 'font-opendyslexic');
+
+        // Apply new font class
+        if (font === 'lexend') {
+            document.body.classList.add('font-lexend');
+        } else if (font === 'opendyslexic') {
             document.body.classList.add('font-opendyslexic');
-            localStorage.setItem('font-preference', 'opendyslexic');
-        } else {
-            document.body.classList.remove('font-opendyslexic');
-            localStorage.setItem('font-preference', 'lexend');
         }
+        // 'default' uses Geist Sans, no extra class needed
+    };
+
+    const handleFontChange = (font: FontPreference) => {
+        setFontPreference(font);
+        applyFont(font);
+        localStorage.setItem('font-preference', font);
+    };
+
+    const handleThemeChange = (newTheme: string) => {
+        console.log('Changing theme from', theme, 'to', newTheme);
+        setTheme(newTheme);
     };
 
     if (!mounted) {
@@ -59,10 +72,10 @@ export default function SettingsPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Tema</Label>
+                            <Label>Tema Colore</Label>
                             <RadioGroup
                                 value={theme}
-                                onValueChange={(value) => setTheme(value)}
+                                onValueChange={handleThemeChange}
                                 className="grid grid-cols-2 md:grid-cols-4 gap-4"
                             >
                                 <div>
@@ -123,39 +136,62 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
 
-                {/* Font Accessibility - Solo per tema grigio */}
-                {theme === 'gray' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Accessibilità Font</CardTitle>
-                            <CardDescription>
-                                Opzioni per migliorare la leggibilità del testo.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Usa OpenDyslexic</Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Font specifico per la dislessia con lettere pesate alla base
-                                    </p>
-                                </div>
-                                <Switch
-                                    checked={useOpenDyslexic}
-                                    onCheckedChange={toggleOpenDyslexic}
-                                />
+                {/* Font Accessibility - Disponibile per tutti i temi */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Accessibilità Font</CardTitle>
+                        <CardDescription>
+                            Scegli il font che preferisci per migliorare la leggibilità.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <RadioGroup
+                            value={fontPreference}
+                            onValueChange={(value) => handleFontChange(value as FontPreference)}
+                            className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                        >
+                            <div>
+                                <RadioGroupItem value="default" id="font-default" className="peer sr-only" />
+                                <Label
+                                    htmlFor="font-default"
+                                    className="flex flex-col rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 [&:has([data-state=checked])]:border-blue-600 cursor-pointer"
+                                >
+                                    <span className="font-semibold">Geist Sans</span>
+                                    <span className="text-sm text-muted-foreground">Font predefinito</span>
+                                    <div className="mt-2 p-2 bg-muted/50 rounded text-sm" style={{ fontFamily: 'var(--font-geist-sans), system-ui' }}>
+                                        Anteprima: ABCDabcd 0123
+                                    </div>
+                                </Label>
                             </div>
-                            <div className="p-4 rounded-lg bg-muted/50 border">
-                                <p className="text-sm">
-                                    <strong>Anteprima:</strong> Questo è un esempio di testo per vedere come appare il font selezionato.
-                                </p>
-                                <p className="text-sm mt-2">
-                                    I numeri: 0123456789 e le lettere: ABCDEFGabcdefg
-                                </p>
+                            <div>
+                                <RadioGroupItem value="lexend" id="font-lexend" className="peer sr-only" />
+                                <Label
+                                    htmlFor="font-lexend"
+                                    className="flex flex-col rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 [&:has([data-state=checked])]:border-blue-600 cursor-pointer"
+                                >
+                                    <span className="font-semibold">Lexend</span>
+                                    <span className="text-sm text-muted-foreground">Ottimizzato per la lettura</span>
+                                    <div className="mt-2 p-2 bg-muted/50 rounded text-sm" style={{ fontFamily: 'var(--font-lexend), system-ui' }}>
+                                        Anteprima: ABCDabcd 0123
+                                    </div>
+                                </Label>
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
+                            <div>
+                                <RadioGroupItem value="opendyslexic" id="font-opendyslexic" className="peer sr-only" />
+                                <Label
+                                    htmlFor="font-opendyslexic"
+                                    className="flex flex-col rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-blue-600 [&:has([data-state=checked])]:border-blue-600 cursor-pointer"
+                                >
+                                    <span className="font-semibold">OpenDyslexic</span>
+                                    <span className="text-sm text-muted-foreground">Progettato per la dislessia</span>
+                                    <div className="mt-2 p-2 bg-muted/50 rounded text-sm" style={{ fontFamily: "'OpenDyslexic', system-ui" }}>
+                                        Anteprima: ABCDabcd 0123
+                                    </div>
+                                </Label>
+                            </div>
+                        </RadioGroup>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
