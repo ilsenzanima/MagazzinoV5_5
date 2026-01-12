@@ -216,17 +216,18 @@
 
 /* OpenDyslexic Theme - Variante con font OpenDyslexic */
 /* Per chi preferisce OpenDyslexic invece di Lexend */
-.gray.font-opendyslexic,
-.gray.font-opendyslexic * {
+/* Nota: .gray è su html, .font-opendyslexic è su body */
+html.gray body.font-opendyslexic,
+html.gray body.font-opendyslexic * {
   font-family: 'OpenDyslexic', system-ui, sans-serif !important;
 }
 
-.gray.font-opendyslexic h1,
-.gray.font-opendyslexic h2,
-.gray.font-opendyslexic h3,
-.gray.font-opendyslexic h4,
-.gray.font-opendyslexic h5,
-.gray.font-opendyslexic h6 {
+html.gray body.font-opendyslexic h1,
+html.gray body.font-opendyslexic h2,
+html.gray body.font-opendyslexic h3,
+html.gray body.font-opendyslexic h4,
+html.gray body.font-opendyslexic h5,
+html.gray body.font-opendyslexic h6 {
   font-weight: 700;
 }
 
