@@ -181,6 +181,17 @@
   }
 }
 
+/* Gray Theme - Font Inter per titoli */
+.gray h1,
+.gray h2,
+.gray h3,
+.gray h4,
+.gray h5,
+.gray h6 {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-weight: 600;
+}
+
 /* Animations */
 @keyframes blob {
   0% {
