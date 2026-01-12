@@ -181,7 +181,12 @@
   }
 }
 
-/* Gray Theme - Font Inter per titoli */
+/* Gray Theme - Font Lexend per dislessia, Inter per titoli */
+/* Lexend: font progettato per ridurre lo stress visivo e aiutare la lettura */
+.gray {
+  font-family: var(--font-lexend), system-ui, sans-serif;
+}
+
 .gray h1,
 .gray h2,
 .gray h3,

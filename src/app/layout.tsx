@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Inter, Lexend } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
@@ -18,6 +18,11 @@ const geistMono = Geist_Mono({
 
 const inter = Inter({
   variable: "--font-inter",
+  subsets: ["latin"],
+});
+
+const lexend = Lexend({
+  variable: "--font-lexend",
   subsets: ["latin"],
 });
 
@@ -52,7 +57,7 @@ export default function RootLayout({
   return (
     <html lang="it" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${lexend.variable} antialiased bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
