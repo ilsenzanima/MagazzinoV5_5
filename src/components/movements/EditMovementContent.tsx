@@ -168,6 +168,12 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
         // We can skip the first run.
     }, [activeTab, selectedJob]);
 
+    // Auto-sync packagesCount with number of lines
+    useEffect(() => {
+        const count = lines.length > 0 ? lines.length : 1;
+        setPackagesCount(count.toString());
+    }, [lines.length]);
+
     // Re-implementing the location logic but ensuring we don't overwrite on mount if we already have values
     // This is tricky. The original code ran on mount.
     // If I load an existing note, I want to keep its values.

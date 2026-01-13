@@ -162,6 +162,12 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
         }
     }, [activeTab, selectedJob]);
 
+    // Auto-sync packagesCount with number of lines
+    useEffect(() => {
+        const count = lines.length > 0 ? lines.length : 1;
+        setPackagesCount(count.toString());
+    }, [lines.length]);
+
     // Handlers
     const handleJobSearch = useCallback(async (term: string) => {
         setJobsLoading(true);
