@@ -541,119 +541,122 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* Add Line Form */}
-                            <div className="flex flex-col sm:flex-row gap-3 items-end bg-slate-50 dark:bg-muted p-3 rounded-lg border border-slate-100 dark:border-slate-700">
-                                <div className="flex-1 space-y-2 w-full">
-                                    <Label>Seleziona Articolo</Label>
-                                    <div
-                                        className="flex items-center justify-between bg-white dark:bg-card border dark:border-border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 h-10"
-                                        onClick={() => setIsItemSelectorOpen(true)}
-                                    >
-                                        {selectedItemForLine ? (
-                                            <div className="flex flex-col overflow-hidden">
-                                                <span className="font-medium text-sm truncate">{selectedItemForLine.name}</span>
-                                                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedItemForLine.code}</span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-slate-500 dark:text-slate-400 text-sm">Cerca articolo...</span>
-                                        )}
-                                        <Search className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-                                    </div>
-                                </div>
-
-                                {/* Batch Selector for Exit/Sale - Always show when item selected */}
-                                {(activeTab === 'exit' || activeTab === 'sale') && selectedItemForLine && (
-                                    <div className="w-full sm:w-56 space-y-2">
-                                        <Label className="text-xs">Seleziona Lotto (FIFO)</Label>
-                                        <Select
-                                            value={currentLine.purchaseItemId}
-                                            onValueChange={(val) => setCurrentLine({ ...currentLine, purchaseItemId: val })}
+                            <div className={`flex flex-col gap-3 ${selectedItemForLine && (activeTab === 'exit' || activeTab === 'sale') ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800' : 'bg-slate-50 dark:bg-muted border-slate-100 dark:border-slate-700'} p-3 rounded-lg border`}>
+                                {/* Row 1: Article Selector */}
+                                <div className="flex gap-3 items-end">
+                                    <div className="flex-1 space-y-2 w-full">
+                                        <Label>Seleziona Articolo</Label>
+                                        <div
+                                            className="flex items-center justify-between bg-white dark:bg-card border dark:border-border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 h-10"
+                                            onClick={() => setIsItemSelectorOpen(true)}
                                         >
-                                            <SelectTrigger className="h-10 bg-white dark:bg-card">
-                                                <SelectValue placeholder="Seleziona lotto..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {availableBatches.length > 0 ? (
-                                                    <>
-                                                        {availableBatches.map(batch => (
-                                                            <SelectItem key={batch.id} value={batch.id}>
-                                                                <span className="flex flex-col text-left">
-                                                                    <span className="font-medium">{batch.purchaseRef || "Nessun Rif."}</span>
-                                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                                                                        Pz: {batch.remainingPieces ?? batch.remainingQty} / Q.tà: {batch.remainingQty}
+                                            {selectedItemForLine ? (
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="font-medium text-sm truncate">{selectedItemForLine.name}</span>
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedItemForLine.code}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-500 dark:text-slate-400 text-sm">Cerca articolo...</span>
+                                            )}
+                                            <Search className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
+                                        </div>
+                                    </div>
+
+                                    {/* Batch Selector for Exit/Sale - Always show when item selected */}
+                                    {(activeTab === 'exit' || activeTab === 'sale') && selectedItemForLine && (
+                                        <div className="w-full sm:w-56 space-y-2">
+                                            <Label className="text-xs">Seleziona Lotto (FIFO)</Label>
+                                            <Select
+                                                value={currentLine.purchaseItemId}
+                                                onValueChange={(val) => setCurrentLine({ ...currentLine, purchaseItemId: val })}
+                                            >
+                                                <SelectTrigger className="h-10 bg-white dark:bg-card">
+                                                    <SelectValue placeholder="Seleziona lotto..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {availableBatches.length > 0 ? (
+                                                        <>
+                                                            {availableBatches.map(batch => (
+                                                                <SelectItem key={batch.id} value={batch.id}>
+                                                                    <span className="flex flex-col text-left">
+                                                                        <span className="font-medium">{batch.purchaseRef || "Nessun Rif."}</span>
+                                                                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                                                                            Pz: {batch.remainingPieces ?? batch.remainingQty} / Q.tà: {batch.remainingQty}
+                                                                        </span>
                                                                     </span>
+                                                                </SelectItem>
+                                                            ))}
+                                                            <SelectItem value="fictitious" className="border-t mt-1 pt-1">
+                                                                <span className="flex flex-col text-left text-amber-600">
+                                                                    <span className="font-medium">⚠️ Lotto Fittizio</span>
+                                                                    <span className="text-xs">Non scala da magazzino</span>
                                                                 </span>
                                                             </SelectItem>
-                                                        ))}
-                                                        <SelectItem value="fictitious" className="border-t mt-1 pt-1">
-                                                            <span className="flex flex-col text-left text-amber-600">
-                                                                <span className="font-medium">⚠️ Lotto Fittizio</span>
-                                                                <span className="text-xs">Non scala da magazzino</span>
-                                                            </span>
-                                                        </SelectItem>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <SelectItem value="no-batches" disabled>
-                                                            <span className="text-red-500">Nessun lotto disponibile</span>
-                                                        </SelectItem>
-                                                        <SelectItem value="fictitious">
-                                                            <span className="flex flex-col text-left text-amber-600">
-                                                                <span className="font-medium">⚠️ Lotto Fittizio</span>
-                                                                <span className="text-xs">Non scala da magazzino</span>
-                                                            </span>
-                                                        </SelectItem>
-                                                    </>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        {availableBatches.length === 0 && (
-                                            <p className="text-xs text-amber-600">Nessun lotto reale. Usa "Fittizio" per movimenti senza tracciabilità.</p>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="w-full sm:w-32 space-y-2">
-                                    {currentLine.coefficient !== 1 && (
-                                        <div>
-                                            <Label htmlFor="pieces-input" className="text-xs">Pezzi</Label>
-                                            <Input
-                                                id="pieces-input"
-                                                type="number"
-                                                min="0"
-                                                className="bg-white h-8 text-sm"
-                                                value={currentLine.pieces}
-                                                onChange={(e) => {
-                                                    const p = e.target.value;
-                                                    // Se abbiamo i pezzi, calcoliamo la quantità
-                                                    // Se il campo è vuoto, lasciamo vuoto anche quantità
-                                                    const q = p ? (parseFloat(p) * currentLine.coefficient).toFixed(2) : "";
-
-                                                    setCurrentLine({
-                                                        ...currentLine,
-                                                        pieces: p,
-                                                        quantity: q
-                                                    });
-                                                }}
-                                                placeholder="Pezzi"
-                                            />
-                                            <p className="text-xs text-muted-foreground mt-1">Coeff: {currentLine.coefficient}</p>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <SelectItem value="no-batches" disabled>
+                                                                <span className="text-red-500">Nessun lotto disponibile</span>
+                                                            </SelectItem>
+                                                            <SelectItem value="fictitious">
+                                                                <span className="flex flex-col text-left text-amber-600">
+                                                                    <span className="font-medium">⚠️ Lotto Fittizio</span>
+                                                                    <span className="text-xs">Non scala da magazzino</span>
+                                                                </span>
+                                                            </SelectItem>
+                                                        </>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            {availableBatches.length === 0 && (
+                                                <p className="text-xs text-amber-600">Nessun lotto reale. Usa "Fittizio" per movimenti senza tracciabilità.</p>
+                                            )}
                                         </div>
                                     )}
-                                    <Label htmlFor="qty-input">Quantità ({currentLine.unit})</Label>
-                                    <Input
-                                        id="qty-input"
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        className={`bg-white ${currentLine.coefficient !== 1 ? 'bg-slate-100' : ''}`}
-                                        readOnly={currentLine.coefficient !== 1}
-                                        value={currentLine.quantity}
-                                        onChange={(e) => setCurrentLine({ ...currentLine, quantity: e.target.value })}
-                                    />
+
+                                    <div className="w-full sm:w-32 space-y-2">
+                                        {currentLine.coefficient !== 1 && (
+                                            <div>
+                                                <Label htmlFor="pieces-input" className="text-xs">Pezzi</Label>
+                                                <Input
+                                                    id="pieces-input"
+                                                    type="number"
+                                                    min="0"
+                                                    className="bg-white h-8 text-sm"
+                                                    value={currentLine.pieces}
+                                                    onChange={(e) => {
+                                                        const p = e.target.value;
+                                                        // Se abbiamo i pezzi, calcoliamo la quantità
+                                                        // Se il campo è vuoto, lasciamo vuoto anche quantità
+                                                        const q = p ? (parseFloat(p) * currentLine.coefficient).toFixed(2) : "";
+
+                                                        setCurrentLine({
+                                                            ...currentLine,
+                                                            pieces: p,
+                                                            quantity: q
+                                                        });
+                                                    }}
+                                                    placeholder="Pezzi"
+                                                />
+                                                <p className="text-xs text-muted-foreground mt-1">Coeff: {currentLine.coefficient}</p>
+                                            </div>
+                                        )}
+                                        <Label htmlFor="qty-input">Quantità ({currentLine.unit})</Label>
+                                        <Input
+                                            id="qty-input"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className={`bg-white ${currentLine.coefficient !== 1 ? 'bg-slate-100' : ''}`}
+                                            readOnly={currentLine.coefficient !== 1}
+                                            value={currentLine.quantity}
+                                            onChange={(e) => setCurrentLine({ ...currentLine, quantity: e.target.value })}
+                                        />
+                                    </div>
+                                    <Button onClick={handleAddLine} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700" aria-label="Aggiungi riga">
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                                <Button onClick={handleAddLine} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700" aria-label="Aggiungi riga">
-                                    <Plus className="h-4 w-4" />
-                                </Button>
                             </div>
 
                             {/* Lines Table */}
