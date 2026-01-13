@@ -195,12 +195,11 @@ export interface Purchase {
     supplierName?: string;
     deliveryNoteNumber: string;
     deliveryNoteDate: string;
-    status: 'draft' | 'completed';
     notes?: string;
     createdBy?: string;
     createdByName?: string;
     createdAt: string;
-    items?: { price: number; quantity?: number }[];
+    items?: { price: number; quantity?: number; remainingPieces?: number }[];
     price?: number;
     quantity?: number;
     jobId?: string;
@@ -208,6 +207,7 @@ export interface Purchase {
     documentUrl?: string | null;
     totalAmount?: number;
 }
+
 
 export interface PurchaseItem {
     id: string;

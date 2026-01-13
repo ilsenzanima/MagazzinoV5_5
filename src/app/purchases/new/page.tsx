@@ -374,7 +374,6 @@ export default function NewPurchasePage() {
                 supplierId: formData.supplierId,
                 deliveryNoteNumber: formData.deliveryNoteNumber,
                 deliveryNoteDate: formData.deliveryNoteDate,
-                status: 'draft',
                 notes: '',
                 jobId: formData.jobId || undefined,
                 documentUrl: documentUrl
