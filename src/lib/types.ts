@@ -199,7 +199,7 @@ export interface Purchase {
     createdBy?: string;
     createdByName?: string;
     createdAt: string;
-    items?: { price: number; quantity?: number; remainingPieces?: number }[];
+    items?: { price: number; quantity?: number }[];
     price?: number;
     quantity?: number;
     jobId?: string;
