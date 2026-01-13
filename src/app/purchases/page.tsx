@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, ChevronLeft, ChevronRight, CheckCircle, Package } from "lucide-react";
+import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, Suspense, useDeferredValue, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -14,17 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth-provider";
 
 // Computed status types
-type PurchaseStatus = 'ok' | 'missing_prices' | 'exhausted';
+type PurchaseStatus = 'ok' | 'missing_prices';
 
 // Helper function to compute purchase status
 function getPurchaseStatus(purchase: Purchase): PurchaseStatus {
   const items = purchase.items || [];
-
-  // Check if any item has remainingPieces <= 0
-  const hasExhaustedItems = items.some(item =>
-    item.remainingPieces !== undefined && item.remainingPieces !== null && item.remainingPieces <= 0
-  );
-  if (hasExhaustedItems) return 'exhausted';
 
   // Check if any item has price = 0
   const hasMissingPrices = items.some(item => item.price === 0);
@@ -40,8 +34,6 @@ function getStatusInfo(status: PurchaseStatus) {
       return { label: 'OK', variant: 'default' as const, icon: CheckCircle, color: 'text-green-600' };
     case 'missing_prices':
       return { label: 'Prezzi mancanti', variant: 'secondary' as const, icon: AlertTriangle, color: 'text-amber-600' };
-    case 'exhausted':
-      return { label: 'Pezzi esauriti', variant: 'destructive' as const, icon: Package, color: 'text-red-600' };
   }
 }
 
@@ -54,7 +46,7 @@ function PurchasesContent() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDeferredValue(searchTerm);
-  const [activeTab, setActiveTab] = useState<'all' | 'ok' | 'missing_prices' | 'exhausted'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'ok' | 'missing_prices'>('all');
 
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -94,7 +86,7 @@ function PurchasesContent() {
 
   // Count by status for tab badges
   const statusCounts = useMemo(() => {
-    const counts = { ok: 0, missing_prices: 0, exhausted: 0 };
+    const counts = { ok: 0, missing_prices: 0 };
     purchases.forEach(p => {
       const status = getPurchaseStatus(p);
       counts[status]++;
@@ -130,7 +122,7 @@ function PurchasesContent() {
 
         {/* Filter Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="all" className="text-xs sm:text-sm">
               Tutti ({purchases.length})
             </TabsTrigger>
@@ -140,11 +132,7 @@ function PurchasesContent() {
             </TabsTrigger>
             <TabsTrigger value="missing_prices" className="text-xs sm:text-sm">
               <AlertTriangle className="h-3 w-3 mr-1 hidden sm:inline" />
-              Prezzi ({statusCounts.missing_prices})
-            </TabsTrigger>
-            <TabsTrigger value="exhausted" className="text-xs sm:text-sm">
-              <Package className="h-3 w-3 mr-1 hidden sm:inline" />
-              Esauriti ({statusCounts.exhausted})
+              Prezzi mancanti ({statusCounts.missing_prices})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -222,13 +210,6 @@ function PurchasesContent() {
                           <div className="mb-4 flex items-center text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 p-2 rounded text-xs font-medium border border-yellow-100 dark:border-yellow-900">
                             <AlertTriangle className="h-3 w-3 mr-1.5" />
                             Prezzi mancanti
-                          </div>
-                        )}
-
-                        {status === 'exhausted' && (
-                          <div className="mb-4 flex items-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 p-2 rounded text-xs font-medium border border-red-100 dark:border-red-900">
-                            <Package className="h-3 w-3 mr-1.5" />
-                            Pezzi esauriti
                           </div>
                         )}
 

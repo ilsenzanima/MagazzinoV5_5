@@ -14,8 +14,7 @@ export const mapDbToPurchase = (db: any): Purchase => ({
     createdAt: db.created_at,
     items: db.purchase_items?.map((item: any) => ({
         price: item.price,
-        quantity: item.quantity,
-        remainingPieces: item.remaining_pieces
+        quantity: item.quantity
     })),
     jobId: db.job_id,
     jobCode: db.jobs?.code,
@@ -51,7 +50,7 @@ export const purchasesApi = {
 
         let query = supabase
             .from('purchases')
-            .select('*, suppliers(name), purchase_items(price, quantity, remaining_pieces)', { count: 'estimated' });
+            .select('*, suppliers(name), purchase_items(price, quantity)', { count: 'estimated' });
 
         if (supplierId) {
             query = query.eq('supplier_id', supplierId);
