@@ -560,28 +560,55 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
                                     </div>
                                 </div>
 
-                                {/* Batch Selector for Exit/Sale */}
-                                {(activeTab === 'exit' || activeTab === 'sale') && selectedItemForLine && availableBatches.length > 0 && (
-                                    <div className="w-full sm:w-48 space-y-2">
-                                        <Label className="text-xs">Lotto (FIFO)</Label>
+                                {/* Batch Selector for Exit/Sale - Always show when item selected */}
+                                {(activeTab === 'exit' || activeTab === 'sale') && selectedItemForLine && (
+                                    <div className="w-full sm:w-56 space-y-2">
+                                        <Label className="text-xs">Seleziona Lotto (FIFO)</Label>
                                         <Select
                                             value={currentLine.purchaseItemId}
                                             onValueChange={(val) => setCurrentLine({ ...currentLine, purchaseItemId: val })}
                                         >
-                                            <SelectTrigger className="h-10 bg-white">
-                                                <SelectValue placeholder="Lotto..." />
+                                            <SelectTrigger className="h-10 bg-white dark:bg-card">
+                                                <SelectValue placeholder="Seleziona lotto..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {availableBatches.map(batch => (
-                                                    <SelectItem key={batch.id} value={batch.id}>
-                                                        <span className="flex flex-col text-left">
-                                                            <span className="font-medium">{batch.purchaseRef || "Nessun Rif."}</span>
-                                                            <span className="text-xs text-slate-500 dark:text-slate-400">Disp: {batch.remainingQty}</span>
-                                                        </span>
-                                                    </SelectItem>
-                                                ))}
+                                                {availableBatches.length > 0 ? (
+                                                    <>
+                                                        {availableBatches.map(batch => (
+                                                            <SelectItem key={batch.id} value={batch.id}>
+                                                                <span className="flex flex-col text-left">
+                                                                    <span className="font-medium">{batch.purchaseRef || "Nessun Rif."}</span>
+                                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                                                                        Pz: {batch.remainingPieces ?? batch.remainingQty} / Q.tà: {batch.remainingQty}
+                                                                    </span>
+                                                                </span>
+                                                            </SelectItem>
+                                                        ))}
+                                                        <SelectItem value="fictitious" className="border-t mt-1 pt-1">
+                                                            <span className="flex flex-col text-left text-amber-600">
+                                                                <span className="font-medium">⚠️ Lotto Fittizio</span>
+                                                                <span className="text-xs">Non scala da magazzino</span>
+                                                            </span>
+                                                        </SelectItem>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <SelectItem value="no-batches" disabled>
+                                                            <span className="text-red-500">Nessun lotto disponibile</span>
+                                                        </SelectItem>
+                                                        <SelectItem value="fictitious">
+                                                            <span className="flex flex-col text-left text-amber-600">
+                                                                <span className="font-medium">⚠️ Lotto Fittizio</span>
+                                                                <span className="text-xs">Non scala da magazzino</span>
+                                                            </span>
+                                                        </SelectItem>
+                                                    </>
+                                                )}
                                             </SelectContent>
                                         </Select>
+                                        {availableBatches.length === 0 && (
+                                            <p className="text-xs text-amber-600">Nessun lotto reale. Usa "Fittizio" per movimenti senza tracciabilità.</p>
+                                        )}
                                     </div>
                                 )}
 
