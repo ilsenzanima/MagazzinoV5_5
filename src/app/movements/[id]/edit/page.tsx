@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { mapDbToDeliveryNote, mapDbItemToInventoryItem, mapDbToJob } from '@/lib/api';
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import EditMovementContent from '@/components/movements/EditMovementContent';
+import NewMovementContent from '@/components/movements/NewMovementContent';
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
@@ -66,7 +66,7 @@ export default async function EditMovementPage({ params }: { params: Promise<{ i
             .select('*, clients(*)')
             .eq('id', initialNote.jobId)
             .single();
-        
+
         if (linkedJob) {
             initialJobs.push(mapDbToJob(linkedJob));
         }
@@ -75,10 +75,10 @@ export default async function EditMovementPage({ params }: { params: Promise<{ i
     return (
         <DashboardLayout>
             <Suspense fallback={<EditMovementSkeleton />}>
-                <EditMovementContent 
+                <NewMovementContent
                     initialNote={initialNote}
-                    initialInventory={initialInventory} 
-                    initialJobs={initialJobs} 
+                    initialInventory={initialInventory}
+                    initialJobs={initialJobs}
                 />
             </Suspense>
         </DashboardLayout>

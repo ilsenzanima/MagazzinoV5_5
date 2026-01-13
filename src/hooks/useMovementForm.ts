@@ -4,8 +4,8 @@ import { format } from "date-fns";
 import { inventoryApi } from "@/lib/services/inventory";
 import { jobsApi } from "@/lib/services/jobs";
 import { warehousesApi } from "@/lib/services/warehouses";
-import { InventoryItem, Job, Warehouse } from "@/lib/types";
-import { createMovement } from "@/app/movements/actions";
+import { InventoryItem, Job, Warehouse, DeliveryNote } from "@/lib/types";
+import { createMovement, updateMovement } from "@/app/movements/actions";
 
 export interface MovementLine {
     tempId: string;
@@ -27,11 +27,16 @@ export interface MovementLine {
 interface UseMovementFormProps {
     initialInventory: InventoryItem[];
     initialJobs: Job[];
+    initialNote?: DeliveryNote; // Optional: if provided, we're in edit mode
 }
 
-export function useMovementForm({ initialInventory, initialJobs }: UseMovementFormProps) {
+export function useMovementForm({ initialInventory, initialJobs, initialNote }: UseMovementFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+
+    // Edit Mode
+    const isEditing = !!initialNote;
+    const editingId = initialNote?.id;
 
     // Data Sources
     const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
@@ -47,24 +52,43 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
     const [jobsLoading, setJobsLoading] = useState(false);
     const [itemsLoading, setItemsLoading] = useState(false);
 
-    // Form State
-    const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale'>('entry');
-    const [numberPart, setNumberPart] = useState("");
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-    const [causal, setCausal] = useState("");
-    const [pickupLocation, setPickupLocation] = useState("");
-    const [deliveryLocation, setDeliveryLocation] = useState("");
+    // Form State - Initialize from initialNote if editing
+    const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale'>(initialNote?.type || 'entry');
+    const [numberPart, setNumberPart] = useState(initialNote?.number.split('/')[0] || "");
+    const [date, setDate] = useState(initialNote?.date.split('T')[0] || new Date().toISOString().split('T')[0]);
+    const [selectedJob, setSelectedJob] = useState<Job | null>(
+        initialNote?.jobId ? (initialJobs.find(j => j.id === initialNote.jobId) || null) : null
+    );
+    const [causal, setCausal] = useState(initialNote?.causal || "");
+    const [pickupLocation, setPickupLocation] = useState(initialNote?.pickupLocation || "");
+    const [deliveryLocation, setDeliveryLocation] = useState(initialNote?.deliveryLocation || "");
 
     // Footer fields
-    const [transportMean, setTransportMean] = useState("Mittente");
-    const [transportTime, setTransportTime] = useState("");
-    const [appearance, setAppearance] = useState("A VISTA");
-    const [packagesCount, setPackagesCount] = useState<string>("1");
-    const [notes, setNotes] = useState("");
+    const [transportMean, setTransportMean] = useState(initialNote?.transportMean || "Mittente");
+    const [transportTime, setTransportTime] = useState(initialNote?.transportTime || "");
+    const [appearance, setAppearance] = useState(initialNote?.appearance || "A VISTA");
+    const [packagesCount, setPackagesCount] = useState<string>(initialNote?.packagesCount?.toString() || "1");
+    const [notes, setNotes] = useState(initialNote?.notes || "");
 
-    // Line State
-    const [lines, setLines] = useState<MovementLine[]>([]);
+    // Line State - Initialize from initialNote items if editing
+    const [lines, setLines] = useState<MovementLine[]>(
+        initialNote?.items ? initialNote.items.map(item => ({
+            tempId: item.id || Math.random().toString(36).substr(2, 9),
+            itemId: item.inventoryId,
+            itemName: item.inventoryName || "",
+            itemCode: item.inventoryCode || "",
+            itemUnit: item.inventoryUnit || "PZ",
+            itemBrand: item.inventoryBrand,
+            itemCategory: item.inventoryCategory,
+            itemDescription: item.inventoryDescription,
+            quantity: item.quantity,
+            pieces: item.pieces,
+            coefficient: item.coefficient || 1,
+            purchaseItemId: item.purchaseItemId,
+            purchaseRef: item.purchaseNumber || (item.purchaseItemId ? "Lotto" : undefined),
+            isFictitious: item.isFictitious
+        })) : []
+    );
     const [currentLine, setCurrentLine] = useState({
         itemId: "",
         quantity: "",
@@ -341,35 +365,45 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
             return;
         }
 
+        const noteData = {
+            type: activeTab,
+            number: fullNumber,
+            date: date,
+            jobId: selectedJob?.id,
+            causal: causal,
+            pickupLocation: pickupLocation,
+            deliveryLocation: deliveryLocation,
+            transportMean: transportMean,
+            transportTime: transportTime,
+            appearance: appearance,
+            packagesCount: parseInt(packagesCount) || 1,
+            notes: notes
+        };
+
+        const itemsData = lines.map(l => ({
+            inventoryId: l.itemId,
+            quantity: l.quantity,
+            pieces: l.pieces,
+            coefficient: l.coefficient,
+            purchaseItemId: l.purchaseItemId,
+            isFictitious: l.isFictitious,
+            price: 0
+        }));
+
         try {
             setLoading(true);
-            await createMovement({
-                type: activeTab,
-                number: fullNumber,
-                date: date,
-                jobId: selectedJob?.id,
-                causal: causal,
-                pickupLocation: pickupLocation,
-                deliveryLocation: deliveryLocation,
-                transportMean: transportMean,
-                transportTime: transportTime,
-                appearance: appearance,
-                packagesCount: parseInt(packagesCount) || 1,
-                notes: notes
-            }, lines.map(l => ({
-                inventoryId: l.itemId,
-                quantity: l.quantity,
-                pieces: l.pieces,
-                coefficient: l.coefficient,
-                purchaseItemId: l.purchaseItemId,
-                isFictitious: l.isFictitious,
-                price: 0
-            })));
+            if (isEditing && editingId) {
+                // Edit mode: update existing movement
+                await updateMovement(editingId, noteData, itemsData);
+            } else {
+                // Create mode: create new movement
+                await createMovement(noteData, itemsData);
+            }
         } catch (error: any) {
             if (error?.message?.includes('NEXT_REDIRECT') || error?.digest?.includes('NEXT_REDIRECT')) {
                 throw error;
             }
-            console.error("Create failed", error);
+            console.error(isEditing ? "Update failed" : "Create failed", error);
             alert(`Errore durante il salvataggio: ${error.message}`);
         } finally {
             setLoading(false);
@@ -379,6 +413,7 @@ export function useMovementForm({ initialInventory, initialJobs }: UseMovementFo
     return {
         // State
         loading,
+        isEditing,
         inventory,
         jobs,
         isJobSelectorOpen, setIsJobSelectorOpen,
