@@ -8,23 +8,26 @@ export const mapDbToPurchase = (db: any): Purchase => ({
     supplierName: db.suppliers?.name,
     deliveryNoteNumber: db.delivery_note_number,
     deliveryNoteDate: db.delivery_note_date,
-    status: db.status,
     notes: db.notes,
     createdBy: db.created_by,
     createdByName: db.profiles?.full_name,
     createdAt: db.created_at,
-    items: db.purchase_items,
+    items: db.purchase_items?.map((item: any) => ({
+        price: item.price,
+        quantity: item.quantity,
+        remainingPieces: item.remaining_pieces
+    })),
     jobId: db.job_id,
     jobCode: db.jobs?.code,
     documentUrl: db.document_url,
     totalAmount: db.purchase_items?.reduce((sum: number, item: any) => sum + ((item.price || 0) * (item.quantity || 1)), 0)
 });
 
+
 export const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
     supplier_id: purchase.supplierId,
     delivery_note_number: purchase.deliveryNoteNumber,
     delivery_note_date: purchase.deliveryNoteDate,
-    status: purchase.status,
     notes: purchase.notes,
     created_by: purchase.createdBy,
     job_id: purchase.jobId || null,
@@ -48,7 +51,7 @@ export const purchasesApi = {
 
         let query = supabase
             .from('purchases')
-            .select('*, suppliers(name), purchase_items(price, quantity)', { count: 'estimated' });
+            .select('*, suppliers(name), purchase_items(price, quantity, remaining_pieces)', { count: 'estimated' });
 
         if (supplierId) {
             query = query.eq('supplier_id', supplierId);
