@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Save, Loader2, ArrowDownRight, ArrowUpRight, ShoppingBag } from "lucide-react";
 import Link from "next/link";
-import { InventoryItem, Job } from "@/lib/types";
+import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { useMovementForm } from "@/hooks/useMovementForm";
 
@@ -19,18 +19,19 @@ import { MovementJobInventory } from "./form/MovementJobInventory";
 interface NewMovementContentProps {
     initialInventory: InventoryItem[];
     initialJobs: Job[];
+    initialNote?: DeliveryNote; // Optional: if provided, we're in edit mode
 }
 
-export default function NewMovementContent({ initialInventory, initialJobs }: NewMovementContentProps) {
+export default function NewMovementContent({ initialInventory, initialJobs, initialNote }: NewMovementContentProps) {
     const { userRole } = useAuth();
 
-    const form = useMovementForm({ initialInventory, initialJobs });
+    const form = useMovementForm({ initialInventory, initialJobs, initialNote });
 
     if (userRole === 'user') {
         return (
             <div className="flex flex-col items-center justify-center h-full py-20">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Accesso Negato</h2>
-                <p className="text-slate-500 dark:text-slate-400 mb-6">Non hai i permessi necessari per creare nuovi movimenti.</p>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">Non hai i permessi necessari per {form.isEditing ? 'modificare' : 'creare nuovi'} movimenti.</p>
                 <Link href="/movements">
                     <Button variant="outline">
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -51,11 +52,13 @@ export default function NewMovementContent({ initialInventory, initialJobs }: Ne
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
                     </Link>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Nuovo Movimento</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                        {form.isEditing ? 'Modifica Movimento' : 'Nuovo Movimento'}
+                    </h1>
                 </div>
                 <Button onClick={form.handleSubmit} disabled={form.loading} className="bg-[#003366] hover:bg-[#002244]">
                     {form.loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Salva Documento
+                    {form.isEditing ? 'Salva Modifiche' : 'Salva Documento'}
                 </Button>
             </div>
 
