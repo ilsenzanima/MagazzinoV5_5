@@ -228,14 +228,18 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                 Stampa Bolla
                             </Button>
                             {(userRole === 'admin' || userRole === 'operativo') && (
-                                <Button variant="destructive" onClick={handleDelete}>
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Elimina
-                                </Button>
+                                <>
+                                    <Button variant="destructive" onClick={handleDelete}>
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Elimina
+                                    </Button>
+                                    <Link href={`/movements/${initialMovement.id}/edit`}>
+                                        <Button>
+                                            Modifica Movimento
+                                        </Button>
+                                    </Link>
+                                </>
                             )}
-                            <Button onClick={() => setIsEditing(true)}>
-                                Modifica Testata
-                            </Button>
                         </>
                     ) : (
                         <div className="flex gap-2">
