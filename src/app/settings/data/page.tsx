@@ -1,404 +1,593 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import {
-    Download,
-    Upload,
-    Loader2,
-    CheckCircle,
-    AlertTriangle,
-    Database,
-    Calendar,
-    FileJson,
-    RefreshCw
-} from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Plus, X, Loader2, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemType, Unit } from "@/lib/api";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 
-// Tables to backup/restore (in dependency order)
-const TABLES = [
-    'profiles',
-    'clients',
-    'suppliers',
-    'inventory',
-    'jobs',
-    'purchases',
-    'purchase_items',
-    'workers',
-    'attendance',
-    'delivery_notes',
-    'delivery_note_items',
-];
+export default function SettingsInventoryPage() {
+    // Units State
+    const [units, setUnits] = useState<Unit[]>([]);
+    const [loadingUnits, setLoadingUnits] = useState(true);
+    const [newUnitName, setNewUnitName] = useState("");
+    const [addingUnit, setAddingUnit] = useState(false);
 
-interface BackupData {
-    timestamp: string;
-    tables: { [key: string]: any[] };
-    totalRecords: number;
-}
+    // Suppliers State
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [loadingSuppliers, setLoadingSuppliers] = useState(true);
+    const [newSupplierName, setNewSupplierName] = useState("");
+    const [addingSupplier, setAddingSupplier] = useState(false);
 
-export default function DataSettingsPage() {
-    const [isBackingUp, setIsBackingUp] = useState(false);
-    const [isRestoring, setIsRestoring] = useState(false);
-    const [backupData, setBackupData] = useState<BackupData | null>(null);
-    const [backupStatus, setBackupStatus] = useState<string>("");
-    const [restoreFile, setRestoreFile] = useState<File | null>(null);
-    const [restoreData, setRestoreData] = useState<BackupData | null>(null);
-    const [selectedTable, setSelectedTable] = useState<string>("all");
-    const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
-    const [restoreStatus, setRestoreStatus] = useState<string>("");
+    // Brands State
+    const [brands, setBrands] = useState<Brand[]>([]);
+    const [loadingBrands, setLoadingBrands] = useState(true);
+    const [newBrandName, setNewBrandName] = useState("");
+    const [addingBrand, setAddingBrand] = useState(false);
 
-    // Backup all tables
-    const handleBackup = async () => {
-        setIsBackingUp(true);
-        setBackupStatus("Avvio backup...");
+    // Types State
+    const [types, setTypes] = useState<ItemType[]>([]);
+    const [loadingTypes, setLoadingTypes] = useState(true);
+    const [newTypeName, setNewTypeName] = useState("");
+    const [addingType, setAddingType] = useState(false);
 
+    // Warehouses State
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [loadingWarehouses, setLoadingWarehouses] = useState(true);
+    const [newWarehouseName, setNewWarehouseName] = useState("");
+    const [newWarehouseAddress, setNewWarehouseAddress] = useState("");
+    const [newWarehouseIsPrimary, setNewWarehouseIsPrimary] = useState(false);
+    const [addingWarehouse, setAddingWarehouse] = useState(false);
+
+    useEffect(() => {
+        loadSuppliers();
+        loadBrands();
+        loadTypes();
+        loadUnits();
+        loadWarehouses();
+    }, []);
+
+    const loadSuppliers = async () => {
         try {
-            const backup: BackupData = {
-                timestamp: new Date().toISOString(),
-                tables: {},
-                totalRecords: 0
-            };
-
-            for (const table of TABLES) {
-                setBackupStatus(`Backup ${table}...`);
-
-                const { data, error } = await supabase
-                    .from(table)
-                    .select('*')
-                    .order('created_at', { ascending: true });
-
-                if (error) {
-                    console.error(`Error backing up ${table}:`, error);
-                    backup.tables[table] = [];
-                } else {
-                    backup.tables[table] = data || [];
-                    backup.totalRecords += data?.length || 0;
-                }
-            }
-
-            setBackupData(backup);
-            setBackupStatus(`Backup completato! ${backup.totalRecords} record totali`);
-
-            // Auto-download
-            downloadBackup(backup);
-
+            setLoadingSuppliers(true);
+            const data = await suppliersApi.getAll();
+            setSuppliers(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
-            console.error("Backup error:", error);
-            setBackupStatus("Errore durante il backup");
+            console.error("Failed to load suppliers", error);
         } finally {
-            setIsBackingUp(false);
+            setLoadingSuppliers(false);
         }
     };
 
-    // Download backup as JSON
-    const downloadBackup = (data: BackupData) => {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `backup_${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
-
-    // Handle file upload for restore
-    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        setRestoreFile(file);
-
+    const loadBrands = async () => {
         try {
-            const text = await file.text();
-            const data = JSON.parse(text) as BackupData;
-
-            if (!data.timestamp || !data.tables) {
-                throw new Error("File di backup non valido");
-            }
-
-            setRestoreData(data);
-            setRestoreStatus(`File caricato: ${data.totalRecords} record da ${new Date(data.timestamp).toLocaleString('it-IT')}`);
+            setLoadingBrands(true);
+            const data = await brandsApi.getAll();
+            setBrands(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
-            console.error("Error parsing backup file:", error);
-            setRestoreStatus("Errore: File di backup non valido");
-            setRestoreData(null);
+            console.error("Failed to load brands", error);
+        } finally {
+            setLoadingBrands(false);
         }
     };
 
-    // Perform restore
-    const handleRestore = async () => {
-        if (!restoreData) return;
+    const loadTypes = async () => {
+        try {
+            setLoadingTypes(true);
+            const data = await itemTypesApi.getAll();
+            setTypes(data.sort((a, b) => a.name.localeCompare(b.name)));
+        } catch (error) {
+            console.error("Failed to load types", error);
+        } finally {
+            setLoadingTypes(false);
+        }
+    };
 
-        setShowRestoreConfirm(false);
-        setIsRestoring(true);
-        setRestoreStatus("Avvio ripristino...");
+    const loadUnits = async () => {
+        try {
+            setLoadingUnits(true);
+            const data = await unitsApi.getAll();
+            setUnits(data);
+        } catch (error) {
+            console.error("Failed to load units", error);
+        } finally {
+            setLoadingUnits(false);
+        }
+    };
+
+    const handleAddSupplier = async () => {
+        const nameToAdd = newSupplierName.trim();
+        if (!nameToAdd) return;
+
+        // Check for duplicates (case insensitive)
+        if (suppliers.some(s => s.name.toLowerCase() === nameToAdd.toLowerCase())) {
+            alert("Esiste già un fornitore con questo nome.");
+            return;
+        }
 
         try {
-            const tablesToRestore = selectedTable === "all"
-                ? TABLES
-                : [selectedTable];
-
-            let totalRestored = 0;
-
-            for (const table of tablesToRestore) {
-                const tableData = restoreData.tables[table];
-                if (!tableData || tableData.length === 0) {
-                    setRestoreStatus(`${table}: nessun dato, saltato`);
-                    continue;
-                }
-
-                setRestoreStatus(`Ripristino ${table} (${tableData.length} record)...`);
-
-                // Delete existing data
-                const { error: deleteError } = await supabase
-                    .from(table)
-                    .delete()
-                    .neq('id', '00000000-0000-0000-0000-000000000000');
-
-                if (deleteError) {
-                    console.error(`Error clearing ${table}:`, deleteError);
-                    continue;
-                }
-
-                // Insert in batches
-                const batchSize = 50;
-                for (let i = 0; i < tableData.length; i += batchSize) {
-                    const batch = tableData.slice(i, i + batchSize);
-                    const { error: insertError } = await supabase
-                        .from(table)
-                        .insert(batch);
-
-                    if (insertError) {
-                        console.error(`Error inserting into ${table}:`, insertError);
-                    } else {
-                        totalRestored += batch.length;
-                    }
-                }
-            }
-
-            setRestoreStatus(`✅ Ripristino completato! ${totalRestored} record ripristinati`);
-
+            setAddingSupplier(true);
+            const newSupplier = await suppliersApi.create({ name: nameToAdd });
+            // Add and re-sort
+            setSuppliers([...suppliers, newSupplier].sort((a, b) => a.name.localeCompare(b.name)));
+            setNewSupplierName("");
         } catch (error) {
-            console.error("Restore error:", error);
-            setRestoreStatus("❌ Errore durante il ripristino");
+            console.error("Failed to add supplier", error);
         } finally {
-            setIsRestoring(false);
+            setAddingSupplier(false);
+        }
+    };
+
+    const handleAddBrand = async () => {
+        const nameToAdd = newBrandName.trim();
+        if (!nameToAdd) return;
+
+        // Check for duplicates (case insensitive)
+        if (brands.some(b => b.name.toLowerCase() === nameToAdd.toLowerCase())) {
+            alert("Esiste già una marca con questo nome.");
+            return;
+        }
+
+        try {
+            setAddingBrand(true);
+            const newBrand = await brandsApi.create(nameToAdd);
+            // Add and re-sort
+            setBrands([...brands, newBrand].sort((a, b) => a.name.localeCompare(b.name)));
+            setNewBrandName("");
+        } catch (error) {
+            console.error("Failed to add brand", error);
+        } finally {
+            setAddingBrand(false);
+        }
+    };
+
+    const handleAddType = async () => {
+        const nameToAdd = newTypeName.trim();
+        if (!nameToAdd) return;
+
+        // Check for duplicates (case insensitive)
+        if (types.some(t => t.name.toLowerCase() === nameToAdd.toLowerCase())) {
+            alert("Esiste già una tipologia con questo nome.");
+            return;
+        }
+
+        try {
+            setAddingType(true);
+            const newType = await itemTypesApi.create(nameToAdd);
+            // Add and re-sort
+            setTypes([...types, newType].sort((a, b) => a.name.localeCompare(b.name)));
+            setNewTypeName("");
+        } catch (error) {
+            console.error("Failed to add type", error);
+        } finally {
+            setAddingType(false);
+        }
+    };
+
+    const handleDeleteSupplier = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questo fornitore?")) return;
+        try {
+            await suppliersApi.delete(id);
+            setSuppliers(suppliers.filter(s => s.id !== id));
+        } catch (error) {
+            console.error("Failed to delete supplier", error);
+        }
+    };
+
+    const handleDeleteBrand = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questa marca?")) return;
+        try {
+            await brandsApi.delete(id);
+            setBrands(brands.filter(b => b.id !== id));
+        } catch (error) {
+            console.error("Failed to delete brand", error);
+        }
+    };
+
+    const handleDeleteType = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questa tipologia?")) return;
+        try {
+            await itemTypesApi.delete(id);
+            setTypes(types.filter(t => t.id !== id));
+        } catch (error) {
+            console.error("Failed to delete type", error);
+        }
+    };
+
+    const handleAddUnit = async () => {
+        if (!newUnitName.trim()) return;
+        try {
+            setAddingUnit(true);
+            const newUnit = await unitsApi.create(newUnitName);
+            setUnits([...units, newUnit]);
+            setNewUnitName("");
+        } catch (error) {
+            console.error("Failed to add unit", error);
+        } finally {
+            setAddingUnit(false);
+        }
+    };
+
+    const handleDeleteUnit = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questa unità?")) return;
+        try {
+            await unitsApi.delete(id);
+            setUnits(units.filter(u => u.id !== id));
+        } catch (error) {
+            console.error("Failed to delete unit", error);
+        }
+    };
+
+    const loadWarehouses = async () => {
+        try {
+            setLoadingWarehouses(true);
+            const data = await warehousesApi.getAll();
+            setWarehouses(data);
+        } catch (error) {
+            console.error("Failed to load warehouses", error);
+        } finally {
+            setLoadingWarehouses(false);
+        }
+    };
+
+    const handleAddWarehouse = async () => {
+        if (!newWarehouseName.trim()) return;
+        try {
+            setAddingWarehouse(true);
+            const newWarehouse = await warehousesApi.create({
+                name: newWarehouseName,
+                address: newWarehouseAddress || undefined,
+                isPrimary: newWarehouseIsPrimary
+            });
+            setWarehouses([...warehouses, newWarehouse]);
+            setNewWarehouseName("");
+            setNewWarehouseAddress("");
+            setNewWarehouseIsPrimary(false);
+        } catch (error) {
+            console.error("Failed to add warehouse", error);
+        } finally {
+            setAddingWarehouse(false);
+        }
+    };
+
+    const handleDeleteWarehouse = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questo magazzino?")) return;
+        try {
+            await warehousesApi.delete(id);
+            setWarehouses(warehouses.filter(w => w.id !== id));
+        } catch (error) {
+            console.error("Failed to delete warehouse", error);
+        }
+    };
+
+    const handleTogglePrimary = async (id: string) => {
+        try {
+            await warehousesApi.update(id, { isPrimary: true });
+            await loadWarehouses(); // Reload to reflect trigger changes
+        } catch (error) {
+            console.error("Failed to update warehouse", error);
         }
     };
 
     return (
         <div className="space-y-6">
             <div>
-                <h3 className="text-lg font-medium">Gestione Dati</h3>
+                <h3 className="text-lg font-medium">Impostazioni Elenchi</h3>
                 <p className="text-sm text-muted-foreground">
-                    Backup e ripristino dei dati del database.
+                    Gestisci le liste predefinite per prodotti, fornitori e magazzini.
                 </p>
             </div>
             <Separator />
 
-            <div className="space-y-6">
-                {/* Backup Section */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Download className="h-5 w-5" />
-                            Backup Dati
-                        </CardTitle>
-                        <CardDescription>
-                            Scarica una copia completa di tutti i dati in formato JSON.
-                            Il backup automatico viene eseguito ogni domenica notte.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Button
-                            onClick={handleBackup}
-                            disabled={isBackingUp}
-                            className="w-full sm:w-auto"
-                        >
-                            {isBackingUp ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    {backupStatus}
-                                </>
-                            ) : (
-                                <>
-                                    <Database className="mr-2 h-4 w-4" />
-                                    Scarica Backup Completo
-                                </>
-                            )}
-                        </Button>
+            <Tabs defaultValue="suppliers">
+                <TabsList>
+                    <TabsTrigger value="suppliers">Fornitori</TabsTrigger>
+                    <TabsTrigger value="brands">Marche</TabsTrigger>
+                    <TabsTrigger value="types">Tipologie</TabsTrigger>
+                    <TabsTrigger value="units">Unità di Misura</TabsTrigger>
+                    <TabsTrigger value="warehouses">Magazzini</TabsTrigger>
+                </TabsList>
 
-                        {backupData && !isBackingUp && (
-                            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                                <CheckCircle className="h-4 w-4" />
-                                <span className="text-sm">{backupStatus}</span>
-                            </div>
-                        )}
-
-                        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                            <h4 className="font-medium text-sm mb-2">Tabelle incluse nel backup:</h4>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
-                                {TABLES.map(table => (
-                                    <div key={table} className="flex items-center gap-1">
-                                        <FileJson className="h-3 w-3" />
-                                        {table}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Restore Section */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Upload className="h-5 w-5" />
-                            Ripristino Dati
-                        </CardTitle>
-                        <CardDescription>
-                            Ripristina i dati da un file di backup precedente.
-                            <span className="text-amber-600 dark:text-amber-400 font-medium block mt-1">
-                                ⚠️ Attenzione: il ripristino sovrascriverà i dati esistenti!
-                            </span>
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {/* File Upload */}
-                        <div>
-                            <label className="block text-sm font-medium mb-2">
-                                1. Seleziona il file di backup
-                            </label>
-                            <input
-                                type="file"
-                                accept=".json"
-                                onChange={handleFileUpload}
-                                className="block w-full text-sm text-muted-foreground
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-md file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-primary file:text-primary-foreground
-                  hover:file:bg-primary/90
-                  cursor-pointer"
-                            />
-                        </div>
-
-                        {/* Restore options */}
-                        {restoreData && (
-                            <>
-                                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                                        <Calendar className="h-4 w-4" />
-                                        <span className="text-sm font-medium">
-                                            Backup del {new Date(restoreData.timestamp).toLocaleString('it-IT')}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                                        {restoreData.totalRecords} record totali
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-2">
-                                        2. Scegli cosa ripristinare
-                                    </label>
-                                    <Select value={selectedTable} onValueChange={setSelectedTable}>
-                                        <SelectTrigger className="w-full sm:w-64">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">Tutte le tabelle</SelectItem>
-                                            {TABLES.map(table => (
-                                                <SelectItem key={table} value={table}>
-                                                    {table} ({restoreData.tables[table]?.length || 0} record)
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
+                <TabsContent value="suppliers" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gestione Fornitori</CardTitle>
+                            <CardDescription>Gestisci l'elenco dei fornitori approvati.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuovo Fornitore..."
+                                    className="max-w-sm"
+                                    value={newSupplierName}
+                                    onChange={(e) => setNewSupplierName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSupplier()}
+                                />
                                 <Button
-                                    onClick={() => setShowRestoreConfirm(true)}
-                                    disabled={isRestoring}
-                                    variant="destructive"
-                                    className="w-full sm:w-auto"
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddSupplier}
+                                    disabled={addingSupplier || !newSupplierName.trim()}
                                 >
-                                    {isRestoring ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            {restoreStatus}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <RefreshCw className="mr-2 h-4 w-4" />
-                                            Ripristina {selectedTable === "all" ? "Tutto" : selectedTable}
-                                        </>
-                                    )}
+                                    {addingSupplier ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                                 </Button>
-                            </>
-                        )}
-
-                        {restoreStatus && !isRestoring && (
-                            <div className={`flex items-center gap-2 ${restoreStatus.includes('✅')
-                                    ? 'text-green-600 dark:text-green-400'
-                                    : restoreStatus.includes('❌')
-                                        ? 'text-red-600 dark:text-red-400'
-                                        : 'text-muted-foreground'
-                                }`}>
-                                <span className="text-sm">{restoreStatus}</span>
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
 
-            {/* Confirm Dialog */}
-            <AlertDialog open={showRestoreConfirm} onOpenChange={setShowRestoreConfirm}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-amber-500" />
-                            Conferma Ripristino
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Stai per ripristinare {selectedTable === "all" ? "TUTTE le tabelle" : `la tabella "${selectedTable}"`}.
-                            <br /><br />
-                            <strong className="text-foreground">
-                                Questa azione eliminerà i dati correnti e li sostituirà con quelli del backup.
-                            </strong>
-                            <br /><br />
-                            Sei sicuro di voler continuare?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Annulla</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRestore} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            Sì, Ripristina
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            {loadingSuppliers ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento fornitori...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {suppliers.map(supplier => (
+                                        <Badge key={supplier.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                            {supplier.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteSupplier(supplier.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {suppliers.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessun fornitore presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="brands" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gestione Marche</CardTitle>
+                            <CardDescription>Aggiungi o rimuovi le marche disponibili.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuova Marca..."
+                                    className="max-w-sm"
+                                    value={newBrandName}
+                                    onChange={(e) => setNewBrandName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddBrand}
+                                    disabled={addingBrand || !newBrandName.trim()}
+                                >
+                                    {addingBrand ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingBrands ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento marche...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {brands.map(brand => (
+                                        <Badge key={brand.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                            {brand.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteBrand(brand.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {brands.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessuna marca presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="types" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gestione Tipologie</CardTitle>
+                            <CardDescription>Categorie merceologiche dei prodotti.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuova Tipologia..."
+                                    className="max-w-sm"
+                                    value={newTypeName}
+                                    onChange={(e) => setNewTypeName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddType()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddType}
+                                    disabled={addingType || !newTypeName.trim()}
+                                >
+                                    {addingType ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingTypes ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento tipologie...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {types.map(type => (
+                                        <Badge key={type.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                            {type.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteType(type.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {types.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessuna tipologia presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="units" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Unità di Misura</CardTitle>
+                            <CardDescription>Unità di misura disponibili per i prodotti.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuova Unità..."
+                                    className="max-w-sm"
+                                    value={newUnitName}
+                                    onChange={(e) => setNewUnitName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddUnit()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddUnit}
+                                    disabled={addingUnit || !newUnitName.trim()}
+                                >
+                                    {addingUnit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingUnits ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento unità...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {units.map(unit => (
+                                        <Badge key={unit.id} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                            {unit.name}
+                                            <button
+                                                className="hover:bg-slate-100 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteUnit(unit.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {units.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessuna unità presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="warehouses" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gestione Magazzini</CardTitle>
+                            <CardDescription>Magazzini disponibili per presenze e bolle di consegna.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-3">
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Nome Magazzino..."
+                                        className="max-w-sm"
+                                        value={newWarehouseName}
+                                        onChange={(e) => setNewWarehouseName(e.target.value)}
+                                    />
+                                    <Input
+                                        placeholder="Indirizzo (opzionale)..."
+                                        className="flex-1"
+                                        value={newWarehouseAddress}
+                                        onChange={(e) => setNewWarehouseAddress(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="isPrimary"
+                                        checked={newWarehouseIsPrimary}
+                                        onChange={(e) => setNewWarehouseIsPrimary(e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300"
+                                    />
+                                    <label htmlFor="isPrimary" className="text-sm text-muted-foreground">
+                                        Imposta come principale
+                                    </label>
+                                    <Button
+                                        size="sm"
+                                        className="ml-auto bg-blue-600 hover:bg-blue-700"
+                                        onClick={handleAddWarehouse}
+                                        disabled={addingWarehouse || !newWarehouseName.trim()}
+                                    >
+                                        {addingWarehouse ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-2" /> Aggiungi</>}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {loadingWarehouses ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento magazzini...
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {warehouses.map(warehouse => (
+                                        <div key={warehouse.id} className="flex items-start justify-between p-3 border rounded-lg bg-white dark:bg-slate-800">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium">{warehouse.name}</span>
+                                                    {warehouse.isPrimary && (
+                                                        <Badge variant="default" className="bg-blue-600">Principale</Badge>
+                                                    )}
+                                                </div>
+                                                {warehouse.address && (
+                                                    <p className="text-sm text-muted-foreground mt-1">{warehouse.address}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {!warehouse.isPrimary && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleTogglePrimary(warehouse.id)}
+                                                    >
+                                                        Rendi principale
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteWarehouse(warehouse.id)}
+                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {warehouses.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessun magazzino presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
