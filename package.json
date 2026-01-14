@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "backup": "node scripts/backup-database.js"
+    "backup": "node scripts/backup-database.js",
+    "restore": "node scripts/restore-database.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
