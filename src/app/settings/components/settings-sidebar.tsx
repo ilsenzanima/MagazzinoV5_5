@@ -9,7 +9,8 @@ import {
   Bell,
   Settings,
   Shield,
-  Database
+  Database,
+  HardDrive
 } from "lucide-react";
 
 const sidebarNavItems = [
@@ -17,6 +18,11 @@ const sidebarNavItems = [
     title: "Generale",
     href: "/settings",
     icon: Settings,
+  },
+  {
+    title: "Profilo",
+    href: "/settings/profile",
+    icon: User,
   },
   {
     title: "Notifiche",
@@ -27,6 +33,11 @@ const sidebarNavItems = [
     title: "Dati",
     href: "/settings/data",
     icon: Database,
+  },
+  {
+    title: "Backup",
+    href: "/settings/backup",
+    icon: HardDrive,
   },
   {
     title: "Amministrazione",
