@@ -9,7 +9,7 @@ import {
   Bell,
   Settings,
   Shield,
-  Package
+  Database
 } from "lucide-react";
 
 const sidebarNavItems = [
@@ -19,19 +19,14 @@ const sidebarNavItems = [
     icon: Settings,
   },
   {
-    title: "Profilo",
-    href: "/settings/profile",
-    icon: User,
-  },
-  {
     title: "Notifiche",
     href: "/settings/notifications",
     icon: Bell,
   },
   {
     title: "Dati",
-    href: "/settings/inventory",
-    icon: Package,
+    href: "/settings/data",
+    icon: Database,
   },
   {
     title: "Amministrazione",
@@ -60,9 +55,9 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
           className={cn(
             buttonVariants({ variant: "ghost" }),
             pathname === item.href
-              ? "bg-muted hover:bg-muted text-primary font-semibold"
-              : "hover:bg-transparent hover:underline text-muted-foreground",
-            "justify-start whitespace-nowrap"
+              ? "bg-slate-200 dark:bg-slate-700 text-foreground font-semibold"
+              : "hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground",
+            "justify-start whitespace-nowrap transition-colors"
           )}
         >
           <item.icon className="mr-2 h-4 w-4" />
