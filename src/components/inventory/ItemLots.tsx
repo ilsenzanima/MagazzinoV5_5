@@ -6,13 +6,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Package } from "lucide-react";
+import { AlertTriangle, Package, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { reassignLotToEntries } from "@/app/inventory/[id]/actions";
+import Link from "next/link";
 
 interface LotInfo {
     id: string;
+    purchaseId?: string;
     purchaseRef: string;
     date: string;
     originalQty: number;
@@ -172,9 +174,16 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                             <TableBody>
                                 {lots.map(lot => {
                                     const usedPercentage = ((lot.originalQty - lot.remainingQty) / lot.originalQty * 100);
-                                    return (
-                                        <TableRow key={lot.id}>
-                                            <TableCell className="font-medium">{lot.purchaseRef}</TableCell>
+                                    const rowContent = (
+                                        <>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    {lot.purchaseRef}
+                                                    {lot.purchaseId && (
+                                                        <ExternalLink className="h-3 w-3 text-blue-500" />
+                                                    )}
+                                                </div>
+                                            </TableCell>
                                             <TableCell className="text-sm text-slate-500 dark:text-slate-400">
                                                 {format(new Date(lot.date), 'dd/MM/yyyy')}
                                             </TableCell>
@@ -195,6 +204,20 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                                     {usedPercentage.toFixed(0)}%
                                                 </Badge>
                                             </TableCell>
+                                        </>
+                                    );
+
+                                    return lot.purchaseId ? (
+                                        <TableRow
+                                            key={lot.id}
+                                            className="cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                            onClick={() => window.location.href = `/purchases/${lot.purchaseId}`}
+                                        >
+                                            {rowContent}
+                                        </TableRow>
+                                    ) : (
+                                        <TableRow key={lot.id}>
+                                            {rowContent}
                                         </TableRow>
                                     );
                                 })}

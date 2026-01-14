@@ -275,6 +275,7 @@ export const inventoryApi = {
         if (error) throw error;
         return data.map((b: any) => ({
             id: b.purchase_item_id,
+            purchaseId: b.purchase_id,
             purchaseRef: b.purchase_ref,
             date: b.purchase_date,
             originalQty: b.original_quantity,
@@ -316,6 +317,7 @@ export const inventoryApi = {
         return {
             lots: lots.map((b: any) => ({
                 id: b.purchase_item_id,
+                purchaseId: b.purchase_id,
                 purchaseRef: b.purchase_ref,
                 date: b.purchase_date,
                 originalQty: b.original_quantity,
