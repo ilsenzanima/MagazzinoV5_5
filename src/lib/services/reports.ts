@@ -79,9 +79,6 @@ export const getArticlesWithStock = async (targetDate?: string): Promise<Article
             if (!item) continue;
 
             const pieces = lot.remaining_pieces || 0;
-            // Skip items with no remaining pieces
-            if (pieces <= 0) continue;
-
             const coeff = lot.coefficient || item.coefficient || 1;
             const quantity = pieces * coeff;
             const price = lot.unit_price || 0;
@@ -183,9 +180,6 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
             if (!item) continue;
 
             const pieces = lot.remaining_pieces || 0;
-            // Skip items with no remaining pieces
-            if (pieces <= 0) continue;
-
             const coeff = lot.coefficient || item.coefficient || 1;
 
             countItems.push({
