@@ -547,7 +547,7 @@ export default function NewPurchasePage() {
 
                                     {/* Logic for Pieces/Quantity */}
                                     <div className="md:col-span-2 space-y-2">
-                                        <Label>Pezzi</Label>
+                                        <Label>Pezzi <span className="text-xs text-muted-foreground font-normal">(Coeff: {currentLine.coefficient})</span></Label>
                                         <Input
                                             type="number"
                                             min="0"
@@ -556,7 +556,6 @@ export default function NewPurchasePage() {
                                             onChange={(e) => handleCurrentLinePiecesChange(e.target.value)}
                                             placeholder="Pezzi"
                                         />
-                                        <p className="text-xs text-muted-foreground">Coeff: {currentLine.coefficient}</p>
                                     </div>
 
                                     <div className="md:col-span-2 space-y-2">
@@ -578,7 +577,7 @@ export default function NewPurchasePage() {
                                             step="0.00001"
                                             value={currentLine.price}
                                             onChange={(e) => setCurrentLine({ ...currentLine, price: e.target.value })}
-                                            placeholder="0.00000"
+                                            placeholder="0"
                                         />
                                     </div>
                                     <div className="md:col-span-4 flex items-center gap-2 pb-2">
@@ -617,9 +616,14 @@ export default function NewPurchasePage() {
                                     </div>
                                 )}
 
-                                <Button type="button" onClick={handleAddLine} className="w-full md:w-auto">
-                                    <Plus className="mr-2 h-4 w-4" /> Aggiungi Riga
-                                </Button>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                    <Button type="button" onClick={handleAddLine} className="w-full sm:w-auto">
+                                        <Plus className="mr-2 h-4 w-4" /> Aggiungi Riga
+                                    </Button>
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                        ⚠️ Ricorda di premere "Aggiungi Riga" per ogni materiale!
+                                    </p>
+                                </div>
                             </div>
 
                             {/* Lines Table */}

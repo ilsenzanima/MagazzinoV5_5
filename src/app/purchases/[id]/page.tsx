@@ -849,7 +849,7 @@ export default function PurchaseDetailPage() {
                                     </div>
 
                                     <div className="md:col-span-2 space-y-2">
-                                        <Label>Pezzi</Label>
+                                        <Label>Pezzi <span className="text-xs text-muted-foreground font-normal">(Coeff: {newItem.coefficient || 1})</span></Label>
                                         <Input
                                             type="number"
                                             min="0"
@@ -858,7 +858,6 @@ export default function PurchaseDetailPage() {
                                             onChange={(e) => handleNewItemPiecesChange(e.target.value)}
                                             placeholder="0"
                                         />
-                                        <p className="text-xs text-muted-foreground">Coeff: {newItem.coefficient || 1}</p>
                                     </div>
 
                                     <div className="md:col-span-2 space-y-2">
@@ -880,7 +879,7 @@ export default function PurchaseDetailPage() {
                                             step="0.01"
                                             value={newItem.price}
                                             onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-                                            placeholder="0.00"
+                                            placeholder="0"
                                         />
                                     </div>
                                     <div className="md:col-span-2 flex items-center gap-2 pb-2">
