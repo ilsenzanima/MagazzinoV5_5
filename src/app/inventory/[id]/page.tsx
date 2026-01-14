@@ -237,6 +237,7 @@ export default function InventoryDetailPage() {
         name: item.name,
         brand: item.brand,
         type: item.type,
+        model: item.model,
         supplierCode: item.supplierCode,
         minStock: item.minStock,
         unit: item.unit,
