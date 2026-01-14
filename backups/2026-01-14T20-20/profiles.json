@@ -1,0 +1,29 @@
+[
+  {
+    "id": "657f6739-ff53-4aac-824f-77a491997c74",
+    "email": "a.dagostino@opifiresafe.com",
+    "full_name": "Alex D'Agostino",
+    "role": "admin",
+    "avatar_url": null,
+    "updated_at": "2025-12-21T04:47:41.711+00:00",
+    "created_at": "2025-12-20T19:53:16.781118+00:00"
+  },
+  {
+    "id": "3628bafb-e37f-44f3-ac96-5fb56b6791ab",
+    "email": "amministrazione@errevisystem.com",
+    "full_name": "Luisa Bertogna",
+    "role": "operativo",
+    "avatar_url": null,
+    "updated_at": "2026-01-14T05:23:17.125615+00:00",
+    "created_at": "2026-01-14T05:23:07.396622+00:00"
+  },
+  {
+    "id": "60665091-b53f-4f09-b288-d8499ef7cad4",
+    "email": "f.romano@opifiresafe.com",
+    "full_name": null,
+    "role": "operativo",
+    "avatar_url": null,
+    "updated_at": null,
+    "created_at": "2026-01-14T11:25:28.619116+00:00"
+  }
+]
