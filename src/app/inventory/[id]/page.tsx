@@ -101,7 +101,7 @@ export default function InventoryDetailPage() {
 
   // Lots State
   const [lotsData, setLotsData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState("movements");
+  const [activeTab, setActiveTab] = useState("lots");
 
   // Helper to handle pieces/quantity change
   const handleMovementPiecesChange = (val: string) => {
