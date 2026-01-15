@@ -137,7 +137,6 @@ export default function InventoryReport() {
                                 <TableRow className="border-b dark:border-slate-700">
                                     <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Codice</TableHead>
                                     <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Articolo</TableHead>
-                                    <TableHead className="bg-white dark:bg-slate-900 dark:text-slate-300">Lotto</TableHead>
                                     <TableHead className="text-center bg-white dark:bg-slate-900 dark:text-slate-300">Pezzi Fisici (Sistema)</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -146,14 +145,14 @@ export default function InventoryReport() {
                                     <>
                                         {/* Type Header Row */}
                                         <TableRow key={`type-${type}`} className="bg-slate-100 dark:bg-slate-800">
-                                            <TableCell colSpan={4} className="font-bold text-slate-700 dark:text-slate-200 py-2">
+                                            <TableCell colSpan={3} className="font-bold text-slate-700 dark:text-slate-200 py-2">
                                                 {type}
                                             </TableCell>
                                         </TableRow>
                                         {/* Items in this type */}
                                         {items.map((item, idx) => (
                                             <TableRow
-                                                key={`${item.itemId}-${item.lotRef}-${idx}`}
+                                                key={`${item.itemId}-${idx}`}
                                                 className="dark:border-slate-700"
                                             >
                                                 <TableCell className="font-mono text-sm dark:text-slate-300">{item.itemCode}</TableCell>
@@ -161,7 +160,6 @@ export default function InventoryReport() {
                                                     {item.itemName}
                                                     {item.itemModel && <span className="text-slate-400 dark:text-slate-500"> ({item.itemModel})</span>}
                                                 </TableCell>
-                                                <TableCell className="text-sm dark:text-slate-300">{item.lotRef}</TableCell>
                                                 <TableCell className="text-center font-medium dark:text-slate-300">{item.systemPieces}</TableCell>
                                             </TableRow>
                                         ))}
