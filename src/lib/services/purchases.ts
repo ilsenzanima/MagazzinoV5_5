@@ -23,15 +23,25 @@ export const mapDbToPurchase = (db: any): Purchase => ({
 });
 
 
-export const mapPurchaseToDb = (purchase: Partial<Purchase>) => ({
-    supplier_id: purchase.supplierId,
-    delivery_note_number: purchase.deliveryNoteNumber,
-    delivery_note_date: purchase.deliveryNoteDate,
-    notes: purchase.notes,
-    created_by: purchase.createdBy,
-    job_id: purchase.jobId || null,
-    document_url: purchase.documentUrl
-});
+export const mapPurchaseToDb = (purchase: Partial<Purchase>) => {
+    const dbPurchase: any = {};
+
+    // Only include fields that are explicitly passed (not undefined)
+    if (purchase.supplierId !== undefined) dbPurchase.supplier_id = purchase.supplierId;
+    if (purchase.deliveryNoteNumber !== undefined) dbPurchase.delivery_note_number = purchase.deliveryNoteNumber;
+    if (purchase.deliveryNoteDate !== undefined) dbPurchase.delivery_note_date = purchase.deliveryNoteDate;
+    if (purchase.notes !== undefined) dbPurchase.notes = purchase.notes;
+    if (purchase.createdBy !== undefined) dbPurchase.created_by = purchase.createdBy;
+    if (purchase.documentUrl !== undefined) dbPurchase.document_url = purchase.documentUrl;
+
+    // CRITICAL: Only update job_id when explicitly passed (even if null/empty to clear it)
+    // This prevents accidental clearing of job_id when editing other fields
+    if ('jobId' in purchase) {
+        dbPurchase.job_id = purchase.jobId || null;
+    }
+
+    return dbPurchase;
+};
 
 export const purchasesApi = {
     getAll: async () => {
