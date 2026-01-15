@@ -27,6 +27,25 @@ export default function PrintDeliveryNotePage({ params }: { params: { id: string
 
     useEffect(() => {
         if (!loading && note) {
+            // Generate custom filename for PDF
+            // Format: 001_PP25_2025gen07_NomeCommessa_tipo.pdf
+            const typeLabels: { [key: string]: string } = {
+                'exit': 'uscita',
+                'entry': 'rientro',
+                'sale': 'vendita'
+            };
+            const dateFormatted = format(new Date(note.date), 'yyyyMMMdd', { locale: it });
+            const jobName = (note.jobDescription || note.jobCode || 'magazzino')
+                .replace(/[^a-zA-Z0-9\s]/g, '')
+                .replace(/\s+/g, '_')
+                .substring(0, 30);
+            const typeLabel = typeLabels[note.type] || note.type;
+
+            // Pad bolla number with zeros for proper file sorting (e.g., 001 instead of 1)
+            const bollaNumber = note.number.replace('/', '_').replace(/^(\d+)/, (match) => match.padStart(3, '0'));
+
+            document.title = `${bollaNumber}_${dateFormatted}_${jobName}_${typeLabel}`;
+
             setTimeout(() => {
                 window.print();
             }, 500);
