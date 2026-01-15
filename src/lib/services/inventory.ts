@@ -287,15 +287,87 @@ export const inventoryApi = {
     },
 
     // Get all lots for an item (for Lots tab in item detail)
+    // Includes ALL lots - even exhausted ones (remaining = 0)
     getLotsForItem: async (itemId: string) => {
-        // Get all lots from purchase_batch_availability
-        const { data: lots, error: lotsError } = await supabase
-            .from('purchase_batch_availability')
-            .select('*')
-            .eq('item_id', itemId)
-            .order('purchase_date', { ascending: false }); // Most recent first
+        // Get ALL purchase items for this item (not just available ones)
+        const { data: purchaseItems, error: piError } = await supabase
+            .from('purchase_items')
+            .select(`
+                id,
+                purchase_id,
+                quantity,
+                pieces,
+                price,
+                coefficient,
+                purchases!inner (
+                    id,
+                    delivery_note_number,
+                    delivery_note_date,
+                    job_id
+                )
+            `)
+            .eq('item_id', itemId);
 
-        if (lotsError) throw lotsError;
+        if (piError) throw piError;
+
+        // Filter out direct-to-job purchases (job_id not null on purchase header)
+        const warehousePurchases = purchaseItems.filter((pi: any) => !pi.purchases.job_id);
+
+        // For each purchase item, calculate remaining quantity
+        const lotsWithRemaining = await Promise.all(warehousePurchases.map(async (pi: any) => {
+            // Get total exits for this purchase item
+            const { data: exits, error: exitsError } = await supabase
+                .from('delivery_note_items')
+                .select(`
+                    quantity,
+                    pieces,
+                    is_fictitious,
+                    delivery_notes!inner (type)
+                `)
+                .eq('purchase_item_id', pi.id);
+
+            if (exitsError) throw exitsError;
+
+            // Calculate used quantity (exits - returns)
+            let usedQty = 0;
+            let usedPieces = 0;
+            exits?.forEach((dni: any) => {
+                if (dni.is_fictitious) return; // Skip fictitious
+                if (dni.delivery_notes.type === 'exit' || dni.delivery_notes.type === 'sale') {
+                    usedQty += dni.quantity || 0;
+                    usedPieces += dni.pieces || 0;
+                } else if (dni.delivery_notes.type === 'entry') {
+                    usedQty -= dni.quantity || 0;
+                    usedPieces -= dni.pieces || 0;
+                }
+            });
+
+            const remainingQty = Math.max(0, Math.min(pi.quantity - usedQty, pi.quantity));
+            const remainingPieces = Math.max(0, Math.min((pi.pieces || 0) - usedPieces, pi.pieces || 0));
+
+            return {
+                id: pi.id,
+                purchaseId: pi.purchase_id,
+                purchaseRef: pi.purchases.delivery_note_number,
+                date: pi.purchases.delivery_note_date,
+                originalQty: pi.quantity,
+                remainingQty: remainingQty,
+                originalPieces: pi.pieces,
+                remainingPieces: remainingPieces,
+                price: pi.price
+            };
+        }));
+
+        // Sort: first by availability (remaining > 0 first), then by date descending
+        const sortedLots = lotsWithRemaining.sort((a, b) => {
+            // First: available lots before exhausted
+            const aAvailable = a.remainingQty > 0.001 ? 1 : 0;
+            const bAvailable = b.remainingQty > 0.001 ? 1 : 0;
+            if (bAvailable !== aAvailable) return bAvailable - aAvailable;
+
+            // Then: by date descending (most recent first)
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
 
         // Get total inventory quantity
         const { data: item, error: itemError } = await supabase
@@ -306,26 +378,20 @@ export const inventoryApi = {
 
         if (itemError) throw itemError;
 
-        // Calculate tracked quantity (sum of all lots)
-        const trackedQuantity = lots.reduce((sum, lot) => sum + (lot.remaining_quantity || 0), 0);
-        const trackedPieces = lots.reduce((sum, lot) => sum + (lot.remaining_pieces || 0), 0);
+        // Calculate tracked quantity (sum of all lots with remaining > 0)
+        const trackedQuantity = sortedLots
+            .filter(lot => lot.remainingQty > 0.001)
+            .reduce((sum, lot) => sum + lot.remainingQty, 0);
+        const trackedPieces = sortedLots
+            .filter(lot => lot.remainingPieces && lot.remainingPieces > 0)
+            .reduce((sum, lot) => sum + (lot.remainingPieces || 0), 0);
 
         // Calculate untracked (difference between total and tracked)
         const untrackedQuantity = Math.max(0, (item.quantity || 0) - trackedQuantity);
         const untrackedPieces = Math.max(0, (item.pieces || 0) - trackedPieces);
 
         return {
-            lots: lots.map((b: any) => ({
-                id: b.purchase_item_id,
-                purchaseId: b.purchase_id,
-                purchaseRef: b.purchase_ref,
-                date: b.purchase_date,
-                originalQty: b.original_quantity,
-                remainingQty: b.remaining_quantity,
-                originalPieces: b.original_pieces,
-                remainingPieces: b.remaining_pieces,
-                price: b.unit_price
-            })),
+            lots: sortedLots,
             untrackedQuantity,
             untrackedPieces,
             totalQuantity: item.quantity,

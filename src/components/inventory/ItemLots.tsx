@@ -152,7 +152,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
             {/* Lots List */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-sm">Lotti Disponibili</CardTitle>
+                    <CardTitle className="text-sm">Storico Lotti</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {lots.length === 0 ? (
@@ -166,7 +166,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                 <TableRow>
                                     <TableHead>Rif. Acquisto</TableHead>
                                     <TableHead>Data</TableHead>
-                                    <TableHead className="text-right">Originale</TableHead>
+                                    <TableHead className="text-right">Prezzo Unit.</TableHead>
                                     <TableHead className="text-right">Disponibile</TableHead>
                                     <TableHead className="text-right">Usato %</TableHead>
                                 </TableRow>
@@ -188,9 +188,10 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                                 {format(new Date(lot.date), 'dd/MM/yyyy')}
                                             </TableCell>
                                             <TableCell className="text-right text-sm">
-                                                <div>{lot.originalQty} {itemUnit}</div>
-                                                {lot.originalPieces !== undefined && (
-                                                    <div className="text-xs text-slate-400">{lot.originalPieces} pz</div>
+                                                {lot.price !== undefined && lot.price !== null ? (
+                                                    <span className="font-medium">€ {lot.price.toFixed(2)}</span>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">N/D</span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -210,7 +211,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                     return lot.purchaseId ? (
                                         <TableRow
                                             key={lot.id}
-                                            className="cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                            className={`cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors ${lot.remainingQty <= 0.001 ? 'opacity-50' : ''}`}
                                             onClick={() => window.location.href = `/purchases/${lot.purchaseId}`}
                                         >
                                             {rowContent}
