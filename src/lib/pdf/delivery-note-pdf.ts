@@ -163,7 +163,23 @@ export async function generateDeliveryNotePDF(
     currentY += rowEHeight + 5; // Gap before table
 
     // --- 3. Table (Harmonized) ---
-    const tableBody = groupedItems.map(item => {
+    // Sort items by Category (ASC) then Name (ASC)
+    const sortedItems = [...groupedItems].sort((a, b) => {
+        const catA = (a.inventoryCategory || "").toLowerCase();
+        const catB = (b.inventoryCategory || "").toLowerCase();
+        if (catA < catB) return -1;
+        if (catA > catB) return 1;
+
+        // If categories are equal, sort by Name
+        const nameA = (a.inventoryName || "").toLowerCase();
+        const nameB = (b.inventoryName || "").toLowerCase();
+        if (nameA < nameB) return -1;
+        if (nameA > nameB) return 1;
+
+        return 0;
+    });
+
+    const tableBody = sortedItems.map(item => {
         const nameWithModel = item.inventoryName + (item.inventoryModel ? ` (${item.inventoryModel})` : '');
         return [
             item.inventoryCategory || "-",
