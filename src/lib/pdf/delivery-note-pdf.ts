@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
 import type { DeliveryNote, DeliveryNoteItem } from '@/lib/types';
 
 /**
@@ -325,7 +326,7 @@ export async function generateDeliveryNotePDF(
         'entry': 'rientro',
         'sale': 'vendita'
     };
-    const dateFormatted = format(new Date(movement.date), 'yyyyMMMdd');
+    const dateFormatted = format(new Date(movement.date), 'yyyyMMMdd', { locale: it });
     const jobName = (movement.jobDescription || movement.jobCode || 'magazzino')
         .replace(/[^a-zA-Z0-9\s]/g, '')
         .replace(/\s+/g, '_')
