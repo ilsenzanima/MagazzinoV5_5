@@ -17,11 +17,11 @@ AND i.pieces > 0
 ORDER BY i.code;
 
 -- Se i risultati sono corretti, esegui questo UPDATE:
-/*
+
 UPDATE inventory i
 SET pieces = 0
 WHERE EXISTS (
   SELECT 1 FROM purchase_items pi WHERE pi.item_id = i.id
 )
 AND i.pieces > 0;
-*/
+

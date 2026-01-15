@@ -319,5 +319,21 @@ export async function generateDeliveryNotePDF(
     // Draw footer at the bottom of the current (last) page
     drawFooter(pageHeight - footerHeight - margin);
 
-    doc.save(`DDT_${movement.number.replace(/\//g, '-')}.pdf`);
+    // Generate custom filename: 001_PP25_2025gen07_NomeCommessa_tipo.pdf
+    const typeLabels: { [key: string]: string } = {
+        'exit': 'uscita',
+        'entry': 'rientro',
+        'sale': 'vendita'
+    };
+    const dateFormatted = format(new Date(movement.date), 'yyyyMMMdd');
+    const jobName = (movement.jobDescription || movement.jobCode || 'magazzino')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 30);
+    const typeLabel = typeLabels[movement.type] || movement.type;
+    // Pad bolla number with zeros for proper file sorting (e.g., 001 instead of 1)
+    const bollaNumber = movement.number.replace('/', '_').replace(/^(\d+)/, (match) => match.padStart(3, '0'));
+
+    const filename = `${bollaNumber}_${dateFormatted}_${jobName}_${typeLabel}.pdf`;
+    doc.save(filename);
 }
