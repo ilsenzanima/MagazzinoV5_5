@@ -362,75 +362,147 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                     )}
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Codice</TableHead>
-                                <TableHead>Descrizione</TableHead>
-                                <TableHead>Rif. Acquisto</TableHead>
-                                <TableHead className="w-[100px]">Quantità</TableHead>
-                                {isEditing && <TableHead className="w-[50px]"></TableHead>}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {items.length === 0 ? (
+                    {/* Desktop View: Table */}
+                    <div className="hidden md:block">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-8 text-slate-400 dark:text-slate-500">
-                                        Nessun articolo inserito
-                                    </TableCell>
+                                    <TableHead>Codice</TableHead>
+                                    <TableHead>Descrizione</TableHead>
+                                    <TableHead>Rif. Acquisto</TableHead>
+                                    <TableHead className="w-[100px]">Quantità</TableHead>
+                                    {isEditing && <TableHead className="w-[50px]"></TableHead>}
                                 </TableRow>
-                            ) : (
-                                items.map((item, index) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell className="font-medium">{item.inventoryCode}</TableCell>
-                                        <TableCell>
-                                            <div>
-                                                <span className="block font-medium">
-                                                    {item.inventoryName}
-                                                    {item.inventoryModel && <span className="text-slate-400 dark:text-slate-500 font-normal"> ({item.inventoryModel})</span>}
-                                                </span>
-                                                <span className="text-xs text-slate-500 dark:text-slate-400">{item.inventoryDescription}</span>
-                                            </div>
+                            </TableHeader>
+                            <TableBody>
+                                {items.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center py-8 text-slate-400 dark:text-slate-500">
+                                            Nessun articolo inserito
                                         </TableCell>
-                                        <TableCell>
+                                    </TableRow>
+                                ) : (
+                                    items.map((item, index) => (
+                                        <TableRow key={item.id}>
+                                            <TableCell className="font-medium">{item.inventoryCode}</TableCell>
+                                            <TableCell>
+                                                <div>
+                                                    <span className="block font-medium">
+                                                        {item.inventoryName}
+                                                        {item.inventoryModel && <span className="text-slate-400 dark:text-slate-500 font-normal"> ({item.inventoryModel})</span>}
+                                                    </span>
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400">{item.inventoryDescription}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {item.purchaseNumber ? (
+                                                    <div className="text-xs">
+                                                        <span className="block font-medium text-blue-600 dark:text-blue-400">
+                                                            Bolla {item.purchaseNumber}
+                                                        </span>
+                                                        <span className="text-slate-500 dark:text-slate-400">
+                                                            {item.purchaseDate ? format(new Date(item.purchaseDate), 'dd/MM/yyyy') : '-'}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400">-</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {isEditing ? (
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        value={item.quantity}
+                                                        onChange={(e) => handleUpdateItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                                                        className="w-20"
+                                                    />
+                                                ) : (
+                                                    <Badge variant="secondary">{item.quantity} {item.inventoryUnit}</Badge>
+                                                )}
+                                            </TableCell>
+                                            {isEditing && (
+                                                <TableCell>
+                                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
+                                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                                    </Button>
+                                                </TableCell>
+                                            )}
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* Mobile View: Cards List */}
+                    <div className="md:hidden space-y-4">
+                        {items.length === 0 ? (
+                            <div className="text-center py-8 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                                Nessun articolo inserito
+                            </div>
+                        ) : (
+                            items.map((item, index) => (
+                                <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                                    {/* Header: Code & Action */}
+                                    <div className="flex justify-between items-start">
+                                        <Badge variant="outline" className="text-xs font-mono">
+                                            {item.inventoryCode}
+                                        </Badge>
+                                        {isEditing && (
+                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => handleRemoveItem(index)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    {/* Main Info */}
+                                    <div>
+                                        <h4 className="font-medium text-sm leading-tight">
+                                            {item.inventoryName}
+                                            {item.inventoryModel && <span className="text-slate-500 font-normal"> ({item.inventoryModel})</span>}
+                                        </h4>
+                                        {item.inventoryDescription && (
+                                            <p className="text-xs text-slate-500 mt-1">{item.inventoryDescription}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Footer: Quantity & Purchase Ref */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                                        <div className="text-xs">
                                             {item.purchaseNumber ? (
-                                                <div className="text-xs">
-                                                    <span className="block font-medium text-blue-600 dark:text-blue-400">
-                                                        Bolla {item.purchaseNumber}
-                                                    </span>
-                                                    <span className="text-slate-500 dark:text-slate-400">
-                                                        {item.purchaseDate ? format(new Date(item.purchaseDate), 'dd/MM/yyyy') : '-'}
-                                                    </span>
+                                                <>
+                                                    <span className="text-slate-500">Rif: </span>
+                                                    <span className="font-medium text-blue-600">Bolla {item.purchaseNumber}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-slate-400 italic">Nessun rif.</span>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            {isEditing ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-slate-500">Qtà:</span>
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        value={item.quantity}
+                                                        onChange={(e) => handleUpdateItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                                                        className="w-20 h-8"
+                                                    />
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-slate-400">-</span>
+                                                <Badge variant="secondary" className="text-base">
+                                                    {item.quantity} {item.inventoryUnit}
+                                                </Badge>
                                             )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {isEditing ? (
-                                                <Input
-                                                    type="number"
-                                                    min="1"
-                                                    value={item.quantity}
-                                                    onChange={(e) => handleUpdateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                                                    className="w-20"
-                                                />
-                                            ) : (
-                                                <Badge variant="secondary">{item.quantity} {item.inventoryUnit}</Badge>
-                                            )}
-                                        </TableCell>
-                                        {isEditing && (
-                                            <TableCell>
-                                                <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
-                                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                                </Button>
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </CardContent>
             </Card>
 
