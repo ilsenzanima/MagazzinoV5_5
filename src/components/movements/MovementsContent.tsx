@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useDeferredValue } from "react";
 import { deliveryNotesApi, DeliveryNote } from "@/lib/api";
@@ -162,6 +162,12 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                 const typeConfig = getTypeConfig(movement.type);
                 const Icon = typeConfig.icon;
 
+                const handleQuickPrint = (e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.open(`/print/delivery-note/${movement.id}`, '_blank');
+                };
+
                 return (
                   <Link href={`/movements/${movement.id}`} key={movement.id}>
                     <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200 dark:border-slate-700">
@@ -177,10 +183,19 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                               {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
                             </p>
                           </div>
-                          <Badge variant="secondary" className={typeConfig.color}>
-                            <Icon className="mr-1 h-3 w-3" />
-                            {typeConfig.label}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={handleQuickPrint}
+                              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-blue-600 transition-colors"
+                              title="Stampa rapida"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </button>
+                            <Badge variant="secondary" className={typeConfig.color}>
+                              <Icon className="mr-1 h-3 w-3" />
+                              {typeConfig.label}
+                            </Badge>
+                          </div>
                         </div>
 
                         <div className="space-y-2 text-sm">
