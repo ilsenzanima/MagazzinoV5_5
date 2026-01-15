@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -593,38 +593,227 @@ export default function PurchaseDetailPage() {
                             <CardTitle>Materiali in Bolla</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Materiale</TableHead>
-                                        <TableHead className="text-right">Pezzi</TableHead>
-                                        <TableHead className="text-right">Coeff.</TableHead>
-                                        <TableHead className="text-right">Q.tà Tot.</TableHead>
-                                        <TableHead className="text-right">Prezzo Unit.</TableHead>
-                                        <TableHead className="text-right">Totale Riga</TableHead>
-                                        <TableHead>Destinazione</TableHead>
-                                        <TableHead></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {items.map((item) => (
-                                        <TableRow key={item.id} className={item.price === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/20" : ""}>
-                                            <TableCell>
-                                                <div className="font-medium">
-                                                    {item.itemName}
-                                                    {item.itemModel && <span className="text-slate-500 font-medium ml-1">({item.itemModel})</span>}
-                                                </div>
-                                                <div className="text-xs text-slate-500">{item.itemCode}</div>
-                                            </TableCell>
+                            {/* Desktop View: Table */}
+                            <div className="hidden md:block">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Materiale</TableHead>
+                                            <TableHead className="text-right">Pezzi</TableHead>
+                                            <TableHead className="text-right">Coeff.</TableHead>
+                                            <TableHead className="text-right">Q.tà Tot.</TableHead>
+                                            <TableHead className="text-right">Prezzo Unit.</TableHead>
+                                            <TableHead className="text-right">Totale Riga</TableHead>
+                                            <TableHead>Destinazione</TableHead>
+                                            <TableHead></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {items.map((item) => (
+                                            <TableRow key={item.id} className={item.price === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/20" : ""}>
+                                                <TableCell>
+                                                    <div className="font-medium">
+                                                        {item.itemName}
+                                                        {item.itemModel && <span className="text-slate-500 font-medium ml-1">({item.itemModel})</span>}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">{item.itemCode}</div>
+                                                </TableCell>
 
-                                            {/* Editable Fields */}
+                                                {/* Editable Fields */}
+                                                {editingItemId === item.id ? (
+                                                    <>
+                                                        <TableCell className="text-right">
+                                                            <Input
+                                                                type="number"
+                                                                step="0.01"
+                                                                className="w-20 ml-auto text-right h-8"
+                                                                value={editValues.pieces}
+                                                                onChange={(e) => {
+                                                                    const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                                    const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
+                                                                    handleEditPiecesChange(e.target.value, coeff);
+                                                                }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-slate-500">
+                                                            {(() => {
+                                                                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                                return inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
+                                                            })()}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Input
+                                                                type="number"
+                                                                step="0.01"
+                                                                className="w-20 ml-auto text-right h-8"
+                                                                value={editValues.quantity}
+                                                                onChange={(e) => {
+                                                                    const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                                    const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
+                                                                    handleEditQuantityChange(e.target.value, coeff);
+                                                                }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Input
+                                                                type="number"
+                                                                className="w-24 ml-auto text-right h-8"
+                                                                value={editValues.price}
+                                                                step="0.00001"
+                                                                onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
+                                                            />
+                                                        </TableCell>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <TableCell className="text-right">
+                                                            {item.pieces || (item.coefficient === 1 || !item.coefficient ? item.quantity : '-')}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-slate-500">
+                                                            {item.coefficient || 1}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">{item.quantity}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                                item.price === 0 ? (
+                                                                    <span className="text-red-500 font-bold flex items-center justify-end">
+                                                                        <AlertTriangle className="h-3 w-3 mr-1" />
+                                                                        MANCANTE
+                                                                    </span>
+                                                                ) : (
+                                                                    `€ ${item.price.toFixed(5)}`
+                                                                )
+                                                            ) : (
+                                                                <span className="text-slate-400 italic text-xs">Riservato</span>
+                                                            )}
+                                                        </TableCell>
+                                                    </>
+                                                )}
+
+                                                <TableCell className="text-right font-medium">
+                                                    {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                        `€ ${(item.quantity * item.price).toFixed(2)}`
+                                                    ) : (
+                                                        <span className="text-slate-400 italic text-xs">Riservato</span>
+                                                    )}
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    {item.jobId ? (
+                                                        <span className="text-blue-600 font-medium text-sm">
+                                                            Commessa: {item.jobCode}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-green-600 font-medium text-sm">
+                                                            Magazzino
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+
+                                                <TableCell className="text-right">
+                                                    {editingItemId === item.id ? (
+                                                        <div className="flex justify-end gap-1">
+                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => {
+                                                                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                                const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
+                                                                saveEdit(item.id, coeff);
+                                                            }}>
+                                                                <Save className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500" onClick={cancelEdit}>
+                                                                X
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        (userRole === 'admin' || userRole === 'operativo') && (
+                                                            <div className="flex justify-end gap-1">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => startEditing(item)}
+                                                                >
+                                                                    Modifica
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() => handleDeleteItem(item.id)}
+                                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        )
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold text-lg">
+                                            <TableCell colSpan={5} className="text-right">TOTALE BOLLA</TableCell>
+                                            <TableCell className="text-right">
+                                                {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                    `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
+                                                ) : (
+                                                    <span className="text-slate-400 italic text-sm">Riservato</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell></TableCell>
+                                            <TableCell></TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* Mobile View: Cards List */}
+                            <div className="md:hidden space-y-4">
+                                {items.map((item) => (
+                                    <div key={item.id} className={`bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3 ${item.price === 0 ? "border-l-4 border-yellow-500" : ""}`}>
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h4 className="font-medium text-sm leading-tight">
+                                                    {item.itemName}
+                                                    {item.itemModel && <span className="text-slate-500 font-normal"> ({item.itemModel})</span>}
+                                                </h4>
+                                                <p className="text-xs text-slate-500 font-mono mt-1">{item.itemCode}</p>
+                                            </div>
+                                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                                <div className="flex gap-1">
+                                                    {editingItemId === item.id ? (
+                                                        <>
+                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => {
+                                                                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                                const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
+                                                                saveEdit(item.id, coeff);
+                                                            }}>
+                                                                <Save className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500" onClick={cancelEdit}>
+                                                                X
+                                                            </Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEditing(item)}>
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => handleDeleteItem(item.id)}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
                                             {editingItemId === item.id ? (
                                                 <>
-                                                    <TableCell className="text-right">
+                                                    <div className="col-span-1">
+                                                        <Label className="text-xs text-slate-500">Pezzi</Label>
                                                         <Input
                                                             type="number"
                                                             step="0.01"
-                                                            className="w-20 ml-auto text-right h-8"
+                                                            className="h-8"
                                                             value={editValues.pieces}
                                                             onChange={(e) => {
                                                                 const inventoryItem = inventory.find(inv => inv.id === item.itemId);
@@ -632,18 +821,13 @@ export default function PurchaseDetailPage() {
                                                                 handleEditPiecesChange(e.target.value, coeff);
                                                             }}
                                                         />
-                                                    </TableCell>
-                                                    <TableCell className="text-right text-slate-500">
-                                                        {(() => {
-                                                            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                            return inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
-                                                        })()}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
+                                                    </div>
+                                                    <div className="col-span-1">
+                                                        <Label className="text-xs text-slate-500">Quantità</Label>
                                                         <Input
                                                             type="number"
                                                             step="0.01"
-                                                            className="w-20 ml-auto text-right h-8"
+                                                            className="h-8"
                                                             value={editValues.quantity}
                                                             onChange={(e) => {
                                                                 const inventoryItem = inventory.find(inv => inv.id === item.itemId);
@@ -651,115 +835,76 @@ export default function PurchaseDetailPage() {
                                                                 handleEditQuantityChange(e.target.value, coeff);
                                                             }}
                                                         />
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
+                                                    </div>
+                                                    <div className="col-span-2">
+                                                        <Label className="text-xs text-slate-500">Prezzo</Label>
                                                         <Input
                                                             type="number"
-                                                            className="w-24 ml-auto text-right h-8"
-                                                            value={editValues.price}
                                                             step="0.00001"
+                                                            className="h-8"
+                                                            value={editValues.price}
                                                             onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
                                                         />
-                                                    </TableCell>
+                                                    </div>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <TableCell className="text-right">
-                                                        {item.pieces || (item.coefficient === 1 || !item.coefficient ? item.quantity : '-')}
-                                                    </TableCell>
-                                                    <TableCell className="text-right text-slate-500">
-                                                        {item.coefficient || 1}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">{item.quantity}</TableCell>
-                                                    <TableCell className="text-right">
+                                                    <div>
+                                                        <span className="text-slate-500 block text-xs">Quantità</span>
+                                                        <span className="font-medium">
+                                                            {item.quantity}
+                                                            {item.pieces && <span className="text-slate-400 font-normal text-xs ml-1">({item.pieces} pz x {item.coefficient || 1})</span>}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-500 block text-xs">Prezzo</span>
                                                         {(userRole === 'admin' || userRole === 'operativo') ? (
                                                             item.price === 0 ? (
-                                                                <span className="text-red-500 font-bold flex items-center justify-end">
-                                                                    <AlertTriangle className="h-3 w-3 mr-1" />
-                                                                    MANCANTE
+                                                                <span className="text-red-500 font-bold text-xs flex items-center">
+                                                                    <AlertTriangle className="h-3 w-3 mr-1" /> MANCANTE
                                                                 </span>
                                                             ) : (
-                                                                `€ ${item.price.toFixed(5)}`
+                                                                <span>€ {item.price.toFixed(5)}</span>
                                                             )
                                                         ) : (
                                                             <span className="text-slate-400 italic text-xs">Riservato</span>
                                                         )}
-                                                    </TableCell>
+                                                    </div>
                                                 </>
                                             )}
+                                        </div>
 
-                                            <TableCell className="text-right font-medium">
-                                                {(userRole === 'admin' || userRole === 'operativo') ? (
-                                                    `€ ${(item.quantity * item.price).toFixed(2)}`
-                                                ) : (
-                                                    <span className="text-slate-400 italic text-xs">Riservato</span>
-                                                )}
-                                            </TableCell>
-
-                                            <TableCell>
+                                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-sm">
+                                            <div>
                                                 {item.jobId ? (
-                                                    <span className="text-blue-600 font-medium text-sm">
-                                                        Commessa: {item.jobCode}
-                                                    </span>
+                                                    <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
+                                                        {item.jobCode}
+                                                    </Badge>
                                                 ) : (
-                                                    <span className="text-green-600 font-medium text-sm">
+                                                    <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
                                                         Magazzino
-                                                    </span>
+                                                    </Badge>
                                                 )}
-                                            </TableCell>
-
-                                            <TableCell className="text-right">
-                                                {editingItemId === item.id ? (
-                                                    <div className="flex justify-end gap-1">
-                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => {
-                                                            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                            const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
-                                                            saveEdit(item.id, coeff);
-                                                        }}>
-                                                            <Save className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500" onClick={cancelEdit}>
-                                                            X
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    (userRole === 'admin' || userRole === 'operativo') && (
-                                                        <div className="flex justify-end gap-1">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => startEditing(item)}
-                                                            >
-                                                                Modifica
-                                                            </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => handleDeleteItem(item.id)}
-                                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </div>
-                                                    )
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold text-lg">
-                                        <TableCell colSpan={5} className="text-right">TOTALE BOLLA</TableCell>
-                                        <TableCell className="text-right">
-                                            {(userRole === 'admin' || userRole === 'operativo') ? (
-                                                `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
-                                            ) : (
-                                                <span className="text-slate-400 italic text-sm">Riservato</span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
+                                            </div>
+                                            <div className="font-bold">
+                                                {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                    `Tot: € ${(item.quantity * item.price).toFixed(2)}`
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-lg flex justify-between items-center font-bold">
+                                    <span>TOTALE BOLLA</span>
+                                    <span>
+                                        {(userRole === 'admin' || userRole === 'operativo') ? (
+                                            `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
+                                        ) : (
+                                            <span className="text-slate-400 italic text-sm">Riservato</span>
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -769,68 +914,122 @@ export default function PurchaseDetailPage() {
                             <CardTitle>Tracciabilità Lotti</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Articolo</TableHead>
-                                        <TableHead className="text-right">Q.tà Iniziale</TableHead>
-                                        <TableHead className="text-right">Q.tà Residua</TableHead>
-                                        <TableHead className="text-right">Stato</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {items.map((item) => {
-                                        const batch = batchAvailability.find(b => b.id === item.id);
+                            {/* Desktop View */}
+                            <div className="hidden md:block">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Articolo</TableHead>
+                                            <TableHead className="text-right">Q.tà Iniziale</TableHead>
+                                            <TableHead className="text-right">Q.tà Residua</TableHead>
+                                            <TableHead className="text-right">Stato</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {items.map((item) => {
+                                            const batch = batchAvailability.find(b => b.id === item.id);
+                                            const isJobAssigned = purchase?.jobId != null;
+                                            const remaining = isJobAssigned ? 0 : (batch ? batch.remainingQty : item.quantity);
+                                            const original = item.quantity;
 
-                                        // For job-assigned purchases, show different status
-                                        const isJobAssigned = purchase?.jobId != null;
+                                            let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
+                                            let statusText = "Disponibile";
 
-                                        // If job-assigned, materials go directly to site (not warehouse)
-                                        const remaining = isJobAssigned ? 0 : (batch ? batch.remainingQty : item.quantity);
-                                        const original = item.quantity;
+                                            if (isJobAssigned) {
+                                                statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
+                                                statusText = "A cantiere";
+                                            } else if (remaining <= 0.001) {
+                                                statusColor = "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300";
+                                                statusText = "Esaurito";
+                                            } else if (remaining < original) {
+                                                statusColor = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300";
+                                                statusText = "Parziale";
+                                            } else if (remaining > original) {
+                                                statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
+                                                statusText = "Eccedenza";
+                                            }
 
-                                        let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
-                                        let statusText = "Disponibile";
+                                            return (
+                                                <TableRow key={item.id}>
+                                                    <TableCell>
+                                                        <div className="font-medium">
+                                                            {item.itemName}
+                                                            {item.itemModel && <span className="text-slate-500 font-normal ml-1">({item.itemModel})</span>}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500">{item.itemCode}</div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">{original}</TableCell>
+                                                    <TableCell className="text-right font-bold">
+                                                        {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Badge variant="secondary" className={statusColor}>
+                                                            {statusText}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
 
-                                        if (isJobAssigned) {
-                                            // Direct to job site
-                                            statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
-                                            statusText = "A cantiere";
-                                        } else if (remaining <= 0.001) {
-                                            statusColor = "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300";
-                                            statusText = "Esaurito";
-                                        } else if (remaining < original) {
-                                            statusColor = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300";
-                                            statusText = "Parziale";
-                                        } else if (remaining > original) {
-                                            // Should not happen unless returns > exits
-                                            statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
-                                            statusText = "Eccedenza";
-                                        }
+                            {/* Mobile View */}
+                            <div className="md:hidden space-y-4">
+                                {items.map((item) => {
+                                    const batch = batchAvailability.find(b => b.id === item.id);
+                                    const isJobAssigned = purchase?.jobId != null;
+                                    const remaining = isJobAssigned ? 0 : (batch ? batch.remainingQty : item.quantity);
+                                    const original = item.quantity;
 
-                                        return (
-                                            <TableRow key={item.id}>
-                                                <TableCell>
-                                                    <div className="font-medium">
+                                    let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
+                                    let statusText = "Disponibile";
+
+                                    if (isJobAssigned) {
+                                        statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
+                                        statusText = "A cantiere";
+                                    } else if (remaining <= 0.001) {
+                                        statusColor = "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300";
+                                        statusText = "Esaurito";
+                                    } else if (remaining < original) {
+                                        statusColor = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300";
+                                        statusText = "Parziale";
+                                    } else if (remaining > original) {
+                                        statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
+                                        statusText = "Eccedenza";
+                                    }
+
+                                    return (
+                                        <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h4 className="font-medium text-sm leading-tight">
                                                         {item.itemName}
-                                                        {item.itemModel && <span className="text-slate-500 font-normal ml-1">({item.itemModel})</span>}
-                                                    </div>
-                                                    <div className="text-xs text-slate-500">{item.itemCode}</div>
-                                                </TableCell>
-                                                <TableCell className="text-right">{original}</TableCell>
-                                                <TableCell className="text-right font-bold">
-                                                    {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Badge variant="secondary" className={statusColor}>
-                                                        {statusText}
-                                                    </Badge>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
+                                                        {item.itemModel && <span className="text-slate-500 font-normal"> ({item.itemModel})</span>}
+                                                    </h4>
+                                                    <p className="text-xs text-slate-500 font-mono mt-1">{item.itemCode}</p>
+                                                </div>
+                                                <Badge variant="secondary" className={statusColor}>
+                                                    {statusText}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-200 dark:border-slate-700">
+                                                <div>
+                                                    <span className="text-slate-500 text-xs block">Iniziale</span>
+                                                    <span className="font-medium">{original}</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-slate-500 text-xs block">Residua</span>
+                                                    <span className="font-bold">
+                                                        {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </CardContent>
                     </Card>
 
