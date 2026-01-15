@@ -122,9 +122,12 @@ export function MovementLinesInput({
                     </div>
                 )}
 
-                <div className="grid grid-cols-5 gap-4">
+                <div className="grid grid-cols-5 gap-4 items-end">
                     <div className="space-y-2">
-                        <Label>Pezzi</Label>
+                        <Label className="flex items-center gap-2">
+                            Pezzi
+                            <span className="text-xs text-muted-foreground font-normal">Coeff: {currentLine.coefficient}</span>
+                        </Label>
                         <Input
                             type="number"
                             placeholder="0"
@@ -143,7 +146,6 @@ export function MovementLinesInput({
                                 }
                             }}
                         />
-                        <p className="text-xs text-muted-foreground">Coeff: {currentLine.coefficient}</p>
                     </div>
                     <div className="space-y-2">
                         <Label>Quantità ({currentLine.unit})</Label>
@@ -172,11 +174,14 @@ export function MovementLinesInput({
                         <Label>U.M.</Label>
                         <Input value={currentLine.unit} readOnly className="bg-slate-50" />
                     </div>
-                    <div className="col-span-2 flex items-end">
+                    <div className="col-span-2 flex flex-col gap-1">
                         <Button onClick={onAddLine} className="w-full">
                             <Plus className="h-4 w-4 mr-2" />
                             Aggiungi
                         </Button>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                            ⚠️ Premi "Aggiungi" per ogni articolo!
+                        </p>
                     </div>
                 </div>
             </CardContent>
