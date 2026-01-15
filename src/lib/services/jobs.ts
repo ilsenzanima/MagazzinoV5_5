@@ -103,6 +103,7 @@ export const jobsApi = {
             supabase
                 .from('jobs')
                 .select('*, clients(*)')
+                .order('status', { ascending: true })  // 'active' comes before 'completed'
                 .order('created_at', { ascending: false })
         );
         if (error) throw error;
@@ -150,6 +151,7 @@ export const jobsApi = {
 
         query = query.select('*, clients(*)');
         query = query
+            .order('status', { ascending: true })  // 'active' comes before 'completed'
             .order('created_at', { ascending: false })
             .range(from, to);
 
@@ -171,6 +173,7 @@ export const jobsApi = {
                     .from('jobs')
                     .select('*, clients(name, address, street, street_number, postal_code, city, province)')
                     .eq('client_id', clientId)
+                    .order('status', { ascending: true })  // 'active' comes before 'completed'
                     .order('created_at', { ascending: false })
             );
 
