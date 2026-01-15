@@ -40,7 +40,7 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
 
     try {
       setIsDeleting(true);
-      await purchasesApi.update(purchaseId, { documentUrl: null }); 
+      await purchasesApi.update(purchaseId, { documentUrl: null });
       onUpdate();
     } catch (error) {
       console.error("Failed to delete document", error);
@@ -56,13 +56,13 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
         <CardTitle className="text-base font-semibold">Documento (DDT / Fattura)</CardTitle>
         {!documentUrl && (
           <div className="relative">
-             <input
-                type="file"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                onChange={handleFileUpload}
-                disabled={isUploading}
-                accept=".pdf,.jpg,.jpeg,.png"
-              />
+            <input
+              type="file"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
             <Button variant="outline" size="sm" disabled={isUploading}>
               {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
               {isUploading ? "Caricamento..." : "Carica"}
@@ -72,16 +72,16 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
       </CardHeader>
       <CardContent>
         {documentUrl ? (
-          <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
+          <div className="flex items-center justify-between p-3 border dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-800">
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="bg-blue-100 p-2 rounded flex-shrink-0">
+              <div className="bg-blue-100 dark:bg-blue-900/50 p-2 rounded flex-shrink-0">
                 <FileText className="h-5 w-5 text-blue-600" />
               </div>
               <div className="overflow-hidden min-w-0">
-                <p className="font-medium text-sm truncate text-slate-900">Documento Allegato</p>
-                <a 
-                  href={documentUrl} 
-                  target="_blank" 
+                <p className="font-medium text-sm truncate text-slate-900 dark:text-slate-100">Documento Allegato</p>
+                <a
+                  href={documentUrl}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-blue-600 hover:underline flex items-center mt-0.5"
                 >
@@ -89,10 +89,10 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
                 </a>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-slate-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 flex-shrink-0"
               onClick={handleDelete}
               disabled={isDeleting}
             >
@@ -100,7 +100,7 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
             </Button>
           </div>
         ) : (
-          <div className="text-center py-6 text-slate-400 border-2 border-dashed rounded-md bg-slate-50/50">
+          <div className="text-center py-6 text-slate-400 dark:text-slate-500 border-2 border-dashed dark:border-slate-600 rounded-md bg-slate-50/50 dark:bg-slate-800/50">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Nessun documento allegato</p>
           </div>
