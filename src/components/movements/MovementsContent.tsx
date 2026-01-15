@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useDeferredValue } from "react";
-import { deliveryNotesApi, DeliveryNote } from "@/lib/api";
+import { deliveryNotesApi, DeliveryNote, DeliveryNoteItem } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -162,10 +162,33 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                 const typeConfig = getTypeConfig(movement.type);
                 const Icon = typeConfig.icon;
 
-                const handleQuickPrint = (e: React.MouseEvent) => {
+                const handleQuickPrint = async (e: React.MouseEvent) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  window.open(`/print/delivery-note/${movement.id}`, '_blank');
+                  try {
+                    // Load full delivery note data
+                    const fullNote = await deliveryNotesApi.getById(movement.id);
+
+                    // Group items by inventory ID
+                    const grouped = new Map<string, DeliveryNoteItem>();
+                    fullNote.items?.forEach(item => {
+                      const key = item.inventoryId;
+                      if (grouped.has(key)) {
+                        const existing = grouped.get(key)!;
+                        grouped.set(key, { ...existing, quantity: existing.quantity + item.quantity });
+                      } else {
+                        grouped.set(key, { ...item });
+                      }
+                    });
+                    const groupedItems = Array.from(grouped.values());
+
+                    // Generate and download PDF
+                    const { generateDeliveryNotePDF } = await import('@/lib/pdf/delivery-note-pdf');
+                    await generateDeliveryNotePDF(fullNote, groupedItems);
+                  } catch (error) {
+                    console.error("Failed to print", error);
+                    alert("Errore durante la stampa");
+                  }
                 };
 
                 return (
