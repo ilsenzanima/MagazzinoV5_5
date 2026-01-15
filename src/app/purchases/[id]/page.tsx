@@ -441,38 +441,40 @@ export default function PurchaseDetailPage() {
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         Torna agli Acquisti
                     </Link>
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900">Dettaglio Acquisto</h1>
                             <p className="text-slate-500">
                                 Bolla n. {purchase.deliveryNoteNumber} del {new Date(purchase.deliveryNoteDate).toLocaleDateString()}
                             </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             {hasMissingPrices && (
-                                <div className="bg-yellow-50 text-yellow-800 px-4 py-2 rounded-md border border-yellow-200 flex items-center shadow-sm animate-pulse">
-                                    <AlertTriangle className="h-5 w-5 mr-2" />
-                                    <span className="font-medium">Attenzione: Ci sono articoli con prezzo mancante (0.00)</span>
+                                <div className="bg-yellow-50 text-yellow-800 px-3 py-2 rounded-md border border-yellow-200 flex items-start shadow-sm animate-pulse max-w-full sm:max-w-xs">
+                                    <AlertTriangle className="h-5 w-5 mr-2 shrink-0 mt-0.5" />
+                                    <span className="font-medium text-sm leading-tight">Attenzione: Ci sono articoli con prezzo mancante</span>
                                 </div>
                             )}
                             {(userRole === 'admin' || userRole === 'operativo') && (
-                                <>
+                                <div className="flex gap-2">
                                     <Button
                                         onClick={() => setIsAddPopupOpen(true)}
-                                        className="flex items-center gap-2"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2"
                                     >
                                         <Plus className="h-4 w-4" />
-                                        Aggiungi Articolo
+                                        <span className="sr-only sm:not-sr-only">Aggiungi</span>
+                                        <span className="sm:hidden">Agg. Articolo</span>
                                     </Button>
                                     <Button
                                         variant="destructive"
                                         onClick={handleDeletePurchase}
-                                        className="flex items-center gap-2"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2"
                                     >
                                         <Trash2 className="h-4 w-4" />
-                                        Elimina Acquisto
+                                        <span className="sr-only sm:not-sr-only">Elimina</span>
+                                        <span className="sm:hidden">Elimina</span>
                                     </Button>
-                                </>
+                                </div>
                             )}
                         </div>
                     </div>
