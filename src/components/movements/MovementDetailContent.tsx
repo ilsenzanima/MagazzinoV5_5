@@ -443,7 +443,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                             </div>
                         ) : (
                             items.map((item, index) => (
-                                <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-md space-y-2 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-md space-y-2 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
                                     <div className="flex justify-between items-start gap-2">
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
