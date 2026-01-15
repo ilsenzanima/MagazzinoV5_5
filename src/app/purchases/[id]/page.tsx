@@ -781,13 +781,22 @@ export default function PurchaseDetailPage() {
                                 <TableBody>
                                     {items.map((item) => {
                                         const batch = batchAvailability.find(b => b.id === item.id);
-                                        const remaining = batch ? batch.remainingQty : item.quantity;
+
+                                        // For job-assigned purchases, show different status
+                                        const isJobAssigned = purchase?.jobId != null;
+
+                                        // If job-assigned, materials go directly to site (not warehouse)
+                                        const remaining = isJobAssigned ? 0 : (batch ? batch.remainingQty : item.quantity);
                                         const original = item.quantity;
 
                                         let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
                                         let statusText = "Disponibile";
 
-                                        if (remaining <= 0.001) {
+                                        if (isJobAssigned) {
+                                            // Direct to job site
+                                            statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
+                                            statusText = "A cantiere";
+                                        } else if (remaining <= 0.001) {
                                             statusColor = "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300";
                                             statusText = "Esaurito";
                                         } else if (remaining < original) {
@@ -809,7 +818,9 @@ export default function PurchaseDetailPage() {
                                                     <div className="text-xs text-slate-500">{item.itemCode}</div>
                                                 </TableCell>
                                                 <TableCell className="text-right">{original}</TableCell>
-                                                <TableCell className="text-right font-bold">{typeof remaining === 'number' ? remaining.toFixed(2) : '-'}</TableCell>
+                                                <TableCell className="text-right font-bold">
+                                                    {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
+                                                </TableCell>
                                                 <TableCell className="text-right">
                                                     <Badge variant="secondary" className={statusColor}>
                                                         {statusText}
