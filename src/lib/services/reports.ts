@@ -176,7 +176,11 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
         const countItems: InventoryCountItem[] = [];
 
         // Build items from ALL inventory (not just those with lots)
+        // Exclude items with category 'attrezzatura'
         for (const item of items || []) {
+            // Skip attrezzatura items
+            if (item.category?.toLowerCase() === 'attrezzatura') continue;
+
             const totalPieces = itemPiecesMap.get(item.id) || 0;
             const coeff = item.coefficient || 1;
 
