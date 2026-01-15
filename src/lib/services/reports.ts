@@ -141,20 +141,20 @@ export interface InventoryCountData {
 }
 
 // Get all items for inventory count - aggregated by item (not by lot)
+// Shows ALL items including those with 0 pieces (to confirm they are at zero)
 export const getInventoryCountData = async (): Promise<InventoryCountData> => {
     try {
-        // Get all lots with remaining pieces
+        // Get all lots (including those with 0 pieces for accurate calculation)
         const { data: lots, error: lotsError } = await supabase
             .from('purchase_batch_availability')
-            .select('*')
-            .gt('remaining_pieces', 0);
+            .select('*');
 
         if (lotsError) {
             console.error('Error fetching lots:', lotsError);
             throw lotsError;
         }
 
-        // Get all inventory items
+        // Get ALL inventory items
         const { data: items, error: itemsError } = await supabase
             .from('inventory')
             .select('id, code, name, model, brand, category, unit, coefficient, pieces');
@@ -164,26 +164,20 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
             throw itemsError;
         }
 
-        // Create a map of items for quick lookup
-        const itemMap = new Map<string, any>();
-        (items || []).forEach(item => {
-            itemMap.set(item.id, item);
-        });
-
         // Aggregate pieces by item (sum all lots)
         const itemPiecesMap = new Map<string, number>();
         for (const lot of lots || []) {
             const currentPieces = itemPiecesMap.get(lot.item_id) || 0;
-            itemPiecesMap.set(lot.item_id, currentPieces + (lot.remaining_pieces || 0));
+            // Only add positive remaining pieces
+            const piecesToAdd = Math.max(0, lot.remaining_pieces || 0);
+            itemPiecesMap.set(lot.item_id, currentPieces + piecesToAdd);
         }
 
         const countItems: InventoryCountItem[] = [];
 
-        // Build aggregated items
-        for (const [itemId, totalPieces] of itemPiecesMap) {
-            const item = itemMap.get(itemId);
-            if (!item || totalPieces === 0) continue;
-
+        // Build items from ALL inventory (not just those with lots)
+        for (const item of items || []) {
+            const totalPieces = itemPiecesMap.get(item.id) || 0;
             const coeff = item.coefficient || 1;
 
             countItems.push({
