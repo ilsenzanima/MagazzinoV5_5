@@ -767,7 +767,7 @@ export default function PurchaseDetailPage() {
                             {/* Mobile View: Cards List */}
                             <div className="md:hidden space-y-2">
                                 {items.map((item) => (
-                                    <div key={item.id} className={`bg-slate-50 dark:bg-slate-800 p-3 rounded-md space-y-2 text-sm shadow-sm ${item.price === 0 ? "border-l-4 border-yellow-500" : "border border-slate-200 dark:border-slate-700"}`}>
+                                    <div key={item.id} className={`bg-slate-50 dark:bg-slate-800 p-2.5 rounded-md space-y-2 text-sm shadow-sm ${item.price === 0 ? "border-l-4 border-yellow-500" : "border border-slate-200 dark:border-slate-700"}`}>
                                         <div className="flex justify-between items-start gap-2">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -791,7 +791,7 @@ export default function PurchaseDetailPage() {
                                             </div>
 
                                             {(userRole === 'admin' || userRole === 'operativo') && (
-                                                <div className="flex gap-0 shrink-0 -mt-1 -mr-1">
+                                                <div className="flex gap-0 shrink-0">
                                                     {editingItemId === item.id ? (
                                                         <>
                                                             <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => {
@@ -995,7 +995,7 @@ export default function PurchaseDetailPage() {
                                     }
 
                                     return (
-                                        <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-md space-y-2 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
+                                        <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-md space-y-2 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
                                             <div className="flex justify-between items-start gap-2">
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2 flex-wrap">
