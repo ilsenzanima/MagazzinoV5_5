@@ -131,8 +131,7 @@ export interface InventoryCountItem {
     itemType: string;
     itemUnit: string;
     coefficient: number;
-    lotRef: string;
-    systemPieces: number;
+    systemPieces: number;  // Total pieces across all lots
     systemQuantity: number;
 }
 
@@ -141,15 +140,14 @@ export interface InventoryCountData {
     generatedAt: string;
 }
 
-// Get all items for inventory count
+// Get all items for inventory count - aggregated by item (not by lot)
 export const getInventoryCountData = async (): Promise<InventoryCountData> => {
     try {
         // Get all lots with remaining pieces
         const { data: lots, error: lotsError } = await supabase
             .from('purchase_batch_availability')
             .select('*')
-            .gt('remaining_pieces', 0)
-            .order('purchase_date', { ascending: true });
+            .gt('remaining_pieces', 0);
 
         if (lotsError) {
             console.error('Error fetching lots:', lotsError);
@@ -172,15 +170,21 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
             itemMap.set(item.id, item);
         });
 
+        // Aggregate pieces by item (sum all lots)
+        const itemPiecesMap = new Map<string, number>();
+        for (const lot of lots || []) {
+            const currentPieces = itemPiecesMap.get(lot.item_id) || 0;
+            itemPiecesMap.set(lot.item_id, currentPieces + (lot.remaining_pieces || 0));
+        }
+
         const countItems: InventoryCountItem[] = [];
 
-        // Process lots
-        for (const lot of lots || []) {
-            const item = itemMap.get(lot.item_id);
-            if (!item) continue;
+        // Build aggregated items
+        for (const [itemId, totalPieces] of itemPiecesMap) {
+            const item = itemMap.get(itemId);
+            if (!item || totalPieces === 0) continue;
 
-            const pieces = lot.remaining_pieces || 0;
-            const coeff = lot.coefficient || item.coefficient || 1;
+            const coeff = item.coefficient || 1;
 
             countItems.push({
                 itemId: item.id,
@@ -191,14 +195,10 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
                 itemType: item.category || '',
                 itemUnit: item.unit || '',
                 coefficient: coeff,
-                lotRef: lot.purchase_ref || 'N/D',
-                systemPieces: pieces,
-                systemQuantity: pieces * coeff
+                systemPieces: totalPieces,
+                systemQuantity: totalPieces * coeff
             });
         }
-
-        // NOTE: Removed legacy fallback to inventory.pieces
-        // All stock must come from tracked lots (purchase_items + delivery_notes)
 
         // Sort by type and code
         countItems.sort((a, b) => {
