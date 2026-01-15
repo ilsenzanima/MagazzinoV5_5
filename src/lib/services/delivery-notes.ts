@@ -39,20 +39,29 @@ export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
     }))
 });
 
-const mapDeliveryNoteToDb = (note: Partial<DeliveryNote>) => ({
-    type: note.type,
-    number: note.number,
-    date: note.date,
-    job_id: note.jobId,
-    causal: note.causal,
-    pickup_location: note.pickupLocation,
-    delivery_location: note.deliveryLocation,
-    transport_mean: note.transportMean,
-    transport_time: note.transportTime,
-    appearance: note.appearance,
-    packages_count: note.packagesCount,
-    notes: note.notes
-});
+const mapDeliveryNoteToDb = (note: Partial<DeliveryNote>) => {
+    const dbNote: any = {};
+
+    // Only include fields that are explicitly passed (not undefined)
+    if (note.type !== undefined) dbNote.type = note.type;
+    if (note.number !== undefined) dbNote.number = note.number;
+    if (note.date !== undefined) dbNote.date = note.date;
+    if (note.causal !== undefined) dbNote.causal = note.causal;
+    if (note.pickupLocation !== undefined) dbNote.pickup_location = note.pickupLocation;
+    if (note.deliveryLocation !== undefined) dbNote.delivery_location = note.deliveryLocation;
+    if (note.transportMean !== undefined) dbNote.transport_mean = note.transportMean;
+    if (note.transportTime !== undefined) dbNote.transport_time = note.transportTime;
+    if (note.appearance !== undefined) dbNote.appearance = note.appearance;
+    if (note.packagesCount !== undefined) dbNote.packages_count = note.packagesCount;
+    if (note.notes !== undefined) dbNote.notes = note.notes;
+
+    // CRITICAL: Only update job_id when explicitly passed
+    if ('jobId' in note) {
+        dbNote.job_id = note.jobId || null;
+    }
+
+    return dbNote;
+};
 
 export const deliveryNotesApi = {
     getAll: async () => {

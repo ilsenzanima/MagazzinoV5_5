@@ -26,20 +26,30 @@ export const mapDbToJob = (db: any): Job => ({
     cup: db.cup
 });
 
-const mapJobToDb = (job: Partial<Job>) => ({
-    client_id: job.clientId,
+const mapJobToDb = (job: Partial<Job>) => {
+    const dbJob: any = {};
 
-    code: job.code,
-    name: job.name,
-    description: job.description,
-    status: job.status,
-    start_date: job.startDate,
-    end_date: job.endDate || null,
-    site_address: job.siteAddress,
-    site_manager: job.siteManager,
-    cig: job.cig,
-    cup: job.cup
-});
+    // Only include fields that are explicitly passed (not undefined)
+    if (job.code !== undefined) dbJob.code = job.code;
+    if (job.name !== undefined) dbJob.name = job.name;
+    if (job.description !== undefined) dbJob.description = job.description;
+    if (job.status !== undefined) dbJob.status = job.status;
+    if (job.startDate !== undefined) dbJob.start_date = job.startDate;
+    if (job.siteAddress !== undefined) dbJob.site_address = job.siteAddress;
+    if (job.siteManager !== undefined) dbJob.site_manager = job.siteManager;
+    if (job.cig !== undefined) dbJob.cig = job.cig;
+    if (job.cup !== undefined) dbJob.cup = job.cup;
+
+    // Handle nullable fields - only include when explicitly passed
+    if ('endDate' in job) {
+        dbJob.end_date = job.endDate || null;
+    }
+    if ('clientId' in job) {
+        dbJob.client_id = job.clientId || null;
+    }
+
+    return dbJob;
+};
 
 const mapDbToJobLog = (db: any): JobLog => ({
     id: db.id,

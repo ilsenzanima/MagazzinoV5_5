@@ -25,23 +25,28 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     model: dbItem.model
 });
 
-export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => ({
-    code: item.code,
-    name: item.name,
-    brand: item.brand,
-    category: item.type, // Map type -> category
-    quantity: item.quantity,
-    min_stock: item.minStock, // Map minStock -> min_stock
-    image_url: item.image, // Map image -> image_url
-    description: item.description,
-    price: item.price,
-    location: item.location,
-    unit: item.unit,
-    coefficient: item.coefficient,
-    supplier_code: item.supplierCode,
-    real_quantity: item.realQuantity,
-    model: item.model
-});
+export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
+    const dbItem: any = {};
+
+    // Only include fields that are explicitly passed (not undefined)
+    if (item.code !== undefined) dbItem.code = item.code;
+    if (item.name !== undefined) dbItem.name = item.name;
+    if (item.brand !== undefined) dbItem.brand = item.brand;
+    if (item.type !== undefined) dbItem.category = item.type; // Map type -> category
+    if (item.quantity !== undefined) dbItem.quantity = item.quantity;
+    if (item.minStock !== undefined) dbItem.min_stock = item.minStock;
+    if (item.image !== undefined) dbItem.image_url = item.image;
+    if (item.description !== undefined) dbItem.description = item.description;
+    if (item.price !== undefined) dbItem.price = item.price;
+    if (item.location !== undefined) dbItem.location = item.location;
+    if (item.unit !== undefined) dbItem.unit = item.unit;
+    if (item.coefficient !== undefined) dbItem.coefficient = item.coefficient;
+    if (item.supplierCode !== undefined) dbItem.supplier_code = item.supplierCode;
+    if (item.realQuantity !== undefined) dbItem.real_quantity = item.realQuantity;
+    if (item.model !== undefined) dbItem.model = item.model;
+
+    return dbItem;
+};
 
 const mapDbToInventorySupplierCode = (db: any): InventorySupplierCode => ({
     id: db.id,
