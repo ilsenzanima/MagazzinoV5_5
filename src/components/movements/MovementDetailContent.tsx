@@ -436,64 +436,51 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                     </div>
 
                     {/* Mobile View: Cards List */}
-                    <div className="md:hidden space-y-4">
+                    <div className="md:hidden space-y-2">
                         {items.length === 0 ? (
                             <div className="text-center py-8 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 rounded-lg">
                                 Nessun articolo inserito
                             </div>
                         ) : (
                             items.map((item, index) => (
-                                <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
-                                    {/* Header: Code & Action */}
-                                    <div className="flex justify-between items-start">
-                                        <Badge variant="outline" className="text-xs font-mono">
-                                            {item.inventoryCode}
-                                        </Badge>
-                                        {isEditing && (
-                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => handleRemoveItem(index)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {/* Main Info */}
-                                    <div>
-                                        <h4 className="font-medium text-sm leading-tight">
-                                            {item.inventoryName}
-                                            {item.inventoryModel && <span className="text-slate-500 font-normal"> ({item.inventoryModel})</span>}
-                                        </h4>
-                                        {item.inventoryDescription && (
-                                            <p className="text-xs text-slate-500 mt-1">{item.inventoryDescription}</p>
-                                        )}
-                                    </div>
-
-                                    {/* Footer: Quantity & Purchase Ref */}
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
-                                        <div className="text-xs">
-                                            {item.purchaseNumber ? (
-                                                <>
-                                                    <span className="text-slate-500">Rif: </span>
-                                                    <span className="font-medium text-blue-600">Bolla {item.purchaseNumber}</span>
-                                                </>
-                                            ) : (
-                                                <span className="text-slate-400 italic">Nessun rif.</span>
+                                <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-md space-y-2 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h4 className="font-semibold text-sm truncate text-slate-900 dark:text-slate-100">
+                                                    {item.inventoryName}
+                                                </h4>
+                                                {item.inventoryModel && <span className="text-slate-500 text-xs">({item.inventoryModel})</span>}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                                <span className="text-xs font-mono text-slate-500">{item.inventoryCode}</span>
+                                                {item.purchaseNumber && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+                                                        Bolla {item.purchaseNumber}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {item.inventoryDescription && (
+                                                <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">{item.inventoryDescription}</p>
                                             )}
                                         </div>
 
-                                        <div>
+                                        <div className="shrink-0 flex flex-col items-end gap-1">
                                             {isEditing ? (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-slate-500">Qtà:</span>
+                                                <div className="flex items-center gap-1">
                                                     <Input
                                                         type="number"
                                                         min="1"
                                                         value={item.quantity}
                                                         onChange={(e) => handleUpdateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                                                        className="w-20 h-8"
+                                                        className="w-16 h-7 text-right text-sm"
                                                     />
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => handleRemoveItem(index)}>
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
                                                 </div>
                                             ) : (
-                                                <Badge variant="secondary" className="text-base">
+                                                <Badge variant="secondary" className="text-sm border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700">
                                                     {item.quantity} {item.inventoryUnit}
                                                 </Badge>
                                             )}

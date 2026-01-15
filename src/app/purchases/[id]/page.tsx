@@ -765,39 +765,53 @@ export default function PurchaseDetailPage() {
                             </div>
 
                             {/* Mobile View: Cards List */}
-                            <div className="md:hidden space-y-4">
+                            <div className="md:hidden space-y-2">
                                 {items.map((item) => (
-                                    <div key={item.id} className={`bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3 ${item.price === 0 ? "border-l-4 border-yellow-500" : ""}`}>
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h4 className="font-medium text-sm leading-tight">
-                                                    {item.itemName}
-                                                    {item.itemModel && <span className="text-slate-500 font-normal"> ({item.itemModel})</span>}
-                                                </h4>
-                                                <p className="text-xs text-slate-500 font-mono mt-1">{item.itemCode}</p>
+                                    <div key={item.id} className={`bg-slate-50 dark:bg-slate-800 p-3 rounded-md space-y-2 text-sm shadow-sm ${item.price === 0 ? "border-l-4 border-yellow-500" : "border border-slate-200 dark:border-slate-700"}`}>
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h4 className="font-semibold text-sm truncate text-slate-900 dark:text-slate-100">
+                                                        {item.itemName}
+                                                    </h4>
+                                                    {item.itemModel && <span className="text-slate-500 text-xs">({item.itemModel})</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="text-xs font-mono text-slate-500">{item.itemCode}</span>
+                                                    {item.jobId ? (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+                                                            {item.jobCode}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 font-medium">
+                                                            Magazzino
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
+
                                             {(userRole === 'admin' || userRole === 'operativo') && (
-                                                <div className="flex gap-1">
+                                                <div className="flex gap-0 shrink-0 -mt-1 -mr-1">
                                                     {editingItemId === item.id ? (
                                                         <>
-                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => {
+                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => {
                                                                 const inventoryItem = inventory.find(inv => inv.id === item.itemId);
                                                                 const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
                                                                 saveEdit(item.id, coeff);
                                                             }}>
-                                                                <Save className="h-4 w-4" />
+                                                                <Save className="h-3.5 w-3.5" />
                                                             </Button>
-                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500" onClick={cancelEdit}>
-                                                                X
+                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-500" onClick={cancelEdit}>
+                                                                <X className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEditing(item)}>
-                                                                <Edit className="h-4 w-4" />
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" onClick={() => startEditing(item)}>
+                                                                <Edit className="h-3.5 w-3.5" />
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => handleDeleteItem(item.id)}>
-                                                                <Trash2 className="h-4 w-4" />
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => handleDeleteItem(item.id)}>
+                                                                <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </>
                                                     )}
@@ -805,96 +819,77 @@ export default function PurchaseDetailPage() {
                                             )}
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            {editingItemId === item.id ? (
-                                                <>
-                                                    <div className="col-span-1">
-                                                        <Label className="text-xs text-slate-500">Pezzi</Label>
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            className="h-8"
-                                                            value={editValues.pieces}
-                                                            onChange={(e) => {
-                                                                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                                const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
-                                                                handleEditPiecesChange(e.target.value, coeff);
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-1">
-                                                        <Label className="text-xs text-slate-500">Quantità</Label>
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            className="h-8"
-                                                            value={editValues.quantity}
-                                                            onChange={(e) => {
-                                                                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                                const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
-                                                                handleEditQuantityChange(e.target.value, coeff);
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-2">
-                                                        <Label className="text-xs text-slate-500">Prezzo</Label>
-                                                        <Input
-                                                            type="number"
-                                                            step="0.00001"
-                                                            className="h-8"
-                                                            value={editValues.price}
-                                                            onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
-                                                        />
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div>
-                                                        <span className="text-slate-500 block text-xs">Quantità</span>
-                                                        <span className="font-medium">
-                                                            {item.quantity}
-                                                            {item.pieces && <span className="text-slate-400 font-normal text-xs ml-1">({item.pieces} pz x {item.coefficient || 1})</span>}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-slate-500 block text-xs">Prezzo</span>
-                                                        {(userRole === 'admin' || userRole === 'operativo') ? (
-                                                            item.price === 0 ? (
-                                                                <span className="text-red-500 font-bold text-xs flex items-center">
-                                                                    <AlertTriangle className="h-3 w-3 mr-1" /> MANCANTE
-                                                                </span>
-                                                            ) : (
-                                                                <span>€ {item.price.toFixed(5)}</span>
-                                                            )
-                                                        ) : (
-                                                            <span className="text-slate-400 italic text-xs">Riservato</span>
-                                                        )}
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
+                                        {editingItemId === item.id ? (
+                                            <div className="grid grid-cols-2 gap-2 bg-white dark:bg-slate-900/50 p-2 rounded border border-slate-100 dark:border-slate-700/50">
+                                                <div className="col-span-1">
+                                                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Pezzi</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="h-7 text-sm"
+                                                        value={editValues.pieces}
+                                                        onChange={(e) => {
+                                                            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                            const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
+                                                            handleEditPiecesChange(e.target.value, coeff);
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Quantità</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="h-7 text-sm"
+                                                        value={editValues.quantity}
+                                                        onChange={(e) => {
+                                                            const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+                                                            const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
+                                                            handleEditQuantityChange(e.target.value, coeff);
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Prezzo</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.00001"
+                                                        className="h-7 text-sm"
+                                                        value={editValues.price}
+                                                        onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-between text-sm pt-1 border-t border-slate-200/50 dark:border-slate-700/50 mt-1">
+                                                <div>
+                                                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                                        {item.quantity}
+                                                    </span>
+                                                    {item.pieces && <span className="text-slate-500 text-xs ml-1">({item.pieces} pz)</span>}
+                                                </div>
 
-                                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-sm">
-                                            <div>
-                                                {item.jobId ? (
-                                                    <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
-                                                        {item.jobCode}
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                                                        Magazzino
-                                                    </Badge>
-                                                )}
+                                                <div className="text-right">
+                                                    {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                        item.price === 0 ? (
+                                                            <span className="text-red-500 font-bold text-xs flex items-center">
+                                                                <AlertTriangle className="h-3 w-3 mr-1" /> MANCANTE
+                                                            </span>
+                                                        ) : (
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="font-mono text-xs">€ {item.price.toFixed(5)}</span>
+                                                                <span className="font-bold text-slate-900 dark:text-white text-xs">Tot: € ${(item.quantity * item.price).toFixed(2)}</span>
+                                                            </div>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-slate-400 italic text-xs">Riservato</span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="font-bold">
-                                                {(userRole === 'admin' || userRole === 'operativo') ? (
-                                                    `Tot: € ${(item.quantity * item.price).toFixed(2)}`
-                                                ) : null}
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 ))}
-                                <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-lg flex justify-between items-center font-bold">
+                                <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-md flex justify-between items-center font-bold text-sm">
                                     <span>TOTALE BOLLA</span>
                                     <span>
                                         {(userRole === 'admin' || userRole === 'operativo') ? (
@@ -975,7 +970,7 @@ export default function PurchaseDetailPage() {
                             </div>
 
                             {/* Mobile View */}
-                            <div className="md:hidden space-y-4">
+                            <div className="md:hidden space-y-2">
                                 {items.map((item) => {
                                     const batch = batchAvailability.find(b => b.id === item.id);
                                     const isJobAssigned = purchase?.jobId != null;
@@ -1000,28 +995,30 @@ export default function PurchaseDetailPage() {
                                     }
 
                                     return (
-                                        <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h4 className="font-medium text-sm leading-tight">
-                                                        {item.itemName}
-                                                        {item.itemModel && <span className="text-slate-500 font-normal"> ({item.itemModel})</span>}
-                                                    </h4>
-                                                    <p className="text-xs text-slate-500 font-mono mt-1">{item.itemCode}</p>
+                                        <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-md space-y-2 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h4 className="font-semibold text-sm truncate text-slate-900 dark:text-slate-100">
+                                                            {item.itemName}
+                                                        </h4>
+                                                        {item.itemModel && <span className="text-slate-500 text-xs">({item.itemModel})</span>}
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 font-mono mt-0.5">{item.itemCode}</p>
                                                 </div>
-                                                <Badge variant="secondary" className={statusColor}>
+                                                <Badge variant="secondary" className={`${statusColor} text-[10px] px-1.5 py-0`}>
                                                     {statusText}
                                                 </Badge>
                                             </div>
 
-                                            <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-200 dark:border-slate-700">
+                                            <div className="flex items-center justify-between text-sm pt-1 border-t border-slate-200/50 dark:border-slate-700/50 mt-1">
                                                 <div>
-                                                    <span className="text-slate-500 text-xs block">Iniziale</span>
-                                                    <span className="font-medium">{original}</span>
+                                                    <span className="text-slate-500 text-[10px] uppercase tracking-wider block">Iniziale</span>
+                                                    <span className="font-medium text-slate-700 dark:text-slate-300">{original}</span>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className="text-slate-500 text-xs block">Residua</span>
-                                                    <span className="font-bold">
+                                                    <span className="text-slate-500 text-[10px] uppercase tracking-wider block">Residua</span>
+                                                    <span className="font-bold text-slate-900 dark:text-white">
                                                         {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
                                                     </span>
                                                 </div>
