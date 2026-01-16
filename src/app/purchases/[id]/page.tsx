@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -41,6 +41,8 @@ export default function PurchaseDetailPage() {
     const [purchase, setPurchase] = useState<Purchase | null>(null);
     const [items, setItems] = useState<PurchaseItem[]>([]);
     const [batchAvailability, setBatchAvailability] = useState<any[]>([]); // New state for traceability
+    const [itemJobMovements, setItemJobMovements] = useState<Record<string, any[]>>({}); // Job movements per item
+    const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set()); // Track expanded items
 
     // Data Sources for Add Item
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -87,13 +89,14 @@ export default function PurchaseDetailPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData] = await Promise.all([
+            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData] = await Promise.all([
                 purchasesApi.getById(id),
                 purchasesApi.getItems(id),
                 inventoryApi.getAll(),
                 jobsApi.getAll(),
                 purchasesApi.getPurchaseBatchAvailability(id),
-                suppliersApi.getAll()
+                suppliersApi.getAll(),
+                purchasesApi.getPurchaseItemJobMovements(id)
             ]);
 
             setPurchase(purchaseData);
@@ -102,6 +105,7 @@ export default function PurchaseDetailPage() {
             setJobs(jobsData.filter(j => j.status === 'active'));
             setBatchAvailability(availabilityData);
             setSuppliers(suppliersData);
+            setItemJobMovements(jobMovementsData);
 
             if (purchaseData.jobId) {
                 const job = jobsData.find(j => j.id === purchaseData.jobId);
@@ -417,6 +421,18 @@ export default function PurchaseDetailPage() {
 
     const cancelEdit = () => {
         setEditingItemId(null);
+    };
+
+    const toggleExpanded = (itemId: string) => {
+        setExpandedItems(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(itemId)) {
+                newSet.delete(itemId);
+            } else {
+                newSet.add(itemId);
+            }
+            return newSet;
+        });
     };
 
     if (loading) {
@@ -946,25 +962,69 @@ export default function PurchaseDetailPage() {
                                                 statusText = "Eccedenza";
                                             }
 
+                                            const jobMovements = itemJobMovements[item.id] || [];
+                                            const isExpanded = expandedItems.has(item.id);
+                                            const hasMovements = jobMovements.length > 0;
+
                                             return (
-                                                <TableRow key={item.id}>
-                                                    <TableCell>
-                                                        <div className="font-medium">
-                                                            {item.itemName}
-                                                            {item.itemModel && <span className="text-slate-500 font-normal ml-1">({item.itemModel})</span>}
-                                                        </div>
-                                                        <div className="text-xs text-slate-500">{item.itemCode}</div>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">{original}</TableCell>
-                                                    <TableCell className="text-right font-bold">
-                                                        {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Badge variant="secondary" className={statusColor}>
-                                                            {statusText}
-                                                        </Badge>
-                                                    </TableCell>
-                                                </TableRow>
+                                                <>
+                                                    <TableRow key={item.id} className={hasMovements ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" : ""}>
+                                                        <TableCell onClick={() => hasMovements && toggleExpanded(item.id)}>
+                                                            <div className="flex items-center gap-2">
+                                                                {hasMovements && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6 p-0"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            toggleExpanded(item.id);
+                                                                        }}
+                                                                    >
+                                                                        {isExpanded ? (
+                                                                            <ChevronDown className="h-4 w-4 text-slate-500" />
+                                                                        ) : (
+                                                                            <ChevronRight className="h-4 w-4 text-slate-500" />
+                                                                        )}
+                                                                    </Button>
+                                                                )}
+                                                                <div className={!hasMovements ? "ml-8" : ""}>
+                                                                    <div className="font-medium">
+                                                                        {item.itemName}
+                                                                        {item.itemModel && <span className="text-slate-500 font-normal ml-1">({item.itemModel})</span>}
+                                                                    </div>
+                                                                    <div className="text-xs text-slate-500">{item.itemCode}</div>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">{original}</TableCell>
+                                                        <TableCell className="text-right font-bold">
+                                                            {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Badge variant="secondary" className={statusColor}>
+                                                                {statusText}
+                                                            </Badge>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    {isExpanded && jobMovements.map((movement, idx) => (
+                                                        <TableRow key={`${item.id}-job-${idx}`} className="bg-slate-50/50 dark:bg-slate-900/50">
+                                                            <TableCell colSpan={4}>
+                                                                <div className="pl-10 py-1 flex items-center gap-2">
+                                                                    <span className="text-slate-400">└─</span>
+                                                                    <span className="font-medium text-blue-600 dark:text-blue-400">
+                                                                        {movement.jobCode}
+                                                                    </span>
+                                                                    <span className="text-slate-600 dark:text-slate-300">
+                                                                        {movement.totalPieces > 0 && `${movement.totalPieces} pz`}
+                                                                        {movement.totalPieces > 0 && movement.totalQuantity > 0 && ' - '}
+                                                                        {movement.totalQuantity > 0 && `${movement.totalQuantity.toFixed(2)} ${item.itemModel || 'm²'}`}
+                                                                    </span>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </>
                                             );
                                         })}
                                     </TableBody>
@@ -996,35 +1056,73 @@ export default function PurchaseDetailPage() {
                                         statusText = "Eccedenza";
                                     }
 
+                                    const jobMovements = itemJobMovements[item.id] || [];
+                                    const isExpanded = expandedItems.has(item.id);
+                                    const hasMovements = jobMovements.length > 0;
+
                                     return (
-                                        <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-md space-y-2 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <h4 className="font-semibold text-sm truncate text-slate-900 dark:text-slate-100">
-                                                            {item.itemName}
-                                                        </h4>
-                                                        {item.itemModel && <span className="text-slate-500 text-xs">({item.itemModel})</span>}
+                                        <div key={item.id} className="bg-slate-50 dark:bg-slate-800 rounded-md text-sm border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                                            <div className="p-2.5 space-y-2">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            {hasMovements && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-5 w-5 p-0 shrink-0"
+                                                                    onClick={() => toggleExpanded(item.id)}
+                                                                >
+                                                                    {isExpanded ? (
+                                                                        <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+                                                                    ) : (
+                                                                        <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
+                                                                    )}
+                                                                </Button>
+                                                            )}
+                                                            <h4 className="font-semibold text-sm truncate text-slate-900 dark:text-slate-100">
+                                                                {item.itemName}
+                                                            </h4>
+                                                            {item.itemModel && <span className="text-slate-500 text-xs">({item.itemModel})</span>}
+                                                        </div>
+                                                        <p className="text-xs text-slate-500 font-mono mt-0.5">{item.itemCode}</p>
                                                     </div>
-                                                    <p className="text-xs text-slate-500 font-mono mt-0.5">{item.itemCode}</p>
+                                                    <Badge variant="secondary" className={`${statusColor} text-[10px] px-1.5 py-0 shrink-0`}>
+                                                        {statusText}
+                                                    </Badge>
                                                 </div>
-                                                <Badge variant="secondary" className={`${statusColor} text-[10px] px-1.5 py-0`}>
-                                                    {statusText}
-                                                </Badge>
+
+                                                <div className="flex items-center justify-between text-sm pt-1 border-t border-slate-200/50 dark:border-slate-700/50 mt-1">
+                                                    <div>
+                                                        <span className="text-slate-500 text-[10px] uppercase tracking-wider block">Iniziale</span>
+                                                        <span className="font-medium text-slate-700 dark:text-slate-300">{original}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-slate-500 text-[10px] uppercase tracking-wider block">Residua</span>
+                                                        <span className="font-bold text-slate-900 dark:text-white">
+                                                            {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-center justify-between text-sm pt-1 border-t border-slate-200/50 dark:border-slate-700/50 mt-1">
-                                                <div>
-                                                    <span className="text-slate-500 text-[10px] uppercase tracking-wider block">Iniziale</span>
-                                                    <span className="font-medium text-slate-700 dark:text-slate-300">{original}</span>
+                                            {isExpanded && jobMovements.length > 0 && (
+                                                <div className="bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-2 space-y-1">
+                                                    {jobMovements.map((movement, idx) => (
+                                                        <div key={idx} className="flex items-center gap-2 text-xs">
+                                                            <span className="text-slate-400">└─</span>
+                                                            <span className="font-medium text-blue-600 dark:text-blue-400">
+                                                                {movement.jobCode}
+                                                            </span>
+                                                            <span className="text-slate-600 dark:text-slate-300">
+                                                                {movement.totalPieces > 0 && `${movement.totalPieces} pz`}
+                                                                {movement.totalPieces > 0 && movement.totalQuantity > 0 && ' - '}
+                                                                {movement.totalQuantity > 0 && `${movement.totalQuantity.toFixed(2)} ${item.itemModel || 'm²'}`}
+                                                            </span>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className="text-slate-500 text-[10px] uppercase tracking-wider block">Residua</span>
-                                                    <span className="font-bold text-slate-900 dark:text-white">
-                                                        {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                            )}
                                         </div>
                                     );
                                 })}
