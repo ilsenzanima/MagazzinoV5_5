@@ -1,6 +1,8 @@
 -- View per tracciabilità movimenti lotto-commessa
 -- Mostra dove è stato movimentato il materiale di ogni lotto (purchase_item)
 
+DROP VIEW IF EXISTS public.purchase_item_job_movements;
+
 CREATE OR REPLACE VIEW public.purchase_item_job_movements AS
 SELECT 
     dni.purchase_item_id,
