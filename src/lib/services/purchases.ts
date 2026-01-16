@@ -67,25 +67,32 @@ export const purchasesApi = {
         }
 
         if (search) {
-            // 1. Find matching suppliers to include them in the OR search
-            const { data: suppliers } = await supabase
-                .from('suppliers')
-                .select('id')
-                .ilike('name', `%${search}%`);
+            // Split search into words for fuzzy matching
+            const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
 
-            const supplierIds = suppliers?.map(s => s.id) || [];
-
-            // 2. Build OR filter
-            let orConditions = [
-                `delivery_note_number.ilike.%${search}%`,
-                `notes.ilike.%${search}%`
-            ];
-
-            if (supplierIds.length > 0) {
-                orConditions.push(`supplier_id.in.(${supplierIds.join(',')})`);
+            // Find matching suppliers
+            let supplierIds: string[] = [];
+            for (const word of words) {
+                const { data: suppliers } = await supabase
+                    .from('suppliers')
+                    .select('id')
+                    .ilike('name', `%${word}%`);
+                if (suppliers) {
+                    supplierIds = [...new Set([...supplierIds, ...suppliers.map(s => s.id)])];
+                }
             }
 
-            query = query.or(orConditions.join(','));
+            // For each word, apply OR conditions (chained = AND between words)
+            for (const word of words) {
+                let orConditions = [
+                    `delivery_note_number.ilike.%${word}%`,
+                    `notes.ilike.%${word}%`
+                ];
+                if (supplierIds.length > 0) {
+                    orConditions.push(`supplier_id.in.(${supplierIds.join(',')})`);
+                }
+                query = query.or(orConditions.join(','));
+            }
         }
 
         query = query

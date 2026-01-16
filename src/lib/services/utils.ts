@@ -15,3 +15,13 @@ export function fetchWithTimeout<T>(promise: PromiseLike<T>, ms: number = 30000)
         );
     });
 }
+
+/**
+ * Parse search term into individual words for fuzzy matching.
+ * Returns empty array if no valid search words.
+ * Example: "af panel " -> ["af", "panel"]
+ */
+export function parseSearchWords(search: string): string[] {
+    if (!search) return [];
+    return search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
+}

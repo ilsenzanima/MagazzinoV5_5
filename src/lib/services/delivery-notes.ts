@@ -99,23 +99,32 @@ export const deliveryNotesApi = {
             .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'estimated' });
 
         if (search) {
-            const { data: jobs } = await supabase
-                .from('jobs')
-                .select('id')
-                .ilike('code', `%${search}%`);
+            // Split search into words for fuzzy matching
+            const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
 
-            const jobIds = jobs?.map(j => j.id) || [];
-
-            let orConditions = [
-                `number.ilike.%${search}%`,
-                `causal.ilike.%${search}%`
-            ];
-
-            if (jobIds.length > 0) {
-                orConditions.push(`job_id.in.(${jobIds.join(',')})`);
+            // Find matching jobs
+            let jobIds: string[] = [];
+            for (const word of words) {
+                const { data: jobs } = await supabase
+                    .from('jobs')
+                    .select('id')
+                    .or(`code.ilike.%${word}%,description.ilike.%${word}%`);
+                if (jobs) {
+                    jobIds = [...new Set([...jobIds, ...jobs.map(j => j.id)])];
+                }
             }
 
-            query = query.or(orConditions.join(','));
+            // For each word, apply OR conditions (chained = AND between words)
+            for (const word of words) {
+                let orConditions = [
+                    `number.ilike.%${word}%`,
+                    `causal.ilike.%${word}%`
+                ];
+                if (jobIds.length > 0) {
+                    orConditions.push(`job_id.in.(${jobIds.join(',')})`);
+                }
+                query = query.or(orConditions.join(','));
+            }
         }
 
         query = query
