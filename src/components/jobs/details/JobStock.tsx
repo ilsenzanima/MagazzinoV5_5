@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Package, ArrowRight, AlertTriangle, ArrowUpRight, ArrowDownLeft, History } from "lucide-react"
+import { Package, ArrowRight, AlertTriangle, ArrowUpRight, ArrowDownLeft, History, Search, ChevronDown, ChevronRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { fictitiousPricesApi } from "@/lib/services/fictitiousPrices"
@@ -20,8 +21,14 @@ interface JobStockProps {
 export function JobStock({ movements, jobId }: JobStockProps) {
     const { userRole } = useAuth()
     const [searchTerm, setSearchTerm] = useState("")
+    const [expandedItemCode, setExpandedItemCode] = useState<string | null>(null)
     const [fictitiousPrices, setFictitiousPrices] = useState<Record<string, number>>({})
     const [loadingPrices, setLoadingPrices] = useState(true)
+
+    // Toggle expanded item - only one at a time
+    const toggleExpanded = (code: string) => {
+        setExpandedItemCode(prev => prev === code ? null : code)
+    }
 
     // Load saved fictitious prices
     useEffect(() => {
@@ -79,117 +86,160 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         return map
     }, [movements])
 
-    // Calculate Current Stock at Site - Memoized
-    const stockMap = useMemo(() => {
-        const map = new Map<string, {
-            itemId: string,
-            name: string,
-            model?: string,
-            code: string,
-            qty: number,
-            pieces: number,
-            unit: string,
-            price: number, // Specific or Average
-            isFictitious: boolean,
-            referenceMap: Map<string, { noteId: string, isReturn: boolean }>, // ref -> {noteId, isReturn}
-            purchaseId?: string,
-            purchaseNumber?: string,
-            purchaseDate?: string,
-            supplierName?: string
-        }>()
+    // Batch type for individual lots
+    interface Batch {
+        sourceKey: string
+        qty: number
+        pieces: number
+        price: number
+        referenceMap: Map<string, { noteId: string, isReturn: boolean }>
+        purchaseId?: string
+        purchaseNumber?: string
+        purchaseDate?: string
+        supplierName?: string
+    }
+
+    // Grouped item type
+    interface GroupedItem {
+        itemId: string
+        name: string
+        model?: string
+        code: string
+        unit: string
+        isFictitious: boolean
+        totalQty: number
+        totalPieces: number
+        totalValue: number
+        batches: Batch[]
+    }
+
+    // Calculate Current Stock at Site - Grouped by Item Code
+    const groupedStock = useMemo(() => {
+        const map = new Map<string, GroupedItem>()
 
         movements.forEach(m => {
-            // Determine direction relative to Job Site
-            // Purchase -> Job In (+)
-            // Warehouse Unload (Out from Wh) -> Job In (+)
-            // Warehouse Exit (Out from Wh) -> Job In (+)
-            // Warehouse Load (In to Wh) -> Job Out (-)
-            // Warehouse Entry (In to Wh) -> Job Out (-)
-
             const isSiteIn = ['purchase', 'unload', 'exit'].includes(m.type)
-
-            // We normalize quantity to be positive for input, negative for output
-            // We use Math.abs to ignore the sign coming from the View (which is Warehouse-centric)
             const qtyChange = isSiteIn ? Math.abs(m.quantity) : -Math.abs(m.quantity)
 
-            // Calculate pieces change
-            let piecesChange = 0;
+            let piecesChange = 0
             if (m.pieces !== undefined && m.pieces !== null) {
-                piecesChange = isSiteIn ? Math.abs(m.pieces) : -Math.abs(m.pieces);
+                piecesChange = isSiteIn ? Math.abs(m.pieces) : -Math.abs(m.pieces)
             } else if (m.coefficient && m.coefficient !== 0) {
-                // Fallback if pieces is missing but we have coefficient
-                const p = m.quantity / m.coefficient;
-                piecesChange = isSiteIn ? Math.abs(p) : -Math.abs(p);
+                const p = m.quantity / m.coefficient
+                piecesChange = isSiteIn ? Math.abs(p) : -Math.abs(p)
             }
 
-            // Group by Item + Fictitious + Source (Purchase/Bolla)
-            // Use Reference/PurchaseId to separate batches
             const sourceKey = m.purchaseId || m.reference || 'unknown'
-            const key = `${m.itemCode}-${!!m.isFictitious}-${sourceKey}`
+            const groupKey = `${m.itemCode}-${!!m.isFictitious}`
 
+            if (!m.itemCode) return
 
-            const current = map.get(key)
+            let price = 0
+            if (!m.isFictitious) {
+                price = m.itemPrice || 0
+            }
+
+            const current = map.get(groupKey)
 
             if (current) {
-                current.qty += qtyChange
-                current.pieces += piecesChange
-                // Add reference to existing Map with type info
-                if (m.reference && m.deliveryNoteId) {
-                    current.referenceMap.set(m.reference, { noteId: m.deliveryNoteId, isReturn: !isSiteIn })
+                // Find or create batch
+                let batch = current.batches.find(b => b.sourceKey === sourceKey)
+                if (batch) {
+                    batch.qty += qtyChange
+                    batch.pieces += piecesChange
+                    if (m.reference && m.deliveryNoteId) {
+                        batch.referenceMap.set(m.reference, { noteId: m.deliveryNoteId, isReturn: !isSiteIn })
+                    }
+                } else {
+                    const referenceMap = new Map<string, { noteId: string, isReturn: boolean }>()
+                    if (m.reference && m.deliveryNoteId) {
+                        referenceMap.set(m.reference, { noteId: m.deliveryNoteId, isReturn: !isSiteIn })
+                    }
+                    current.batches.push({
+                        sourceKey,
+                        qty: qtyChange,
+                        pieces: piecesChange,
+                        price,
+                        referenceMap,
+                        purchaseId: m.purchaseId,
+                        purchaseNumber: m.purchaseNumber,
+                        purchaseDate: m.purchaseDate,
+                        supplierName: m.supplierName
+                    })
                 }
-            } else if (m.itemCode) {
-                // Determine price - Fittizi sempre a 0
-                let price = 0
-                if (!m.isFictitious) {
-                    price = m.itemPrice || 0
-                }
-
+            } else {
                 const referenceMap = new Map<string, { noteId: string, isReturn: boolean }>()
                 if (m.reference && m.deliveryNoteId) {
                     referenceMap.set(m.reference, { noteId: m.deliveryNoteId, isReturn: !isSiteIn })
                 }
 
-                map.set(key, {
+                map.set(groupKey, {
                     itemId: m.itemId || '',
                     name: m.itemName || 'Sconosciuto',
                     model: m.itemModel,
                     code: m.itemCode,
-                    qty: qtyChange,
-                    pieces: piecesChange,
                     unit: m.itemUnit || 'PZ',
-                    price: price,
                     isFictitious: !!m.isFictitious,
-                    referenceMap,
-                    purchaseId: m.purchaseId,
-                    purchaseNumber: m.purchaseNumber,
-                    purchaseDate: m.purchaseDate,
-                    supplierName: m.supplierName
+                    totalQty: 0,
+                    totalPieces: 0,
+                    totalValue: 0,
+                    batches: [{
+                        sourceKey,
+                        qty: qtyChange,
+                        pieces: piecesChange,
+                        price,
+                        referenceMap,
+                        purchaseId: m.purchaseId,
+                        purchaseNumber: m.purchaseNumber,
+                        purchaseDate: m.purchaseDate,
+                        supplierName: m.supplierName
+                    }]
                 })
             }
         })
-        return map
-    }, [movements, lastPurchasePriceMap])
 
-    // Filter out zero quantity items, but maybe allow small float errors?
-    // Sort by Name - Memoized
-    const currentStock = useMemo(() => {
-        return Array.from(stockMap.values())
-            .filter(i => Math.abs(i.qty) > 0.001)
-            .sort((a, b) => a.name.localeCompare(b.name))
-    }, [stockMap])
+        // Calculate totals and filter out empty batches
+        map.forEach((item, key) => {
+            item.batches = item.batches.filter(b => Math.abs(b.qty) > 0.001)
+            item.totalQty = item.batches.reduce((sum, b) => sum + b.qty, 0)
+            item.totalPieces = item.batches.reduce((sum, b) => sum + b.pieces, 0)
+            item.totalValue = item.batches.reduce((sum, b) => sum + (b.qty * b.price), 0)
+
+            // Remove items with no remaining stock
+            if (Math.abs(item.totalQty) <= 0.001) {
+                map.delete(key)
+            }
+        })
+
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+    }, [movements])
+
+    // Filter by search term
+    const filteredStock = useMemo(() => {
+        if (!searchTerm) return groupedStock
+        const term = searchTerm.toLowerCase()
+        return groupedStock.filter(item =>
+            item.name.toLowerCase().includes(term) ||
+            item.code.toLowerCase().includes(term) ||
+            (item.model && item.model.toLowerCase().includes(term))
+        )
+    }, [groupedStock, searchTerm])
 
     // Calculate Total Value including fictitious items
     const totalValue = useMemo(() => {
-        return currentStock.reduce((sum, item) => {
+        return groupedStock.reduce((sum, item) => {
             if (item.isFictitious) {
-                // Use fictitious price from state
                 const price = fictitiousPrices[item.itemId] ?? 0
-                return sum + (item.qty * price)
+                return sum + (item.totalQty * price)
             } else {
-                return sum + (item.qty * item.price)
+                return sum + item.totalValue
             }
         }, 0)
-    }, [currentStock, fictitiousPrices])
+    }, [groupedStock, fictitiousPrices])
+
+    // Count unique items (for display)
+    const realItemsCount = groupedStock.filter(i => !i.isFictitious).length
+    const fictItemsCount = groupedStock.filter(i => i.isFictitious).length
 
     return (
         <div className="space-y-6">
@@ -208,8 +258,8 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                 </div>
                             </div>
                             <div className="text-right text-sm text-slate-500 dark:text-slate-400">
-                                <p>{currentStock.filter(i => !i.isFictitious).length} articoli reali</p>
-                                <p>{currentStock.filter(i => i.isFictitious).length} articoli fittizi</p>
+                                <p>{realItemsCount} articoli reali</p>
+                                <p>{fictItemsCount} articoli fittizi</p>
                             </div>
                         </div>
                     </CardContent>
@@ -221,7 +271,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                         <Package className="h-4 w-4" />
                         Giacenza Attuale
                         <Badge variant="secondary" className="ml-1 text-xs">
-                            {currentStock.length}
+                            {groupedStock.length}
                         </Badge>
                     </TabsTrigger>
                     <TabsTrigger value="history" className="flex items-center gap-2">
@@ -236,195 +286,237 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                 {/* Tab: Giacenza Attuale */}
                 <TabsContent value="stock" className="mt-6">
                     <div className="space-y-4">
+                        {/* Search Bar */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input
+                                placeholder="Cerca materiale per nome o codice..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
 
-                        <div className="grid gap-4 md:hidden">
-                            {currentStock.length === 0 ? (
+                        {/* Mobile View - Cards with Expandable Details */}
+                        <div className="space-y-2 md:hidden">
+                            {filteredStock.length === 0 ? (
                                 <div className="text-center py-8 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700">
-                                    Nessun materiale attualmente in cantiere.
+                                    {searchTerm ? 'Nessun risultato trovato.' : 'Nessun materiale attualmente in cantiere.'}
                                 </div>
                             ) : (
-                                currentStock.map((item, idx) => (
-                                    <Card key={`mobile-${item.code}-${item.isFictitious}-${idx}`}>
-                                        <CardContent className="p-4 space-y-3">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <div className="font-medium text-slate-900 dark:text-white">
-                                                        {item.name}
-                                                        {item.model && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({item.model})</span>}
+                                filteredStock.map((item) => {
+                                    const isExpanded = expandedItemCode === item.code
+                                    return (
+                                        <Card key={`mobile-${item.code}`} className="overflow-hidden">
+                                            {/* Main Row - Always Visible */}
+                                            <div
+                                                className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                                onClick={() => toggleExpanded(item.code)}
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 p-0">
+                                                        {isExpanded ? (
+                                                            <ChevronDown className="h-4 w-4 text-slate-500" />
+                                                        ) : (
+                                                            <ChevronRight className="h-4 w-4 text-slate-500" />
+                                                        )}
+                                                    </Button>
+                                                    <div className="min-w-0">
+                                                        <div className="font-medium text-slate-900 dark:text-white truncate">
+                                                            {item.name}
+                                                            {item.model && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({item.model})</span>}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{item.code}</div>
                                                     </div>
-                                                    <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{item.code}</div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className="font-bold text-slate-900 dark:text-white">{item.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}</div>
-                                                    {Math.abs(item.pieces) > 0.01 && (
-                                                        <div className="text-xs text-slate-500 dark:text-slate-400">{item.pieces.toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz</div>
+                                                <div className="text-right shrink-0 ml-2">
+                                                    <div className="font-bold text-slate-900 dark:text-white">
+                                                        {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                                    </div>
+                                                    {(userRole === 'admin' || userRole === 'operativo') && !item.isFictitious && (
+                                                        <div className="text-xs text-slate-500">
+                                                            € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t dark:border-slate-700">
-                                                <div>
-                                                    <span className="text-xs text-slate-500 dark:text-slate-400 block">Riferimento</span>
-                                                    {item.referenceMap.size > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {Array.from(item.referenceMap.entries()).map(([ref, info]) => (
-                                                                <Link
-                                                                    key={ref}
-                                                                    href={`/movements/${info.noteId}`}
-                                                                    className={`hover:underline ${info.isReturn
-                                                                            ? 'text-orange-600 dark:text-orange-400'
-                                                                            : 'text-blue-600 dark:text-blue-400'
-                                                                        }`}
-                                                                >
-                                                                    {ref}
+                                            {/* Expanded Details */}
+                                            {isExpanded && (
+                                                <div className="border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-3">
+                                                    <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                                        {item.batches.length} {item.batches.length === 1 ? 'Lotto' : 'Lotti'}
+                                                    </div>
+                                                    {item.batches.map((batch, idx) => (
+                                                        <div key={idx} className="bg-white dark:bg-slate-800 rounded-md p-2 border border-slate-200 dark:border-slate-700 text-sm space-y-1">
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="text-slate-600 dark:text-slate-300">
+                                                                    {batch.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                                                    {Math.abs(batch.pieces) > 0.01 && (
+                                                                        <span className="text-slate-400 ml-1">({batch.pieces.toLocaleString('it-IT', { maximumFractionDigits: 0 })} pz)</span>
+                                                                    )}
+                                                                </div>
+                                                                {(userRole === 'admin' || userRole === 'operativo') && (
+                                                                    <div className="text-right text-slate-600 dark:text-slate-300">
+                                                                        € {(batch.qty * batch.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                        <div className="text-xs text-slate-400">@ €{batch.price.toFixed(4)}</div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {batch.purchaseId && (
+                                                                <Link href={`/purchases/${batch.purchaseId}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline block">
+                                                                    Bolla {batch.purchaseNumber} - {batch.supplierName || 'Fornitore'}
                                                                 </Link>
-                                                            ))}
+                                                            )}
+                                                            {batch.referenceMap.size > 0 && (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {Array.from(batch.referenceMap.entries()).map(([ref, info]) => (
+                                                                        <Link
+                                                                            key={ref}
+                                                                            href={`/movements/${info.noteId}`}
+                                                                            className={`text-xs hover:underline ${info.isReturn ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`}
+                                                                        >
+                                                                            {ref}
+                                                                        </Link>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    ) : (
-                                                        <span className="text-slate-700 dark:text-slate-300">-</span>
-                                                    )}
+                                                    ))}
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className="text-xs text-slate-500 dark:text-slate-400 block">Valore</span>
-                                                    {userRole === 'user' ? (
-                                                        <span className="text-slate-400 italic text-xs">Riservato</span>
-                                                    ) : (
-                                                        <span className="font-medium text-slate-700 dark:text-slate-300">
-                                                            € {(item.qty * item.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))
+                                            )}
+                                        </Card>
+                                    )
+                                })
                             )}
                         </div>
 
+                        {/* Desktop View - Table with Expandable Rows */}
                         <Card className="hidden md:block">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead className="w-8"></TableHead>
                                         <TableHead>Codice</TableHead>
                                         <TableHead>Articolo</TableHead>
-                                        <TableHead>Bolla di riferimento</TableHead>
-                                        <TableHead>Riferimento Acquisto</TableHead>
-                                        <TableHead className="text-right">Quantità Attuale</TableHead>
-                                        <TableHead className="text-right">Valore Stimato</TableHead>
+                                        <TableHead className="text-right">N° Lotti</TableHead>
+                                        <TableHead className="text-right">Q.tà Totale</TableHead>
+                                        <TableHead className="text-right">Valore</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {currentStock.length === 0 ? (
+                                    {filteredStock.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-500">
-                                                Nessun materiale attualmente in cantiere.
+                                                {searchTerm ? 'Nessun risultato trovato.' : 'Nessun materiale attualmente in cantiere.'}
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        currentStock.map((item, idx) => (
-                                            <TableRow key={`${item.code}-${item.isFictitious}-${idx}`}>
-                                                <TableCell className="font-mono text-xs">{item.code}</TableCell>
-                                                <TableCell className="font-medium">
-                                                    {item.name}
-                                                    {item.model && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({item.model})</span>}
-                                                    {item.isFictitious && (
-                                                        <Badge variant="outline" className="ml-2 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-[10px] h-5 px-1.5">
-                                                            Fittizio
-                                                        </Badge>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                                                    {/* Bolla Reference - Multiple with type colors */}
-                                                    {item.referenceMap.size > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {Array.from(item.referenceMap.entries()).map(([ref, info]) => (
-                                                                <Link
-                                                                    key={ref}
-                                                                    href={`/movements/${info.noteId}`}
-                                                                    className={`hover:underline ${info.isReturn
-                                                                        ? 'text-orange-600 dark:text-orange-400'
-                                                                        : 'text-blue-600 dark:text-blue-400'
-                                                                        }`}
-                                                                    title={info.isReturn ? 'Reso' : 'Uscita'}
-                                                                >
-                                                                    {ref}
-                                                                </Link>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        '-'
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                                                    {/* Purchase Info */}
-                                                    {item.isFictitious ? (
-                                                        <span className="text-slate-400 dark:text-slate-500 italic">Fittizio</span>
-                                                    ) : item.purchaseId ? (
-                                                        <Link href={`/purchases/${item.purchaseId}`} className="group flex flex-col hover:bg-slate-50 dark:hover:bg-slate-800 p-1 rounded -ml-1 transition-colors">
-                                                            <span className="font-medium text-blue-600 dark:text-blue-400 group-hover:underline">
-                                                                Bolla {item.purchaseNumber || '?'}
-                                                            </span>
-                                                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                                                                {item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString() : ''} - {item.supplierName || 'Fornitore'}
-                                                            </span>
-                                                        </Link>
-                                                    ) : (
-                                                        <span className="text-slate-400 dark:text-slate-500 italic">Magazzino</span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono text-slate-600 dark:text-slate-400">
-                                                    {Math.abs(item.pieces) > 0.01 ? item.pieces.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : '-'}
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold text-slate-700 dark:text-slate-300">
-                                                    {item.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
-                                                </TableCell>
-                                                <TableCell className="text-right text-slate-500 dark:text-slate-400">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        {userRole === 'user' ? (
-                                                            <span className="text-slate-400 italic text-xs">Riservato</span>
-                                                        ) : item.isFictitious ? (
-                                                            (userRole === 'admin' || userRole === 'operativo') ? (
-                                                                <div className="flex flex-col items-end gap-1">
-                                                                    <div className="flex items-center gap-1">
-                                                                        <span className="text-xs text-slate-400">P.U.</span>
-                                                                        <span className="text-xs">€</span>
-                                                                        <Input
-                                                                            type="number"
-                                                                            min="0"
-                                                                            step="0.00001"
-                                                                            className="w-20 h-7 text-right text-sm"
-                                                                            value={fictitiousPrices[item.itemId] ?? 0}
-                                                                            onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
-                                                                            placeholder="0.00"
-                                                                            disabled={loadingPrices}
-                                                                        />
-                                                                    </div>
-                                                                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                                                                        Tot: € {(item.qty * (fictitiousPrices[item.itemId] ?? 0)).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                                                                    </span>
+                                        filteredStock.map((item) => {
+                                            const isExpanded = expandedItemCode === item.code
+                                            return (
+                                                <>
+                                                    <TableRow
+                                                        key={item.code}
+                                                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+                                                        onClick={() => toggleExpanded(item.code)}
+                                                    >
+                                                        <TableCell className="w-8 p-2">
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                                                                {isExpanded ? (
+                                                                    <ChevronDown className="h-4 w-4 text-slate-500" />
+                                                                ) : (
+                                                                    <ChevronRight className="h-4 w-4 text-slate-500" />
+                                                                )}
+                                                            </Button>
+                                                        </TableCell>
+                                                        <TableCell className="font-mono text-xs">{item.code}</TableCell>
+                                                        <TableCell className="font-medium">
+                                                            {item.name}
+                                                            {item.model && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({item.model})</span>}
+                                                            {item.isFictitious && (
+                                                                <Badge variant="outline" className="ml-2 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-[10px] h-5 px-1.5">
+                                                                    Fittizio
+                                                                </Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-slate-500">{item.batches.length}</TableCell>
+                                                        <TableCell className="text-right font-bold text-slate-700 dark:text-slate-300">
+                                                            {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            {userRole === 'user' ? (
+                                                                <span className="text-slate-400 italic text-xs">Riservato</span>
+                                                            ) : item.isFictitious ? (
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <span className="text-xs">€</span>
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="0.00001"
+                                                                        className="w-20 h-7 text-right text-sm"
+                                                                        value={fictitiousPrices[item.itemId] ?? 0}
+                                                                        onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        placeholder="0.00"
+                                                                        disabled={loadingPrices}
+                                                                    />
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-slate-400 italic text-xs">
-                                                                    € {(item.qty * (fictitiousPrices[item.itemId] ?? 0)).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                <span className="text-slate-600 dark:text-slate-400">
+                                                                    € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                                                                 </span>
-                                                            )
-                                                        ) : (
-                                                            <>
-                                                                {(!item.price || item.price === 0) && (
-                                                                    <div className="group relative">
-                                                                        <AlertTriangle className="h-4 w-4 text-amber-500 cursor-help" />
-                                                                        <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-32 bg-slate-800 text-white text-xs rounded p-1 text-center z-10">
-                                                                            Prezzo mancante
-                                                                        </span>
-                                                                    </div>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    {/* Expanded Batch Details */}
+                                                    {isExpanded && item.batches.map((batch, idx) => (
+                                                        <TableRow key={`${item.code}-batch-${idx}`} className="bg-slate-50/50 dark:bg-slate-900/50">
+                                                            <TableCell></TableCell>
+                                                            <TableCell colSpan={2} className="text-sm">
+                                                                <div className="pl-4 flex items-center gap-2">
+                                                                    <span className="text-slate-400">└─</span>
+                                                                    {batch.purchaseId ? (
+                                                                        <Link href={`/purchases/${batch.purchaseId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                                                                            Bolla {batch.purchaseNumber} - {batch.supplierName || 'Fornitore'}
+                                                                        </Link>
+                                                                    ) : (
+                                                                        <span className="text-slate-500">Magazzino</span>
+                                                                    )}
+                                                                    {batch.referenceMap.size > 0 && (
+                                                                        <div className="flex gap-1 ml-2">
+                                                                            {Array.from(batch.referenceMap.entries()).map(([ref, info]) => (
+                                                                                <Link
+                                                                                    key={ref}
+                                                                                    href={`/movements/${info.noteId}`}
+                                                                                    className={`text-xs hover:underline ${info.isReturn ? 'text-orange-600' : 'text-blue-600'}`}
+                                                                                >
+                                                                                    {ref}
+                                                                                </Link>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell className="text-right text-slate-500 text-sm">
+                                                                {Math.abs(batch.pieces) > 0.01 ? `${batch.pieces.toLocaleString('it-IT', { maximumFractionDigits: 0 })} pz` : '-'}
+                                                            </TableCell>
+                                                            <TableCell className="text-right text-slate-600 dark:text-slate-400 text-sm">
+                                                                {batch.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                                            </TableCell>
+                                                            <TableCell className="text-right text-slate-500 text-sm">
+                                                                {(userRole === 'admin' || userRole === 'operativo') && (
+                                                                    <>
+                                                                        € {(batch.qty * batch.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                        <span className="text-xs text-slate-400 ml-1">(@€{batch.price.toFixed(4)})</span>
+                                                                    </>
                                                                 )}
-                                                                € {(item.qty * item.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </>
+                                            )
+                                        })
                                     )}
                                 </TableBody>
                             </Table>
