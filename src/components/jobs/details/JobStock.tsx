@@ -364,12 +364,16 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                 )}
                                                             </div>
                                                             {batch.purchaseId && (
-                                                                <Link href={`/purchases/${batch.purchaseId}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline block">
-                                                                    Bolla {batch.purchaseNumber} - {batch.supplierName || 'Fornitore'}
-                                                                </Link>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-xs text-slate-500">Riferimento acquisto:</span>
+                                                                    <Link href={`/purchases/${batch.purchaseId}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                                                                        Bolla {batch.purchaseNumber} - {batch.supplierName || 'Fornitore'}
+                                                                    </Link>
+                                                                </div>
                                                             )}
                                                             {batch.referenceMap.size > 0 && (
-                                                                <div className="flex flex-wrap gap-1">
+                                                                <div className="flex flex-wrap items-center gap-1">
+                                                                    <span className="text-xs text-slate-500">Bolle di riferimento:</span>
                                                                     {Array.from(batch.referenceMap.entries()).map(([ref, info]) => (
                                                                         <Link
                                                                             key={ref}
@@ -474,8 +478,9 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                         <TableRow key={`${item.code}-batch-${idx}`} className="bg-slate-50/50 dark:bg-slate-900/50">
                                                             <TableCell></TableCell>
                                                             <TableCell colSpan={2} className="text-sm">
-                                                                <div className="pl-4 flex items-center gap-2">
+                                                                <div className="pl-4 flex items-center gap-2 flex-wrap">
                                                                     <span className="text-slate-400">└─</span>
+                                                                    <span className="text-xs text-slate-500">Rif. Acquisto:</span>
                                                                     {batch.purchaseId ? (
                                                                         <Link href={`/purchases/${batch.purchaseId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                                                                             Bolla {batch.purchaseNumber} - {batch.supplierName || 'Fornitore'}
@@ -484,7 +489,9 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                         <span className="text-slate-500">Magazzino</span>
                                                                     )}
                                                                     {batch.referenceMap.size > 0 && (
-                                                                        <div className="flex gap-1 ml-2">
+                                                                        <>
+                                                                            <span className="text-slate-300 dark:text-slate-600">|</span>
+                                                                            <span className="text-xs text-slate-500">Bolle:</span>
                                                                             {Array.from(batch.referenceMap.entries()).map(([ref, info]) => (
                                                                                 <Link
                                                                                     key={ref}
@@ -494,7 +501,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                                     {ref}
                                                                                 </Link>
                                                                             ))}
-                                                                        </div>
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                             </TableCell>
