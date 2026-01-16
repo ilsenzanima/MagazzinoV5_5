@@ -6,9 +6,12 @@
 -- Aggiunge anche ricerca nel campo model/variante
 -- =====================================================
 
-CREATE OR REPLACE FUNCTION get_inventory_search(
+-- Drop existing function first
+DROP FUNCTION IF EXISTS public.get_inventory_search(text, text, int, int);
+
+CREATE OR REPLACE FUNCTION public.get_inventory_search(
   p_search text,
-  p_status text DEFAULT NULL, -- 'low_stock', 'out_of_stock', 'all'
+  p_status text DEFAULT NULL,
   p_limit int DEFAULT 20,
   p_offset int DEFAULT 0
 )
@@ -18,68 +21,54 @@ RETURNS TABLE (
   name text,
   brand text,
   category text,
-  quantity float8,
-  min_stock float8,
+  quantity numeric,
+  min_stock integer,
   image_url text,
   description text,
-  price float8,
+  price numeric,
   location text,
   unit text,
-  coefficient float8,
-  pieces float8,
+  coefficient numeric,
+  pieces numeric,
   supplier_code text,
-  real_quantity float8,
+  real_quantity numeric,
   model text,
   created_at timestamptz,
   updated_at timestamptz,
   total_count bigint
 ) AS $$
 DECLARE
-  v_search_words text[];
-  v_trimmed text;
+  v_words text[];
 BEGIN
-  -- Trim and split search term into words
-  v_trimmed := TRIM(COALESCE(p_search, ''));
-  IF v_trimmed = '' THEN
-    v_search_words := ARRAY[]::text[];
-  ELSE
-    v_search_words := string_to_array(LOWER(v_trimmed), ' ');
-    -- Remove empty elements
-    v_search_words := array_remove(v_search_words, '');
-  END IF;
+  v_words := string_to_array(LOWER(TRIM(COALESCE(p_search, ''))), ' ');
+  v_words := array_remove(v_words, '');
 
   RETURN QUERY
-  WITH filtered_items AS (
-    SELECT 
-      i.*
+  WITH fi AS (
+    SELECT DISTINCT 
+      i.id, i.code, i.name, i.brand, i.category, i.quantity, i.min_stock,
+      i.image_url, i.description, i.price, i.location, i.unit, i.coefficient, i.pieces,
+      i.supplier_code, i.real_quantity, i.model, i.created_at, i.updated_at
     FROM inventory i
     LEFT JOIN inventory_supplier_codes isc ON isc.inventory_id = i.id
-    WHERE 
-      -- Multi-word fuzzy search: ALL words must match somewhere
-      (v_trimmed = '' OR (
-        SELECT bool_and(
-          LOWER(COALESCE(i.name, '')) LIKE '%' || word || '%' OR
-          LOWER(COALESCE(i.code, '')) LIKE '%' || word || '%' OR
-          LOWER(COALESCE(i.brand, '')) LIKE '%' || word || '%' OR
-          LOWER(COALESCE(i.category, '')) LIKE '%' || word || '%' OR
-          LOWER(COALESCE(i.model, '')) LIKE '%' || word || '%' OR
-          LOWER(COALESCE(i.supplier_code, '')) LIKE '%' || word || '%' OR
-          LOWER(COALESCE(isc.code, '')) LIKE '%' || word || '%'
-        )
-        FROM unnest(v_search_words) AS word
-      ))
-      AND
-      (p_status IS NULL OR p_status = 'all' OR
-       (p_status = 'out_of_stock' AND i.quantity <= 0) OR
-       (p_status = 'low_stock' AND i.quantity <= i.min_stock)
-      )
-    GROUP BY i.id
+    WHERE (array_length(v_words, 1) IS NULL OR (
+      SELECT bool_and(
+        LOWER(COALESCE(i.name,'')) LIKE '%'||w||'%' OR 
+        LOWER(COALESCE(i.code,'')) LIKE '%'||w||'%' OR
+        LOWER(COALESCE(i.brand,'')) LIKE '%'||w||'%' OR 
+        LOWER(COALESCE(i.category,'')) LIKE '%'||w||'%' OR
+        LOWER(COALESCE(i.model,'')) LIKE '%'||w||'%' OR 
+        LOWER(COALESCE(i.supplier_code,'')) LIKE '%'||w||'%' OR
+        LOWER(COALESCE(isc.code,'')) LIKE '%'||w||'%'
+      ) FROM unnest(v_words) AS w
+    ))
+    AND (p_status IS NULL OR p_status = 'all' OR
+         (p_status = 'out_of_stock' AND i.quantity <= 0) OR
+         (p_status = 'low_stock' AND i.quantity <= i.min_stock))
   )
-  SELECT 
-    f.*,
-    (SELECT COUNT(*) FROM filtered_items) as total_count
-  FROM filtered_items f
-  ORDER BY f.name ASC
+  SELECT fi.*, (SELECT COUNT(*) FROM fi)::bigint 
+  FROM fi 
+  ORDER BY fi.name 
   LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
