@@ -216,8 +216,8 @@ export function JobStock({ movements, jobId }: JobStockProps) {
 
     // Filter by search term - split into words for fuzzy matching
     const filteredStock = useMemo(() => {
-        if (!searchTerm) return groupedStock
-        const words = searchTerm.toLowerCase().split(/\s+/).filter(w => w.length > 0)
+        if (!searchTerm.trim()) return groupedStock
+        const words = searchTerm.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0)
         if (words.length === 0) return groupedStock
 
         return groupedStock.filter(item => {
