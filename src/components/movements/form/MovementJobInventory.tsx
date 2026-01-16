@@ -17,10 +17,13 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
 
     if (jobBatchAvailability.length === 0) return null;
 
-    const filteredBatches = jobBatchAvailability.filter(batch =>
-        batch.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        batch.itemCode.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredBatches = jobBatchAvailability.filter(batch => {
+        if (!searchTerm) return true
+        const words = searchTerm.toLowerCase().split(/\s+/).filter(w => w.length > 0)
+        if (words.length === 0) return true
+        const searchTarget = `${batch.itemName} ${batch.itemCode}`.toLowerCase()
+        return words.every(word => searchTarget.includes(word))
+    });
 
     const handleSelect = (batch: any) => {
         onSelectBatch(batch);

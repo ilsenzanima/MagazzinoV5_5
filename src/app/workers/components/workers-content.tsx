@@ -27,14 +27,13 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
 
     const canCreate = userRole === 'admin' || userRole === 'operativo';
 
-    // Filter logic
+    // Filter logic - split search into words for fuzzy matching
     const filteredWorkers = workers.filter((worker) => {
-        const matchesSearch =
-            worker.firstName.toLowerCase().includes(search.toLowerCase()) ||
-            worker.lastName.toLowerCase().includes(search.toLowerCase()) ||
-            (worker.email || "").toLowerCase().includes(search.toLowerCase());
-
-        return matchesSearch;
+        if (!search) return true
+        const words = search.toLowerCase().split(/\s+/).filter(w => w.length > 0)
+        if (words.length === 0) return true
+        const searchTarget = `${worker.firstName} ${worker.lastName} ${worker.email || ''}`.toLowerCase()
+        return words.every(word => searchTarget.includes(word))
     });
 
     const handleWorkerCreated = () => {

@@ -214,15 +214,17 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
     }, [movements])
 
-    // Filter by search term
+    // Filter by search term - split into words for fuzzy matching
     const filteredStock = useMemo(() => {
         if (!searchTerm) return groupedStock
-        const term = searchTerm.toLowerCase()
-        return groupedStock.filter(item =>
-            item.name.toLowerCase().includes(term) ||
-            item.code.toLowerCase().includes(term) ||
-            (item.model && item.model.toLowerCase().includes(term))
-        )
+        const words = searchTerm.toLowerCase().split(/\s+/).filter(w => w.length > 0)
+        if (words.length === 0) return groupedStock
+
+        return groupedStock.filter(item => {
+            const searchTarget = `${item.name} ${item.code} ${item.model || ''}`.toLowerCase()
+            // All words must match somewhere in the target
+            return words.every(word => searchTarget.includes(word))
+        })
     }, [groupedStock, searchTerm])
 
     // Calculate Total Value including fictitious items
