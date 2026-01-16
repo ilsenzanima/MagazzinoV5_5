@@ -268,6 +268,7 @@ export const purchasesApi = {
             grouped[itemId].push({
                 jobId: movement.job_id,
                 jobCode: movement.job_code,
+                jobName: movement.job_name,
                 jobDescription: movement.job_description,
                 totalQuantity: movement.total_quantity,
                 totalPieces: movement.total_pieces
