@@ -289,7 +289,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </div>
 
                       {/* Dettagli */}
-                      <div className="flex-1 p-4 flex flex-col gap-2">
+                      <div className="flex-1 p-3 sm:p-4 flex flex-col gap-2">
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mb-1">{item.code}</p>

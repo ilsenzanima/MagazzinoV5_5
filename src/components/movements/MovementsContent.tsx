@@ -194,19 +194,19 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                 return (
                   <Link href={`/movements/${movement.id}`} key={movement.id}>
                     <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200 dark:border-slate-700">
-                      <CardContent className="p-5">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-blue-600" />
-                              Bolla: {movement.number}
+                      <CardContent className="p-3 sm:p-5">
+                        <div className="flex justify-between items-start mb-3 sm:mb-4">
+                          <div className="min-w-0 flex-1 mr-2">
+                            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-sm sm:text-base">
+                              <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                              <span className="truncate">Bolla: {movement.number}</span>
                             </h3>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
+                              <Calendar className="h-3 w-3 shrink-0" />
                               {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                             <button
                               onClick={handleQuickPrint}
                               className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-blue-600 transition-colors"
@@ -214,17 +214,17 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                             >
                               <Printer className="h-4 w-4" />
                             </button>
-                            <Badge variant="secondary" className={typeConfig.color}>
+                            <Badge variant="secondary" className={`${typeConfig.color} text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2.5 sm:py-0.5`}>
                               <Icon className="mr-1 h-3 w-3" />
                               {typeConfig.label}
                             </Badge>
                           </div>
                         </div>
 
-                        <div className="space-y-2 text-sm">
+                        <div className="space-y-2 text-xs sm:text-sm">
                           <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-700">
                             <span className="text-slate-500 dark:text-slate-400">Causale</span>
-                            <span className="font-medium truncate max-w-[150px]">{movement.causal}</span>
+                            <span className="font-medium truncate max-w-[120px] sm:max-w-[150px]">{movement.causal}</span>
                           </div>
                           {movement.jobCode && (
                             <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-700">
