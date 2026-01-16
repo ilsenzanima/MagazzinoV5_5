@@ -187,14 +187,14 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                   className="hover:shadow-md transition-shadow flex flex-col h-full cursor-pointer relative group"
                   onClick={() => router.push(`/jobs/${job.id}`)}
                 >
-                  <CardHeader className="pb-2">
+                  <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-2">
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div className="min-w-0 pr-2">
                         <div className="text-xs font-mono text-slate-500 dark:text-muted-foreground mb-1">{job.code}</div>
-                        <CardTitle className="text-lg font-bold text-slate-800 dark:text-white line-clamp-1" title={job.name}>{job.name}</CardTitle>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
+                        <CardTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-white line-clamp-1" title={job.name}>{job.name}</CardTitle>
+                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
+                      <div className="flex flex-col items-end gap-2 shrink-0">
                         {getStatusBadge(job.status)}
                         {userRole === 'admin' && (
                           <Button
@@ -214,7 +214,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="text-sm space-y-3 text-slate-600 dark:text-muted-foreground flex-1">
+                  <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 text-sm space-y-3 text-slate-600 dark:text-muted-foreground flex-1">
                     <div className="flex items-center gap-2">
                       <Building className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
                       <span className="font-medium text-slate-700 dark:text-foreground">{job.clientName || 'N/A'}</span>
