@@ -234,5 +234,46 @@ export const purchasesApi = {
     deleteItem: async (id: string) => {
         const { error } = await supabase.from('purchase_items').delete().eq('id', id);
         if (error) throw error;
+    },
+
+    // Get job movements for all items in a purchase
+    getPurchaseItemJobMovements: async (purchaseId: string) => {
+        // First get all purchase_item_ids for this purchase
+        const { data: items } = await supabase
+            .from('purchase_items')
+            .select('id')
+            .eq('purchase_id', purchaseId);
+
+        if (!items || items.length === 0) return [];
+
+        const purchaseItemIds = items.map(i => i.id);
+
+        // Query the view for job movements
+        const { data, error } = await fetchWithTimeout(
+            supabase
+                .from('purchase_item_job_movements')
+                .select('*')
+                .in('purchase_item_id', purchaseItemIds)
+        );
+
+        if (error) throw error;
+
+        // Group by purchase_item_id
+        const grouped: Record<string, any[]> = {};
+        data?.forEach((movement: any) => {
+            const itemId = movement.purchase_item_id;
+            if (!grouped[itemId]) {
+                grouped[itemId] = [];
+            }
+            grouped[itemId].push({
+                jobId: movement.job_id,
+                jobCode: movement.job_code,
+                jobDescription: movement.job_description,
+                totalQuantity: movement.total_quantity,
+                totalPieces: movement.total_pieces
+            });
+        });
+
+        return grouped;
     }
 };
