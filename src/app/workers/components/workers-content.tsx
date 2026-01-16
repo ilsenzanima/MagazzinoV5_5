@@ -29,8 +29,8 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
 
     // Filter logic - split search into words for fuzzy matching
     const filteredWorkers = workers.filter((worker) => {
-        if (!search) return true
-        const words = search.toLowerCase().split(/\s+/).filter(w => w.length > 0)
+        if (!search.trim()) return true
+        const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0)
         if (words.length === 0) return true
         const searchTarget = `${worker.firstName} ${worker.lastName} ${worker.email || ''}`.toLowerCase()
         return words.every(word => searchTarget.includes(word))
