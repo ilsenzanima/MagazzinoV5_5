@@ -136,27 +136,36 @@ export const jobsApi = {
         }
 
         if (search) {
-            const { data: clients } = await supabase
-                .from('clients')
-                .select('id')
-                .ilike('name', `%${search}%`);
+            // Split search into words for fuzzy matching
+            const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
 
-            const clientIds = clients?.map(c => c.id) || [];
-
-            let orConditions = [
-                `code.ilike.%${search}%`,
-                `name.ilike.%${search}%`,
-                `description.ilike.%${search}%`,
-                `cig.ilike.%${search}%`,
-                `cup.ilike.%${search}%`,
-                `site_address.ilike.%${search}%`
-            ];
-
-            if (clientIds.length > 0) {
-                orConditions.push(`client_id.in.(${clientIds.join(',')})`);
+            // Find matching clients
+            let clientIds: string[] = [];
+            for (const word of words) {
+                const { data: clients } = await supabase
+                    .from('clients')
+                    .select('id')
+                    .ilike('name', `%${word}%`);
+                if (clients) {
+                    clientIds = [...new Set([...clientIds, ...clients.map(c => c.id)])];
+                }
             }
 
-            query = query.or(orConditions.join(','));
+            // For each word, apply OR conditions (chained = AND between words)
+            for (const word of words) {
+                let orConditions = [
+                    `code.ilike.%${word}%`,
+                    `name.ilike.%${word}%`,
+                    `description.ilike.%${word}%`,
+                    `cig.ilike.%${word}%`,
+                    `cup.ilike.%${word}%`,
+                    `site_address.ilike.%${word}%`
+                ];
+                if (clientIds.length > 0) {
+                    orConditions.push(`client_id.in.(${clientIds.join(',')})`);
+                }
+                query = query.or(orConditions.join(','));
+            }
         }
 
         query = query.select('*, clients(*)');

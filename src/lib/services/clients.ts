@@ -48,10 +48,15 @@ export const clientsApi = {
     getPaginated: async (options: { page: number; limit: number; search?: string }) => {
         let query = supabase.from('clients').select('*', { count: 'estimated' });
 
-        // Filter by search term
+        // Multi-word fuzzy search
         if (options.search) {
-            const term = options.search;
-            query = query.or(`name.ilike.%${term}%,vat_number.ilike.%${term}%,email.ilike.%${term}%`);
+            const words = options.search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
+            // For each word, add an OR condition across searchable fields
+            // Then we need ALL words to match (AND between words)
+            // Supabase doesn't support AND(OR1, OR2), so we chain filters
+            for (const word of words) {
+                query = query.or(`name.ilike.%${word}%,vat_number.ilike.%${word}%,email.ilike.%${word}%,city.ilike.%${word}%`);
+            }
         }
 
         // Sort by name
