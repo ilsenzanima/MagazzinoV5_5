@@ -197,7 +197,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     return (
         <div className="space-y-6 pb-20 max-w-5xl mx-auto">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                     <Link href="/movements">
                         <Button variant="ghost" size="icon">
@@ -205,50 +205,54 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                         </Button>
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                            {movement.type === 'entry' && <ArrowDownRight className="h-6 w-6 text-green-600" />}
-                            {movement.type === 'exit' && <ArrowUpRight className="h-6 w-6 text-orange-600" />}
-                            {movement.type === 'sale' && <ShoppingBag className="h-6 w-6 text-blue-600" />}
-                            DDT {movement.number}
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                {movement.type === 'entry' && <ArrowDownRight className="h-6 w-6 text-green-600" />}
+                                {movement.type === 'exit' && <ArrowUpRight className="h-6 w-6 text-orange-600" />}
+                                {movement.type === 'sale' && <ShoppingBag className="h-6 w-6 text-blue-600" />}
+                                <span className="break-all">DDT {movement.number}</span>
+                            </div>
                         </h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
                             Data: {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
                         </p>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
                     {!isEditing ? (
                         <>
                             <Button
                                 variant="default"
-                                className="bg-[#003366] hover:bg-[#002244]"
+                                className="bg-[#003366] hover:bg-[#002244] flex-1 md:flex-none"
                                 onClick={handlePrint}
                             >
-                                <FileText className="h-4 w-4 mr-2" />
-                                Stampa Bolla
+                                <FileText className="h-4 w-4 md:mr-2" />
+                                <span className="hidden md:inline">Stampa Bolla</span>
+                                <span className="md:hidden">Stampa</span>
                             </Button>
                             {(userRole === 'admin' || userRole === 'operativo') && (
                                 <>
-                                    <Button variant="destructive" onClick={handleDelete}>
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Elimina
+                                    <Button variant="destructive" onClick={handleDelete} className="flex-1 md:flex-none px-2">
+                                        <Trash2 className="h-4 w-4 md:mr-2" />
+                                        <span className="hidden md:inline">Elimina</span>
                                     </Button>
                                     <Link href={`/movements/${initialMovement.id}/edit`}>
-                                        <Button>
-                                            Modifica Movimento
+                                        <Button className="flex-1 md:flex-none">
+                                            <span className="hidden md:inline">Modifica Movimento</span>
+                                            <span className="md:hidden">Modifica</span>
                                         </Button>
                                     </Link>
                                 </>
                             )}
                         </>
                     ) : (
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => setIsEditing(false)}>
+                        <div className="flex gap-2 w-full">
+                            <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1">
                                 Annulla
                             </Button>
-                            <Button onClick={handleSaveChanges}>
+                            <Button onClick={handleSaveChanges} className="flex-1">
                                 <Save className="h-4 w-4 mr-2" />
-                                Salva Modifiche
+                                Salva
                             </Button>
                         </div>
                     )}
