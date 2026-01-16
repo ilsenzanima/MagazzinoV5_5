@@ -244,7 +244,7 @@ export const purchasesApi = {
             .select('id')
             .eq('purchase_id', purchaseId);
 
-        if (!items || items.length === 0) return [];
+        if (!items || items.length === 0) return {};
 
         const purchaseItemIds = items.map(i => i.id);
 
