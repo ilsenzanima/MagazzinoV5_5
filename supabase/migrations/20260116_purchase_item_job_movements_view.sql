@@ -6,6 +6,7 @@ SELECT
     dni.purchase_item_id,
     dn.job_id,
     j.code as job_code,
+    j.name as job_name,
     j.description as job_description,
     -- Quantità netta verso la commessa (uscite - rientri)
     SUM(
@@ -33,7 +34,8 @@ WHERE dni.purchase_item_id IS NOT NULL
 GROUP BY 
     dni.purchase_item_id, 
     dn.job_id, 
-    j.code, 
+    j.code,
+    j.name,
     j.description
 -- Mostra solo movimenti con quantità positiva (materiale attualmente in cantiere)
 HAVING SUM(

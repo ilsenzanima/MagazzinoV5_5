@@ -1012,9 +1012,12 @@ export default function PurchaseDetailPage() {
                                                             <TableCell colSpan={4}>
                                                                 <div className="pl-10 py-1 flex items-center gap-2">
                                                                     <span className="text-slate-400">└─</span>
-                                                                    <span className="font-medium text-blue-600 dark:text-blue-400">
-                                                                        {movement.jobCode}
-                                                                    </span>
+                                                                    <Link
+                                                                        href={`/jobs/${movement.jobId}`}
+                                                                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                                                    >
+                                                                        {movement.jobName || movement.jobCode}
+                                                                    </Link>
                                                                     <span className="text-slate-600 dark:text-slate-300">
                                                                         {movement.totalPieces > 0 && `${movement.totalPieces} pz`}
                                                                         {movement.totalPieces > 0 && movement.totalQuantity > 0 && ' - '}
@@ -1111,9 +1114,12 @@ export default function PurchaseDetailPage() {
                                                     {jobMovements.map((movement, idx) => (
                                                         <div key={idx} className="flex items-center gap-2 text-xs">
                                                             <span className="text-slate-400">└─</span>
-                                                            <span className="font-medium text-blue-600 dark:text-blue-400">
-                                                                {movement.jobCode}
-                                                            </span>
+                                                            <Link
+                                                                href={`/jobs/${movement.jobId}`}
+                                                                className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                                            >
+                                                                {movement.jobName || movement.jobCode}
+                                                            </Link>
                                                             <span className="text-slate-600 dark:text-slate-300">
                                                                 {movement.totalPieces > 0 && `${movement.totalPieces} pz`}
                                                                 {movement.totalPieces > 0 && movement.totalQuantity > 0 && ' - '}
@@ -1274,8 +1280,8 @@ export default function PurchaseDetailPage() {
                         jobs={jobs}
                         onSelect={handleHeaderJobSelect}
                     />
-                </div>
-            </div>
-        </DashboardLayout>
+                </div >
+            </div >
+        </DashboardLayout >
     );
 }
