@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,8 +26,6 @@ import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
 import { User } from "@/lib/mock-data";
-import { notify } from "@/lib/notify";
-
 export default function SettingsAdminPage() {
     const { user: currentUser, setSimulatedRole, realRole } = useAuth();
     const [users, setUsers] = useState<User[]>([]);

@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,8 +11,6 @@ import { inventoryApi } from "@/lib/api";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { InventoryItemForm, InventoryFormData } from "@/components/inventory/InventoryItemForm";
-import { notify } from "@/lib/notify";
-
 function NewInventoryItemContent() {
   const router = useRouter();
   const searchParams = useSearchParams();

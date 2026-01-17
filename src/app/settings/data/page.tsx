@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +13,6 @@ import { useState, useEffect } from "react";
 import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemType, Unit } from "@/lib/api";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
-import { notify } from "@/lib/notify";
-
 export default function SettingsInventoryPage() {
     // Units State
     const [units, setUnits] = useState<Unit[]>([]);

@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notify";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,6 @@ import { Supplier, suppliersApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { SupplierCard, SupplierDeleteDialog } from "@/components/suppliers";
-import { notify } from "@/lib/notify";
-
 export default function SuppliersPage() {
   const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");

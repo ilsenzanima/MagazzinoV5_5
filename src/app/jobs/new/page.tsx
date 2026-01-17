@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notify";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -14,8 +15,6 @@ import Link from "next/link";
 import { jobsApi, clientsApi, Client } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 export default function NewJobPage() {
   const router = useRouter();
   const { userRole } = useAuth();

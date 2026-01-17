@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
@@ -10,8 +12,6 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
 import { Loader2 } from "lucide-react";
-import { notify } from "@/lib/notify";
-
 export default function SettingsProfilePage() {
   const { user } = useAuth();
   const [previewImage, setPreviewImage] = useState<string | null>(null);

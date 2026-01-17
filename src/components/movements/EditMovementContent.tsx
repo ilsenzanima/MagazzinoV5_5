@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,8 +32,6 @@ import { updateMovement } from "@/app/movements/actions";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 interface MovementLine {
     tempId: string;
     itemId: string;

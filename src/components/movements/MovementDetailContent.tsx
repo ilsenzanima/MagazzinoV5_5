@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,8 +25,6 @@ import {
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 // jsPDF and autoTable are loaded dynamically on demand to reduce bundle size
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 interface MovementDetailContentProps {
     initialMovement: DeliveryNote;
 }
