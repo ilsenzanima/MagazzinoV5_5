@@ -6,7 +6,6 @@
  */
 
 import { toast } from "@/components/ui/use-toast";
-import { notify } from "@/lib/notify";
 
 export const notify = {
     /**
