@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
+import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, ChevronLeft, ChevronRight, Paperclip, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, Suspense, useDeferredValue } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -124,6 +124,11 @@ function PurchasesContent() {
                           </div>
                           {/* Status Icons */}
                           <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                            {purchase.isExhausted && (
+                              <span title="Materiale esaurito">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                              </span>
+                            )}
                             {purchase.documentUrl && (
                               <span title="Documento allegato">
                                 <Paperclip className="h-4 w-4 text-blue-500" />
