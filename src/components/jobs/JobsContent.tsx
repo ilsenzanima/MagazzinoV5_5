@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notify";
 import { useState, useEffect, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,8 +30,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 interface JobsContentProps {
   initialJobs: Job[];
   initialTotal: number;

@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notify";
 import { useState, useEffect, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,6 @@ import { Client, clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { ClientCard, ClientEditDialog, ClientDeleteDialog } from "@/components/clients";
-import { notify } from "@/lib/notify";
-
 export default function ClientsPage() {
   const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");

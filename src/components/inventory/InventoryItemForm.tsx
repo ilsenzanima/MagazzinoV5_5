@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,8 +18,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 export interface InventoryFormData {
     code: string;
     name: string;

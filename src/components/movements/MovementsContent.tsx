@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,8 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 interface MovementsContentProps {
   initialMovements: DeliveryNote[];
   initialTotalItems: number;

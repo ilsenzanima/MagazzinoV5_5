@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,8 +37,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { notify } from "@/lib/notify";
-
 // Tables to backup/restore (in dependency order)
 const TABLES = [
     'profiles',

@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notify";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -13,8 +14,6 @@ import { suppliersApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 export default function NewSupplierPage() {
   const router = useRouter();
   const { userRole } = useAuth();
@@ -29,18 +28,18 @@ export default function NewSupplierPage() {
 
   if (userRole === 'user') {
     return (
-        <DashboardLayout>
-            <div className="flex flex-col items-center justify-center h-full py-20">
-                <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
-                <p className="text-slate-500 mb-6">Non hai i permessi necessari per creare nuovi fornitori.</p>
-                <Link href="/suppliers">
-                    <Button variant="outline">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Torna ai Fornitori
-                    </Button>
-                </Link>
-            </div>
-        </DashboardLayout>
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-full py-20">
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
+          <p className="text-slate-500 mb-6">Non hai i permessi necessari per creare nuovi fornitori.</p>
+          <Link href="/suppliers">
+            <Button variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Torna ai Fornitori
+            </Button>
+          </Link>
+        </div>
+      </DashboardLayout>
     );
   }
 
@@ -78,21 +77,21 @@ export default function NewSupplierPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="name">Ragione Sociale / Nome *</Label>
-                <Input 
-                  id="name" 
-                  required 
+                <Input
+                  id="name"
+                  required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Inserisci il nome dell'azienda o del fornitore"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="address">Indirizzo Sede</Label>
-                <Textarea 
-                  id="address" 
+                <Textarea
+                  id="address"
                   value={formData.address}
-                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="Via Roma 10, 00100 Roma (RM)"
                   className="min-h-[80px]"
                 />
@@ -101,30 +100,30 @@ export default function NewSupplierPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="vatNumber">Partita IVA / Codice Fiscale</Label>
-                  <Input 
-                    id="vatNumber" 
+                  <Input
+                    id="vatNumber"
                     value={formData.vatNumber}
-                    onChange={(e) => setFormData({...formData, vatNumber: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, vatNumber: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefono</Label>
-                  <Input 
-                    id="phone" 
+                  <Input
+                    id="phone"
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
+                <Input
+                  id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
 

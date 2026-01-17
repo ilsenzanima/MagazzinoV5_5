@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notify";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -11,8 +12,6 @@ import Link from "next/link";
 import { clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 export default function NewClientPage() {
   const { userRole } = useAuth();
   const router = useRouter();
@@ -31,18 +30,18 @@ export default function NewClientPage() {
 
   if (userRole === 'user') {
     return (
-        <DashboardLayout>
-            <div className="flex flex-col items-center justify-center h-full py-20">
-                <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
-                <p className="text-slate-500 mb-6">Non hai i permessi necessari per creare nuovi committenti.</p>
-                <Link href="/clients">
-                    <Button variant="outline">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Torna ai Committenti
-                    </Button>
-                </Link>
-            </div>
-        </DashboardLayout>
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-full py-20">
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
+          <p className="text-slate-500 mb-6">Non hai i permessi necessari per creare nuovi committenti.</p>
+          <Link href="/clients">
+            <Button variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Torna ai Committenti
+            </Button>
+          </Link>
+        </div>
+      </DashboardLayout>
     );
   }
 
@@ -80,11 +79,11 @@ export default function NewClientPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="name">Ragione Sociale / Nome *</Label>
-                <Input 
-                  id="name" 
-                  required 
+                <Input
+                  id="name"
+                  required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Inserisci il nome dell'azienda o del cliente"
                 />
               </div>
@@ -92,88 +91,88 @@ export default function NewClientPage() {
               {/* Indirizzo - Priorità alta come richiesto */}
               <div className="space-y-4 border-t border-b py-4 border-slate-100">
                 <h3 className="font-medium text-slate-900">Indirizzo Sede</h3>
-                
+
                 <div className="grid grid-cols-4 gap-4">
-                    <div className="col-span-3 space-y-2">
-                        <Label htmlFor="street">Via / Piazza</Label>
-                        <Input 
-                        id="street" 
-                        value={formData.street}
-                        onChange={(e) => setFormData({...formData, street: e.target.value})}
-                        placeholder="Via Roma"
-                        />
-                    </div>
-                    <div className="col-span-1 space-y-2">
-                        <Label htmlFor="streetNumber">N. Civico</Label>
-                        <Input 
-                        id="streetNumber" 
-                        value={formData.streetNumber}
-                        onChange={(e) => setFormData({...formData, streetNumber: e.target.value})}
-                        placeholder="10"
-                        />
-                    </div>
+                  <div className="col-span-3 space-y-2">
+                    <Label htmlFor="street">Via / Piazza</Label>
+                    <Input
+                      id="street"
+                      value={formData.street}
+                      onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                      placeholder="Via Roma"
+                    />
+                  </div>
+                  <div className="col-span-1 space-y-2">
+                    <Label htmlFor="streetNumber">N. Civico</Label>
+                    <Input
+                      id="streetNumber"
+                      value={formData.streetNumber}
+                      onChange={(e) => setFormData({ ...formData, streetNumber: e.target.value })}
+                      placeholder="10"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="md:col-span-1 space-y-2">
-                        <Label htmlFor="postalCode">CAP</Label>
-                        <Input 
-                        id="postalCode" 
-                        value={formData.postalCode}
-                        onChange={(e) => setFormData({...formData, postalCode: e.target.value})}
-                        placeholder="00100"
-                        />
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                        <Label htmlFor="city">Città</Label>
-                        <Input 
-                        id="city" 
-                        value={formData.city}
-                        onChange={(e) => setFormData({...formData, city: e.target.value})}
-                        placeholder="Milano"
-                        />
-                    </div>
-                    <div className="md:col-span-1 space-y-2">
-                        <Label htmlFor="province">Provincia</Label>
-                        <Input 
-                        id="province" 
-                        value={formData.province}
-                        onChange={(e) => setFormData({...formData, province: e.target.value})}
-                        placeholder="MI"
-                        maxLength={2}
-                        className="uppercase"
-                        />
-                    </div>
+                  <div className="md:col-span-1 space-y-2">
+                    <Label htmlFor="postalCode">CAP</Label>
+                    <Input
+                      id="postalCode"
+                      value={formData.postalCode}
+                      onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                      placeholder="00100"
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <Label htmlFor="city">Città</Label>
+                    <Input
+                      id="city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      placeholder="Milano"
+                    />
+                  </div>
+                  <div className="md:col-span-1 space-y-2">
+                    <Label htmlFor="province">Provincia</Label>
+                    <Input
+                      id="province"
+                      value={formData.province}
+                      onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                      placeholder="MI"
+                      maxLength={2}
+                      className="uppercase"
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="vatNumber">Partita IVA / Codice Fiscale</Label>
-                  <Input 
-                    id="vatNumber" 
+                  <Input
+                    id="vatNumber"
                     value={formData.vatNumber}
-                    onChange={(e) => setFormData({...formData, vatNumber: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, vatNumber: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefono</Label>
-                  <Input 
-                    id="phone" 
+                  <Input
+                    id="phone"
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
+                <Input
+                  id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
 

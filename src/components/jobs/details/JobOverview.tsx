@@ -1,5 +1,7 @@
 "use client"
 
+import { notify } from "@/lib/notify";
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Job, jobsApi } from "@/lib/api"

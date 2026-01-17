@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -25,8 +27,6 @@ import {
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
-import { notify } from "@/lib/notify";
-
 interface PurchaseLine {
     tempId: string;
     itemId: string;

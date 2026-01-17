@@ -1,4 +1,6 @@
-"use client";
+"use client"
+
+import { notify } from "@/lib/notify";;
 
 import { useState, useEffect } from "react";
 import { Client, clientsApi, jobsApi, deliveryNotesApi } from "@/lib/api";
@@ -15,8 +17,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { notify } from "@/lib/notify";
-
 interface ClientEditDialogProps {
     client: Client | null;
     open: boolean;
