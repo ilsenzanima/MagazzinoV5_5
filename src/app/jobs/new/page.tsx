@@ -14,6 +14,7 @@ import Link from "next/link";
 import { jobsApi, clientsApi, Client } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 export default function NewJobPage() {
   const router = useRouter();
@@ -107,7 +108,7 @@ export default function NewJobPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.clientId) {
-      alert("Seleziona un committente");
+      notify.warning("Seleziona un committente");
       return;
     }
 
@@ -118,7 +119,7 @@ export default function NewJobPage() {
       router.refresh();
     } catch (error) {
       console.error("Error creating job:", error);
-      alert("Errore durante la creazione della commessa");
+      notify.error("Errore durante la creazione della commessa");
     } finally {
       setLoading(false);
     }

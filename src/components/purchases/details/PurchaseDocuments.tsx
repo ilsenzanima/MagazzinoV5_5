@@ -6,6 +6,7 @@ import { FileText, Upload, Trash2, ExternalLink, Loader2, Camera } from "lucide-
 import { purchasesApi } from "@/lib/api"
 import { useState } from "react"
 import { DocumentScanner } from "@/components/ui/document-scanner"
+import { notify } from "@/lib/notify"
 
 interface PurchaseDocumentsProps {
   purchaseId: string;
@@ -29,7 +30,7 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
       onUpdate();
     } catch (error) {
       console.error("Failed to upload document", error);
-      alert("Errore durante il caricamento del documento");
+      notify.error("Errore durante il caricamento del documento");
     } finally {
       setIsUploading(false);
       // Reset input value to allow re-uploading same file if needed
@@ -47,7 +48,7 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
       onUpdate();
     } catch (error) {
       console.error("Failed to upload scanned document", error);
-      alert("Errore durante il caricamento del documento scansionato");
+      notify.error("Errore durante il caricamento del documento scansionato");
     } finally {
       setIsUploading(false);
     }
@@ -62,7 +63,7 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
       onUpdate();
     } catch (error) {
       console.error("Failed to delete document", error);
-      alert("Errore durante l'eliminazione del documento");
+      notify.error("Errore durante l'eliminazione del documento");
     } finally {
       setIsDeleting(false);
     }

@@ -11,6 +11,7 @@ import Link from "next/link";
 import { clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 export default function NewClientPage() {
   const { userRole } = useAuth();
@@ -54,7 +55,7 @@ export default function NewClientPage() {
       router.refresh();
     } catch (error) {
       console.error("Error creating client:", error);
-      alert("Errore durante la creazione del committente");
+      notify.error("Errore durante la creazione del committente");
     } finally {
       setLoading(false);
     }

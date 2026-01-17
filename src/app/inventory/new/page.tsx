@@ -9,6 +9,7 @@ import { inventoryApi } from "@/lib/api";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { InventoryItemForm, InventoryFormData } from "@/components/inventory/InventoryItemForm";
+import { notify } from "@/lib/notify";
 
 function NewInventoryItemContent() {
   const router = useRouter();
@@ -94,7 +95,7 @@ function NewInventoryItemContent() {
           imageUrl = await inventoryApi.uploadImage(imageFile);
         } catch (uploadErr) {
           console.error("Image upload failed", uploadErr);
-          alert("Errore caricamento immagine, l'articolo verrà creato senza immagine.");
+          notify.error("Errore caricamento immagine, l'articolo verrà creato senza immagine.");
         }
       }
 
@@ -117,7 +118,7 @@ function NewInventoryItemContent() {
       router.push("/inventory");
     } catch (error) {
       console.error("Failed to create item", error);
-      alert("Errore durante la creazione dell'articolo");
+      notify.error("Errore durante la creazione dell'articolo");
     } finally {
       setIsLoading(false);
     }
