@@ -125,10 +125,14 @@ function PurchasesContent() {
                           {/* Status Icons */}
                           <div className="flex items-center gap-1.5 shrink-0 ml-2">
                             {purchase.documentUrl && (
-                              <Paperclip className="h-4 w-4 text-blue-500" title="Documento allegato" />
+                              <span title="Documento allegato">
+                                <Paperclip className="h-4 w-4 text-blue-500" />
+                              </span>
                             )}
                             {hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
-                              <AlertTriangle className="h-5 w-5 text-amber-500" title="Prezzo mancante" />
+                              <span title="Prezzo mancante">
+                                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                              </span>
                             )}
                           </div>
                         </div>
