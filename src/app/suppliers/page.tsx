@@ -14,6 +14,7 @@ import { Supplier, suppliersApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { SupplierCard, SupplierDeleteDialog } from "@/components/suppliers";
+import { notify } from "@/lib/notify";
 
 export default function SuppliersPage() {
   const { userRole } = useAuth();
@@ -71,7 +72,7 @@ export default function SuppliersPage() {
       setSupplierToDelete(null);
     } catch (error) {
       console.error("Failed to delete supplier:", error);
-      alert("Errore durante l'eliminazione del fornitore. Verifica che non abbia acquisti associati.");
+      notify.error("Errore durante l'eliminazione del fornitore. Verifica che non abbia acquisti associati.");
     }
   };
 

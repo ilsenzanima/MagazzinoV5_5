@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemType, Unit } from "@/lib/api";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
+import { notify } from "@/lib/notify";
 
 export default function SettingsInventoryPage() {
     // Units State
@@ -107,7 +108,7 @@ export default function SettingsInventoryPage() {
 
         // Check for duplicates (case insensitive)
         if (suppliers.some(s => s.name.toLowerCase() === nameToAdd.toLowerCase())) {
-            alert("Esiste già un fornitore con questo nome.");
+            notify.warning("Esiste già un fornitore con questo nome.");
             return;
         }
 
@@ -130,7 +131,7 @@ export default function SettingsInventoryPage() {
 
         // Check for duplicates (case insensitive)
         if (brands.some(b => b.name.toLowerCase() === nameToAdd.toLowerCase())) {
-            alert("Esiste già una marca con questo nome.");
+            notify.warning("Esiste già una marca con questo nome.");
             return;
         }
 
@@ -153,7 +154,7 @@ export default function SettingsInventoryPage() {
 
         // Check for duplicates (case insensitive)
         if (types.some(t => t.name.toLowerCase() === nameToAdd.toLowerCase())) {
-            alert("Esiste già una tipologia con questo nome.");
+            notify.warning("Esiste già una tipologia con questo nome.");
             return;
         }
 

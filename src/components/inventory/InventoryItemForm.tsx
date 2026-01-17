@@ -16,6 +16,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 export interface InventoryFormData {
     code: string;
@@ -163,7 +164,7 @@ export function InventoryItemForm({
                 });
 
                 if (isDuplicate) {
-                    alert("Articolo già presente! Specificare la variante per differenziarlo.");
+                    notify.warning("Articolo già presente! Specificare la variante per differenziarlo.");
                     setIsCheckingDuplicate(false);
                     return;
                 }
@@ -172,7 +173,7 @@ export function InventoryItemForm({
             await onSubmit({ ...formData, code }, imageFile);
         } catch (error) {
             console.error("Error checking duplicate or submitting", error);
-            alert("Si è verificato un errore durante il salvataggio.");
+            notify.error("Si è verificato un errore durante il salvataggio.");
         } finally {
             setIsCheckingDuplicate(false);
         }

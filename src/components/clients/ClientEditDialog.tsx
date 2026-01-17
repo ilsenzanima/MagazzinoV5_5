@@ -15,6 +15,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { notify } from "@/lib/notify";
 
 interface ClientEditDialogProps {
     client: Client | null;
@@ -162,7 +163,7 @@ export function ClientEditDialog({
             onOpenChange(false);
         } catch (error) {
             console.error("Failed to update client:", error);
-            alert("Errore durante l'aggiornamento del committente");
+            notify.error("Errore durante l'aggiornamento del committente");
         } finally {
             setIsSaving(false);
         }

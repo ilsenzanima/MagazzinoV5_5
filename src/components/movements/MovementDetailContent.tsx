@@ -23,6 +23,7 @@ import {
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 // jsPDF and autoTable are loaded dynamically on demand to reduce bundle size
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 interface MovementDetailContentProps {
     initialMovement: DeliveryNote;
@@ -121,7 +122,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
             router.push('/movements');
         } catch (error) {
             console.error("Failed to delete movement", error);
-            alert("Errore durante l'eliminazione del movimento");
+            notify.error("Errore durante l'eliminazione del movimento");
             setLoading(false);
         }
     };
@@ -142,14 +143,14 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                 price: item.price
             })) as any);
 
-            alert("Modifiche salvate con successo!");
+            notify.success("Modifiche salvate con successo!");
             setIsEditing(false);
             // In a real app we might want to revalidate data here
             // But for now we just update local state if needed or reload page
             router.refresh();
         } catch (error) {
             console.error("Failed to save changes", error);
-            alert("Errore nel salvataggio");
+            notify.error("Errore nel salvataggio");
             setLoading(false);
         }
     };
