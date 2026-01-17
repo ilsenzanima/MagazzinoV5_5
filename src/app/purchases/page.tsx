@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, Suspense, useDeferredValue } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -105,59 +105,50 @@ function PurchasesContent() {
             ) : (
               purchases.map((purchase) => {
                 // Check if any item has missing price
-                const hasMissingPrices = purchase.items?.some(item => item.price === 0);
+                const hasMissingPrices = purchase.items?.some(item => item.price === 0) || purchase.totalAmount === 0;
 
                 return (
                   <Link href={`/purchases/${purchase.id}`} key={purchase.id}>
                     <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200 dark:border-slate-700">
                       <CardContent className="p-5">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="min-w-0 flex-1">
                             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-blue-600" />
-                              Bolla: {purchase.deliveryNoteNumber}
+                              <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                              <span className="truncate">Bolla: {purchase.deliveryNoteNumber}</span>
                             </h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
-                              <User className="h-3 w-3" />
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 truncate">
+                              <User className="h-3 w-3 shrink-0" />
                               {purchase.supplierName || 'Fornitore Sconosciuto'}
                             </p>
                           </div>
+                          {/* Status Icons */}
+                          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                            {purchase.documentUrl && (
+                              <Paperclip className="h-4 w-4 text-blue-500" title="Documento allegato" />
+                            )}
+                            {hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
+                              <AlertTriangle className="h-5 w-5 text-amber-500" title="Prezzo mancante" />
+                            )}
+                          </div>
                         </div>
 
-                        <div className="mb-2">
+                        <div className="mb-3">
                           {(userRole === 'admin' || userRole === 'operativo') ? (
                             <div className="font-bold text-lg text-slate-900 dark:text-white">
                               {purchase.totalAmount !== undefined && purchase.totalAmount !== null
                                 ? `€ ${purchase.totalAmount.toFixed(2)}`
                                 : '-'
                               }
-                              {purchase.totalAmount === 0 && (
-                                <div className="inline-block ml-2" title="Prezzo mancante">
-                                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                </div>
-                              )}
                             </div>
                           ) : (
                             <span className="text-slate-400 dark:text-slate-500 italic text-sm">Riservato</span>
                           )}
                         </div>
 
-                        {hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
-                          <div className="mb-4 flex items-center text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 p-2 rounded text-xs font-medium border border-yellow-100 dark:border-yellow-900">
-                            <AlertTriangle className="h-3 w-3 mr-1.5" />
-                            Prezzi mancanti
-                          </div>
-                        )}
-
-                        <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                            <span>Data: {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}</span>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-xs text-slate-400 dark:text-slate-500">
-                          <span>Registrato da: {purchase.createdByName || 'N/D'}</span>
+                        <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                          <span>{new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}</span>
                         </div>
                       </CardContent>
                     </Card>
