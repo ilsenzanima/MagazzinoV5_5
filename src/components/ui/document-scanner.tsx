@@ -1,11 +1,9 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Camera, RotateCcw, Check, Crop, FileText, Loader2 } from "lucide-react"
-// @ts-ignore - jscanify doesn't have types
-import jscanify from "jscanify"
+import { Camera, RotateCcw, Check, Loader2 } from "lucide-react"
 import { jsPDF } from "jspdf"
 
 interface DocumentScannerProps {
@@ -23,10 +21,43 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
     const fileInputRef = useRef<HTMLInputElement>(null)
     const scannerRef = useRef<any>(null)
 
-    // Initialize scanner
-    if (!scannerRef.current) {
-        scannerRef.current = new jscanify()
-    }
+    // Load jscanify dynamically only when dialog opens
+    useEffect(() => {
+        if (open && !scannerRef.current) {
+            import("jscanify").then((module) => {
+                const JScanify = module.default
+                scannerRef.current = new JScanify()
+            }).catch((err) => {
+                console.error("Failed to load jscanify:", err)
+            })
+        }
+    }, [open])
+
+    const processImage = useCallback((img: HTMLImageElement) => {
+        try {
+            if (scannerRef.current) {
+                const resultCanvas = scannerRef.current.extractPaper(img, img.width, img.height)
+                setProcessedImage(resultCanvas.toDataURL('image/jpeg', 0.9))
+            } else {
+                // Fallback if scanner not loaded
+                const canvas = document.createElement('canvas')
+                canvas.width = img.width
+                canvas.height = img.height
+                const ctx = canvas.getContext('2d')
+                ctx?.drawImage(img, 0, 0)
+                setProcessedImage(canvas.toDataURL('image/jpeg', 0.9))
+            }
+        } catch (error) {
+            console.error('Edge detection failed, using original:', error)
+            // Fallback to original image if detection fails
+            const canvas = document.createElement('canvas')
+            canvas.width = img.width
+            canvas.height = img.height
+            const ctx = canvas.getContext('2d')
+            ctx?.drawImage(img, 0, 0)
+            setProcessedImage(canvas.toDataURL('image/jpeg', 0.9))
+        }
+    }, [])
 
     const handleCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -38,29 +69,13 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             img.onload = () => {
                 setCapturedImage(img)
                 setStep('preview')
-
-                // Process with edge detection
-                setTimeout(() => {
-                    try {
-                        const scanner = scannerRef.current
-                        const resultCanvas = scanner.extractPaper(img, img.width, img.height)
-                        setProcessedImage(resultCanvas.toDataURL('image/jpeg', 0.9))
-                    } catch (error) {
-                        console.error('Edge detection failed, using original:', error)
-                        // Fallback to original image if detection fails
-                        const canvas = document.createElement('canvas')
-                        canvas.width = img.width
-                        canvas.height = img.height
-                        const ctx = canvas.getContext('2d')
-                        ctx?.drawImage(img, 0, 0)
-                        setProcessedImage(canvas.toDataURL('image/jpeg', 0.9))
-                    }
-                }, 100)
+                // Process with edge detection after a short delay
+                setTimeout(() => processImage(img), 100)
             }
             img.src = event.target?.result as string
         }
         reader.readAsDataURL(file)
-    }, [])
+    }, [processImage])
 
     const handleRetake = useCallback(() => {
         setCapturedImage(null)
