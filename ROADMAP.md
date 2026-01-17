@@ -7,8 +7,8 @@
 ## 🔧 Aree di Miglioramento Tecniche
 
 ### 1. Testing Automatizzato
-- [ ] Unit test per servizi API (`src/lib/services/`)
-- [ ] Integration test per flussi critici (acquisti, movimenti, FIFO)
+- [x] Unit test per servizi API (`src/lib/services/`)
+- [x] Integration test per flussi critici (acquisti, movimenti, FIFO)
 - [ ] E2E test con Playwright per UI
 - **Priorità:** Alta
 - **Effort:** 2-3 giorni
