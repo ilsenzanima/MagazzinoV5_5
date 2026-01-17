@@ -14,7 +14,7 @@
 - **Effort:** 2-3 giorni
 
 ### 2. Error Handling Strutturato
-- [ ] Sistema di notifiche toast centralizzato
+- [x] Sistema di notifiche toast centralizzato (`notify.ts`)
 - [ ] Logging errori su servizio esterno (es. Sentry)
 - [ ] Retry automatico per operazioni fallite
 - **Priorità:** Media
