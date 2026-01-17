@@ -338,7 +338,9 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                     {(userRole === 'admin' || userRole === 'operativo') && !item.isFictitious && (
                                                         <div className="text-xs text-slate-500 flex items-center justify-end gap-1">
                                                             {item.totalValue === 0 && (
-                                                                <AlertTriangle className="h-3 w-3 text-amber-500" title="Prezzo mancante" />
+                                                                <span title="Prezzo mancante">
+                                                                    <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                                                </span>
                                                             )}
                                                             € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                                                         </div>
@@ -474,7 +476,9 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                             ) : (
                                                                 <span className="text-slate-600 dark:text-slate-400 flex items-center justify-end gap-1">
                                                                     {item.totalValue === 0 && (
-                                                                        <AlertTriangle className="h-4 w-4 text-amber-500" title="Prezzo mancante" />
+                                                                        <span title="Prezzo mancante">
+                                                                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                                                        </span>
                                                                     )}
                                                                     € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                                                                 </span>
