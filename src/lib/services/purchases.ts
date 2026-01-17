@@ -103,8 +103,15 @@ export const purchasesApi = {
 
         if (error) throw error;
 
+        // Get exhausted purchase IDs (all items used)
+        const { data: exhaustedData } = await supabase.rpc('get_exhausted_purchase_ids');
+        const exhaustedSet = new Set((exhaustedData || []).map((e: any) => e.purchase_id));
+
         return {
-            data: data.map(mapDbToPurchase),
+            data: data.map((d: any) => ({
+                ...mapDbToPurchase(d),
+                isExhausted: exhaustedSet.has(d.id)
+            })),
             total: count || 0
         };
     },
