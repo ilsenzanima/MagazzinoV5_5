@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 interface MovementsContentProps {
   initialMovements: DeliveryNote[];
@@ -187,7 +188,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                     await generateDeliveryNotePDF(fullNote, groupedItems);
                   } catch (error) {
                     console.error("Failed to print", error);
-                    alert("Errore durante la stampa");
+                    notify.error("Errore durante la stampa");
                   }
                 };
 

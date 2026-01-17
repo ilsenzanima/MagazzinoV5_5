@@ -107,7 +107,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             img.src = imageData
         } catch (error) {
             console.error('PDF generation failed:', error)
-            alert('Errore nella generazione del PDF')
+            notify.error('Errore nella generazione del PDF')
             setIsProcessing(false)
             setStep('preview')
         }

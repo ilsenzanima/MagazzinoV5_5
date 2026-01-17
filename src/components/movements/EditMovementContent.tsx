@@ -30,6 +30,7 @@ import { updateMovement } from "@/app/movements/actions";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 interface MovementLine {
     tempId: string;
@@ -301,13 +302,13 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
 
     const handleAddLine = () => {
         if (!selectedItemForLine || !currentLine.quantity) {
-            alert("Seleziona Articolo e Quantità");
+            notify.warning("Seleziona Articolo e Quantità");
             return;
         }
 
         // Validation: Check Purchase Selection for Exits
         if ((activeTab === 'exit' || activeTab === 'sale') && !currentLine.purchaseItemId) {
-            alert("Devi selezionare un lotto di acquisto da cui prelevare la merce.");
+            notify.warning("Devi selezionare un lotto di acquisto da cui prelevare la merce.");
             return;
         }
 
@@ -320,13 +321,13 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
                 // Check pieces if available (source of truth)
                 if (currentLine.pieces && batch.remainingPieces !== undefined) {
                     if (Number(currentLine.pieces) > batch.remainingPieces) {
-                        alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
+                        notify.warning(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
                         return;
                     }
                 }
                 // Fallback to quantity check
                 else if (Number(currentLine.quantity) > batch.remainingQty) {
-                    alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty}`);
+                    notify.warning(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingQty}`);
                     return;
                 }
             }
@@ -359,11 +360,11 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
 
     const handleSave = async () => {
         if (!numberPart) {
-            alert("Inserisci il numero della bolla");
+            notify.warning("Inserisci il numero della bolla");
             return;
         }
         if (lines.length === 0) {
-            alert("Inserisci almeno un articolo");
+            notify.warning("Inserisci almeno un articolo");
             return;
         }
 

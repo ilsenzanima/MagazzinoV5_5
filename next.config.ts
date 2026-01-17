@@ -23,6 +23,19 @@ const nextConfig: NextConfig = {
 
   // ===== CACHING HEADERS =====
   async headers() {
+    // Content Security Policy - adjust domains as needed
+    const cspDirectives = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Required for Next.js
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ');
+
     return [
       // Static assets - immutable cache
       {
@@ -53,6 +66,18 @@ const nextConfig: NextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: cspDirectives,
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(self), microphone=(), geolocation=(), payment=()',
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
           },
         ],
       },

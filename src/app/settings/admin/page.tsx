@@ -24,6 +24,7 @@ import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
 import { User } from "@/lib/mock-data";
+import { notify } from "@/lib/notify";
 
 export default function SettingsAdminPage() {
     const { user: currentUser, setSimulatedRole, realRole } = useAuth();
@@ -123,7 +124,7 @@ export default function SettingsAdminPage() {
             setIsEditRoleOpen(false);
         } catch (error: any) {
             console.error("Error updating role:", error);
-            alert("Errore nell'aggiornamento del ruolo: " + error.message);
+            notify.error("Errore nell'aggiornamento del ruolo: " + error.message);
         }
     };
 
@@ -135,7 +136,7 @@ export default function SettingsAdminPage() {
             setUsers(users.filter(u => u.id !== userId));
         } catch (error: any) {
             console.error("Error deleting user:", error);
-            alert("Errore nell'eliminazione dell'utente: " + error.message);
+            notify.error("Errore nell'eliminazione dell'utente: " + error.message);
         }
     };
 

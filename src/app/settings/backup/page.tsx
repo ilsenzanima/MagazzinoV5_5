@@ -35,6 +35,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { notify } from "@/lib/notify";
 
 // Tables to backup/restore (in dependency order)
 const TABLES = [
@@ -188,7 +189,7 @@ export default function BackupSettingsPage() {
 
         } catch (error) {
             console.error('Error downloading backup:', error);
-            alert('Errore durante il download del backup');
+            notify.error('Errore durante il download del backup');
         } finally {
             setDownloadingBackup(null);
         }

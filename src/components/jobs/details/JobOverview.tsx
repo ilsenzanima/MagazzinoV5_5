@@ -80,7 +80,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
       }
     } catch (error) {
       console.error("Failed to update job", error)
-      alert("Errore durante l'aggiornamento della commessa")
+      notify.error("Errore durante l'aggiornamento della commessa")
     } finally {
       setIsSaving(false)
     }
@@ -92,7 +92,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
       router.push('/jobs')
     } catch (error) {
       console.error("Failed to delete job", error)
-      alert("Errore durante l'eliminazione della commessa")
+      notify.error("Errore durante l'eliminazione della commessa")
     }
   }
 

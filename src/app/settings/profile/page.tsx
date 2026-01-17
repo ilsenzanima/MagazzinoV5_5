@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
 import { Loader2 } from "lucide-react";
+import { notify } from "@/lib/notify";
 
 export default function SettingsProfilePage() {
   const { user } = useAuth();
@@ -82,10 +83,10 @@ export default function SettingsProfilePage() {
         });
 
       if (error) throw error;
-      alert("Profilo aggiornato con successo!");
+      notify.success("Profilo aggiornato con successo!");
     } catch (error: any) {
       console.error("Error saving profile:", error);
-      alert("Errore durante il salvataggio: " + error.message);
+      notify.error("Errore durante il salvataggio: " + error.message);
     } finally {
       setSaving(false);
     }

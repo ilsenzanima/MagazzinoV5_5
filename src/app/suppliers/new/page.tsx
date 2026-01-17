@@ -13,6 +13,7 @@ import { suppliersApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 export default function NewSupplierPage() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function NewSupplierPage() {
       router.refresh();
     } catch (error) {
       console.error("Error creating supplier:", error);
-      alert("Errore durante la creazione del fornitore");
+      notify.error("Errore durante la creazione del fornitore");
     } finally {
       setLoading(false);
     }

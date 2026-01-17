@@ -25,6 +25,7 @@ import {
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 interface PurchaseLine {
     tempId: string;
@@ -241,12 +242,12 @@ export default function NewPurchasePage() {
 
     const handleAddLine = () => {
         if (!currentLine.itemId || !currentLine.quantity || !currentLine.price) {
-            alert("Compila tutti i campi obbligatori (Articolo, Quantità, Prezzo)");
+            notify.warning("Compila tutti i campi obbligatori (Articolo, Quantità, Prezzo)");
             return;
         }
 
         if (currentLine.isJob && !currentLine.jobId) {
-            alert("Seleziona una commessa");
+            notify.warning("Seleziona una commessa");
             return;
         }
 
@@ -352,12 +353,12 @@ export default function NewPurchasePage() {
         e.preventDefault();
 
         if (!formData.supplierId || !formData.deliveryNoteNumber || !formData.deliveryNoteDate) {
-            alert("Compila i dati della bolla (Fornitore, Numero, Data)");
+            notify.warning("Compila i dati della bolla (Fornitore, Numero, Data)");
             return;
         }
 
         if (lines.length === 0) {
-            alert("Inserisci almeno una riga nell'acquisto");
+            notify.warning("Inserisci almeno una riga nell'acquisto");
             return;
         }
 

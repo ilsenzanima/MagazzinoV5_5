@@ -11,6 +11,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { reassignLotToEntries } from "@/app/inventory/[id]/actions";
 import Link from "next/link";
+import { notify } from "@/lib/notify";
 
 interface LotInfo {
     id: string;
@@ -47,16 +48,16 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
             const result = await reassignLotToEntries(itemId, selectedLot, parseFloat(quantityToAssign));
 
             if (result.success) {
-                alert(`✓ ${result.message}`);
+                notify.success(`✓ ${result.message}`);
                 setIsReassignOpen(false);
                 setSelectedLot("");
                 setQuantityToAssign("");
                 onReassignComplete();
             } else {
-                alert(`✗ Errore: ${result.error}`);
+                notify.error(`✗ Errore: ${result.error}`);
             }
         } catch (error: any) {
-            alert(`✗ Errore: ${error.message}`);
+            notify.error(`✗ Errore: ${error.message}`);
         } finally {
             setIsSubmitting(false);
         }

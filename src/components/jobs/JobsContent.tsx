@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 interface JobsContentProps {
   initialJobs: Job[];
@@ -116,7 +117,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
       setJobToDelete(null);
     } catch (error) {
       console.error("Failed to delete job:", error);
-      alert("Errore durante l'eliminazione della commessa");
+      notify.error("Errore durante l'eliminazione della commessa");
     }
   };
 

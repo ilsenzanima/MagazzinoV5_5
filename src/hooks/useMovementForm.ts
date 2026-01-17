@@ -6,6 +6,7 @@ import { jobsApi } from "@/lib/services/jobs";
 import { warehousesApi } from "@/lib/services/warehouses";
 import { InventoryItem, Job, Warehouse, DeliveryNote } from "@/lib/types";
 import { createMovement, updateMovement } from "@/app/movements/actions";
+import { notify } from "@/lib/notify";
 
 export interface MovementLine {
     tempId: string;
@@ -300,11 +301,11 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             if (currentLine.purchaseItemId && batch) {
                 if (currentLine.pieces && batch.remainingPieces !== undefined) {
                     if (Number(currentLine.pieces) > batch.remainingPieces) {
-                        alert(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
+                        notify.warning(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
                         return;
                     }
                 } else if (qty > batch.remainingQty) {
-                    alert(`Quantità eccessiva per il lotto selezionato. Disponibile: ${batch.remainingQty}`);
+                    notify.warning(`Quantità eccessiva per il lotto selezionato. Disponibile: ${batch.remainingQty}`);
                     return;
                 }
             }
@@ -314,7 +315,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             const batch = jobBatchAvailability.find(b => b.purchaseItemId === currentLine.purchaseItemId);
             if (batch) {
                 if (qty > batch.quantity) {
-                    alert(`Quantità eccessiva per il reso. In carico: ${batch.quantity}`);
+                    notify.warning(`Quantità eccessiva per il reso. In carico: ${batch.quantity}`);
                     return;
                 }
             }
@@ -357,11 +358,11 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
 
     const handleSubmit = async () => {
         if (!numberPart) {
-            alert("Inserisci il numero del documento");
+            notify.warning("Inserisci il numero del documento");
             return;
         }
         if (lines.length === 0) {
-            alert("Inserisci almeno una riga");
+            notify.warning("Inserisci almeno una riga");
             return;
         }
 
