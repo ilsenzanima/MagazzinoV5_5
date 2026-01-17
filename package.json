@@ -33,7 +33,6 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "html5-qrcode": "^2.3.8",
-    "jscanify": "^1.4.1",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.562.0",
