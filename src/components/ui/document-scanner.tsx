@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Camera, RotateCcw, Check, Loader2 } from "lucide-react"
@@ -14,50 +14,9 @@ interface DocumentScannerProps {
 
 export function DocumentScanner({ open, onOpenChange, onScanComplete }: DocumentScannerProps) {
     const [step, setStep] = useState<'capture' | 'preview' | 'processing'>('capture')
-    const [capturedImage, setCapturedImage] = useState<HTMLImageElement | null>(null)
-    const [processedImage, setProcessedImage] = useState<string | null>(null)
+    const [imageData, setImageData] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
-    const canvasRef = useRef<HTMLCanvasElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const scannerRef = useRef<any>(null)
-
-    // Load jscanify dynamically only when dialog opens
-    useEffect(() => {
-        if (open && !scannerRef.current) {
-            import("jscanify").then((module) => {
-                const JScanify = module.default
-                scannerRef.current = new JScanify()
-            }).catch((err) => {
-                console.error("Failed to load jscanify:", err)
-            })
-        }
-    }, [open])
-
-    const processImage = useCallback((img: HTMLImageElement) => {
-        try {
-            if (scannerRef.current) {
-                const resultCanvas = scannerRef.current.extractPaper(img, img.width, img.height)
-                setProcessedImage(resultCanvas.toDataURL('image/jpeg', 0.9))
-            } else {
-                // Fallback if scanner not loaded
-                const canvas = document.createElement('canvas')
-                canvas.width = img.width
-                canvas.height = img.height
-                const ctx = canvas.getContext('2d')
-                ctx?.drawImage(img, 0, 0)
-                setProcessedImage(canvas.toDataURL('image/jpeg', 0.9))
-            }
-        } catch (error) {
-            console.error('Edge detection failed, using original:', error)
-            // Fallback to original image if detection fails
-            const canvas = document.createElement('canvas')
-            canvas.width = img.width
-            canvas.height = img.height
-            const ctx = canvas.getContext('2d')
-            ctx?.drawImage(img, 0, 0)
-            setProcessedImage(canvas.toDataURL('image/jpeg', 0.9))
-        }
-    }, [])
 
     const handleCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -65,21 +24,14 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
 
         const reader = new FileReader()
         reader.onload = (event) => {
-            const img = new Image()
-            img.onload = () => {
-                setCapturedImage(img)
-                setStep('preview')
-                // Process with edge detection after a short delay
-                setTimeout(() => processImage(img), 100)
-            }
-            img.src = event.target?.result as string
+            setImageData(event.target?.result as string)
+            setStep('preview')
         }
         reader.readAsDataURL(file)
-    }, [processImage])
+    }, [])
 
     const handleRetake = useCallback(() => {
-        setCapturedImage(null)
-        setProcessedImage(null)
+        setImageData(null)
         setStep('capture')
         if (fileInputRef.current) {
             fileInputRef.current.value = ''
@@ -87,7 +39,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
     }, [])
 
     const handleConfirm = useCallback(async () => {
-        if (!processedImage) return
+        if (!imageData) return
 
         setStep('processing')
         setIsProcessing(true)
@@ -105,55 +57,64 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                 const pdfRatio = pdfWidth / pdfHeight
 
                 let finalWidth, finalHeight, offsetX = 0, offsetY = 0
+                const isLandscape = imgRatio > 1
 
-                if (imgRatio > pdfRatio) {
-                    // Image is wider than A4
-                    finalWidth = pdfWidth
-                    finalHeight = pdfWidth / imgRatio
-                    offsetY = (pdfHeight - finalHeight) / 2
+                if (isLandscape) {
+                    // Landscape image - use landscape PDF
+                    const landscapePdfWidth = 297
+                    const landscapePdfHeight = 210
+                    const landscapeRatio = landscapePdfWidth / landscapePdfHeight
+
+                    if (imgRatio > landscapeRatio) {
+                        finalWidth = landscapePdfWidth
+                        finalHeight = landscapePdfWidth / imgRatio
+                        offsetY = (landscapePdfHeight - finalHeight) / 2
+                    } else {
+                        finalHeight = landscapePdfHeight
+                        finalWidth = landscapePdfHeight * imgRatio
+                        offsetX = (landscapePdfWidth - finalWidth) / 2
+                    }
                 } else {
-                    // Image is taller than A4
-                    finalHeight = pdfHeight
-                    finalWidth = pdfHeight * imgRatio
-                    offsetX = (pdfWidth - finalWidth) / 2
+                    // Portrait image
+                    if (imgRatio > pdfRatio) {
+                        finalWidth = pdfWidth
+                        finalHeight = pdfWidth / imgRatio
+                        offsetY = (pdfHeight - finalHeight) / 2
+                    } else {
+                        finalHeight = pdfHeight
+                        finalWidth = pdfHeight * imgRatio
+                        offsetX = (pdfWidth - finalWidth) / 2
+                    }
                 }
 
                 const pdf = new jsPDF({
-                    orientation: imgRatio > 1 ? 'landscape' : 'portrait',
+                    orientation: isLandscape ? 'landscape' : 'portrait',
                     unit: 'mm',
                     format: 'a4'
                 })
 
-                if (imgRatio > 1) {
-                    // Landscape
-                    pdf.addImage(processedImage, 'JPEG', offsetY, offsetX, finalHeight, finalWidth)
-                } else {
-                    // Portrait
-                    pdf.addImage(processedImage, 'JPEG', offsetX, offsetY, finalWidth, finalHeight)
-                }
+                pdf.addImage(imageData, 'JPEG', offsetX, offsetY, finalWidth, finalHeight)
 
                 const pdfBlob = pdf.output('blob')
                 onScanComplete(pdfBlob)
 
                 // Reset state
-                setCapturedImage(null)
-                setProcessedImage(null)
+                setImageData(null)
                 setStep('capture')
                 setIsProcessing(false)
                 onOpenChange(false)
             }
-            img.src = processedImage
+            img.src = imageData
         } catch (error) {
             console.error('PDF generation failed:', error)
             alert('Errore nella generazione del PDF')
             setIsProcessing(false)
             setStep('preview')
         }
-    }, [processedImage, onScanComplete, onOpenChange])
+    }, [imageData, onScanComplete, onOpenChange])
 
     const handleClose = () => {
-        setCapturedImage(null)
-        setProcessedImage(null)
+        setImageData(null)
         setStep('capture')
         onOpenChange(false)
     }
@@ -194,21 +155,14 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                         </div>
                     )}
 
-                    {step === 'preview' && (
+                    {step === 'preview' && imageData && (
                         <div className="space-y-4">
                             <div className="relative aspect-[3/4] bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
-                                {processedImage ? (
-                                    <img
-                                        src={processedImage}
-                                        alt="Documento scansionato"
-                                        className="w-full h-full object-contain"
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center h-full">
-                                        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                                        <span className="ml-2 text-slate-500">Rilevamento bordi...</span>
-                                    </div>
-                                )}
+                                <img
+                                    src={imageData}
+                                    alt="Documento scansionato"
+                                    className="w-full h-full object-contain"
+                                />
                             </div>
 
                             <div className="flex gap-2">
@@ -219,10 +173,9 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                 <Button
                                     className="flex-1"
                                     onClick={handleConfirm}
-                                    disabled={!processedImage}
                                 >
                                     <Check className="mr-2 h-4 w-4" />
-                                    Conferma
+                                    Genera PDF
                                 </Button>
                             </div>
                         </div>
@@ -237,8 +190,6 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                         </div>
                     )}
                 </div>
-
-                <canvas ref={canvasRef} className="hidden" />
             </DialogContent>
         </Dialog>
     )
