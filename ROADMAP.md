@@ -28,11 +28,11 @@
 - **Effort:** 3-4 giorni
 
 ### 4. Backup Automatici
-- [ ] GitHub Action per backup giornaliero
+- [x] GitHub Action per backup settimanale (domenica 2:00 AM)
 - [ ] Notifica email su completamento/errore
-- [ ] Retention policy (es. ultimi 30 giorni)
+- [x] Retention policy (ultimi 12 backup)
 - **Priorità:** Alta
-- **Effort:** 0.5 giorni
+- **Effort:** ✅ Già implementato
 
 ---
 
