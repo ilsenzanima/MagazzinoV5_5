@@ -16,6 +16,7 @@ import { Client, clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { ClientCard, ClientEditDialog, ClientDeleteDialog } from "@/components/clients";
+import { notify } from "@/lib/notify";
 
 export default function ClientsPage() {
   const { userRole } = useAuth();
@@ -72,7 +73,7 @@ export default function ClientsPage() {
       setClientToDelete(null);
     } catch (error) {
       console.error("Failed to delete client:", error);
-      alert("Errore durante l'eliminazione del committente");
+      notify.error("Errore durante l'eliminazione del committente");
     }
   };
 
