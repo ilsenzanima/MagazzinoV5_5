@@ -40,3 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 File da utilizzare/
+
+# editor configs
+.cursorrules
+.trae/
+
+# debug files
+debug_*.ts
