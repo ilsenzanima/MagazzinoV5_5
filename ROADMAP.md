@@ -48,10 +48,10 @@
 - **Effort:** 2-3 giorni
 
 #### Barcode Scanner
-- [ ] Scansione codice articolo con fotocamera
-- [ ] Ricerca rapida da barcode
-- [ ] Generazione etichette con barcode
-- **Effort:** 1-2 giorni
+- [x] Scansione codice articolo con fotocamera (`html5-qrcode`)
+- [x] Ricerca rapida da barcode
+- [x] Generazione etichette con barcode/QR (`react-barcode`, `react-qr-code`)
+- **Effort:** ✅ Già implementato
 
 ### Media Priorità
 
