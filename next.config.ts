@@ -64,6 +64,9 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
 
+  // ===== EXTERNAL PACKAGES (not bundled for SSR) =====
+  serverExternalPackages: ['jscanify'],
+
   // ===== PRODUCTION SOURCE MAPS =====
   productionBrowserSourceMaps: false,
 };
