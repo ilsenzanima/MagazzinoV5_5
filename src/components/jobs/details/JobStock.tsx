@@ -110,6 +110,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         totalQty: number
         totalPieces: number
         totalValue: number
+        hasMissingPrice: boolean
         batches: Batch[]
     }
 
@@ -183,6 +184,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                     totalQty: 0,
                     totalPieces: 0,
                     totalValue: 0,
+                    hasMissingPrice: false,
                     batches: [{
                         sourceKey,
                         qty: qtyChange,
@@ -204,6 +206,8 @@ export function JobStock({ movements, jobId }: JobStockProps) {
             item.totalQty = item.batches.reduce((sum, b) => sum + b.qty, 0)
             item.totalPieces = item.batches.reduce((sum, b) => sum + b.pieces, 0)
             item.totalValue = item.batches.reduce((sum, b) => sum + (b.qty * b.price), 0)
+            // Check if any batch has missing price (price === 0)
+            item.hasMissingPrice = item.batches.some(b => b.price === 0)
 
             // Remove items with no remaining stock
             if (Math.abs(item.totalQty) <= 0.001) {
@@ -337,8 +341,8 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                     </div>
                                                     {(userRole === 'admin' || userRole === 'operativo') && !item.isFictitious && (
                                                         <div className="text-xs text-slate-500 flex items-center justify-end gap-1">
-                                                            {item.totalValue === 0 && (
-                                                                <span title="Prezzo mancante">
+                                                            {item.hasMissingPrice && (
+                                                                <span title="Prezzo mancante in uno o più lotti">
                                                                     <AlertTriangle className="h-3 w-3 text-amber-500" />
                                                                 </span>
                                                             )}
@@ -475,8 +479,8 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                 </div>
                                                             ) : (
                                                                 <span className="text-slate-600 dark:text-slate-400 flex items-center justify-end gap-1">
-                                                                    {item.totalValue === 0 && (
-                                                                        <span title="Prezzo mancante">
+                                                                    {item.hasMissingPrice && (
+                                                                        <span title="Prezzo mancante in uno o più lotti">
                                                                             <AlertTriangle className="h-4 w-4 text-amber-500" />
                                                                         </span>
                                                                     )}
