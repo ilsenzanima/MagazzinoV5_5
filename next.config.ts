@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
       "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.github.com https://raw.githubusercontent.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
