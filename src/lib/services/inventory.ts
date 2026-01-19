@@ -433,6 +433,7 @@ export const inventoryApi = {
             itemId: b.item_id,
             purchaseItemId: b.purchase_item_id,
             purchaseRef: b.purchase_ref,
+            purchaseDate: b.purchase_date,
             itemName: b.item_name,
             itemModel: b.item_model,
             itemCode: b.item_code,
