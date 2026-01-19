@@ -21,7 +21,7 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
         if (!searchTerm.trim()) return true
         const words = searchTerm.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0)
         if (words.length === 0) return true
-        const searchTarget = `${batch.itemName} ${batch.itemCode}`.toLowerCase()
+        const searchTarget = `${batch.itemName} ${batch.itemCode} ${batch.itemModel || ''}`.toLowerCase()
         return words.every(word => searchTarget.includes(word))
     });
 
@@ -83,11 +83,21 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
                                         return (
                                             <TableRow key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                                                 <TableCell className="py-2">
-                                                    <div className="text-sm font-medium">{batch.itemName}</div>
+                                                    <div className="text-sm font-medium">
+                                                        {batch.itemName}
+                                                        {batch.itemModel && (
+                                                            <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({batch.itemModel})</span>
+                                                        )}
+                                                    </div>
                                                     <div className="text-[10px] text-slate-500 dark:text-slate-400">{batch.itemCode}</div>
                                                 </TableCell>
                                                 <TableCell className="py-2 text-xs text-slate-500 dark:text-slate-400">
-                                                    {batch.purchaseRef || "-"}
+                                                    <div>{batch.purchaseRef || "-"}</div>
+                                                    {batch.purchaseDate && (
+                                                        <div className="text-[10px] text-slate-400">
+                                                            ({new Date(batch.purchaseDate).toLocaleDateString('it-IT')})
+                                                        </div>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="py-2 text-xs text-right">
                                                     <div className="font-bold">{batch.quantity} {batch.itemUnit}</div>
