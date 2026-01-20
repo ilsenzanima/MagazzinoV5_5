@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { loadNotesService } from "@/lib/services/load-notes-mock";
@@ -71,7 +70,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                     </SheetDescription>
                 </SheetHeader>
 
-                <ScrollArea className="flex-1 p-6">
+                <div className="flex-1 p-6 overflow-y-auto">
                     {loading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -106,7 +105,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
 
                                     <div className="space-y-2">
                                         {note.items.map(item => {
-                                            const isChecked = checkedItems.has(item.id) || item.isChecked; // mix server state (mocked) + local state
+                                            const isChecked = checkedItems.has(item.id) || item.isChecked;
                                             return (
                                                 <div
                                                     key={item.id}
@@ -146,7 +145,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                             ))}
                         </div>
                     )}
-                </ScrollArea>
+                </div>
 
                 <div className="p-4 border-t bg-muted/20 text-xs text-center text-muted-foreground">
                     I flag sono solo visivi per aiutarti nella compilazione.
