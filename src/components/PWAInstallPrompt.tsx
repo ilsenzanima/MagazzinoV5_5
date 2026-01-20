@@ -14,6 +14,18 @@ export function PWAInstallPrompt() {
     const [showButton, setShowButton] = useState(false);
 
     useEffect(() => {
+        // Check if already running as standalone app (installed)
+        const isStandaloneMode =
+            window.matchMedia('(display-mode: standalone)').matches ||
+            window.matchMedia('(display-mode: fullscreen)').matches ||
+            (window.navigator as any).standalone === true; // iOS Safari
+
+        if (isStandaloneMode) {
+            console.log('[PWA] App is running in standalone mode - hiding install button');
+            setShowButton(false);
+            return; // Don't set up install prompt if already installed
+        }
+
         const handler = (e: Event) => {
             // Prevent Chrome from showing the default prompt
             e.preventDefault();
@@ -24,12 +36,6 @@ export function PWAInstallPrompt() {
         };
 
         window.addEventListener('beforeinstallprompt', handler);
-
-        // Check if already installed
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            console.log('[PWA] App is already installed');
-            setShowButton(false);
-        }
 
         return () => {
             window.removeEventListener('beforeinstallprompt', handler);
