@@ -31,12 +31,27 @@ const nextConfig: NextConfig = {
       "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
       "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in",
       "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.github.com https://raw.githubusercontent.com",
+      "worker-src 'self'", // For Service Worker
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
     ].join('; ');
 
     return [
+      // Service Worker - must be served without redirect
+      {
+        source: '/sw.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+          {
+            key: 'Service-Worker-Allowed',
+            value: '/',
+          },
+        ],
+      },
       // Static assets - immutable cache
       {
         source: '/_next/static/:path*',
