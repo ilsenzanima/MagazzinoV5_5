@@ -26,8 +26,8 @@ const nextConfig: NextConfig = {
     // Content Security Policy - adjust domains as needed
     const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Required for Next.js
-      "script-src-elem 'self' 'unsafe-inline'", // For Chrome's stricter CSP
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live", // Required for Next.js
+      "script-src-elem 'self' 'unsafe-inline' https://vercel.live", // For Chrome's stricter CSP
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
       "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in",
