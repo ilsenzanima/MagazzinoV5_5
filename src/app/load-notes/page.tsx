@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
 export default function LoadNotesPage() {
+    const router = useRouter();
     const [notes, setNotes] = useState<LoadNote[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -148,7 +150,11 @@ export default function LoadNotesPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {notes.map((note) => (
-                                        <TableRow key={note.id} className="group">
+                                        <TableRow
+                                            key={note.id}
+                                            className="group cursor-pointer hover:bg-muted/50"
+                                            onClick={() => router.push(`/load-notes/${note.id}`)}
+                                        >
                                             <TableCell>
                                                 {note.status === 'pending' ? (
                                                     <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200">
