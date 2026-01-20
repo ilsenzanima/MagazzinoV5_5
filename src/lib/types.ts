@@ -336,3 +336,31 @@ export interface Attendance {
     createdAt?: string;
 }
 
+
+// Load Notes (Note di Carico)
+export interface LoadNoteItem {
+    id: string; // generated client-side for list management
+    inventoryId: string;
+    inventoryName: string;
+    inventoryModel?: string;
+    inventoryCode?: string;
+    inventoryUnit: string;
+    quantity: number;
+    pieces?: number; // Optional: if using pieces logic
+    coefficient?: number;
+    notes?: string;
+    isChecked?: boolean; // UI state for "taken/processed"
+}
+
+export interface LoadNote {
+    id: string;
+    date: string;
+    jobId?: string;
+    jobCode?: string;
+    jobDescription?: string;
+    items: LoadNoteItem[];
+    notes?: string;
+    status: 'pending' | 'completed' | 'archived'; // 'pending' = da processare
+    createdBy?: string;
+    createdAt?: string;
+}
