@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { ConnectionManager } from "@/components/ConnectionManager";
 import { Toaster } from "@/components/ui/toaster";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -68,6 +69,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <ConnectionManager />
+            <ServiceWorkerRegistration />
             {children}
             <Toaster />
           </AuthProvider>
