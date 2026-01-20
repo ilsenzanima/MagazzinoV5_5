@@ -1,79 +1,201 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Plus, Trash, Save, Search } from "lucide-react";
+import { ArrowLeft, Plus, Trash, Save, Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import { loadNotesService } from "@/lib/services/load-notes-mock";
-import { Badge } from "@/components/ui/badge";
+import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
+import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
+import { inventoryApi, jobsApi, InventoryItem, Job } from "@/lib/api";
+import { Checkbox } from "@/components/ui/checkbox";
 
-// Mock data for jobs
-const MOCK_JOBS = [
-    { value: "job-1", label: "2024-001 | Ristrutturazione Villa Rossi", description: "Via Roma 1" },
-    { value: "job-2", label: "2024-002 | Nuovo Impianto Elettrico", description: "Via Milano 2" },
-    { value: "job-3", label: "2024-003 | Manutenzione Condominio", description: "Piazza Verdi" },
-];
-
-// Mock data for inventory search
-const MOCK_INVENTORY = [
-    { id: "inv-1", name: "Tubo PVC Ø32", unit: "m", totalQuantity: 200, model: "Rigido" },
-    { id: "inv-2", name: "Curva 90° PVC Ø32", unit: "pz", totalQuantity: 50, model: "A incollare" },
-    { id: "inv-3", name: "Cavo FS17 1x2.5", unit: "m", totalQuantity: 500, model: "Blu" },
-    { id: "inv-4", name: "Interruttore Bipolare", unit: "pz", totalQuantity: 20, model: "Living Now" },
-];
+interface NoteLine {
+    tempId: string;
+    itemId: string;
+    itemName: string;
+    itemModel?: string;
+    itemCode?: string;
+    pieces: number;
+    quantity: number;
+    coefficient: number;
+    unit: string;
+    isChecked?: boolean;
+}
 
 export default function NewLoadNotePage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(true);
+    const [itemsLoading, setItemsLoading] = useState(false);
+    const [jobsLoading, setJobsLoading] = useState(false);
 
-    // Form State
+    // Data Sources
+    const [inventory, setInventory] = useState<InventoryItem[]>([]);
+    const [jobs, setJobs] = useState<Job[]>([]);
+
+    // Form State - Header
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [jobId, setJobId] = useState("");
+    const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [notes, setNotes] = useState("");
 
-    // Items State
-    const [items, setItems] = useState<any[]>([]);
+    // Form State - Current Line
+    const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
+    const [currentLine, setCurrentLine] = useState({
+        pieces: "",
+        quantity: "",
+        coefficient: 1,
+        unit: "PZ"
+    });
 
-    // Item Add State
-    const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [quantity, setQuantity] = useState("");
-    const [searchItemTerm, setSearchItemTerm] = useState("");
+    // Items List State
+    const [lines, setLines] = useState<NoteLine[]>([]);
 
-    // Validation
-    const isValid = jobId || notes.trim().length > 0;
+    // Dialog States
+    const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
+    const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
 
-    const handleAddItem = () => {
-        if (!selectedItem || !quantity) return;
+    // Validation: Job OR Notes required
+    const isValid = selectedJob || notes.trim().length > 0;
 
-        const newItem = {
-            id: Math.random().toString(36).substr(2, 9),
-            inventoryId: selectedItem.id,
-            inventoryName: selectedItem.name,
-            inventoryUnit: selectedItem.unit,
-            inventoryModel: selectedItem.model,
-            quantity: parseFloat(quantity),
-            inventoryCode: selectedItem.id // Mock code
-        };
+    useEffect(() => {
+        loadData();
+    }, []);
 
-        setItems([...items, newItem]);
-
-        // Reset Item Form
-        setSelectedItem(null);
-        setQuantity("");
-        setSearchItemTerm("");
+    const loadData = async () => {
+        try {
+            setInitialLoading(true);
+            const [inventoryData, jobsData] = await Promise.all([
+                inventoryApi.getPaginated({ page: 1, limit: 50 }),
+                jobsApi.getPaginated({ page: 1, limit: 50, status: 'active' })
+            ]);
+            setInventory(inventoryData.items);
+            setJobs(jobsData.data);
+        } catch (error) {
+            console.error("Failed to load data", error);
+        } finally {
+            setInitialLoading(false);
+        }
     };
 
-    const handleRemoveItem = (id: string) => {
-        setItems(items.filter(i => i.id !== id));
+    const handleItemSearch = useCallback(async (term: string) => {
+        setItemsLoading(true);
+        try {
+            const { items } = await inventoryApi.getPaginated({
+                page: 1,
+                limit: 50,
+                search: term
+            });
+            setInventory(items);
+        } catch (error) {
+            console.error("Failed to search items", error);
+        } finally {
+            setItemsLoading(false);
+        }
+    }, []);
+
+    const handleJobSearch = useCallback(async (term: string) => {
+        setJobsLoading(true);
+        try {
+            const { data } = await jobsApi.getPaginated({
+                page: 1,
+                limit: 50,
+                search: term,
+                status: 'active'
+            });
+            setJobs(data);
+        } catch (error) {
+            console.error("Failed to search jobs", error);
+        } finally {
+            setJobsLoading(false);
+        }
+    }, []);
+
+    const handleItemSelect = (item: InventoryItem) => {
+        setSelectedItemForLine(item);
+        setCurrentLine({
+            pieces: "",
+            quantity: "",
+            coefficient: item.coefficient ? Number(item.coefficient) : 1,
+            unit: item.unit || 'PZ'
+        });
+        setIsItemSelectorOpen(false);
+    };
+
+    const handleJobSelect = (job: Job) => {
+        setSelectedJob(job);
+        setIsJobSelectorOpen(false);
+    };
+
+    const handleCurrentLinePiecesChange = (piecesStr: string) => {
+        const pieces = parseFloat(piecesStr);
+        if (isNaN(pieces)) {
+            setCurrentLine(prev => ({ ...prev, pieces: piecesStr, quantity: "" }));
+            return;
+        }
+        const quantity = (pieces * currentLine.coefficient).toFixed(2);
+        setCurrentLine(prev => ({
+            ...prev,
+            pieces: piecesStr,
+            quantity: quantity
+        }));
+    };
+
+    const handleCurrentLineQuantityChange = (quantityStr: string) => {
+        const quantity = parseFloat(quantityStr);
+        if (isNaN(quantity)) {
+            setCurrentLine(prev => ({ ...prev, quantity: quantityStr, pieces: "" }));
+            return;
+        }
+        let piecesStr = currentLine.pieces;
+        if (currentLine.coefficient && currentLine.coefficient !== 1) {
+            piecesStr = (quantity / currentLine.coefficient).toFixed(2);
+        } else {
+            piecesStr = quantity.toString();
+        }
+        setCurrentLine(prev => ({
+            ...prev,
+            quantity: quantityStr,
+            pieces: piecesStr
+        }));
+    };
+
+    const handleAddLine = () => {
+        if (!selectedItemForLine || !currentLine.quantity) {
+            toast.warning("Seleziona un articolo e inserisci la quantità");
+            return;
+        }
+
+        const newLine: NoteLine = {
+            tempId: Math.random().toString(36).substr(2, 9),
+            itemId: selectedItemForLine.id,
+            itemName: selectedItemForLine.name,
+            itemModel: selectedItemForLine.model,
+            itemCode: selectedItemForLine.code,
+            pieces: parseFloat(currentLine.pieces) || parseFloat(currentLine.quantity),
+            quantity: parseFloat(currentLine.quantity),
+            coefficient: currentLine.coefficient,
+            unit: currentLine.unit,
+            isChecked: false
+        };
+
+        setLines([...lines, newLine]);
+
+        // Reset current line
+        setCurrentLine({ pieces: "", quantity: "", coefficient: 1, unit: "PZ" });
+        setSelectedItemForLine(null);
+    };
+
+    const removeLine = (tempId: string) => {
+        setLines(lines.filter(l => l.tempId !== tempId));
     };
 
     const handleSave = async () => {
@@ -84,15 +206,24 @@ export default function NewLoadNotePage() {
 
         setIsLoading(true);
         try {
-            const selectedJob = MOCK_JOBS.find(j => j.value === jobId);
-
             await loadNotesService.create({
                 date,
-                jobId: selectedJob?.value,
-                jobCode: selectedJob?.label.split(' | ')[0],
-                jobDescription: selectedJob?.label.split(' | ')[1],
+                jobId: selectedJob?.id,
+                jobCode: selectedJob?.code,
+                jobDescription: selectedJob?.name,
                 notes,
-                items
+                items: lines.map(l => ({
+                    id: l.tempId,
+                    inventoryId: l.itemId,
+                    inventoryName: l.itemName,
+                    inventoryModel: l.itemModel,
+                    inventoryCode: l.itemCode,
+                    inventoryUnit: l.unit,
+                    quantity: l.quantity,
+                    pieces: l.pieces,
+                    coefficient: l.coefficient,
+                    isChecked: false
+                }))
             });
 
             toast.success("Nota creata con successo");
@@ -104,227 +235,228 @@ export default function NewLoadNotePage() {
         }
     };
 
-    // Filtered inventory for search
-    const filteredInventory = searchItemTerm
-        ? MOCK_INVENTORY.filter(i =>
-            i.name.toLowerCase().includes(searchItemTerm.toLowerCase()) ||
-            i.model.toLowerCase().includes(searchItemTerm.toLowerCase())
-        )
-        : [];
+    if (initialLoading) {
+        return (
+            <DashboardLayout>
+                <div className="flex justify-center items-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col space-y-6 max-w-4xl mx-auto">
+            <div className="max-w-4xl mx-auto pb-10">
                 {/* Header */}
-                <div className="flex items-center gap-4 border-b pb-4">
-                    <Link href="/load-notes">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
+                <div className="mb-6">
+                    <Link href="/load-notes" className="flex items-center text-muted-foreground hover:text-foreground mb-2">
+                        <ArrowLeft className="h-4 w-4 mr-1" />
+                        Torna alle Note
                     </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">Nuova Nota di Carico</h1>
-                        <p className="text-muted-foreground text-sm">
-                            Inserisci il materiale prelevato. Non scarica il magazzino.
-                        </p>
-                    </div>
+                    <h1 className="text-2xl font-bold">Nuova Nota di Carico</h1>
+                    <p className="text-muted-foreground text-sm">
+                        Inserisci il materiale prelevato. Non scarica il magazzino.
+                    </p>
                 </div>
 
-                {/* Main Form */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-6">
+                    {/* Header Data */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Dettagli Generali</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label>Data</Label>
+                                <Input
+                                    type="date"
+                                    value={date}
+                                    onChange={e => setDate(e.target.value)}
+                                />
+                            </div>
 
-                    {/* Testata (Left Column) */}
-                    <div className="md:col-span-1 space-y-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Dettagli Generali</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Data</Label>
-                                    <Input
-                                        type="date"
-                                        value={date}
-                                        onChange={e => setDate(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Commessa</Label>
-                                    <SearchableSelect
-                                        options={MOCK_JOBS}
-                                        value={jobId}
-                                        onValueChange={setJobId}
-                                        placeholder="Seleziona commessa..."
-                                    />
-                                    {!jobId && !notes && (
-                                        <p className="text-[10px] text-destructive">
-                                            * Obbligatorio se mancano le note
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Note / Appunti</Label>
-                                    <Textarea
-                                        placeholder="Note libere (es. 'Materiale per il bagno del piano terra')..."
-                                        className="h-32 resize-none"
-                                        value={notes}
-                                        onChange={e => setNotes(e.target.value)}
-                                    />
-                                    {!jobId && !notes && (
-                                        <p className="text-[10px] text-destructive">
-                                            * Obbligatorio se manca la commessa
-                                        </p>
-                                    )}
-                                </div>
-
-                                <Button
-                                    className="w-full mt-4"
-                                    onClick={handleSave}
-                                    disabled={!isValid || isLoading}
+                            <div className="space-y-2">
+                                <Label>Commessa {!notes && <span className="text-destructive text-xs">*</span>}</Label>
+                                <div
+                                    className="flex items-center justify-between border rounded-md px-3 py-2 cursor-pointer hover:bg-muted h-10"
+                                    onClick={() => setIsJobSelectorOpen(true)}
                                 >
-                                    <Save className="mr-2 h-4 w-4" />
-                                    Salva Nota
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Materiali (Right Column) */}
-                    <div className="md:col-span-2 space-y-4">
-                        <Card className="h-full flex flex-col">
-                            <CardHeader>
-                                <CardTitle className="text-base">Lista Materiali</CardTitle>
-                                <CardDescription>Cerca materiali e aggiungi quantità (Lotti non richiesti)</CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex-1 flex flex-col space-y-4">
-
-                                {/* Add Item Box */}
-                                <div className="p-4 bg-muted/50 rounded-lg space-y-4 border">
-                                    <div className="space-y-2">
-                                        <Label>Cerca Articolo</Label>
-                                        <div className="relative">
-                                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                placeholder="Scrivi nome articolo..."
-                                                className="pl-8"
-                                                value={searchItemTerm}
-                                                onChange={e => {
-                                                    setSearchItemTerm(e.target.value);
-                                                    setSelectedItem(null); // Reset selection on typing
-                                                }}
-                                            />
+                                    {selectedJob ? (
+                                        <div className="flex flex-col overflow-hidden">
+                                            <span className="font-medium text-sm truncate">{selectedJob.code}</span>
+                                            <span className="text-[10px] text-muted-foreground truncate">{selectedJob.name}</span>
                                         </div>
-                                        {/* Dropdown Results Mock */}
-                                        {searchItemTerm && !selectedItem && (
-                                            <div className="absolute z-10 w-[calc(100%-4rem)] md:w-[calc(66%-4rem)] max-w-xl bg-popover border rounded-md shadow-md mt-1 overflow-hidden">
-                                                {filteredInventory.length > 0 ? (
-                                                    filteredInventory.map(item => (
-                                                        <div
-                                                            key={item.id}
-                                                            className="p-2 hover:bg-accent cursor-pointer flex justify-between items-center text-sm"
-                                                            onClick={() => {
-                                                                setSelectedItem(item);
-                                                                setSearchItemTerm(item.name);
-                                                            }}
-                                                        >
-                                                            <div>
-                                                                <div className="font-medium">{item.name}</div>
-                                                                <div className="text-xs text-muted-foreground">{item.model}</div>
-                                                            </div>
-                                                            <div className="text-right text-xs">
-                                                                <div>Disp: {item.totalQuantity} {item.unit}</div>
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="p-2 text-sm text-muted-foreground">Nessun articolo trovato</div>
-                                                )}
-                                            </div>
-                                        )}
+                                    ) : (
+                                        <span className="text-sm text-muted-foreground">Seleziona commessa...</span>
+                                    )}
+                                    <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 md:col-span-3">
+                                <Label>Note / Appunti {!selectedJob && <span className="text-destructive text-xs">*</span>}</Label>
+                                <Textarea
+                                    placeholder="Note libere (es. 'Materiale per il bagno del piano terra')..."
+                                    className="h-24 resize-none"
+                                    value={notes}
+                                    onChange={e => setNotes(e.target.value)}
+                                />
+                                {!isValid && (
+                                    <p className="text-[10px] text-destructive">
+                                        * Compila almeno una Commessa o le Note
+                                    </p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Add Items Section */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Lista Materiali</CardTitle>
+                            <CardDescription>Cerca materiali e aggiungi quantità</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Add Line Form */}
+                            <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                                    <div className="md:col-span-5 space-y-2">
+                                        <Label>Materiale</Label>
+                                        <div
+                                            className="flex items-center justify-between bg-background border rounded-md px-3 py-2 cursor-pointer hover:bg-muted h-10"
+                                            onClick={() => setIsItemSelectorOpen(true)}
+                                        >
+                                            {selectedItemForLine ? (
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                    <span className="font-mono text-xs font-bold bg-muted px-1 rounded">{selectedItemForLine.code}</span>
+                                                    <span className="text-sm truncate">{selectedItemForLine.name}</span>
+                                                    {selectedItemForLine.model && <span className="text-xs text-muted-foreground">({selectedItemForLine.model})</span>}
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-muted-foreground">Cerca articolo...</span>
+                                            )}
+                                            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                        </div>
                                     </div>
 
-                                    {selectedItem && (
-                                        <div className="flex items-end gap-3 animate-in fade-in slide-in-from-top-2">
-                                            <div className="flex-1">
-                                                <Label className="text-xs text-muted-foreground">Articolo Selezionato</Label>
-                                                <div className="font-medium text-sm flex items-center gap-2">
-                                                    {selectedItem.name}
-                                                    <Badge variant="outline" className="text-[10px]">{selectedItem.model}</Badge>
-                                                </div>
-                                            </div>
-                                            <div className="w-24">
-                                                <Label>Quantità</Label>
-                                                <div className="relative">
-                                                    <Input
-                                                        type="number"
-                                                        value={quantity}
-                                                        onChange={e => setQuantity(e.target.value)}
-                                                        placeholder="0"
-                                                    />
-                                                    <span className="absolute right-3 top-2.5 text-xs text-muted-foreground">
-                                                        {selectedItem.unit}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <Button onClick={handleAddItem} disabled={!quantity}>
-                                                <Plus className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
+                                    <div className="md:col-span-2 space-y-2">
+                                        <Label>Pezzi <span className="text-xs text-muted-foreground font-normal">(Coeff: {currentLine.coefficient})</span></Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={currentLine.pieces}
+                                            onChange={(e) => handleCurrentLinePiecesChange(e.target.value)}
+                                            placeholder="Pezzi"
+                                        />
+                                    </div>
 
-                                {/* Items List */}
-                                <div className="border rounded-md flex-1 overflow-hidden">
-                                    <Table>
-                                        <TableHeader>
+                                    <div className="md:col-span-2 space-y-2">
+                                        <Label>Quantità ({currentLine.unit})</Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={currentLine.quantity}
+                                            onChange={(e) => handleCurrentLineQuantityChange(e.target.value)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-3 flex items-end pb-px">
+                                        <Button type="button" onClick={handleAddLine} className="w-full">
+                                            <Plus className="mr-2 h-4 w-4" /> Aggiungi
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Lines Table */}
+                            <div className="rounded-md border overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[250px]">Materiale</TableHead>
+                                            <TableHead className="text-center w-[100px]">Pezzi</TableHead>
+                                            <TableHead className="text-center w-[60px]">Coeff.</TableHead>
+                                            <TableHead className="text-right w-[120px]">Q.tà Tot.</TableHead>
+                                            <TableHead className="w-[50px]"></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {lines.length === 0 ? (
                                             <TableRow>
-                                                <TableHead>Articolo</TableHead>
-                                                <TableHead className="text-right">Qtà</TableHead>
-                                                <TableHead className="w-[50px]"></TableHead>
+                                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                    Nessun materiale aggiunto
+                                                </TableCell>
                                             </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {items.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                                                        Nessun materiale aggiunto
+                                        ) : (
+                                            lines.map((line) => (
+                                                <TableRow key={line.tempId}>
+                                                    <TableCell>
+                                                        <div className="font-medium">
+                                                            {line.itemName}
+                                                            {line.itemModel && <span className="text-muted-foreground font-normal ml-1">({line.itemModel})</span>}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground font-mono">{line.itemCode}</div>
+                                                    </TableCell>
+                                                    <TableCell className="text-center font-medium">
+                                                        {line.pieces}
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-sm text-muted-foreground">
+                                                        {line.coefficient}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold">
+                                                        {line.quantity} <span className="text-muted-foreground text-xs font-normal">{line.unit}</span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => removeLine(line.tempId)}
+                                                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+                                                        >
+                                                            <Trash className="h-4 w-4" />
+                                                        </Button>
                                                     </TableCell>
                                                 </TableRow>
-                                            ) : (
-                                                items.map(item => (
-                                                    <TableRow key={item.id}>
-                                                        <TableCell>
-                                                            <div className="font-medium">{item.inventoryName}</div>
-                                                            <div className="text-xs text-muted-foreground">{item.inventoryModel}</div>
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-bold">
-                                                            {item.quantity} <span className="text-muted-foreground text-xs font-normal">{item.inventoryUnit}</span>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                                                onClick={() => handleRemoveItem(item.id)}
-                                                            >
-                                                                <Trash className="h-4 w-4" />
-                                                            </Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                            </CardContent>
-                        </Card>
+                    <div className="flex justify-end gap-4">
+                        <Link href="/load-notes">
+                            <Button variant="outline" type="button">Annulla</Button>
+                        </Link>
+                        <Button onClick={handleSave} disabled={!isValid || isLoading} className="w-32">
+                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Salva</>}
+                        </Button>
                     </div>
-
                 </div>
             </div>
+
+            <ItemSelectorDialog
+                open={isItemSelectorOpen}
+                onOpenChange={setIsItemSelectorOpen}
+                onSelect={handleItemSelect}
+                items={inventory}
+                onSearch={handleItemSearch}
+                loading={itemsLoading}
+            />
+
+            <JobSelectorDialog
+                open={isJobSelectorOpen}
+                onOpenChange={setIsJobSelectorOpen}
+                onSelect={handleJobSelect}
+                jobs={jobs}
+                onSearch={handleJobSearch}
+                loading={jobsLoading}
+            />
         </DashboardLayout>
     );
 }
