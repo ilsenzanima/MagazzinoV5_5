@@ -32,9 +32,23 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
     const form = useMovementForm({ initialInventory, initialJobs, initialNote });
 
     // Handler when user selects an item from Notes Assistant
-    const handleUseNoteItem = (item: LoadNoteItem) => {
-        // Find the item in inventory to get full details
-        const inventoryItem = form.inventory.find(inv => inv.id === item.inventoryId);
+    const handleUseNoteItem = async (item: LoadNoteItem) => {
+        // First try to find the item in local inventory cache
+        let inventoryItem = form.inventory.find(inv => inv.id === item.inventoryId);
+
+        // If not found locally, fetch from API
+        if (!inventoryItem && item.inventoryId) {
+            try {
+                const { inventoryApi } = await import("@/lib/api");
+                const fetchedItem = await inventoryApi.getById(item.inventoryId);
+                if (fetchedItem) {
+                    inventoryItem = fetchedItem;
+                }
+            } catch (error) {
+                console.error("Failed to fetch inventory item", error);
+            }
+        }
+
         if (inventoryItem) {
             form.handleItemSelect(inventoryItem);
             // Pre-fill quantity from note
@@ -43,6 +57,8 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                 pieces: item.pieces?.toString() || '',
                 quantity: item.quantity?.toString() || ''
             }));
+        } else {
+            console.warn("Could not find inventory item for", item.inventoryId);
         }
     };
 
