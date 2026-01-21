@@ -26,7 +26,7 @@ import {
     FileText,
     Package,
     CheckCircle2,
-    Circle,
+    Clock,
     Trash2,
     Archive,
     RotateCcw
@@ -95,17 +95,18 @@ export default function LoadNotesPage() {
     return (
         <DashboardLayout>
             <div className="flex flex-col space-y-6">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Note di Carico</h1>
-                        <p className="text-muted-foreground">
-                            Gestisci gli appunti per il materiale prelevato dal magazzino
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                    <div className="min-w-0">
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Note di Carico</h1>
+                        <p className="text-muted-foreground text-sm truncate">
+                            Gestisci gli appunti per il materiale prelevato
                         </p>
                     </div>
-                    <Link href="/load-notes/new">
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Nuova Nota
+                    <Link href="/load-notes/new" className="shrink-0">
+                        <Button size="sm" className="w-full sm:w-auto">
+                            <Plus className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Nuova Nota</span>
+                            <span className="sm:hidden">Nuova</span>
                         </Button>
                     </Link>
                 </div>
@@ -141,11 +142,10 @@ export default function LoadNotesPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="w-[100px]">Stato</TableHead>
-                                        <TableHead>Data</TableHead>
-                                        <TableHead>Commessa</TableHead>
-                                        <TableHead>Note / Materiale</TableHead>
-                                        <TableHead className="text-right">Azioni</TableHead>
+                                        <TableHead className="w-[50px] sm:w-[100px]">Stato</TableHead>
+                                        <TableHead className="hidden sm:table-cell">Data</TableHead>
+                                        <TableHead>Commessa / Note</TableHead>
+                                        <TableHead className="text-right w-[80px]">Azioni</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -157,44 +157,67 @@ export default function LoadNotesPage() {
                                         >
                                             <TableCell>
                                                 {note.status === 'pending' ? (
-                                                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200">
-                                                        DA PROCESSARE
-                                                    </Badge>
+                                                    <>
+                                                        {/* Mobile: icon only */}
+                                                        <span className="sm:hidden" title="Da processare">
+                                                            <Clock className="h-5 w-5 text-yellow-600" />
+                                                        </span>
+                                                        {/* Desktop: full badge */}
+                                                        <Badge variant="secondary" className="hidden sm:inline-flex bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200">
+                                                            DA PROCESSARE
+                                                        </Badge>
+                                                    </>
                                                 ) : (
-                                                    <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                                                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                                                        COMPLETATA
-                                                    </Badge>
+                                                    <>
+                                                        {/* Mobile: icon only */}
+                                                        <span className="sm:hidden" title="Completata">
+                                                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                                        </span>
+                                                        {/* Desktop: full badge */}
+                                                        <Badge variant="outline" className="hidden sm:inline-flex text-green-600 border-green-200 bg-green-50">
+                                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                                            COMPLETATA
+                                                        </Badge>
+                                                    </>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="font-medium">
+                                            <TableCell className="hidden sm:table-cell font-medium whitespace-nowrap">
                                                 {format(new Date(note.date), "dd MMM yyyy", { locale: it })}
                                             </TableCell>
                                             <TableCell>
-                                                {note.jobCode ? (
-                                                    <div className="flex flex-col">
-                                                        <span className="font-semibold text-sm">{note.jobCode}</span>
-                                                        <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={note.jobDescription}>
-                                                            {note.jobDescription}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-muted-foreground italic">Nessuna commessa</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="space-y-1">
-                                                    {note.notes && (
-                                                        <div className="flex items-start text-sm">
-                                                            <FileText className="h-3 w-3 mr-1 mt-1 text-muted-foreground shrink-0" />
-                                                            <span className="line-clamp-2">{note.notes}</span>
-                                                        </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                    {/* Mobile: show date inline */}
+                                                    <span className="sm:hidden text-[10px] text-muted-foreground">
+                                                        {format(new Date(note.date), "dd/MM/yy", { locale: it })}
+                                                    </span>
+                                                    {/* Job info */}
+                                                    {note.jobCode ? (
+                                                        <>
+                                                            {/* Mobile: only name */}
+                                                            <span className="sm:hidden text-sm font-medium truncate max-w-[150px]">
+                                                                {note.jobDescription || note.jobCode}
+                                                            </span>
+                                                            {/* Desktop: code + name */}
+                                                            <span className="hidden sm:inline font-semibold text-sm">{note.jobCode}</span>
+                                                            <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[200px]">
+                                                                {note.jobDescription}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-muted-foreground italic text-sm">Nessuna commessa</span>
                                                     )}
+                                                    {/* Notes - always visible when present */}
+                                                    {note.notes && (
+                                                        <span className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2">
+                                                            {note.notes}
+                                                        </span>
+                                                    )}
+                                                    {/* Desktop only: item count */}
                                                     {note.items.length > 0 && (
-                                                        <div className="flex items-center text-xs text-muted-foreground">
+                                                        <span className="hidden sm:flex items-center text-[10px] text-muted-foreground">
                                                             <Package className="h-3 w-3 mr-1" />
-                                                            {note.items.length} articoli: {note.items.map(i => i.inventoryName).join(", ").slice(0, 50)}...
-                                                        </div>
+                                                            {note.items.length} articoli
+                                                        </span>
                                                     )}
                                                 </div>
                                             </TableCell>
