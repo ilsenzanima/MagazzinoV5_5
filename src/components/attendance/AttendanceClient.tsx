@@ -341,7 +341,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                         Oggi
                     </Button>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center flex-wrap gap-2">
                     {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
 
                     <Button
