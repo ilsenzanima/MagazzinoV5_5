@@ -287,21 +287,21 @@ export default function NewLoadNotePage() {
                                         type="button"
                                         variant={noteType === 'uscita' ? 'default' : 'outline'}
                                         size="sm"
-                                        className={`h-8 px-2 ${noteType === 'uscita' ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
+                                        className={`h-8 px-3 text-xs ${noteType === 'uscita' ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
                                         onClick={() => setNoteType('uscita')}
                                     >
-                                        <ArrowUpRight className="h-4 w-4" />
-                                        <span className="hidden sm:inline ml-1 text-xs">Uscita</span>
+                                        <ArrowUpRight className="h-3 w-3 mr-1" />
+                                        Uscita
                                     </Button>
                                     <Button
                                         type="button"
                                         variant={noteType === 'reso' ? 'default' : 'outline'}
                                         size="sm"
-                                        className={`h-8 px-2 ${noteType === 'reso' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                        className={`h-8 px-3 text-xs ${noteType === 'reso' ? 'bg-green-600 hover:bg-green-700' : ''}`}
                                         onClick={() => setNoteType('reso')}
                                     >
-                                        <ArrowDownRight className="h-4 w-4" />
-                                        <span className="hidden sm:inline ml-1 text-xs">Reso</span>
+                                        <ArrowDownRight className="h-3 w-3 mr-1" />
+                                        Reso
                                     </Button>
                                 </div>
                             </div>

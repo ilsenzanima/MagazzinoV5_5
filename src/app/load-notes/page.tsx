@@ -97,7 +97,7 @@ export default function LoadNotesPage() {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col space-y-6">
+            <div className="flex flex-col space-y-6 overflow-x-hidden">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                     <div className="min-w-0">
                         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Note di Carico</h1>
