@@ -251,7 +251,7 @@ export default function NewLoadNotePage() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-4xl mx-auto pb-10">
+            <div className="max-w-4xl mx-auto pb-10 overflow-hidden">
                 {/* Header */}
                 <div className="mb-6">
                     <Link href="/load-notes" className="flex items-center text-muted-foreground hover:text-foreground mb-2">
@@ -327,7 +327,7 @@ export default function NewLoadNotePage() {
                             <div className="space-y-2 md:col-span-3">
                                 <Label>Note / Appunti {!selectedJob && <span className="text-destructive text-xs">*</span>}</Label>
                                 <Textarea
-                                    placeholder="Note libere (es. 'Materiale per il bagno del piano terra')..."
+                                    placeholder="Note libere..."
                                     className="h-24 resize-none"
                                     value={notes}
                                     onChange={e => setNotes(e.target.value)}
