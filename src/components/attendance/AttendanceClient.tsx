@@ -325,7 +325,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 w-full max-w-full overflow-x-hidden">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-card p-4 rounded-lg shadow-sm border dark:border-border">
                 <div className="flex items-center space-x-2">
                     <Button variant="outline" size="icon" onClick={handlePrevMonth}>
