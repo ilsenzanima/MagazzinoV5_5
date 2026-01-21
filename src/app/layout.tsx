@@ -59,7 +59,7 @@ export default function RootLayout({
   return (
     <html lang="it" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${lexend.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${lexend.variable} antialiased bg-background text-foreground overflow-x-hidden`}
       >
         <ThemeProvider
           attribute="class"
