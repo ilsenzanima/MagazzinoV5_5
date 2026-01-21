@@ -65,6 +65,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/movements",
           active: pathname === "/movements" || pathname.startsWith("/movements/"),
         },
+        {
+          label: "Note di Carico",
+          icon: ClipboardList,
+          href: "/load-notes",
+          active: pathname === "/load-notes" || pathname.startsWith("/load-notes/"),
+        },
       ]
     },
     {
