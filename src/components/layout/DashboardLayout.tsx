@@ -247,7 +247,7 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className={cn(
-        "flex-1 md:pl-64 flex flex-col min-h-screen transition-all pb-24 md:pb-0", // Added pb-24 for mobile nav space
+        "flex-1 md:pl-64 flex flex-col min-h-screen transition-all pb-24 md:pb-0 overflow-x-hidden w-full", // Added pb-24 for mobile nav space
         simulatedRole ? "pt-10" : ""
       )}>
 
