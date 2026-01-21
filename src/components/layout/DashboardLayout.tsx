@@ -247,7 +247,7 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className={cn(
-        "flex-1 md:pl-64 flex flex-col min-h-screen transition-all pb-24 md:pb-0 overflow-x-hidden w-full", // Added pb-24 for mobile nav space
+        "flex-1 md:pl-64 flex flex-col min-h-screen transition-all pb-24 md:pb-0 min-w-0", // min-w-0 prevents flex expansion
         simulatedRole ? "pt-10" : ""
       )}>
 
@@ -262,7 +262,7 @@ export default function DashboardLayout({
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 p-2 md:p-8 overflow-y-auto w-full max-w-full">
+        <main className="flex-1 p-2 md:p-8 overflow-y-auto overflow-x-hidden min-w-0">
           {children}
         </main>
 

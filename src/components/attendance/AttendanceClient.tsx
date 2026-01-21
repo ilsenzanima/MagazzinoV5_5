@@ -325,7 +325,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     };
 
     return (
-        <div className="space-y-6 w-full max-w-full">
+        <div className="space-y-4 min-w-0">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-card p-4 rounded-lg shadow-sm border dark:border-border">
                 <div className="flex items-center space-x-2">
                     <Button variant="outline" size="icon" onClick={handlePrevMonth}>
@@ -403,7 +403,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 )}
             </div>
 
-            <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border w-full">
+            <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border overflow-hidden">
                 <AttendanceMonthGrid
                     currentDate={currentDate}
                     workers={initialWorkers}
