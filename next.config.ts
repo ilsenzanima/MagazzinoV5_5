@@ -30,8 +30,9 @@ const nextConfig: NextConfig = {
       "script-src-elem 'self' 'unsafe-inline' https://vercel.live", // For Chrome's stricter CSP
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
-      "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.github.com https://raw.githubusercontent.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.openstreetmap.org https://*.tile.openstreetmap.org",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.github.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org",
+      "frame-src 'self' https://www.google.com https://maps.google.com https://*.openstreetmap.org", // For map embeds
       "worker-src 'self'", // For Service Worker
       "frame-ancestors 'none'",
       "base-uri 'self'",
