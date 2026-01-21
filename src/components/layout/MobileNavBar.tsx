@@ -9,7 +9,8 @@ import {
     Package,
     Menu,
     PlusCircle,
-    QrCode
+    QrCode,
+    FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,6 +81,12 @@ export function MobileNavBar({ onOpenMenu }: MobileNavBarProps) {
                             <Link href="/inventory" className="flex items-center gap-2 cursor-pointer p-3">
                                 <QrCode className="h-4 w-4" />
                                 <span>Scansiona / Inventario</span>
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href="/load-notes/new" className="flex items-center gap-2 cursor-pointer p-3">
+                                <FileText className="h-4 w-4" />
+                                <span>Nuova Nota di Carico</span>
                             </Link>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
