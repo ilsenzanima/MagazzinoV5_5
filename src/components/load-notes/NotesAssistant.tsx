@@ -34,13 +34,25 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
     const fetchNotes = async () => {
         setLoading(true);
         try {
-            // Fetch all notes then filter pending ones
-            // In real app, we would pass 'status: pending' to API
+            // Fetch ALL pending notes (not filtered by job)
             const allNotes = await loadNotesService.getAll({
-                jobId: currentJobId,
                 status: 'pending' // Only show pending notes in assistant
             });
-            setNotes(allNotes);
+
+            // Sort: matching job first, then notes without job, then by date
+            const sorted = allNotes.sort((a, b) => {
+                // If we have a currentJobId, prioritize those notes
+                if (currentJobId) {
+                    const aMatches = a.jobId === currentJobId;
+                    const bMatches = b.jobId === currentJobId;
+                    if (aMatches && !bMatches) return -1;
+                    if (!aMatches && bMatches) return 1;
+                }
+                // Then by date descending
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+            });
+
+            setNotes(sorted);
         } catch (error) {
             console.error("Failed to fetch notes", error);
         } finally {
