@@ -403,7 +403,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 )}
             </div>
 
-            <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border">
+            <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border w-full">
                 <AttendanceMonthGrid
                     currentDate={currentDate}
                     workers={initialWorkers}
