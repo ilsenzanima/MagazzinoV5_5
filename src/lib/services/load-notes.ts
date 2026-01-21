@@ -18,8 +18,9 @@ export const loadNotesService = {
         let query = supabase
             .from('load_notes_with_details')
             .select('*')
-            .order('status', { ascending: true }) // pending first
-            .order('date', { ascending: false });
+            .order('status', { ascending: false }) // 'pending' > 'completed' alphabetically, so descending puts pending first
+            .order('date', { ascending: false })
+            .order('job_description', { ascending: true, nullsFirst: false }); // job name, notes without job last
 
         if (filters?.status) {
             query = query.eq('status', filters.status);
