@@ -30,7 +30,9 @@ import {
     Trash2,
     Archive,
     RotateCcw,
-    User
+    User,
+    ArrowUpRight,
+    ArrowDownRight
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -192,30 +194,34 @@ export default function LoadNotesPage() {
                                                     <span className="sm:hidden text-[10px] text-muted-foreground">
                                                         {format(new Date(note.date), "dd/MM/yy", { locale: it })}
                                                     </span>
-                                                    {/* Job info */}
-                                                    {note.jobCode ? (
-                                                        <>
-                                                            {/* Mobile: only job name */}
-                                                            <span className="sm:hidden text-sm font-medium line-clamp-1">
+                                                    {/* Job info with type icon */}
+                                                    <div className="flex items-center gap-1">
+                                                        {/* Type icon */}
+                                                        <span title={note.noteType === 'reso' ? 'Reso' : 'Uscita'}>
+                                                            {note.noteType === 'reso' ? (
+                                                                <ArrowDownRight className="h-4 w-4 text-green-600 shrink-0" />
+                                                            ) : (
+                                                                <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
+                                                            )}
+                                                        </span>
+                                                        {/* Job name */}
+                                                        {note.jobCode ? (
+                                                            <span className="text-sm font-medium line-clamp-1 sm:truncate sm:max-w-[220px]" title={note.jobDescription}>
                                                                 {note.jobDescription || note.jobCode}
                                                             </span>
-                                                            {/* Desktop: only job name (no code) */}
-                                                            <span className="hidden sm:block font-semibold text-sm truncate max-w-[250px]" title={note.jobDescription}>
-                                                                {note.jobDescription || note.jobCode}
-                                                            </span>
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-muted-foreground italic text-sm">Nessuna commessa</span>
-                                                    )}
+                                                        ) : (
+                                                            <span className="text-muted-foreground italic text-sm">Nessuna commessa</span>
+                                                        )}
+                                                    </div>
                                                     {/* Notes - always visible when present */}
                                                     {note.notes && (
-                                                        <span className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2">
+                                                        <span className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2 pl-5">
                                                             {note.notes}
                                                         </span>
                                                     )}
                                                     {/* Desktop only: item count */}
                                                     {note.items.length > 0 && (
-                                                        <span className="hidden sm:flex items-center text-[10px] text-muted-foreground">
+                                                        <span className="hidden sm:flex items-center text-[10px] text-muted-foreground pl-5">
                                                             <Package className="h-3 w-3 mr-1" />
                                                             {note.items.length} articoli
                                                         </span>

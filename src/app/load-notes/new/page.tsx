@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Plus, Trash, Save, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash, Save, Search, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
@@ -45,6 +45,7 @@ export default function NewLoadNotePage() {
 
     // Form State - Header
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [noteType, setNoteType] = useState<'uscita' | 'reso'>('uscita');
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [notes, setNotes] = useState("");
 
@@ -210,6 +211,7 @@ export default function NewLoadNotePage() {
         try {
             await loadNotesService.create({
                 date,
+                noteType,
                 jobId: selectedJob?.id,
                 jobCode: selectedJob?.code,
                 jobDescription: selectedJob?.name,
@@ -276,6 +278,32 @@ export default function NewLoadNotePage() {
                                     value={date}
                                     onChange={e => setDate(e.target.value)}
                                 />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Tipo Nota</Label>
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        variant={noteType === 'uscita' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className={`flex-1 ${noteType === 'uscita' ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
+                                        onClick={() => setNoteType('uscita')}
+                                    >
+                                        <ArrowUpRight className="mr-1 h-4 w-4" />
+                                        Uscita
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={noteType === 'reso' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className={`flex-1 ${noteType === 'reso' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                        onClick={() => setNoteType('reso')}
+                                    >
+                                        <ArrowDownRight className="mr-1 h-4 w-4" />
+                                        Reso
+                                    </Button>
+                                </div>
                             </div>
 
                             <div className="space-y-2">
