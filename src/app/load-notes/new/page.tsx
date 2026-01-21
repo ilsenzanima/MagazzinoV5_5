@@ -282,25 +282,25 @@ export default function NewLoadNotePage() {
 
                             <div className="space-y-2">
                                 <Label>Tipo Nota</Label>
-                                <div className="flex gap-2">
+                                <div className="flex gap-1">
                                     <Button
                                         type="button"
                                         variant={noteType === 'uscita' ? 'default' : 'outline'}
                                         size="sm"
-                                        className={`flex-1 ${noteType === 'uscita' ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
+                                        className={`h-8 px-2 text-xs ${noteType === 'uscita' ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
                                         onClick={() => setNoteType('uscita')}
                                     >
-                                        <ArrowUpRight className="mr-1 h-4 w-4" />
+                                        <ArrowUpRight className="h-3 w-3 mr-1" />
                                         Uscita
                                     </Button>
                                     <Button
                                         type="button"
                                         variant={noteType === 'reso' ? 'default' : 'outline'}
                                         size="sm"
-                                        className={`flex-1 ${noteType === 'reso' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                        className={`h-8 px-2 text-xs ${noteType === 'reso' ? 'bg-green-600 hover:bg-green-700' : ''}`}
                                         onClick={() => setNoteType('reso')}
                                     >
-                                        <ArrowDownRight className="mr-1 h-4 w-4" />
+                                        <ArrowDownRight className="h-3 w-3 mr-1" />
                                         Reso
                                     </Button>
                                 </div>
