@@ -39,7 +39,7 @@ export default function AttendanceMonthGrid({
 
     return (
         <div className="border rounded-md overflow-x-auto scroll-shadow-x scroll-smooth-mobile">
-            <table className="w-full text-xs md:text-sm border-collapse bg-white dark:bg-card">
+            <table className="min-w-max text-xs md:text-sm border-collapse bg-white dark:bg-card">
                 <thead>
                     <tr>
                         <th className="sticky left-0 z-20 bg-gray-100 dark:bg-slate-800 p-2 text-left font-semibold border dark:border-slate-700 min-w-[150px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
