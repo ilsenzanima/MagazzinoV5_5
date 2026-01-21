@@ -132,5 +132,22 @@ export const loadNotesService = {
             n.id === id ? { ...n, status: newStatus as any } : n
         );
         return MOCK_NOTES.find(n => n.id === id);
+    },
+
+    toggleItemCheck: async (noteId: string, itemId: string, isChecked: boolean) => {
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        MOCK_NOTES = MOCK_NOTES.map(note => {
+            if (note.id === noteId) {
+                return {
+                    ...note,
+                    items: note.items.map(item =>
+                        item.id === itemId ? { ...item, isChecked } : item
+                    )
+                };
+            }
+            return note;
+        });
+        return MOCK_NOTES.find(n => n.id === noteId);
     }
 };

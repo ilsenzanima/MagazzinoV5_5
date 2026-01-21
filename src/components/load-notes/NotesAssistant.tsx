@@ -60,14 +60,25 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
         }
     };
 
-    const toggleCheck = (itemId: string) => {
+    const toggleCheck = async (noteId: string, itemId: string) => {
+        const isCurrentlyChecked = checkedItems.has(itemId);
+        const newChecked = !isCurrentlyChecked;
+
+        // Update local state immediately for responsiveness
         const next = new Set(checkedItems);
-        if (next.has(itemId)) {
-            next.delete(itemId);
-        } else {
+        if (newChecked) {
             next.add(itemId);
+        } else {
+            next.delete(itemId);
         }
         setCheckedItems(next);
+
+        // Persist to mock service (syncs with note detail page)
+        try {
+            await loadNotesService.toggleItemCheck(noteId, itemId, newChecked);
+        } catch (error) {
+            console.error("Failed to toggle item check", error);
+        }
     };
 
     return (
@@ -129,7 +140,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                                                 >
                                                     <Checkbox
                                                         checked={isChecked}
-                                                        onCheckedChange={() => toggleCheck(item.id)}
+                                                        onCheckedChange={() => toggleCheck(note.id, item.id)}
                                                     />
                                                     <div className={`flex-1 text-sm ${isChecked ? 'line-through text-muted-foreground' : ''}`}>
                                                         <span className="font-medium">{item.inventoryName}</span>
