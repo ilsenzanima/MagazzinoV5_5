@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Plus, Trash, Save, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash, Save, Search, Loader2, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
@@ -16,7 +16,7 @@ import { loadNotesService } from "@/lib/services/load-notes-mock";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { inventoryApi, jobsApi, InventoryItem, Job } from "@/lib/api";
-import { Checkbox } from "@/components/ui/checkbox";
+import { LoadNote, LoadNoteItem } from "@/lib/types";
 
 interface NoteLine {
     tempId: string;
@@ -29,11 +29,14 @@ interface NoteLine {
     coefficient: number;
     unit: string;
     isChecked?: boolean;
-    availableStock?: number;
+    availableStock?: number; // Stock disponibile
 }
 
-export default function NewLoadNotePage() {
+export default function EditLoadNotePage() {
+    const params = useParams();
     const router = useRouter();
+    const noteId = params.id as string;
+
     const [isLoading, setIsLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [itemsLoading, setItemsLoading] = useState(false);
@@ -69,11 +72,46 @@ export default function NewLoadNotePage() {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [noteId]);
 
     const loadData = async () => {
         try {
             setInitialLoading(true);
+
+            // Load note data
+            const noteData = await loadNotesService.getById(noteId);
+            if (noteData) {
+                setDate(noteData.date);
+                setNotes(noteData.notes || "");
+
+                // Convert items to NoteLine format
+                const existingLines: NoteLine[] = noteData.items.map(item => ({
+                    tempId: item.id,
+                    itemId: item.inventoryId,
+                    itemName: item.inventoryName,
+                    itemModel: item.inventoryModel,
+                    itemCode: item.inventoryCode,
+                    pieces: item.pieces || item.quantity,
+                    quantity: item.quantity,
+                    coefficient: item.coefficient || 1,
+                    unit: item.inventoryUnit || "PZ",
+                    isChecked: item.isChecked,
+                    availableStock: undefined // Will be loaded
+                }));
+                setLines(existingLines);
+
+                // Load job if exists
+                if (noteData.jobId) {
+                    // Try to find job in list or set basic info
+                    setSelectedJob({
+                        id: noteData.jobId,
+                        code: noteData.jobCode || "",
+                        name: noteData.jobDescription || ""
+                    } as Job);
+                }
+            }
+
+            // Load inventory and jobs
             const [inventoryData, jobsData] = await Promise.all([
                 inventoryApi.getPaginated({ page: 1, limit: 50 }),
                 jobsApi.getPaginated({ page: 1, limit: 50, status: 'active' })
@@ -82,6 +120,7 @@ export default function NewLoadNotePage() {
             setJobs(jobsData.data);
         } catch (error) {
             console.error("Failed to load data", error);
+            toast.error("Errore nel caricamento della nota");
         } finally {
             setInitialLoading(false);
         }
@@ -208,7 +247,7 @@ export default function NewLoadNotePage() {
 
         setIsLoading(true);
         try {
-            await loadNotesService.create({
+            await loadNotesService.update(noteId, {
                 date,
                 jobId: selectedJob?.id,
                 jobCode: selectedJob?.code,
@@ -224,12 +263,12 @@ export default function NewLoadNotePage() {
                     quantity: l.quantity,
                     pieces: l.pieces,
                     coefficient: l.coefficient,
-                    isChecked: false
+                    isChecked: l.isChecked || false
                 }))
             });
 
-            toast.success("Nota creata con successo");
-            router.push("/load-notes");
+            toast.success("Nota aggiornata con successo");
+            router.push(`/load-notes/${noteId}`);
         } catch (error) {
             toast.error("Errore durante il salvataggio");
         } finally {
@@ -252,13 +291,13 @@ export default function NewLoadNotePage() {
             <div className="max-w-4xl mx-auto pb-10">
                 {/* Header */}
                 <div className="mb-6">
-                    <Link href="/load-notes" className="flex items-center text-muted-foreground hover:text-foreground mb-2">
+                    <Link href={`/load-notes/${noteId}`} className="flex items-center text-muted-foreground hover:text-foreground mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        Torna alle Note
+                        Torna al Dettaglio
                     </Link>
-                    <h1 className="text-2xl font-bold">Nuova Nota di Carico</h1>
+                    <h1 className="text-2xl font-bold">Modifica Nota di Carico</h1>
                     <p className="text-muted-foreground text-sm">
-                        Inserisci il materiale prelevato. Non scarica il magazzino.
+                        Modifica i dati della nota e i materiali.
                     </p>
                 </div>
 
@@ -285,14 +324,24 @@ export default function NewLoadNotePage() {
                                     onClick={() => setIsJobSelectorOpen(true)}
                                 >
                                     {selectedJob ? (
-                                        <div className="flex flex-col overflow-hidden">
+                                        <div className="flex flex-col overflow-hidden flex-1">
                                             <span className="font-medium text-sm truncate">{selectedJob.code}</span>
                                             <span className="text-[10px] text-muted-foreground truncate">{selectedJob.name}</span>
                                         </div>
                                     ) : (
                                         <span className="text-sm text-muted-foreground">Seleziona commessa...</span>
                                     )}
-                                    <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                    {selectedJob ? (
+                                        <X
+                                            className="h-4 w-4 text-muted-foreground hover:text-destructive flex-shrink-0"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedJob(null);
+                                            }}
+                                        />
+                                    ) : (
+                                        <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                    )}
                                 </div>
                             </div>
 
@@ -450,7 +499,7 @@ export default function NewLoadNotePage() {
                     </Card>
 
                     <div className="flex justify-end gap-4">
-                        <Link href="/load-notes">
+                        <Link href={`/load-notes/${noteId}`}>
                             <Button variant="outline" type="button">Annulla</Button>
                         </Link>
                         <Button onClick={handleSave} disabled={!isValid || isLoading} className="w-32">
