@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
-import { loadNotesService } from "@/lib/services/load-notes-mock";
+import { loadNotesService } from "@/lib/services/load-notes";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { inventoryApi, jobsApi, InventoryItem, Job } from "@/lib/api";
@@ -213,20 +213,11 @@ export default function NewLoadNotePage() {
                 date,
                 noteType,
                 jobId: selectedJob?.id,
-                jobCode: selectedJob?.code,
-                jobDescription: selectedJob?.name,
                 notes,
                 items: lines.map(l => ({
-                    id: l.tempId,
                     inventoryId: l.itemId,
-                    inventoryName: l.itemName,
-                    inventoryModel: l.itemModel,
-                    inventoryCode: l.itemCode,
-                    inventoryUnit: l.unit,
                     quantity: l.quantity,
-                    pieces: l.pieces,
-                    coefficient: l.coefficient,
-                    isChecked: false
+                    pieces: l.pieces
                 }))
             });
 

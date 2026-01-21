@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { loadNotesService } from "@/lib/services/load-notes-mock";
+import { loadNotesService } from "@/lib/services/load-notes";
 import { LoadNote, LoadNoteItem } from "@/lib/types";
 import { FileText, Loader2, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

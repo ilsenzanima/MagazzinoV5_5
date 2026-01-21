@@ -37,7 +37,7 @@ import {
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { LoadNote } from "@/lib/types";
-import { loadNotesService } from "@/lib/services/load-notes-mock";
+import { loadNotesService } from "@/lib/services/load-notes";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
