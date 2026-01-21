@@ -355,6 +355,7 @@ export interface LoadNoteItem {
 export interface LoadNote {
     id: string;
     date: string;
+    noteType: 'uscita' | 'reso'; // uscita = material going out, reso = material returning
     jobId?: string;
     jobCode?: string;
     jobDescription?: string;

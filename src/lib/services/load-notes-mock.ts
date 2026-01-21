@@ -5,6 +5,7 @@ let MOCK_NOTES: LoadNote[] = [
     {
         id: "1",
         date: new Date().toISOString().split('T')[0],
+        noteType: "uscita",
         jobId: "job-1",
         jobCode: "2024-001",
         jobDescription: "Ristrutturazione Villa Rossi",
@@ -35,6 +36,7 @@ let MOCK_NOTES: LoadNote[] = [
     {
         id: "2",
         date: "2024-01-15",
+        noteType: "reso",
         jobId: "job-2",
         jobCode: "2024-002",
         jobDescription: "Nuovo Impianto Elettrico Bianchi",
