@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { loadNotesService } from "@/lib/services/load-notes";
 import { LoadNote, LoadNoteItem } from "@/lib/types";
-import { FileText, Loader2, PlusCircle } from "lucide-react";
+import { FileText, Loader2, PlusCircle, ArrowDownRight, ArrowUpRight, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 
 interface NotesAssistantProps {
     isOpen: boolean;
@@ -21,6 +22,7 @@ interface NotesAssistantProps {
 export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: NotesAssistantProps) {
     const [notes, setNotes] = useState<LoadNote[]>([]);
     const [loading, setLoading] = useState(false);
+    const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
 
     // We keep track of checked items locally for the session
     const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
@@ -40,9 +42,11 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                 jobId: currentJobId // Filter by job if provided
             });
 
-            // Sort by date descending
+            // Sort by date descending, then by job name
             const sorted = allNotes.sort((a, b) => {
-                return new Date(b.date).getTime() - new Date(a.date).getTime();
+                const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+                if (dateCompare !== 0) return dateCompare;
+                return (a.jobDescription || '').localeCompare(b.jobDescription || '');
             });
 
             setNotes(sorted);
@@ -66,7 +70,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
         }
         setCheckedItems(next);
 
-        // Persist to mock service (syncs with note detail page)
+        // Persist to service (syncs with note detail page)
         try {
             await loadNotesService.toggleItemCheck(noteId, itemId, newChecked);
         } catch (error) {
@@ -74,10 +78,20 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
         }
     };
 
+    const toggleExpanded = (noteId: string) => {
+        const next = new Set(expandedNotes);
+        if (next.has(noteId)) {
+            next.delete(noteId);
+        } else {
+            next.add(noteId);
+        }
+        setExpandedNotes(next);
+    };
+
     return (
         <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0 gap-0">
-                <SheetHeader className="p-6 pb-2 border-b">
+            <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
+                <SheetHeader className="p-6 pb-4 border-b">
                     <SheetTitle>Assistente Note di Carico</SheetTitle>
                     <SheetDescription>
                         {currentJobId
@@ -86,7 +100,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                     </SheetDescription>
                 </SheetHeader>
 
-                <div className="flex-1 p-6 overflow-y-auto">
+                <div className="flex-1 p-4 overflow-y-auto">
                     {loading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -97,78 +111,106 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                             <p>Nessuna nota attiva trovata.</p>
                         </div>
                     ) : (
-                        <div className="space-y-6">
-                            {notes.map(note => (
-                                <div key={note.id} className="border rounded-lg p-4 bg-card shadow-sm">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <div className="text-sm text-muted-foreground mb-1">
-                                                {format(new Date(note.date), "d MMM yyyy", { locale: it })}
-                                            </div>
-                                            {note.jobDescription ? (
-                                                <Badge variant="outline" className="mb-2 text-xs">
-                                                    {note.jobDescription}
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="secondary" className="mb-2 text-xs">
-                                                    Appunto generico
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    </div>
+                        <div className="space-y-2">
+                            {notes.map(note => {
+                                const isExpanded = expandedNotes.has(note.id);
+                                const uncheckedCount = note.items.filter(i => !checkedItems.has(i.id) && !i.isChecked).length;
 
-                                    {note.notes && (
-                                        <div className="bg-muted/30 p-2 rounded text-sm italic mb-4 border-l-2 border-primary/20 text-muted-foreground">
-                                            "{note.notes}"
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-2">
-                                        {note.items.map(item => {
-                                            const isChecked = checkedItems.has(item.id) || item.isChecked;
-                                            return (
-                                                <div
-                                                    key={item.id}
-                                                    className={`
-                                                        flex items-center gap-3 p-2 rounded border 
-                                                        transition-colors
-                                                        ${isChecked ? 'bg-muted/50 border-transparent' : 'bg-background hover:border-primary/50'}
-                                                    `}
-                                                >
-                                                    <Checkbox
-                                                        checked={isChecked}
-                                                        onCheckedChange={() => toggleCheck(note.id, item.id)}
-                                                    />
-                                                    <div className={`flex-1 text-sm ${isChecked ? 'line-through text-muted-foreground' : ''}`}>
-                                                        <span className="font-medium">{item.inventoryName}</span>
-                                                        <span className="text-xs text-muted-foreground ml-1">({item.inventoryModel})</span>
-                                                    </div>
-                                                    <div className={`text-sm font-semibold whitespace-nowrap ${isChecked ? 'text-muted-foreground' : ''}`}>
-                                                        {item.quantity} {item.inventoryUnit}
-                                                    </div>
-                                                    {onUseItem && !isChecked && (
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-6 w-6 text-primary"
-                                                            title="Usa in DDT"
-                                                            onClick={() => onUseItem(item)}
-                                                        >
-                                                            <PlusCircle className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
+                                return (
+                                    <Collapsible key={note.id} open={isExpanded} onOpenChange={() => toggleExpanded(note.id)}>
+                                        <CollapsibleTrigger asChild>
+                                            <div className="flex items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors">
+                                                {/* Type Icon */}
+                                                <div className={`flex-shrink-0 p-1.5 rounded ${note.noteType === 'uscita' ? 'bg-amber-500/10 text-amber-600' : 'bg-green-500/10 text-green-600'}`}>
+                                                    {note.noteType === 'uscita'
+                                                        ? <ArrowUpRight className="h-4 w-4" />
+                                                        : <ArrowDownRight className="h-4 w-4" />
+                                                    }
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
+
+                                                {/* Date and Job */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {format(new Date(note.date), "d MMM", { locale: it })}
+                                                        </span>
+                                                        {uncheckedCount > 0 && (
+                                                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                                                {uncheckedCount}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="font-medium text-sm truncate">
+                                                        {note.jobDescription || note.notes || "Appunto generico"}
+                                                    </div>
+                                                </div>
+
+                                                {/* Chevron */}
+                                                <div className="flex-shrink-0 text-muted-foreground">
+                                                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                                </div>
+                                            </div>
+                                        </CollapsibleTrigger>
+
+                                        <CollapsibleContent>
+                                            <div className="ml-4 pl-4 border-l-2 border-muted mt-1 space-y-1">
+                                                {note.notes && (
+                                                    <div className="text-xs italic text-muted-foreground py-1 px-2">
+                                                        "{note.notes}"
+                                                    </div>
+                                                )}
+                                                {note.items.map(item => {
+                                                    const isChecked = checkedItems.has(item.id) || item.isChecked;
+                                                    return (
+                                                        <div
+                                                            key={item.id}
+                                                            className={`
+                                                                flex items-center gap-2 p-2 rounded border text-sm
+                                                                transition-colors
+                                                                ${isChecked ? 'bg-muted/30 border-transparent opacity-60' : 'bg-background hover:border-primary/50'}
+                                                            `}
+                                                        >
+                                                            <Checkbox
+                                                                checked={isChecked}
+                                                                onCheckedChange={() => toggleCheck(note.id, item.id)}
+                                                            />
+                                                            <div className={`flex-1 min-w-0 ${isChecked ? 'line-through text-muted-foreground' : ''}`}>
+                                                                <span className="font-medium">{item.inventoryName}</span>
+                                                                {item.inventoryModel && (
+                                                                    <span className="text-xs text-muted-foreground ml-1">({item.inventoryModel})</span>
+                                                                )}
+                                                            </div>
+                                                            <div className={`text-xs font-semibold whitespace-nowrap ${isChecked ? 'text-muted-foreground' : ''}`}>
+                                                                {item.quantity} {item.inventoryUnit}
+                                                            </div>
+                                                            {onUseItem && !isChecked && (
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-6 w-6 text-primary flex-shrink-0"
+                                                                    title="Usa in DDT"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onUseItem(item);
+                                                                    }}
+                                                                >
+                                                                    <PlusCircle className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </CollapsibleContent>
+                                    </Collapsible>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
 
                 <div className="p-4 border-t bg-muted/20 text-xs text-center text-muted-foreground">
-                    I flag sono solo visivi per aiutarti nella compilazione.
+                    Clicca su una nota per vedere il contenuto
                 </div>
             </SheetContent>
         </Sheet>
