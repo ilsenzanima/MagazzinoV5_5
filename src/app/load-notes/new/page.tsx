@@ -412,12 +412,12 @@ export default function NewLoadNotePage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[220px]">Materiale</TableHead>
-                                            <TableHead className="text-center w-[80px]">Pezzi</TableHead>
-                                            <TableHead className="text-right w-[100px]">Q.tà Tot.</TableHead>
-                                            <TableHead className="text-right w-[80px]">Giacenza</TableHead>
-                                            <TableHead className="text-right w-[90px]">Da Ordinare</TableHead>
-                                            <TableHead className="w-[50px]"></TableHead>
+                                            <TableHead>Materiale</TableHead>
+                                            <TableHead className="text-center w-[60px]">Pezzi</TableHead>
+                                            <TableHead className="text-right w-[80px]">Q.tà</TableHead>
+                                            <TableHead className="hidden sm:table-cell text-right w-[70px]">Giacenza</TableHead>
+                                            <TableHead className="hidden sm:table-cell text-right w-[80px]">Da Ord.</TableHead>
+                                            <TableHead className="w-[40px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -435,22 +435,21 @@ export default function NewLoadNotePage() {
                                                 return (
                                                     <TableRow key={line.tempId}>
                                                         <TableCell>
-                                                            <div className="font-medium">
+                                                            <div className="font-medium text-sm truncate max-w-[150px] sm:max-w-none">
                                                                 {line.itemName}
-                                                                {line.itemModel && <span className="text-muted-foreground font-normal ml-1">({line.itemModel})</span>}
                                                             </div>
-                                                            <div className="text-xs text-muted-foreground font-mono">{line.itemCode}</div>
+                                                            <div className="text-xs text-muted-foreground font-mono truncate">{line.itemCode}</div>
                                                         </TableCell>
                                                         <TableCell className="text-center font-medium">
                                                             {line.pieces}
                                                         </TableCell>
-                                                        <TableCell className="text-right font-bold">
+                                                        <TableCell className="text-right font-bold text-sm">
                                                             {line.quantity} <span className="text-muted-foreground text-xs font-normal">{line.unit}</span>
                                                         </TableCell>
-                                                        <TableCell className={`text-right ${line.availableStock !== undefined && line.availableStock < line.quantity ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                                        <TableCell className={`hidden sm:table-cell text-right ${line.availableStock !== undefined && line.availableStock < line.quantity ? 'text-amber-600' : 'text-muted-foreground'}`}>
                                                             {line.availableStock !== undefined ? line.availableStock : '-'}
                                                         </TableCell>
-                                                        <TableCell className="text-right">
+                                                        <TableCell className="hidden sm:table-cell text-right">
                                                             {shortage > 0 ? (
                                                                 <span className="text-destructive font-bold">+{shortage}</span>
                                                             ) : (
