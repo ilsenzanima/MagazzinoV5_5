@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Loader2, ArrowDownRight, ArrowUpRight, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Save, Loader2, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText } from "lucide-react";
 import Link from "next/link";
 import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
@@ -15,6 +15,9 @@ import { MovementLinesInput } from "./form/MovementLinesInput";
 import { MovementLinesList } from "./form/MovementLinesList";
 import { MovementFooter } from "./form/MovementFooter";
 import { MovementJobInventory } from "./form/MovementJobInventory";
+import { NotesAssistant } from "@/components/load-notes/NotesAssistant";
+import { LoadNoteItem } from "@/lib/types";
+import { useState } from "react";
 
 interface NewMovementContentProps {
     initialInventory: InventoryItem[];
@@ -24,8 +27,24 @@ interface NewMovementContentProps {
 
 export default function NewMovementContent({ initialInventory, initialJobs, initialNote }: NewMovementContentProps) {
     const { userRole } = useAuth();
+    const [isNotesAssistantOpen, setIsNotesAssistantOpen] = useState(false);
 
     const form = useMovementForm({ initialInventory, initialJobs, initialNote });
+
+    // Handler when user selects an item from Notes Assistant
+    const handleUseNoteItem = (item: LoadNoteItem) => {
+        // Find the item in inventory to get full details
+        const inventoryItem = form.inventory.find(inv => inv.id === item.inventoryId);
+        if (inventoryItem) {
+            form.handleItemSelect(inventoryItem);
+            // Pre-fill quantity from note
+            form.setCurrentLine(prev => ({
+                ...prev,
+                pieces: item.pieces?.toString() || '',
+                quantity: item.quantity?.toString() || ''
+            }));
+        }
+    };
 
     if (userRole === 'user') {
         return (
@@ -170,7 +189,17 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                        I will stick to the same layout.
                     */}
                     <div className="space-y-6">
-                        {/* Potential place for Totals or Instructions */}
+                        {/* Notes Assistant Button */}
+                        <Button
+                            variant="outline"
+                            className="w-full justify-start gap-2"
+                            onClick={() => setIsNotesAssistantOpen(true)}
+                        >
+                            <FileText className="h-4 w-4" />
+                            Assistente Note di Carico
+                        </Button>
+
+                        {/* Riepilogo */}
                         <div className="bg-slate-50 dark:bg-muted p-4 rounded-lg border dark:border-border text-sm text-slate-500 dark:text-slate-400">
                             <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Riepilogo</h4>
                             <p>Righe inserite: {form.lines.length}</p>
@@ -180,6 +209,14 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                     </div>
                 </div>
             </Tabs>
+
+            {/* Notes Assistant Sheet */}
+            <NotesAssistant
+                isOpen={isNotesAssistantOpen}
+                onClose={() => setIsNotesAssistantOpen(false)}
+                currentJobId={form.selectedJob?.id}
+                onUseItem={handleUseNoteItem}
+            />
         </div>
     );
 }
