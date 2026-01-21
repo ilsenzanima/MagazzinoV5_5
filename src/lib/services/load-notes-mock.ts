@@ -28,6 +28,8 @@ let MOCK_NOTES: LoadNote[] = [
                 isChecked: false
             }
         ],
+        createdBy: "user-1",
+        createdByName: "Mario Rossi",
         createdAt: new Date().toISOString()
     },
     {
@@ -48,6 +50,8 @@ let MOCK_NOTES: LoadNote[] = [
                 isChecked: true
             }
         ],
+        createdBy: "user-2",
+        createdByName: "Luigi Verdi",
         createdAt: "2024-01-15T10:00:00Z"
     }
 ];

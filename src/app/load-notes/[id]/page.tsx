@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Edit, Trash2, Archive, RotateCcw, Loader2, Package, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Archive, RotateCcw, Loader2, Package, CheckCircle2, User } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { LoadNote } from "@/lib/types";
@@ -162,11 +162,16 @@ export default function LoadNoteDetailPage() {
                         </div>
                         <div>
                             <span className="text-muted-foreground">Commessa:</span>
-                            {note.jobCode ? (
-                                <span className="ml-2 font-medium">{note.jobCode} - {note.jobDescription}</span>
+                            {note.jobDescription ? (
+                                <span className="ml-2 font-medium">{note.jobDescription}</span>
                             ) : (
                                 <span className="ml-2 text-muted-foreground italic">Nessuna commessa</span>
                             )}
+                        </div>
+                        <div className="flex items-center">
+                            <User className="h-4 w-4 text-muted-foreground mr-1" />
+                            <span className="text-muted-foreground">Creata da:</span>
+                            <span className="ml-2 font-medium">{note.createdByName || 'Sconosciuto'}</span>
                         </div>
                         {note.notes && (
                             <div className="md:col-span-2">

@@ -362,5 +362,6 @@ export interface LoadNote {
     notes?: string;
     status: 'pending' | 'completed' | 'archived'; // 'pending' = da processare
     createdBy?: string;
+    createdByName?: string; // Display name of creator
     createdAt?: string;
 }
