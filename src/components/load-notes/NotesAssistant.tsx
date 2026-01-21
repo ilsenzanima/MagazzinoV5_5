@@ -105,9 +105,9 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                                             <div className="text-sm text-muted-foreground mb-1">
                                                 {format(new Date(note.date), "d MMM yyyy", { locale: it })}
                                             </div>
-                                            {note.jobCode ? (
+                                            {note.jobDescription ? (
                                                 <Badge variant="outline" className="mb-2 text-xs">
-                                                    {note.jobCode}
+                                                    {note.jobDescription}
                                                 </Badge>
                                             ) : (
                                                 <Badge variant="secondary" className="mb-2 text-xs">

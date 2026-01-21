@@ -73,7 +73,6 @@ export default function RootLayout({
             <ServiceWorkerRegistration />
             {children}
             <Toaster />
-            <PWAInstallPrompt />
           </AuthProvider>
         </ThemeProvider>
       </body>
