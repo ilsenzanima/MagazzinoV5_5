@@ -29,7 +29,8 @@ import {
     Clock,
     Trash2,
     Archive,
-    RotateCcw
+    RotateCcw,
+    User
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -142,10 +143,11 @@ export default function LoadNotesPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="w-[50px] sm:w-[100px]">Stato</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Data</TableHead>
+                                        <TableHead className="w-[40px] sm:w-[100px]">Stato</TableHead>
+                                        <TableHead className="hidden sm:table-cell w-[100px]">Data</TableHead>
                                         <TableHead>Commessa / Note</TableHead>
-                                        <TableHead className="text-right w-[80px]">Azioni</TableHead>
+                                        <TableHead className="hidden md:table-cell w-[120px]">Autore</TableHead>
+                                        <TableHead className="text-right w-[70px] sm:w-[80px]">Azioni</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -193,14 +195,13 @@ export default function LoadNotesPage() {
                                                     {/* Job info */}
                                                     {note.jobCode ? (
                                                         <>
-                                                            {/* Mobile: only name */}
-                                                            <span className="sm:hidden text-sm font-medium truncate max-w-[150px]">
+                                                            {/* Mobile: only job name */}
+                                                            <span className="sm:hidden text-sm font-medium line-clamp-1">
                                                                 {note.jobDescription || note.jobCode}
                                                             </span>
-                                                            {/* Desktop: code + name */}
-                                                            <span className="hidden sm:inline font-semibold text-sm">{note.jobCode}</span>
-                                                            <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[200px]">
-                                                                {note.jobDescription}
+                                                            {/* Desktop: only job name (no code) */}
+                                                            <span className="hidden sm:block font-semibold text-sm truncate max-w-[250px]" title={note.jobDescription}>
+                                                                {note.jobDescription || note.jobCode}
                                                             </span>
                                                         </>
                                                     ) : (
@@ -219,6 +220,13 @@ export default function LoadNotesPage() {
                                                             {note.items.length} articoli
                                                         </span>
                                                     )}
+                                                </div>
+                                            </TableCell>
+                                            {/* Creator column - desktop only */}
+                                            <TableCell className="hidden md:table-cell">
+                                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                                    <User className="h-3 w-3" />
+                                                    <span className="truncate max-w-[100px]">{note.createdByName || '-'}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right">
