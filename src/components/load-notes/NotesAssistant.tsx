@@ -34,21 +34,14 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
     const fetchNotes = async () => {
         setLoading(true);
         try {
-            // Fetch ALL pending notes (not filtered by job)
+            // Fetch pending notes, filtered by job if currentJobId is provided
             const allNotes = await loadNotesService.getAll({
-                status: 'pending' // Only show pending notes in assistant
+                status: 'pending',
+                jobId: currentJobId // Filter by job if provided
             });
 
-            // Sort: matching job first, then notes without job, then by date
+            // Sort by date descending
             const sorted = allNotes.sort((a, b) => {
-                // If we have a currentJobId, prioritize those notes
-                if (currentJobId) {
-                    const aMatches = a.jobId === currentJobId;
-                    const bMatches = b.jobId === currentJobId;
-                    if (aMatches && !bMatches) return -1;
-                    if (!aMatches && bMatches) return 1;
-                }
-                // Then by date descending
                 return new Date(b.date).getTime() - new Date(a.date).getTime();
             });
 
@@ -112,9 +105,13 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                                             <div className="text-sm text-muted-foreground mb-1">
                                                 {format(new Date(note.date), "d MMM yyyy", { locale: it })}
                                             </div>
-                                            {!currentJobId && note.jobCode && (
-                                                <Badge variant="outline" className="mb-2">
+                                            {note.jobCode ? (
+                                                <Badge variant="outline" className="mb-2 text-xs">
                                                     {note.jobCode}
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="secondary" className="mb-2 text-xs">
+                                                    Appunto generico
                                                 </Badge>
                                             )}
                                         </div>
