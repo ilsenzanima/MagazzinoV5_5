@@ -49,7 +49,7 @@ export function LeaveRequestForm({ workers, onSuccess }: LeaveRequestFormProps) 
 
     const workerOptions = workers.map(w => ({
         value: w.id,
-        label: `${w.first_name} ${w.last_name || ''}`.trim(),
+        label: `${w.firstName} ${w.lastName || ''}`.trim(),
     }))
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
