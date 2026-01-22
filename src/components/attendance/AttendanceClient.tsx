@@ -12,7 +12,8 @@ import AttendanceInfoPopup from "./AttendanceInfoPopup";
 import { CourseQuickSelectDialog } from "./CourseQuickSelectDialog";
 import { generateMonthlyReport } from "./report-generator";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Users, FileDown, Filter, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Users, FileDown, Filter, X, FilePlus } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -352,6 +353,13 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                         <FileDown className="h-4 w-4" />
                         PDF
                     </Button>
+
+                    <Link href="/attendance/request">
+                        <Button variant="outline" className="gap-2">
+                            <FilePlus className="h-4 w-4" />
+                            Richiesta Permesso
+                        </Button>
+                    </Link>
 
                     {canEdit && (
                         <Button onClick={() => setIsBulkModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
