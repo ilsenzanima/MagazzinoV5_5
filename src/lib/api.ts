@@ -8,3 +8,5 @@ export * from './services';
 // We leave mock-data separate as it's not strictly part of the API definition but data.
 import { InventoryItem, User } from './types';
 export type { InventoryItem, User };
+
+export * from './services/leave-requests';
