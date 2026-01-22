@@ -27,7 +27,7 @@ import { leaveRequestsApi } from "@/lib/api"
 const formSchema = z.object({
     workerId: z.string().min(1, "Seleziona un dipendente"),
     date: z.string().min(1, "Seleziona una data"),
-    hours: z.coerce.number().min(1, "Minimo 1 ora").max(24, "Massimo 24 ore"),
+    hours: z.number().min(1, "Minimo 1 ora").max(24, "Massimo 24 ore"),
 })
 
 interface LeaveRequestFormProps {
