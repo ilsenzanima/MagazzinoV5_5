@@ -99,7 +99,16 @@ export function LeaveRequestForm({ workers, onSuccess }: LeaveRequestFormProps) 
                             <FormItem>
                                 <FormLabel>Ore</FormLabel>
                                 <FormControl>
-                                    <Input type="number" min={1} max={24} {...field} />
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        max={24}
+                                        value={field.value}
+                                        onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                                        onBlur={field.onBlur}
+                                        name={field.name}
+                                        ref={field.ref}
+                                    />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
