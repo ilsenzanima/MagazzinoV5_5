@@ -82,11 +82,22 @@ export async function generateLeaveRequestPDF(request: LeaveRequest): Promise<vo
     const daysDiff = differenceInDays(endDate, startDate);
 
     // Generate text like "23 Gennaio 2026" or range
+    // Logic: 
+    // IF single day:
+    //    IF hours != 8 -> "23 Gennaio 2026 (4 ore)"
+    //    ELSE -> "23 Gennaio 2026"
+    // ELSE (range):
+    //    "Dal 23 Gennaio 2026 al 25 Gennaio 2026"
+
     let daysText = "";
     if (daysDiff === 0) {
         daysText = format(startDate, 'd MMMM yyyy', { locale: it });
         // Capitalize month
         daysText = daysText.replace(/(\s[a-z])/, (match) => match.toUpperCase());
+
+        if (request.hours !== 8) {
+            daysText += ` (${request.hours} ore)`;
+        }
     } else {
         const startStr = format(startDate, 'd MMMM yyyy', { locale: it });
         const endStr = format(endDate, 'd MMMM yyyy', { locale: it });
