@@ -1,13 +1,14 @@
 "use client"
 
-import { format } from "date-fns"
+import { format, isSameDay } from "date-fns"
 import { it } from "date-fns/locale"
-import { FileText, User, Calendar, Clock, Trash2 } from "lucide-react"
+import { FileText, User, Calendar, Clock, Trash2, ArrowRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { LeaveRequest } from "@/lib/services/leave-requests"
 import { toast } from "sonner"
 import { leaveRequestsApi } from "@/lib/api"
+import { generateLeaveRequestPDF } from "@/lib/pdf/leave-request-pdf"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -28,10 +29,14 @@ interface LeaveRequestListProps {
 
 export function LeaveRequestList({ requests, isAdmin, onDelete }: LeaveRequestListProps) {
 
-    const handleCardClick = (req: LeaveRequest) => {
-        toast.info("Generazione PDF in arrivo...", {
-            description: `Richiesta permessi per ${req.worker?.first_name}`
-        })
+    const handleCardClick = async (req: LeaveRequest) => {
+        try {
+            await generateLeaveRequestPDF(req)
+            toast.success("PDF generato!")
+        } catch (error) {
+            console.error("PDF generation error:", error)
+            toast.error("Errore generazione PDF")
+        }
     }
 
     const handleDelete = async (e: React.MouseEvent, req: LeaveRequest) => {
@@ -44,6 +49,22 @@ export function LeaveRequestList({ requests, isAdmin, onDelete }: LeaveRequestLi
             console.error(error)
             toast.error("Errore durante l'eliminazione")
         }
+    }
+
+    const formatDateRange = (startDate: string, endDate: string) => {
+        const start = new Date(startDate)
+        const end = new Date(endDate)
+
+        if (isSameDay(start, end)) {
+            return format(start, "d MMM yyyy", { locale: it })
+        }
+        return (
+            <span className="flex items-center gap-1">
+                {format(start, "d MMM", { locale: it })}
+                <ArrowRight className="h-3 w-3" />
+                {format(end, "d MMM yyyy", { locale: it })}
+            </span>
+        )
     }
 
     if (requests.length === 0) {
@@ -77,14 +98,12 @@ export function LeaveRequestList({ requests, isAdmin, onDelete }: LeaveRequestLi
 
                         <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                             <Calendar className="h-4 w-4 opacity-70" />
-                            <span>
-                                {format(new Date(req.date), "d MMM yyyy", { locale: it })}
-                            </span>
+                            {formatDateRange(req.date, req.end_date || req.date)}
                         </div>
 
                         <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                             <Clock className="h-4 w-4 opacity-70" />
-                            <span>{req.hours} ore</span>
+                            <span>{req.hours} ore/giorno</span>
                         </div>
 
                         {isAdmin && (

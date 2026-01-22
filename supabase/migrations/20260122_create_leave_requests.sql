@@ -3,6 +3,7 @@ create table if not exists public.leave_requests (
     id uuid not null default gen_random_uuid(),
     worker_id uuid not null references public.workers(id) on delete cascade,
     date date not null,
+    end_date date not null,
     hours numeric not null default 8,
     requester_id uuid references auth.users(id),
     status text not null default 'approved',
