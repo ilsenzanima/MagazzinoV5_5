@@ -1,7 +1,6 @@
-
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { LeaveRequestForm } from "./LeaveRequestForm"
 import { LeaveRequestList } from "./LeaveRequestList"
 import { Worker, LeaveRequest, leaveRequestsApi } from "@/lib/api"
@@ -9,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/components/auth-provider"
 
 interface LeaveRequestManagerProps {
     workers: Worker[]
@@ -17,6 +17,8 @@ interface LeaveRequestManagerProps {
 
 export function LeaveRequestManager({ workers, initialRequests }: LeaveRequestManagerProps) {
     const [requests, setRequests] = useState<LeaveRequest[]>(initialRequests)
+    const { userRole } = useAuth()
+    const isAdmin = userRole === 'admin'
 
     const loadRequests = async () => {
         try {
@@ -26,9 +28,6 @@ export function LeaveRequestManager({ workers, initialRequests }: LeaveRequestMa
             console.error("Failed to load requests", error)
         }
     }
-
-    // Load on mount just in case, or rely on initial.
-    // We rely on initial, but reload on success.
 
     return (
         <div className="space-y-8">
@@ -55,7 +54,11 @@ export function LeaveRequestManager({ workers, initialRequests }: LeaveRequestMa
 
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Ultime Richieste</h3>
-                <LeaveRequestList requests={requests} />
+                <LeaveRequestList
+                    requests={requests}
+                    isAdmin={isAdmin}
+                    onDelete={loadRequests}
+                />
             </div>
         </div>
     )

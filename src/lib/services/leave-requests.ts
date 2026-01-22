@@ -66,5 +66,14 @@ export const leaveRequestsApi = {
             ...item,
             worker: item.workers
         }));
+    },
+
+    delete: async (id: string): Promise<void> => {
+        const { error } = await supabase
+            .from('leave_requests')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
     }
 };
