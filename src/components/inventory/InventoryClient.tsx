@@ -28,8 +28,27 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+  SheetClose
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { brandsApi, Brand } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 
 interface InventoryClientProps {
@@ -47,6 +66,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>(initialItems);
   const [itemTypes, setItemTypes] = useState<ItemType[]>(initialTypes);
+  const [selectedBrand, setSelectedBrand] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(false); // Initial loading is false because we have props
   const [error, setError] = useState<string | null>(null);
 
@@ -74,17 +96,30 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     }
   }, [itemTypes.length]);
 
+  // Load brands
+  useEffect(() => {
+    brandsApi.getAll().then(setBrands).catch(console.error);
+  }, []);
+
+  const resetFilters = () => {
+    setSelectedBrand("all");
+    setSelectedType("all");
+    setSearchTerm("");
+  };
+
+  const activeFiltersCount = (selectedBrand !== "all" ? 1 : 0) + (selectedType !== "all" ? 1 : 0);
+
   // Load items when dependencies change
   useEffect(() => {
     // Skip first load if parameters match initial props
     // This prevents double fetching on mount
-    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && items === initialItems) {
+    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && items === initialItems) {
       return;
     }
 
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearchTerm, activeTab]);
+  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
 
   const loadItems = async () => {
     try {
@@ -96,7 +131,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         page,
         limit,
         search: debouncedSearchTerm,
-        tab: activeTab
+        tab: activeTab,
+        brand: selectedBrand !== "all" ? selectedBrand : undefined,
+        type: selectedType !== "all" ? selectedType : undefined
       });
       setItems(paginatedItems);
       setTotalItems(total);
@@ -185,9 +222,67 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                 </Button>
               </Link>
             )}
-            <Button variant="ghost" size="icon" className="shrink-0" aria-label="Filtra">
-              <Filter className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-            </Button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant={activeFiltersCount > 0 ? "secondary" : "ghost"} size="icon" className="shrink-0 relative" aria-label="Filtra">
+                  <Filter className={`h-5 w-5 ${activeFiltersCount > 0 ? "text-blue-600" : "text-slate-600 dark:text-slate-400"}`} />
+                  {activeFiltersCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] grid place-items-center h-4 w-4 rounded-full">
+                      {activeFiltersCount}
+                    </span>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Filtri Avanzati</SheetTitle>
+                  <SheetDescription>
+                    Affina la ricerca per trovare specifici articoli.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="py-6 space-y-6">
+                  {/* Brand Filter */}
+                  <div className="space-y-2">
+                    <Label>Marca</Label>
+                    <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tutte le marche" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tutte le marche</SelectItem>
+                        {brands.map((b) => (
+                          <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Type Filter */}
+                  <div className="space-y-2">
+                    <Label>Tipologia</Label>
+                    <Select value={selectedType} onValueChange={setSelectedType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tutte le tipologie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tutte le tipologie</SelectItem>
+                        {itemTypes.map((t) => (
+                          <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <SheetFooter>
+                  <SheetClose asChild>
+                    <Button variant="outline" onClick={resetFilters}>Resetta</Button>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <Button>Chiudi</Button>
+                  </SheetClose>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 
