@@ -134,14 +134,6 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                                     <Calendar className="h-4 w-4 shrink-0" />
                                     <span>Registrato il {new Date(worker.createdAt).toLocaleDateString('it-IT')}</span>
                                 </div>
-
-                                {/* Placeholder for future certificates count/status */}
-                                <div className="pt-2 mt-2 border-t flex justify-between items-center text-xs">
-                                    <span className="text-slate-400">Certificati</span>
-                                    <Badge variant="outline" className="text-slate-400 border-slate-200">
-                                        0 (Placeholder)
-                                    </Badge>
-                                </div>
                             </CardContent>
                         </Card>
                     ))
