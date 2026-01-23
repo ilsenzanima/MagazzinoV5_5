@@ -1,6 +1,7 @@
 "use client"
 
 import { notify } from "@/lib/notify";;
+import { ImageCropper } from "@/components/ui/image-cropper";
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -129,17 +130,30 @@ export function InventoryItemForm({
         }
     }, [initialData]);
 
+    const [isCropperOpen, setIsCropperOpen] = useState(false);
+    const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
+
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            setImageFile(file);
+            // Read file to get source for cropper
             const reader = new FileReader();
-            reader.onloadend = () => {
-                const result = reader.result as string;
-                setPreviewImage(result);
-            };
+            reader.addEventListener("load", () => {
+                setTempImageSrc(reader.result?.toString() || "");
+                setIsCropperOpen(true);
+                // Reset input so same file selection triggers change again if needed
+                e.target.value = "";
+            });
             reader.readAsDataURL(file);
         }
+    };
+
+    const handleCropComplete = (croppedFile: File) => {
+        setImageFile(croppedFile);
+        const objectUrl = URL.createObjectURL(croppedFile);
+        setPreviewImage(objectUrl);
+        // Maybe cleanup objectUrl later? React handles it mostly relevantly or we rely on re-renders. 
+        // For simplicity, this is fine.
     };
 
     const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
@@ -150,11 +164,6 @@ export function InventoryItemForm({
         // Check duplicates
         setIsCheckingDuplicate(true);
         try {
-            // Solo se stiamo creando o se i campi chiave sono cambiati (difficile da tracciare qui, facciamo sempre check per sicurezza se non è troppo pesante, ma meglio solo in create per ora come richiesto per "protezione se creiamo")
-            // Se siamo in edit, potremmo star salvando lo stesso articolo, quindi il check tornerebbe true.
-            // La RPC check_inventory_duplicate non esclude l'ID corrente, quindi restituirà true per se stesso in edit.
-            // Per ora lo implemento SOLO per CREATE come richiesto ("se creiamo un articolo gia presente").
-
             if (mode === 'create') {
                 const isDuplicate = await inventoryApi.checkDuplicate({
                     name: formData.name,
@@ -183,6 +192,14 @@ export function InventoryItemForm({
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <ImageCropper
+                open={isCropperOpen}
+                onOpenChange={setIsCropperOpen}
+                imageSrc={tempImageSrc}
+                onCropComplete={handleCropComplete}
+                title="Ritaglia Foto Articolo"
+            />
+
             {/* Left Column: Image */}
             <div className="space-y-6">
                 <Card>

@@ -61,6 +61,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
+import { ImageCropper } from "@/components/ui/image-cropper";
 
 export default function InventoryDetailPage() {
   const params = useParams();
@@ -75,6 +76,8 @@ export default function InventoryDetailPage() {
   const [stockValue, setStockValue] = useState<number>(0);
   const [isStockValueComplete, setIsStockValueComplete] = useState(true);
   const [calculatedPieces, setCalculatedPieces] = useState<number>(0);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
 
   // Edit Mode State
   const [isEditing, setIsEditing] = useState(false);
@@ -340,19 +343,30 @@ export default function InventoryDetailPage() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && item) {
-      try {
-        const imageUrl = await inventoryApi.uploadImage(file);
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        setTempImageSrc(reader.result?.toString() || "");
+        setIsCropperOpen(true);
+        e.target.value = "";
+      });
+      reader.readAsDataURL(file);
+    }
+  };
 
-        // Update item with new image URL
-        await inventoryApi.update(item.id, { image: imageUrl });
+  const handleCropComplete = async (croppedFile: File) => {
+    if (!item) return;
+    try {
+      const imageUrl = await inventoryApi.uploadImage(croppedFile);
 
-        // Update local state
-        setItem({ ...item, image: imageUrl });
-        alert("Immagine caricata con successo!");
-      } catch (error) {
-        console.error("Image upload failed", error);
-        alert("Errore caricamento immagine");
-      }
+      // Update item with new image URL
+      await inventoryApi.update(item.id, { image: imageUrl });
+
+      // Update local state
+      setItem({ ...item, image: imageUrl });
+      alert("Immagine caricata con successo!");
+    } catch (error) {
+      console.error("Image upload failed", error);
+      alert("Errore caricamento immagine");
     }
   };
 
@@ -502,6 +516,13 @@ export default function InventoryDetailPage() {
 
   return (
     <DashboardLayout>
+      <ImageCropper
+        open={isCropperOpen}
+        onOpenChange={setIsCropperOpen}
+        imageSrc={tempImageSrc}
+        onCropComplete={handleCropComplete}
+        title="Ritaglia Foto Articolo"
+      />
       <div className="max-w-5xl mx-auto space-y-6 pb-20">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
