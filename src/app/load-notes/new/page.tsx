@@ -406,15 +406,19 @@ export default function NewLoadNotePage() {
                                             <TableHead>Materiale</TableHead>
                                             <TableHead className="text-center w-[60px]">Pezzi</TableHead>
                                             <TableHead className="text-right w-[80px]">Q.tà</TableHead>
-                                            <TableHead className="hidden sm:table-cell text-right w-[70px]">Giacenza</TableHead>
-                                            <TableHead className="hidden sm:table-cell text-right w-[80px]">Da Ord.</TableHead>
+                                            {noteType === 'uscita' && (
+                                                <>
+                                                    <TableHead className="hidden sm:table-cell text-right w-[70px]">Giacenza</TableHead>
+                                                    <TableHead className="hidden sm:table-cell text-right w-[80px]">Da Ord.</TableHead>
+                                                </>
+                                            )}
                                             <TableHead className="w-[40px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {lines.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                <TableCell colSpan={noteType === 'uscita' ? 6 : 4} className="text-center py-8 text-muted-foreground">
                                                     Nessun materiale aggiunto
                                                 </TableCell>
                                             </TableRow>
@@ -437,16 +441,20 @@ export default function NewLoadNotePage() {
                                                         <TableCell className="text-right font-bold text-sm">
                                                             {line.quantity} <span className="text-muted-foreground text-xs font-normal">{line.unit}</span>
                                                         </TableCell>
-                                                        <TableCell className={`hidden sm:table-cell text-right ${line.availableStock !== undefined && line.availableStock < line.quantity ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                                                            {line.availableStock !== undefined ? line.availableStock : '-'}
-                                                        </TableCell>
-                                                        <TableCell className="hidden sm:table-cell text-right">
-                                                            {shortage > 0 ? (
-                                                                <span className="text-destructive font-bold">+{shortage}</span>
-                                                            ) : (
-                                                                <span className="text-green-600">✓</span>
-                                                            )}
-                                                        </TableCell>
+                                                        {noteType === 'uscita' && (
+                                                            <>
+                                                                <TableCell className={`hidden sm:table-cell text-right ${line.availableStock !== undefined && line.availableStock < line.quantity ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                                                    {line.availableStock !== undefined ? line.availableStock : '-'}
+                                                                </TableCell>
+                                                                <TableCell className="hidden sm:table-cell text-right">
+                                                                    {shortage > 0 ? (
+                                                                        <span className="text-destructive font-bold">+{shortage}</span>
+                                                                    ) : (
+                                                                        <span className="text-green-600">✓</span>
+                                                                    )}
+                                                                </TableCell>
+                                                            </>
+                                                        )}
                                                         <TableCell>
                                                             <Button
                                                                 variant="ghost"

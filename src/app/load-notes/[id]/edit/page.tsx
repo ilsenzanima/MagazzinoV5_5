@@ -48,6 +48,7 @@ export default function EditLoadNotePage() {
 
     // Form State - Header
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [noteType, setNoteType] = useState<'uscita' | 'reso'>('uscita');
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [notes, setNotes] = useState("");
 
@@ -82,6 +83,7 @@ export default function EditLoadNotePage() {
             const noteData = await loadNotesService.getById(noteId);
             if (noteData) {
                 setDate(noteData.date);
+                setNoteType(noteData.noteType);
                 setNotes(noteData.notes || "");
 
                 // Convert items to NoteLine format
@@ -427,15 +429,19 @@ export default function EditLoadNotePage() {
                                             <TableHead className="w-[220px]">Materiale</TableHead>
                                             <TableHead className="text-center w-[80px]">Pezzi</TableHead>
                                             <TableHead className="text-right w-[100px]">Q.tà Tot.</TableHead>
-                                            <TableHead className="text-right w-[80px]">Giacenza</TableHead>
-                                            <TableHead className="text-right w-[90px]">Da Ordinare</TableHead>
+                                            {noteType === 'uscita' && (
+                                                <>
+                                                    <TableHead className="text-right w-[80px]">Giacenza</TableHead>
+                                                    <TableHead className="text-right w-[90px]">Da Ordinare</TableHead>
+                                                </>
+                                            )}
                                             <TableHead className="w-[50px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {lines.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                <TableCell colSpan={noteType === 'uscita' ? 6 : 4} className="text-center py-8 text-muted-foreground">
                                                     Nessun materiale aggiunto
                                                 </TableCell>
                                             </TableRow>
@@ -459,16 +465,20 @@ export default function EditLoadNotePage() {
                                                         <TableCell className="text-right font-bold">
                                                             {line.quantity} <span className="text-muted-foreground text-xs font-normal">{line.unit}</span>
                                                         </TableCell>
-                                                        <TableCell className={`text-right ${line.availableStock !== undefined && line.availableStock < line.quantity ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                                                            {line.availableStock !== undefined ? line.availableStock : '-'}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            {shortage > 0 ? (
-                                                                <span className="text-destructive font-bold">+{shortage}</span>
-                                                            ) : (
-                                                                <span className="text-green-600">✓</span>
-                                                            )}
-                                                        </TableCell>
+                                                        {noteType === 'uscita' && (
+                                                            <>
+                                                                <TableCell className={`text-right ${line.availableStock !== undefined && line.availableStock < line.quantity ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                                                    {line.availableStock !== undefined ? line.availableStock : '-'}
+                                                                </TableCell>
+                                                                <TableCell className="text-right">
+                                                                    {shortage > 0 ? (
+                                                                        <span className="text-destructive font-bold">+{shortage}</span>
+                                                                    ) : (
+                                                                        <span className="text-green-600">✓</span>
+                                                                    )}
+                                                                </TableCell>
+                                                            </>
+                                                        )}
                                                         <TableCell>
                                                             <Button
                                                                 variant="ghost"
