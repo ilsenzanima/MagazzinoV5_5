@@ -581,135 +581,152 @@ export default function InventoryDetailPage() {
                     }}
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    {(userRole === 'admin' || userRole === 'operativo') && (
-                      <Label htmlFor="image-upload" className="cursor-pointer">
-                        <div className="bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 rounded-md flex items-center text-sm font-medium shadow-sm">
-                          <Upload className="mr-2 h-4 w-4" /> Cambia Foto
-                        </div>
-                        <Input
-                          id="image-upload"
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={handleImageUpload}
-                        />
-                      </Label>
-                    )}
-                  </div>
-                </div>
-
-                {/* Status Badge */}
-                <div className="space-y-2">
-                  <Label>Stato Stock (Calcolato)</Label>
-                  <div className={`flex items-center justify-center p-2 rounded-md border font-bold ${status.color}`}>
-                    {status.label}
-                  </div>
-                </div>
-
-                {/* Quantity Read-Only */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Quantità Disponibile</Label>
-                    <div className="flex flex-col gap-2">
-                      {/* Calculated Quantity (Main) */}
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-md text-center">
-                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
-                        </div>
-                        <div className="text-xs text-blue-400 dark:text-blue-500 font-medium">Quantità Totale</div>
-                      </div>
-
-                      {/* Stock Value - Hidden for regular users */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       {(userRole === 'admin' || userRole === 'operativo') && (
                         <>
-                          <div className="p-3 bg-slate-50 dark:bg-muted border border-slate-200 dark:border-slate-700 rounded-md text-center">
-                            <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-                              {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                          <Label htmlFor="image-upload" className="cursor-pointer">
+                            <div className="bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 rounded-md flex items-center text-sm font-medium shadow-sm">
+                              <Upload className="mr-2 h-4 w-4" /> Cambia
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Valore Stock Attuale</div>
-                          </div>
+                            <Input
+                              id="image-upload"
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={handleImageUpload}
+                            />
+                          </Label>
 
-                          {!isStockValueComplete && (
-                            <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2 justify-center">
-                              <AlertTriangle className="h-4 w-4 shrink-0" />
-                              <span>Dati costo incompleti (Valore parziale)</span>
-                            </div>
+                          {item.image && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="h-9 px-3"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleRemoveImage();
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
                         </>
                       )}
-
-                      {/* Real Pieces (Secondary) */}
-                      {item.coefficient !== 1 && (
-                        <div className="text-center">
-                          <span className="text-xs text-slate-400 dark:text-slate-500">
-                            {calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })} Pezzi fisici
-                          </span>
-                        </div>
-                      )}
-                      {item.coefficient === 1 && (
-                        <div className="text-center text-[10px] text-slate-400 dark:text-slate-500">
-                          1 {item.unit} = 1 Pezzo
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  {/* Audit Section - Visible only to admin/operativo */}
-                  {(userRole === 'admin' || userRole === 'operativo') && (
-                    <div className="pt-4 border-t dark:border-slate-700 space-y-3">
-                      <Label className="text-blue-600 font-semibold">Verifica Inventario (Reale)</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          value={realQtyInput}
-                          onChange={(e) => setRealQtyInput(e.target.value)}
-                          placeholder="Q.tà fisica"
-                          className="bg-white dark:bg-card"
-                        />
-                        <Button size="icon" variant="outline" onClick={handleUpdateRealQty} title="Salva quantità reale">
-                          <Save className="h-4 w-4" />
-                        </Button>
-                        {item.realQuantity !== null && item.realQuantity !== undefined && (
-                          <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500">
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
+                  {/* Status Badge */}
+                  <div className="space-y-2">
+                    <Label>Stato Stock (Calcolato)</Label>
+                    <div className={`flex items-center justify-center p-2 rounded-md border font-bold ${status.color}`}>
+                      {status.label}
+                    </div>
+                  </div>
+
+                  {/* Quantity Read-Only */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Quantità Disponibile</Label>
+                      <div className="flex flex-col gap-2">
+                        {/* Calculated Quantity (Main) */}
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-md text-center">
+                          <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                            {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
+                          </div>
+                          <div className="text-xs text-blue-400 dark:text-blue-500 font-medium">Quantità Totale</div>
+                        </div>
+
+                        {/* Stock Value - Hidden for regular users */}
+                        {(userRole === 'admin' || userRole === 'operativo') && (
+                          <>
+                            <div className="p-3 bg-slate-50 dark:bg-muted border border-slate-200 dark:border-slate-700 rounded-md text-center">
+                              <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
+                                {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                              </div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Valore Stock Attuale</div>
+                            </div>
+
+                            {!isStockValueComplete && (
+                              <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2 justify-center">
+                                <AlertTriangle className="h-4 w-4 shrink-0" />
+                                <span>Dati costo incompleti (Valore parziale)</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Real Pieces (Secondary) */}
+                        {item.coefficient !== 1 && (
+                          <div className="text-center">
+                            <span className="text-xs text-slate-400 dark:text-slate-500">
+                              {calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })} Pezzi fisici
+                            </span>
+                          </div>
+                        )}
+                        {item.coefficient === 1 && (
+                          <div className="text-center text-[10px] text-slate-400 dark:text-slate-500">
+                            1 {item.unit} = 1 Pezzo
+                          </div>
                         )}
                       </div>
-
-                      {item.realQuantity !== null && item.realQuantity !== undefined && (
-                        <div className={`text-sm p-2 rounded-md flex justify-between items-center ${(item.realQuantity - item.quantity) === 0
-                          ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
-                          : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
-                          }`}>
-                          <span className="font-medium">Differenza:</span>
-                          <span className="font-bold">
-                            {item.realQuantity - item.quantity > 0 ? "+" : ""}
-                            {(item.realQuantity - item.quantity).toFixed(2).replace(/[.,]00$/, "")} {item.unit}
-                          </span>
-                        </div>
-                      )}
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                        Visibile solo a Admin e Operativi. Indica discrepanze tra sistema e realtà.
-                      </p>
                     </div>
-                  )}
-                </div>
 
-                {/* QR Code & Barcode */}
-                <div className="pt-4 border-t dark:border-slate-700 flex flex-col items-center gap-4">
-                  <div className="w-full">
-                    <Label className="mb-2 block text-center">Codice Identificativo</Label>
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700">
-                        <QRCode value={item.code} size={128} />
+                    {/* Audit Section - Visible only to admin/operativo */}
+                    {(userRole === 'admin' || userRole === 'operativo') && (
+                      <div className="pt-4 border-t dark:border-slate-700 space-y-3">
+                        <Label className="text-blue-600 font-semibold">Verifica Inventario (Reale)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            value={realQtyInput}
+                            onChange={(e) => setRealQtyInput(e.target.value)}
+                            placeholder="Q.tà fisica"
+                            className="bg-white dark:bg-card"
+                          />
+                          <Button size="icon" variant="outline" onClick={handleUpdateRealQty} title="Salva quantità reale">
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          {item.realQuantity !== null && item.realQuantity !== undefined && (
+                            <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500">
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {item.realQuantity !== null && item.realQuantity !== undefined && (
+                          <div className={`text-sm p-2 rounded-md flex justify-between items-center ${(item.realQuantity - item.quantity) === 0
+                            ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
+                            : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
+                            }`}>
+                            <span className="font-medium">Differenza:</span>
+                            <span className="font-bold">
+                              {item.realQuantity - item.quantity > 0 ? "+" : ""}
+                              {(item.realQuantity - item.quantity).toFixed(2).replace(/[.,]00$/, "")} {item.unit}
+                            </span>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                          Visibile solo a Admin e Operativi. Indica discrepanze tra sistema e realtà.
+                        </p>
                       </div>
-                      <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700 overflow-hidden max-w-full">
-                        <Barcode value={item.code} width={1.5} height={50} fontSize={12} />
+                    )}
+                  </div>
+
+                  {/* QR Code & Barcode */}
+                  <div className="pt-4 border-t dark:border-slate-700 flex flex-col items-center gap-4">
+                    <div className="w-full">
+                      <Label className="mb-2 block text-center">Codice Identificativo</Label>
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700">
+                          <QRCode value={item.code} size={128} />
+                        </div>
+                        <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700 overflow-hidden max-w-full">
+                          <Barcode value={item.code} width={1.5} height={50} fontSize={12} />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
               </CardContent>
             </Card>
           </div>
