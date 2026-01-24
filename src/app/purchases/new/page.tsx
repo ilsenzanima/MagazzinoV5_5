@@ -240,6 +240,32 @@ export default function NewPurchasePage() {
         }));
     };
 
+    const handleCurrentLineTotalChange = (totalStr: string) => {
+        const total = parseFloat(totalStr);
+        const quantity = parseFloat(currentLine.quantity);
+
+        if (isNaN(total)) {
+            // Just update UI if needed, but we don't store total in state distinct from price*qty usually
+            // However, we want to update price. If total is empty/nan, price isn't touched? 
+            // Better behavior: clear price if total is cleared
+            if (totalStr === "") {
+                setCurrentLine(prev => ({ ...prev, price: "" }));
+            }
+            return;
+        }
+
+        if (isNaN(quantity) || quantity === 0) {
+            // Cannot calculate price without quantity
+            return;
+        }
+
+        const newPrice = (total / quantity).toFixed(5);
+        setCurrentLine(prev => ({
+            ...prev,
+            price: newPrice
+        }));
+    };
+
     const handleAddLine = () => {
         if (!currentLine.itemId || !currentLine.quantity || !currentLine.price) {
             notify.warning("Compila tutti i campi obbligatori (Articolo, Quantità, Prezzo)");
@@ -590,6 +616,18 @@ export default function NewPurchasePage() {
                                             value={currentLine.price}
                                             onChange={(e) => setCurrentLine({ ...currentLine, price: e.target.value })}
                                             placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2 space-y-2">
+                                        <Label>Totale Riga</Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={currentLine.quantity && currentLine.price ? (parseFloat(currentLine.quantity) * parseFloat(currentLine.price)).toFixed(2) : ""}
+                                            onChange={(e) => handleCurrentLineTotalChange(e.target.value)}
+                                            placeholder="0.00"
+                                            disabled={!currentLine.quantity}
                                         />
                                     </div>
                                     <div className="md:col-span-4 flex items-center gap-2 pb-2">
