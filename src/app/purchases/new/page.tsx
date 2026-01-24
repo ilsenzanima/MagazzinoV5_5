@@ -93,6 +93,7 @@ export default function NewPurchasePage() {
         coefficient: 1,
         unit: "PZ",
         price: "",
+        total: "",
         isJob: false,
         jobId: ""
     });
@@ -171,7 +172,8 @@ export default function NewPurchasePage() {
             coefficient: item.coefficient ? Number(item.coefficient) : 1,
             unit: item.unit || 'PZ',
             pieces: "",
-            quantity: ""
+            quantity: "",
+            total: ""
         });
         setIsItemSelectorOpen(false);
     };
@@ -217,10 +219,14 @@ export default function NewPurchasePage() {
             piecesStr = quantity.toString();
         }
 
+        const currentPrice = currentLine.price ? parseFloat(currentLine.price) : 0;
+        const newTotal = !isNaN(quantity) && currentPrice ? (quantity * currentPrice).toFixed(2) : currentLine.total;
+
         setCurrentLine(prev => ({
             ...prev,
             quantity: quantityStr,
-            pieces: piecesStr
+            pieces: piecesStr,
+            total: newTotal
         }));
     };
 
@@ -233,38 +239,67 @@ export default function NewPurchasePage() {
         }
 
         const quantity = (pieces * currentLine.coefficient).toFixed(2);
+        const currentPrice = currentLine.price ? parseFloat(currentLine.price) : 0;
+        const newTotal = !isNaN(parseFloat(quantity)) && currentPrice ? (parseFloat(quantity) * currentPrice).toFixed(2) : currentLine.total;
+
         setCurrentLine(prev => ({
             ...prev,
             pieces: piecesStr,
-            quantity: quantity
+            quantity: quantity,
+            total: newTotal
+        }));
+    };
+
+    const handleCurrentLinePriceChange = (priceStr: string) => {
+        const price = parseFloat(priceStr);
+        const quantity = currentLine.quantity ? parseFloat(currentLine.quantity) : 0;
+
+        let newTotal = currentLine.total;
+        if (!isNaN(price) && !isNaN(quantity) && quantity > 0) {
+            newTotal = (price * quantity).toFixed(2);
+        }
+
+        setCurrentLine(prev => ({
+            ...prev,
+            price: priceStr,
+            total: newTotal
         }));
     };
 
     const handleCurrentLineTotalChange = (totalStr: string) => {
-        const total = parseFloat(totalStr);
+        // Only update the input string to allow typing freely
+        setCurrentLine(prev => ({
+            ...prev,
+            total: totalStr
+        }));
+    };
+
+    const handleCurrentLineTotalBlur = () => {
+        const total = parseFloat(currentLine.total);
         const quantity = parseFloat(currentLine.quantity);
 
-        if (isNaN(total)) {
-            // Just update UI if needed, but we don't store total in state distinct from price*qty usually
-            // However, we want to update price. If total is empty/nan, price isn't touched? 
-            // Better behavior: clear price if total is cleared
-            if (totalStr === "") {
-                setCurrentLine(prev => ({ ...prev, price: "" }));
-            }
+        if (isNaN(total) || totalStrCleaned(currentLine.total) === "") {
             return;
         }
 
         if (isNaN(quantity) || quantity === 0) {
-            // Cannot calculate price without quantity
-            return;
+            return; // Cannot calculate price
         }
 
+        // Calculate and update Price
         const newPrice = (total / quantity).toFixed(5);
+
+        // Also ensure total is formatted correctly (optional, maybe keep user input?)
+        const formattedTotal = total.toFixed(2);
+
         setCurrentLine(prev => ({
             ...prev,
-            price: newPrice
+            price: newPrice,
+            total: formattedTotal
         }));
     };
+
+    const totalStrCleaned = (s: string) => s.trim();
 
     const handleAddLine = () => {
         if (!currentLine.itemId || !currentLine.quantity || !currentLine.price) {
@@ -309,7 +344,8 @@ export default function NewPurchasePage() {
             unit: "PZ",
             price: "",
             isJob: !!formData.jobId,
-            jobId: formData.jobId || ""
+            jobId: formData.jobId || "",
+            total: ""
         });
         setSelectedItemForLine(null);
         if (!formData.jobId) {
@@ -614,7 +650,7 @@ export default function NewPurchasePage() {
                                             min="0"
                                             step="0.00001"
                                             value={currentLine.price}
-                                            onChange={(e) => setCurrentLine({ ...currentLine, price: e.target.value })}
+                                            onChange={(e) => handleCurrentLinePriceChange(e.target.value)}
                                             placeholder="0"
                                         />
                                     </div>
@@ -624,8 +660,9 @@ export default function NewPurchasePage() {
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            value={currentLine.quantity && currentLine.price ? (parseFloat(currentLine.quantity) * parseFloat(currentLine.price)).toFixed(2) : ""}
+                                            value={currentLine.total}
                                             onChange={(e) => handleCurrentLineTotalChange(e.target.value)}
+                                            onBlur={handleCurrentLineTotalBlur}
                                             placeholder="0.00"
                                             disabled={!currentLine.quantity}
                                         />
