@@ -40,6 +40,7 @@ interface PurchaseLine {
     coefficient: number;
     unit: string;
     price: number;
+    totalStr?: string;
     isJob: boolean;
     jobId?: string;
     jobCode?: string;
@@ -408,14 +409,43 @@ export default function NewPurchasePage() {
     };
 
     const handleLineTotalChange = (tempId: string, totalStr: string) => {
-        const total = parseFloat(totalStr);
-        if (isNaN(total)) return;
+        // Just update the temporary string value for typing
+        setLines(lines.map(line => {
+            if (line.tempId === tempId) {
+                return { ...line, totalStr: totalStr };
+            }
+            return line;
+        }));
+    };
 
+    const handleLineTotalBlur = (tempId: string) => {
         const line = lines.find(l => l.tempId === tempId);
-        if (!line || line.quantity === 0) return;
+        if (!line || line.totalStr === undefined) return;
+
+        const total = parseFloat(line.totalStr);
+
+        // Validation: if empty or invalid, maybe revert to calculation?
+        // Or if strictly empty, do nothing. 
+        if (isNaN(total) || totalStrCleaned(line.totalStr) === "") {
+            // Optional: reset totalStr to undefined to show calculated value again?
+            // For now let's keep it as is or reset if invalid?
+            // Best UX: if invalid, revert to calculated.
+            if (totalStrCleaned(line.totalStr) === "") {
+                updateLine(tempId, { totalStr: undefined });
+            }
+            return;
+        }
+
+        if (line.quantity === 0) return;
 
         const newPrice = total / line.quantity;
-        updateLine(tempId, { price: newPrice });
+
+        // Update price and clear totalStr to fallback to calculated view (formatted)
+        // OR keep totalStr as formatted total.
+        // Let's clear totalStr so it re-renders as (q*p).toFixed(2) consistent with others
+        // UNLESS we want to preserve exact user input. 
+        // Let's follow the pattern: calculate price, and let the view derive total.
+        updateLine(tempId, { price: newPrice, totalStr: undefined });
     };
 
     const removeLine = (tempId: string) => {
@@ -787,8 +817,9 @@ export default function NewPurchasePage() {
                                                                 min="0"
                                                                 step="0.01"
                                                                 className="h-8 w-24 text-right"
-                                                                value={(line.quantity * line.price).toFixed(2)}
+                                                                value={line.totalStr !== undefined ? line.totalStr : (line.quantity * line.price).toFixed(2)}
                                                                 onChange={(e) => handleLineTotalChange(line.tempId, e.target.value)}
+                                                                onBlur={() => handleLineTotalBlur(line.tempId)}
                                                             />
                                                         </div>
                                                     </TableCell>
