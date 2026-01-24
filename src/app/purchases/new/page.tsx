@@ -345,6 +345,17 @@ export default function NewPurchasePage() {
         }
     };
 
+    const handleLineTotalChange = (tempId: string, totalStr: string) => {
+        const total = parseFloat(totalStr);
+        if (isNaN(total)) return;
+
+        const line = lines.find(l => l.tempId === tempId);
+        if (!line || line.quantity === 0) return;
+
+        const newPrice = total / line.quantity;
+        updateLine(tempId, { price: newPrice });
+    };
+
     const removeLine = (tempId: string) => {
         setLines(lines.filter(l => l.tempId !== tempId));
     };
@@ -693,8 +704,18 @@ export default function NewPurchasePage() {
                                                             />
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-right font-medium">
-                                                        € {(line.quantity * line.price).toFixed(2)}
+                                                    <TableCell className="text-right">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <span className="text-xs text-slate-400">€</span>
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                className="h-8 w-24 text-right"
+                                                                value={(line.quantity * line.price).toFixed(2)}
+                                                                onChange={(e) => handleLineTotalChange(line.tempId, e.target.value)}
+                                                            />
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell>
                                                         {line.isJob ? (
