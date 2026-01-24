@@ -72,7 +72,7 @@ export default function PurchaseDetailPage() {
 
     // Edit Item State
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
-    const [editValues, setEditValues] = useState<{ price: string, quantity: string, pieces: string }>({ price: "", quantity: "", pieces: "" });
+    const [editValues, setEditValues] = useState<{ price: string, quantity: string, pieces: string, total: string }>({ price: "", quantity: "", pieces: "", total: "" });
 
     // Edit Header State
     const [isEditingHeader, setIsEditingHeader] = useState(false);
@@ -341,7 +341,8 @@ export default function PurchaseDetailPage() {
         setEditValues({
             price: item.price.toString(),
             quantity: item.quantity.toString(),
-            pieces: piecesStr
+            pieces: piecesStr,
+            total: (item.quantity * item.price).toFixed(2)
         });
     };
 
@@ -353,10 +354,15 @@ export default function PurchaseDetailPage() {
             quantityStr = (pieces * coefficient).toFixed(2);
         }
 
+        const quantity = !isNaN(pieces) ? (pieces * coefficient).toFixed(2) : editValues.quantity;
+        const price = parseFloat(editValues.price);
+        const total = !isNaN(parseFloat(quantity)) && !isNaN(price) ? (parseFloat(quantity) * price).toFixed(2) : editValues.total;
+
         setEditValues({
             ...editValues,
             pieces: piecesStr,
-            quantity: quantityStr
+            quantity: quantity,
+            total: total
         });
     };
 
@@ -374,10 +380,37 @@ export default function PurchaseDetailPage() {
             }
         }
 
+        const price = parseFloat(editValues.price);
+        const total = !isNaN(quantity) && !isNaN(price) ? (quantity * price).toFixed(2) : editValues.total;
+
         setEditValues({
             ...editValues,
             quantity: quantityStr,
-            pieces: piecesStr
+            pieces: piecesStr,
+            total: total
+        });
+    };
+
+    const handleEditTotalChange = (totalStr: string) => {
+        setEditValues({
+            ...editValues,
+            total: totalStr
+        });
+    };
+
+    const handleEditTotalBlur = () => {
+        const total = parseFloat(editValues.total);
+        const quantity = parseFloat(editValues.quantity);
+
+        if (isNaN(total) || editValues.total.trim() === "") return;
+        if (isNaN(quantity) || quantity === 0) return;
+
+        const newPrice = (total / quantity).toFixed(5);
+
+        setEditValues({
+            ...editValues,
+            price: newPrice,
+            total: total.toFixed(2)
         });
     };
 
@@ -678,7 +711,12 @@ export default function PurchaseDetailPage() {
                                                                 className="w-24 ml-auto text-right h-8"
                                                                 value={editValues.price}
                                                                 step="0.00001"
-                                                                onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
+                                                                onChange={(e) => {
+                                                                    const price = parseFloat(e.target.value);
+                                                                    const quantity = parseFloat(editValues.quantity);
+                                                                    const total = !isNaN(price) && !isNaN(quantity) ? (price * quantity).toFixed(2) : editValues.total;
+                                                                    setEditValues({ ...editValues, price: e.target.value, total: total });
+                                                                }}
                                                             />
                                                         </TableCell>
                                                     </>
@@ -710,7 +748,18 @@ export default function PurchaseDetailPage() {
 
                                                 <TableCell className="text-right font-medium">
                                                     {(userRole === 'admin' || userRole === 'operativo') ? (
-                                                        `€ ${(item.quantity * item.price).toFixed(2)}`
+                                                        editingItemId === item.id ? (
+                                                            <Input
+                                                                type="number"
+                                                                step="0.01"
+                                                                className="w-24 ml-auto text-right h-8"
+                                                                value={editValues.total}
+                                                                onChange={(e) => handleEditTotalChange(e.target.value)}
+                                                                onBlur={handleEditTotalBlur}
+                                                            />
+                                                        ) : (
+                                                            `€ ${(item.quantity * item.price).toFixed(2)}`
+                                                        )
                                                     ) : (
                                                         <span className="text-slate-400 italic text-xs">Riservato</span>
                                                     )}
