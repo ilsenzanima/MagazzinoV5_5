@@ -66,7 +66,7 @@ BEGIN
     -- 2. Status Filter (Existing)
     AND (p_status IS NULL OR p_status = 'all' OR
          (p_status = 'out_of_stock' AND i.quantity <= 0) OR
-         (p_status = 'low_stock' AND i.quantity <= i.min_stock))
+         (p_status = 'low_stock' AND i.quantity <= i.min_stock AND i.quantity > 0))
     -- 3. Brand Filter (New)
     AND (p_brand IS NULL OR i.brand = p_brand)
     -- 4. Type/Category Filter (New)

@@ -223,8 +223,9 @@ export default function NewLoadNotePage() {
 
             toast.success("Nota creata con successo");
             router.push("/load-notes");
-        } catch (error) {
-            toast.error("Errore durante il salvataggio");
+        } catch (error: any) {
+            console.error(error);
+            toast.error(`Errore durante il salvataggio: ${error.message || "Errore sconosciuto"}`);
         } finally {
             setIsLoading(false);
         }
