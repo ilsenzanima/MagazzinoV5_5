@@ -347,7 +347,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                   <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group h-full">
                     <CardContent className="p-0 flex flex-col h-full">
                       {/* Immagine */}
-                      <div className="w-full h-48 bg-slate-200 dark:bg-slate-700 shrink-0 relative flex items-center justify-center bg-white dark:bg-card overflow-hidden">
+                      <div className="w-full h-48 shrink-0 relative flex items-center justify-center bg-card overflow-hidden">
                         {(() => {
                           const typeInfo = itemTypes.find(t => t.name === item.type);
                           const hasCustomImage = !!item.image;
