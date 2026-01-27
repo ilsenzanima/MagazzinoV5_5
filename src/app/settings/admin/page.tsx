@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Shield, ShieldAlert, Trash2, UserCog, UserPlus } from "lucide-react";
+import { KeyRound, Shield, ShieldAlert, Trash2, UserCog, UserPlus } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -137,6 +137,23 @@ export default function SettingsAdminPage() {
         } catch (error: any) {
             console.error("Error deleting user:", error);
             notify.error("Errore nell'eliminazione dell'utente: " + error.message);
+        }
+    };
+
+    const handleRecoverPassword = async (email: string) => {
+        if (!confirm(`Inviare email di recupero password a ${email}?`)) return;
+
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/auth/callback?next=/settings/profile`,
+            });
+
+            if (error) throw error;
+
+            notify.success(`Email di recupero inviata a ${email}`);
+        } catch (error: any) {
+            console.error("Error sending recovery email:", error);
+            notify.error("Errore nell'invio dell'email: " + error.message);
         }
     };
 
@@ -289,6 +306,14 @@ export default function SettingsAdminPage() {
                                                     }}
                                                 >
                                                     <UserCog className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRecoverPassword(user.email)}
+                                                    title="Invia email recupero password"
+                                                >
+                                                    <KeyRound className="h-4 w-4" />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
