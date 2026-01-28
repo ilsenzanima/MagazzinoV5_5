@@ -165,6 +165,17 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                             inventory={form.inventory}
                             onItemSearch={form.handleItemSearch}
                             itemsLoading={form.itemsLoading}
+                            headerActions={
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                                    onClick={() => setIsNotesAssistantOpen(true)}
+                                >
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    Assistente Note
+                                </Button>
+                            }
                         />
 
                         {/* Lines List */}
@@ -212,16 +223,6 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                             <p>Pezzi totali: {form.lines.reduce((acc, l) => acc + (l.pieces || 0), 0)}</p>
                             <p>Quantità totale: {form.lines.reduce((acc, l) => acc + l.quantity, 0)}</p>
                         </div>
-
-                        {/* Notes Assistant Button */}
-                        <Button
-                            variant="outline"
-                            className="w-full justify-start gap-2"
-                            onClick={() => setIsNotesAssistantOpen(true)}
-                        >
-                            <FileText className="h-4 w-4" />
-                            Assistente Note di Carico
-                        </Button>
                     </div>
                 </div>
             </Tabs>
