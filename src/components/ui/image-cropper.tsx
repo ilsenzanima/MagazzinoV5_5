@@ -87,7 +87,10 @@ export function ImageCropper({
                 const croppedFile = await getCroppedImg(
                     imgRef.current,
                     completedCrop,
-                    "cropped-image.jpg"
+                    "cropped-image.png",
+                    400,
+                    400,
+                    "image/png"
                 )
                 onCropComplete(croppedFile)
                 onOpenChange(false)
