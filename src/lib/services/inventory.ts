@@ -318,7 +318,9 @@ export const inventoryApi = {
         if (piError) throw piError;
 
         // Filter out direct-to-job purchases (job_id not null on purchase header)
-        const warehousePurchases = purchaseItems.filter((pi: any) => !pi.purchases.job_id);
+        // UPDATE 2026-01-28: We now INCLUDE direct purchases to allow "phantom" lots for return logic
+        // But we must handle their initial quantity as 0 in warehouse.
+        const warehousePurchases = purchaseItems; // Removed filter: .filter((pi: any) => !pi.purchases.job_id);
 
         // For each purchase item, calculate remaining quantity
         const lotsWithRemaining = await Promise.all(warehousePurchases.map(async (pi: any) => {
@@ -336,8 +338,9 @@ export const inventoryApi = {
             if (exitsError) throw exitsError;
 
             // Calculate used quantity (exits - returns)
-            let usedQty = 0;
-            let usedPieces = 0;
+            // For direct purchases, initial used quantity IS the full quantity (it went to job directly)
+            let usedQty = pi.purchases.job_id ? (pi.quantity || 0) : 0;
+            let usedPieces = pi.purchases.job_id ? (pi.pieces || 0) : 0;
             exits?.forEach((dni: any) => {
                 if (dni.is_fictitious) return; // Skip fictitious
                 if (dni.delivery_notes.type === 'exit' || dni.delivery_notes.type === 'sale') {
