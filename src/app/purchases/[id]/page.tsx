@@ -1014,18 +1014,20 @@ export default function PurchaseDetailPage() {
                                             }
 
                                             let jobMovements = itemJobMovements[item.id] || [];
-                                            // FIX: For direct purchases with no explicit movements (returns/transfers), 
-                                            // show the initial purchase as a movement to the job.
+                                            // FIX:For direct purchases, show "Net at Job" (Original - Remaining).
+                                            // This accounts for returns.
                                             if (isJobAssigned && jobMovements.length === 0) {
                                                 const job = jobs.find(j => j.id === purchase.jobId);
-                                                if (job) {
+                                                const netAtJob = Math.max(0, item.quantity - (remaining || 0));
+
+                                                if (job && netAtJob > 0.001) {
                                                     jobMovements = [{
                                                         jobId: job.id,
                                                         jobCode: job.code,
                                                         jobName: job.name,
                                                         jobDescription: job.description,
-                                                        totalQuantity: item.quantity,
-                                                        totalPieces: item.pieces || 0
+                                                        totalQuantity: netAtJob,
+                                                        totalPieces: 0 // Pieces logic might be complex, leaving 0 or proportional?
                                                     }];
                                                 }
                                             }
@@ -1066,7 +1068,7 @@ export default function PurchaseDetailPage() {
                                                         </TableCell>
                                                         <TableCell className="text-right">{original}</TableCell>
                                                         <TableCell className="text-right font-bold">
-                                                            {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
+                                                            {typeof remaining === 'number' ? remaining.toFixed(2) : '-'}
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             <Badge variant="secondary" className={statusColor}>
@@ -1128,18 +1130,19 @@ export default function PurchaseDetailPage() {
                                     }
 
                                     let jobMovements = itemJobMovements[item.id] || [];
-                                    // FIX: For direct purchases with no explicit movements (returns/transfers),
-                                    // show the initial purchase as a movement to the job.
+                                    // FIX: For direct purchases, show "Net at Job" (Original - Remaining).
                                     if (isJobAssigned && jobMovements.length === 0) {
                                         const job = jobs.find(j => j.id === purchase.jobId);
-                                        if (job) {
+                                        const netAtJob = Math.max(0, item.quantity - (remaining || 0));
+
+                                        if (job && netAtJob > 0.001) {
                                             jobMovements = [{
                                                 jobId: job.id,
                                                 jobCode: job.code,
                                                 jobName: job.name,
                                                 jobDescription: job.description,
-                                                totalQuantity: item.quantity,
-                                                totalPieces: item.pieces || 0
+                                                totalQuantity: netAtJob,
+                                                totalPieces: 0
                                             }];
                                         }
                                     }
@@ -1187,7 +1190,7 @@ export default function PurchaseDetailPage() {
                                                     <div className="text-right">
                                                         <span className="text-slate-500 text-[10px] uppercase tracking-wider block">Residua</span>
                                                         <span className="font-bold text-slate-900 dark:text-white">
-                                                            {isJobAssigned ? '-' : (typeof remaining === 'number' ? remaining.toFixed(2) : '-')}
+                                                            {typeof remaining === 'number' ? remaining.toFixed(2) : '-'}
                                                         </span>
                                                     </div>
                                                 </div>
