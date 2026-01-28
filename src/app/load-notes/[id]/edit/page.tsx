@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Plus, Trash, Save, Search, Loader2, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash, Save, Search, Loader2, X, AlertTriangle, Pencil, Check } from "lucide-react";
 import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -60,6 +60,10 @@ export default function EditLoadNotePage() {
         coefficient: 1,
         unit: "PZ"
     });
+
+    // Edit Item State
+    const [editingLineId, setEditingLineId] = useState<string | null>(null);
+    const [editValues, setEditValues] = useState<{ pieces: string, quantity: string }>({ pieces: "", quantity: "" });
 
     // Items List State
     const [lines, setLines] = useState<NoteLine[]>([]);
@@ -216,6 +220,14 @@ export default function EditLoadNotePage() {
             return;
         }
 
+        const existingLine = lines.find(l => l.itemId === selectedItemForLine.id);
+        if (existingLine) {
+            const confirmNew = confirm(`L'articolo "${selectedItemForLine.name}" è già presente nella lista.\n\nVuoi aggiungerlo come NUOVA voce separata?\n(Annulla per non aggiungere nulla e modificare la voce esistente)`);
+            if (!confirmNew) {
+                return;
+            }
+        }
+
         const newLine: NoteLine = {
             tempId: Math.random().toString(36).substr(2, 9),
             itemId: selectedItemForLine.id,
@@ -235,6 +247,74 @@ export default function EditLoadNotePage() {
         // Reset current line
         setCurrentLine({ pieces: "", quantity: "", coefficient: 1, unit: "PZ" });
         setSelectedItemForLine(null);
+    };
+
+    const startEditing = (line: NoteLine) => {
+        setEditingLineId(line.tempId);
+        setEditValues({
+            pieces: line.pieces.toString(),
+            quantity: line.quantity.toString()
+        });
+    };
+
+    const cancelEdit = () => {
+        setEditingLineId(null);
+        setEditValues({ pieces: "", quantity: "" });
+    };
+
+    const saveEdit = (tempId: string, coefficient: number) => {
+        const newPieces = parseFloat(editValues.pieces);
+        const newQuantity = parseFloat(editValues.quantity);
+
+        if (isNaN(newQuantity) || newQuantity <= 0) {
+            toast.error("Inserisci una quantità valida");
+            return;
+        }
+
+        setLines(lines.map(line => {
+            if (line.tempId === tempId) {
+                return {
+                    ...line,
+                    pieces: !isNaN(newPieces) ? newPieces : newQuantity, // Fallback if no pieces logic
+                    quantity: newQuantity
+                };
+            }
+            return line;
+        }));
+
+        setEditingLineId(null);
+    };
+
+    const handleEditPiecesChange = (piecesStr: string, coefficient: number) => {
+        const pieces = parseFloat(piecesStr);
+        let quantityStr = editValues.quantity;
+
+        if (!isNaN(pieces)) {
+            quantityStr = (pieces * coefficient).toFixed(2);
+        }
+
+        setEditValues({
+            pieces: piecesStr,
+            quantity: quantityStr
+        });
+    };
+
+    const handleEditQuantityChange = (quantityStr: string, coefficient: number) => {
+        const quantity = parseFloat(quantityStr);
+        let piecesStr = editValues.pieces;
+
+        if (!isNaN(quantity)) {
+            if (coefficient && coefficient !== 1) {
+                piecesStr = (quantity / coefficient).toFixed(2);
+            } else {
+                piecesStr = quantity.toString();
+            }
+        }
+
+        setEditValues({
+            pieces: piecesStr,
+            quantity: quantityStr
+        });
     };
 
     const removeLine = (tempId: string) => {
@@ -460,10 +540,31 @@ export default function EditLoadNotePage() {
                                                             <div className="text-xs text-muted-foreground font-mono">{line.itemCode}</div>
                                                         </TableCell>
                                                         <TableCell className="text-center font-medium">
-                                                            {line.pieces}
+                                                            {editingLineId === line.tempId ? (
+                                                                <Input
+                                                                    type="number"
+                                                                    className="h-8 w-20 mx-auto text-center"
+                                                                    value={editValues.pieces}
+                                                                    onChange={(e) => handleEditPiecesChange(e.target.value, line.coefficient)}
+                                                                />
+                                                            ) : (
+                                                                line.pieces
+                                                            )}
                                                         </TableCell>
                                                         <TableCell className="text-right font-bold">
-                                                            {line.quantity} <span className="text-muted-foreground text-xs font-normal">{line.unit}</span>
+                                                            {editingLineId === line.tempId ? (
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <Input
+                                                                        type="number"
+                                                                        className="h-8 w-24 text-right"
+                                                                        value={editValues.quantity}
+                                                                        onChange={(e) => handleEditQuantityChange(e.target.value, line.coefficient)}
+                                                                    />
+                                                                    <span className="text-muted-foreground text-xs font-normal">{line.unit}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <>{line.quantity} <span className="text-muted-foreground text-xs font-normal">{line.unit}</span></>
+                                                            )}
                                                         </TableCell>
                                                         {noteType === 'uscita' && (
                                                             <>
@@ -480,14 +581,45 @@ export default function EditLoadNotePage() {
                                                             </>
                                                         )}
                                                         <TableCell>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => removeLine(line.tempId)}
-                                                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                                                            >
-                                                                <Trash className="h-4 w-4" />
-                                                            </Button>
+                                                            {editingLineId === line.tempId ? (
+                                                                <div className="flex items-center gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => saveEdit(line.tempId, line.coefficient)}
+                                                                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                                                    >
+                                                                        <Check className="h-4 w-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={cancelEdit}
+                                                                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                    >
+                                                                        <X className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => startEditing(line)}
+                                                                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                                                                    >
+                                                                        <Pencil className="h-4 w-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => removeLine(line.tempId)}
+                                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+                                                                    >
+                                                                        <Trash className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            )}
                                                         </TableCell>
                                                     </TableRow>
                                                 );
