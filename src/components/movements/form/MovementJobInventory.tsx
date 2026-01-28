@@ -23,6 +23,15 @@ export function MovementJobInventory({ jobBatchAvailability, onSelectBatch }: Mo
         if (words.length === 0) return true
         const searchTarget = `${batch.itemName} ${batch.itemCode} ${batch.itemModel || ''}`.toLowerCase()
         return words.every(word => searchTarget.includes(word))
+    }).sort((a, b) => {
+        // Sort by name ASC
+        const nameDiff = a.itemName.localeCompare(b.itemName);
+        if (nameDiff !== 0) return nameDiff;
+
+        // Sort by date DESC (if same name)
+        const dateA = new Date(a.purchaseDate || 0).getTime();
+        const dateB = new Date(b.purchaseDate || 0).getTime();
+        return dateB - dateA;
     });
 
     const handleSelect = (batch: any) => {
