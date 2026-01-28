@@ -65,7 +65,8 @@ export function getCroppedImg(
     crop: PixelCrop,
     fileName: string,
     width = 400,
-    height = 400
+    height = 400,
+    mimeType = 'image/png'
 ): Promise<File> {
     const canvas = document.createElement('canvas');
     const scaleX = image.naturalWidth / image.width;
@@ -104,10 +105,10 @@ export function getCroppedImg(
             }
             // Create a File from the Blob
             const file = new File([blob], fileName, {
-                type: 'image/jpeg',
+                type: mimeType,
                 lastModified: Date.now(),
             });
             resolve(file);
-        }, 'image/jpeg', 0.95); // High quality JPEG
+        }, mimeType, 0.95); // High quality
     });
 }
