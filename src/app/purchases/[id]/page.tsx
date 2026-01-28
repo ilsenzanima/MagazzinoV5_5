@@ -991,13 +991,15 @@ export default function PurchaseDetailPage() {
                                         {items.map((item) => {
                                             const batch = batchAvailability.find(b => b.id === item.id);
                                             const isJobAssigned = purchase?.jobId != null;
-                                            const remaining = isJobAssigned ? 0 : (batch ? batch.remainingQty : item.quantity);
+                                            // FIX: Use batch remainingQty if available, otherwise fallback.
+                                            // Don't force 0 for isJobAssigned if we have actual batch data (which includes returns).
+                                            const remaining = batch ? batch.remainingQty : (isJobAssigned ? 0 : item.quantity);
                                             const original = item.quantity;
 
                                             let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
                                             let statusText = "Disponibile";
 
-                                            if (isJobAssigned) {
+                                            if (isJobAssigned && remaining <= 0.001) {
                                                 statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
                                                 statusText = "A cantiere";
                                             } else if (remaining <= 0.001) {
@@ -1088,13 +1090,14 @@ export default function PurchaseDetailPage() {
                                 {items.map((item) => {
                                     const batch = batchAvailability.find(b => b.id === item.id);
                                     const isJobAssigned = purchase?.jobId != null;
-                                    const remaining = isJobAssigned ? 0 : (batch ? batch.remainingQty : item.quantity);
+                                    // FIX: Use batch remainingQty if available, otherwise fallback.
+                                    const remaining = batch ? batch.remainingQty : (isJobAssigned ? 0 : item.quantity);
                                     const original = item.quantity;
 
                                     let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
                                     let statusText = "Disponibile";
 
-                                    if (isJobAssigned) {
+                                    if (isJobAssigned && remaining <= 0.001) {
                                         statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
                                         statusText = "A cantiere";
                                     } else if (remaining <= 0.001) {
