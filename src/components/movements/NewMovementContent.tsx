@@ -205,6 +205,14 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                        I will stick to the same layout.
                     */}
                     <div className="space-y-6">
+                        {/* Riepilogo */}
+                        <div className="bg-slate-50 dark:bg-muted p-4 rounded-lg border dark:border-border text-sm text-slate-500 dark:text-slate-400">
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Riepilogo</h4>
+                            <p>Righe inserite: {form.lines.length}</p>
+                            <p>Pezzi totali: {form.lines.reduce((acc, l) => acc + (l.pieces || 0), 0)}</p>
+                            <p>Quantità totale: {form.lines.reduce((acc, l) => acc + l.quantity, 0)}</p>
+                        </div>
+
                         {/* Notes Assistant Button */}
                         <Button
                             variant="outline"
@@ -214,14 +222,6 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                             <FileText className="h-4 w-4" />
                             Assistente Note di Carico
                         </Button>
-
-                        {/* Riepilogo */}
-                        <div className="bg-slate-50 dark:bg-muted p-4 rounded-lg border dark:border-border text-sm text-slate-500 dark:text-slate-400">
-                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Riepilogo</h4>
-                            <p>Righe inserite: {form.lines.length}</p>
-                            <p>Pezzi totali: {form.lines.reduce((acc, l) => acc + (l.pieces || 0), 0)}</p>
-                            <p>Quantità totale: {form.lines.reduce((acc, l) => acc + l.quantity, 0)}</p>
-                        </div>
                     </div>
                 </div>
             </Tabs>
