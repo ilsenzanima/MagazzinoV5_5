@@ -988,7 +988,8 @@ export default function PurchaseDetailPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-            const batch = batchAvailability.find(b => b.id === item.id);
+                                        {items.map((item) => {
+                                            const batch = batchAvailability.find(b => b.id === item.id);
                                             const isJobAssigned = purchase?.jobId != null;
                                             // FIX: Use batch remainingQty if available, otherwise fallback.
                                             // Don't force 0 for isJobAssigned if we have actual batch data (which includes returns).
@@ -1103,7 +1104,7 @@ export default function PurchaseDetailPage() {
                             {/* Mobile View */}
                             <div className="md:hidden space-y-2">
                                 {items.map((item) => {
-            const batch = batchAvailability.find(b => b.id === item.id);
+                                    const batch = batchAvailability.find(b => b.id === item.id);
                                     const isJobAssigned = purchase?.jobId != null;
                                     // FIX: Use batch remainingQty if available, otherwise fallback.
                                     const remaining = batch ? batch.remainingQty : (isJobAssigned ? 0 : item.quantity);
@@ -1214,7 +1215,8 @@ export default function PurchaseDetailPage() {
                                             )}
                                         </div>
                                     );
-                                })}
+                                })
+                                }
                             </div>
                         </CardContent>
                     </Card>
