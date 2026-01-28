@@ -23,6 +23,7 @@ interface MovementLinesInputProps {
     inventory: InventoryItem[];
     onItemSearch: (term: string) => Promise<void>;
     itemsLoading: boolean;
+    headerActions?: React.ReactNode;
 }
 
 export function MovementLinesInput({
@@ -30,7 +31,8 @@ export function MovementLinesInput({
     selectedItem, onItemSelect, onAddLine,
     availableBatches, activeTab,
     isItemSelectorOpen, setIsItemSelectorOpen,
-    inventory, onItemSearch, itemsLoading
+    inventory, onItemSearch, itemsLoading,
+    headerActions
 }: MovementLinesInputProps) {
 
     // For entry (reso), disable this input - user must use job inventory selector
@@ -39,10 +41,13 @@ export function MovementLinesInput({
     return (
         <Card className={isEntryTab ? 'opacity-60' : ''}>
             <CardHeader>
-                <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    Inserimento Righe
-                    {isEntryTab && <span className="text-xs text-amber-600 dark:text-amber-400 font-normal">(usa selezione da cantiere sopra)</span>}
+                <CardTitle className="text-sm font-medium text-slate-500 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Inserimento Righe
+                        {isEntryTab && <span className="text-xs text-amber-600 dark:text-amber-400 font-normal hidden sm:inline">(usa selezione da cantiere sopra)</span>}
+                    </div>
+                    {headerActions && <div>{headerActions}</div>}
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
