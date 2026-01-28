@@ -988,8 +988,7 @@ export default function PurchaseDetailPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {items.map((item) => {
-                                            const batch = batchAvailability.find(b => b.id === item.id);
+            const batch = batchAvailability.find(b => b.id === item.id);
                                             const isJobAssigned = purchase?.jobId != null;
                                             // FIX: Use batch remainingQty if available, otherwise fallback.
                                             // Don't force 0 for isJobAssigned if we have actual batch data (which includes returns).
@@ -1013,7 +1012,23 @@ export default function PurchaseDetailPage() {
                                                 statusText = "Eccedenza";
                                             }
 
-                                            const jobMovements = itemJobMovements[item.id] || [];
+                                            let jobMovements = itemJobMovements[item.id] || [];
+                                            // FIX: For direct purchases with no explicit movements (returns/transfers), 
+                                            // show the initial purchase as a movement to the job.
+                                            if (isJobAssigned && jobMovements.length === 0) {
+                                                const job = jobs.find(j => j.id === purchase.jobId);
+                                                if (job) {
+                                                    jobMovements = [{
+                                                        jobId: job.id,
+                                                        jobCode: job.code,
+                                                        jobName: job.name,
+                                                        jobDescription: job.description,
+                                                        totalQuantity: item.quantity,
+                                                        totalPieces: item.pieces || 0
+                                                    }];
+                                                }
+                                            }
+
                                             const isExpanded = expandedItems.has(item.id);
                                             const hasMovements = jobMovements.length > 0;
 
@@ -1088,7 +1103,7 @@ export default function PurchaseDetailPage() {
                             {/* Mobile View */}
                             <div className="md:hidden space-y-2">
                                 {items.map((item) => {
-                                    const batch = batchAvailability.find(b => b.id === item.id);
+            const batch = batchAvailability.find(b => b.id === item.id);
                                     const isJobAssigned = purchase?.jobId != null;
                                     // FIX: Use batch remainingQty if available, otherwise fallback.
                                     const remaining = batch ? batch.remainingQty : (isJobAssigned ? 0 : item.quantity);
@@ -1111,7 +1126,23 @@ export default function PurchaseDetailPage() {
                                         statusText = "Eccedenza";
                                     }
 
-                                    const jobMovements = itemJobMovements[item.id] || [];
+                                    let jobMovements = itemJobMovements[item.id] || [];
+                                    // FIX: For direct purchases with no explicit movements (returns/transfers),
+                                    // show the initial purchase as a movement to the job.
+                                    if (isJobAssigned && jobMovements.length === 0) {
+                                        const job = jobs.find(j => j.id === purchase.jobId);
+                                        if (job) {
+                                            jobMovements = [{
+                                                jobId: job.id,
+                                                jobCode: job.code,
+                                                jobName: job.name,
+                                                jobDescription: job.description,
+                                                totalQuantity: item.quantity,
+                                                totalPieces: item.pieces || 0
+                                            }];
+                                        }
+                                    }
+
                                     const isExpanded = expandedItems.has(item.id);
                                     const hasMovements = jobMovements.length > 0;
 
