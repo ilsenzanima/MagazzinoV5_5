@@ -184,9 +184,11 @@ export const attendanceApi = {
     },
 
     // New: Get total hours for all ACTIVE jobs (for dashboard)
-    getActiveJobHours: async (): Promise<{ jobId: string; jobName: string; jobCode: string; totalHours: number }[]> => {
+    getActiveJobHours: async (client?: any): Promise<{ jobId: string; jobName: string; jobCode: string; totalHours: number }[]> => {
+        const supabaseClient = client || supabase;
+
         // 1. Get Active Jobs first
-        const { data: activeJobs, error: jobsError } = await supabase
+        const { data: activeJobs, error: jobsError } = await supabaseClient
             .from('jobs')
             .select('id, name, code')
             .eq('status', 'active');
@@ -194,10 +196,10 @@ export const attendanceApi = {
         if (jobsError) throw jobsError;
         if (!activeJobs || activeJobs.length === 0) return [];
 
-        const activeJobIds = activeJobs.map(j => j.id);
+        const activeJobIds = activeJobs.map((j: any) => j.id);
 
         // 2. Get Attendance for these jobs
-        const { data: attendance, error: attError } = await supabase
+        const { data: attendance, error: attError } = await supabaseClient
             .from('attendance')
             .select('job_id, hours')
             .in('job_id', activeJobIds);
@@ -212,11 +214,11 @@ export const attendanceApi = {
         });
 
         // 4. Map back to job details
-        return activeJobs.map(job => ({
+        return activeJobs.map((job: any) => ({
             jobId: job.id,
             jobName: job.name,
             jobCode: job.code,
             totalHours: hoursMap.get(job.id) || 0
-        })).sort((a, b) => b.totalHours - a.totalHours); // Sort by hours desc
+        })).sort((a: any, b: any) => b.totalHours - a.totalHours); // Sort by hours desc
     }
 };
