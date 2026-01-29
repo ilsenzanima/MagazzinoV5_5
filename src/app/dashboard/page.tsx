@@ -43,7 +43,7 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(5),
     supabase.from('jobs').select('status'),
-    attendanceApi.getActiveJobHours()
+    attendanceApi.getActiveJobHours(supabase)
   ]);
 
   // Process Stats
