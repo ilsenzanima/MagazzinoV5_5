@@ -21,11 +21,13 @@ interface DashboardStats {
 export const DashboardClient = memo(function DashboardClient({
   initialStats,
   recentMovements,
-  jobStats
+  jobStats,
+  activeJobHours
 }: {
   initialStats: DashboardStats,
   recentMovements: any[], // Definito meglio nel componente figlio, ma qui passiamo i dati
-  jobStats: any // Idem
+  jobStats: any, // Idem
+  activeJobHours: any[] // Nuovi dati per il grafico ore
 }) {
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -56,7 +58,7 @@ export const DashboardClient = memo(function DashboardClient({
                 <RecentMovements data={recentMovements} />
               </div>
               <div className="md:col-span-1 lg:col-span-3">
-                <ActiveJobsWidget stats={jobStats} />
+                <ActiveJobsWidget stats={jobStats} activeJobHours={activeJobHours} />
               </div>
             </div>
 

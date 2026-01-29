@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Package, AlertTriangle, Euro } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
+import Link from "next/link";
 
 interface StatsCardsProps {
   totalValue: number;
@@ -37,15 +38,17 @@ export const StatsCards = memo(function StatsCards({ totalValue, lowStockCount, 
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-          <div className="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">Articoli in Scorta Minima</div>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">{lowStockCount}</span>
-          </div>
-        </CardContent>
-      </Card>
+      <Link href="/inventory?tab=low_stock">
+        <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <div className="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">Articoli in Scorta Minima</div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{lowStockCount}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
 
       <Card>
         <CardContent className="p-4 flex flex-col items-center justify-center text-center">

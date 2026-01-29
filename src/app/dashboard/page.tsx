@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"; // Importante: usa la versione SERVER
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import { attendanceApi } from "@/lib/api";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,7 +24,7 @@ export default async function DashboardPage() {
   const supabase = await createClient();
 
   // Fetch all data in parallel for performance
-  const [statsResult, movementsResult, jobsResult] = await Promise.allSettled([
+  const [statsResult, movementsResult, jobsResult, hoursResult] = await Promise.allSettled([
     supabase.rpc('get_dashboard_stats'),
     supabase
       .from('delivery_notes')
@@ -41,7 +42,8 @@ export default async function DashboardPage() {
       `)
       .order('created_at', { ascending: false })
       .limit(5),
-    supabase.from('jobs').select('status')
+    supabase.from('jobs').select('status'),
+    attendanceApi.getActiveJobHours()
   ]);
 
   // Process Stats
@@ -70,8 +72,6 @@ export default async function DashboardPage() {
     return acc;
   }, { active: 0, completed: 0, suspended: 0, total: (jobsData?.length || 0) });
 
-  // Eplicitly add total if not calculated above (reduce implementation above doesn't add total property to acc except initial)
-  // Fix: The reduce above accumulates into {active, completed, suspended}, we need to add total separately or include it.
   const finalJobStats = {
     active: jobStats.active || 0,
     completed: jobStats.completed || 0,
@@ -79,12 +79,17 @@ export default async function DashboardPage() {
     total: jobsData?.length || 0
   };
 
+  // Process Job Hours
+  const activeJobHours = hoursResult.status === 'fulfilled' ? hoursResult.value : [];
+  if (hoursResult.status === 'rejected') console.error("Error fetching job hours:", hoursResult.reason);
+
   return (
     <Suspense fallback={<DashboardSkeleton />}>
       <DashboardClient
         initialStats={stats}
         recentMovements={recentMovements}
         jobStats={finalJobStats}
+        activeJobHours={activeJobHours}
       />
     </Suspense>
   );
