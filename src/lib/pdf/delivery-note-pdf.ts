@@ -343,7 +343,9 @@ export async function generateDeliveryNotePDF(
         'sale': 'vendita'
     };
     const dateFormatted = format(new Date(movement.date), 'yyyyMMMdd', { locale: it });
-    const jobName = (movement.jobDescription || movement.jobCode || 'magazzino')
+    // Use jobName if available, otherwise fall back to description or code
+    const rawJobName = movement.jobName || movement.jobDescription || movement.jobCode || 'magazzino';
+    const jobName = rawJobName
         .replace(/[^a-zA-Z0-9\s]/g, '')
         .replace(/\s+/g, '_')
         .substring(0, 30);
