@@ -42,6 +42,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 export default function LoadNotesPage() {
     const router = useRouter();
     const [notes, setNotes] = useState<LoadNote[]>([]);
@@ -68,7 +70,7 @@ export default function LoadNotesPage() {
     }, [searchTerm]);
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
-        e.preventDefault(); // Prevent link navigation if inside a link (though here we use actions column)
+        e.preventDefault();
         e.stopPropagation();
 
         if (!confirm("Sei sicuro di voler eliminare questa nota?")) return;
@@ -89,11 +91,14 @@ export default function LoadNotesPage() {
         try {
             await loadNotesService.toggleStatus(id, currentStatus);
             toast.success(currentStatus === 'pending' ? "Nota archiviata" : "Nota riaperta");
-            fetchNotes(); // Refresh list to update sort order
+            fetchNotes();
         } catch (error) {
             toast.error("Impossibile aggiornare lo stato");
         }
     };
+
+    const pendingNotes = notes.filter(n => n.status === 'pending');
+    const completedNotes = notes.filter(n => n.status !== 'pending');
 
     return (
         <DashboardLayout>
@@ -127,143 +132,196 @@ export default function LoadNotesPage() {
                     </div>
                 </div>
 
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle>Elenco Note</CardTitle>
-                        <CardDescription>
-                            Le note non ancora prese in carico appaiono per prime.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? (
-                            <div className="text-center py-8 text-muted-foreground">Caricamento...</div>
-                        ) : notes.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">
-                                Nessuna nota trovata.
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto -mx-2 px-2">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-[40px] sm:w-[100px]">Stato</TableHead>
-                                            <TableHead className="hidden sm:table-cell w-[100px]">Data</TableHead>
-                                            <TableHead>Commessa / Note</TableHead>
-                                            <TableHead className="hidden md:table-cell w-[120px]">Autore</TableHead>
-                                            <TableHead className="text-right w-[70px] sm:w-[80px]">Azioni</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {notes.map((note) => (
-                                            <TableRow
-                                                key={note.id}
-                                                className="group cursor-pointer hover:bg-muted/50"
-                                                onClick={() => router.push(`/load-notes/${note.id}`)}
-                                            >
-                                                <TableCell>
-                                                    {note.status === 'pending' ? (
-                                                        <>
-                                                            {/* Mobile: icon only */}
-                                                            <span className="sm:hidden" title="Da processare">
-                                                                <Clock className="h-5 w-5 text-yellow-600" />
-                                                            </span>
-                                                            {/* Desktop: full badge */}
-                                                            <Badge variant="secondary" className="hidden sm:inline-flex bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200">
-                                                                DA PROCESSARE
-                                                            </Badge>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            {/* Mobile: icon only */}
-                                                            <span className="sm:hidden" title="Completata">
-                                                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                                            </span>
-                                                            {/* Desktop: full badge */}
-                                                            <Badge variant="outline" className="hidden sm:inline-flex text-green-600 border-green-200 bg-green-50">
-                                                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                                                COMPLETATA
-                                                            </Badge>
-                                                        </>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="hidden sm:table-cell font-medium whitespace-nowrap">
-                                                    {format(new Date(note.date), "dd MMM yyyy", { locale: it })}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        {/* Mobile: show date inline */}
-                                                        <span className="sm:hidden text-[10px] text-muted-foreground">
-                                                            {format(new Date(note.date), "dd/MM/yy", { locale: it })}
-                                                        </span>
-                                                        {/* Job info with type icon */}
-                                                        <div className="flex items-center gap-1">
-                                                            {/* Type icon */}
-                                                            <span title={note.noteType === 'reso' ? 'Reso' : 'Uscita'}>
-                                                                {note.noteType === 'reso' ? (
-                                                                    <ArrowDownRight className="h-4 w-4 text-green-600 shrink-0" />
-                                                                ) : (
-                                                                    <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
-                                                                )}
-                                                            </span>
-                                                            {/* Job name */}
-                                                            {note.jobCode ? (
-                                                                <span className="text-sm font-medium line-clamp-1 sm:truncate sm:max-w-[220px]" title={note.jobDescription}>
-                                                                    {note.jobDescription || note.jobCode}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-muted-foreground italic text-sm">Nessuna commessa</span>
-                                                            )}
-                                                        </div>
-                                                        {/* Notes - always visible when present */}
-                                                        {note.notes && (
-                                                            <span className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2 pl-5">
-                                                                {note.notes}
-                                                            </span>
-                                                        )}
-                                                        {/* Desktop only: item count */}
-                                                        {note.items.length > 0 && (
-                                                            <span className="hidden sm:flex items-center text-[10px] text-muted-foreground pl-5">
-                                                                <Package className="h-3 w-3 mr-1" />
-                                                                {note.items.length} articoli
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                {/* Creator column - desktop only */}
-                                                <TableCell className="hidden md:table-cell">
-                                                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                                        <User className="h-3 w-3" />
-                                                        <span className="truncate max-w-[100px]">{note.createdByName || '-'}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={(e) => handleToggleStatus(note.id, note.status, e)}
-                                                            title={note.status === 'pending' ? "Segna come completata" : "Riapri nota"}
-                                                        >
-                                                            {note.status === 'pending' ? (
-                                                                <Archive className="h-4 w-4 text-green-600" />
-                                                            ) : (
-                                                                <RotateCcw className="h-4 w-4 text-orange-500" />
-                                                            )}
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" onClick={(e) => handleDelete(note.id, e)}>
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <Tabs defaultValue="pending" className="w-full">
+                    <TabsList className="grid w-full max-w-[400px] grid-cols-2 mb-4">
+                        <TabsTrigger value="pending">
+                            Da Processare
+                            {pendingNotes.length > 0 && (
+                                <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px]">
+                                    {pendingNotes.length}
+                                </Badge>
+                            )}
+                        </TabsTrigger>
+                        <TabsTrigger value="completed">Completate</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="pending">
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle>Da Processare</CardTitle>
+                                <CardDescription>
+                                    Note che richiedono attenzione o scarico magazzino.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <NotesTable
+                                    notes={pendingNotes}
+                                    loading={loading}
+                                    onDelete={handleDelete}
+                                    onToggle={handleToggleStatus}
+                                    router={router}
+                                />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="completed">
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle>Archivio Completate</CardTitle>
+                                <CardDescription>
+                                    Storico delle note già processate.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <NotesTable
+                                    notes={completedNotes}
+                                    loading={loading}
+                                    onDelete={handleDelete}
+                                    onToggle={handleToggleStatus}
+                                    router={router}
+                                />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
         </DashboardLayout>
+    );
+}
+
+function NotesTable({
+    notes,
+    loading,
+    onDelete,
+    onToggle,
+    router
+}: {
+    notes: LoadNote[],
+    loading: boolean,
+    onDelete: (id: string, e: React.MouseEvent) => void,
+    onToggle: (id: string, status: string, e: React.MouseEvent) => void,
+    router: any
+}) {
+    if (loading) {
+        return <div className="text-center py-8 text-muted-foreground">Caricamento...</div>;
+    }
+
+    if (notes.length === 0) {
+        return (
+            <div className="text-center py-8 text-muted-foreground">
+                Nessuna nota in questo elenco.
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-x-auto -mx-2 px-2">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="w-[40px] sm:w-[100px]">Stato</TableHead>
+                        <TableHead className="hidden sm:table-cell w-[100px]">Data</TableHead>
+                        <TableHead>Commessa / Note</TableHead>
+                        <TableHead className="hidden md:table-cell w-[120px]">Autore</TableHead>
+                        <TableHead className="text-right w-[70px] sm:w-[80px]">Azioni</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {notes.map((note) => (
+                        <TableRow
+                            key={note.id}
+                            className="group cursor-pointer hover:bg-muted/50"
+                            onClick={() => router.push(`/load-notes/${note.id}`)}
+                        >
+                            <TableCell>
+                                {note.status === 'pending' ? (
+                                    <>
+                                        <span className="sm:hidden" title="Da processare">
+                                            <Clock className="h-5 w-5 text-yellow-600" />
+                                        </span>
+                                        <Badge variant="secondary" className="hidden sm:inline-flex bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200">
+                                            DA PROCESSARE
+                                        </Badge>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="sm:hidden" title="Completata">
+                                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                        </span>
+                                        <Badge variant="outline" className="hidden sm:inline-flex text-green-600 border-green-200 bg-green-50">
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                            COMPLETATA
+                                        </Badge>
+                                    </>
+                                )}
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell font-medium whitespace-nowrap">
+                                {format(new Date(note.date), "dd MMM yyyy", { locale: it })}
+                            </TableCell>
+                            <TableCell>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="sm:hidden text-[10px] text-muted-foreground">
+                                        {format(new Date(note.date), "dd/MM/yy", { locale: it })}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        <span title={note.noteType === 'reso' ? 'Reso' : 'Uscita'}>
+                                            {note.noteType === 'reso' ? (
+                                                <ArrowDownRight className="h-4 w-4 text-green-600 shrink-0" />
+                                            ) : (
+                                                <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
+                                            )}
+                                        </span>
+                                        {note.jobCode ? (
+                                            <span className="text-sm font-medium line-clamp-1 sm:truncate sm:max-w-[220px]" title={note.jobDescription}>
+                                                {note.jobDescription || note.jobCode}
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted-foreground italic text-sm">Nessuna commessa</span>
+                                        )}
+                                    </div>
+                                    {note.notes && (
+                                        <span className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2 pl-5">
+                                            {note.notes}
+                                        </span>
+                                    )}
+                                    {note.items.length > 0 && (
+                                        <span className="hidden sm:flex items-center text-[10px] text-muted-foreground pl-5">
+                                            <Package className="h-3 w-3 mr-1" />
+                                            {note.items.length} articoli
+                                        </span>
+                                    )}
+                                </div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <User className="h-3 w-3" />
+                                    <span className="truncate max-w-[100px]">{note.createdByName || '-'}</span>
+                                </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => onToggle(note.id, note.status, e)}
+                                        title={note.status === 'pending' ? "Segna come completata" : "Riapri nota"}
+                                    >
+                                        {note.status === 'pending' ? (
+                                            <Archive className="h-4 w-4 text-green-600" />
+                                        ) : (
+                                            <RotateCcw className="h-4 w-4 text-orange-500" />
+                                        )}
+                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={(e) => onDelete(note.id, e)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
     );
 }
