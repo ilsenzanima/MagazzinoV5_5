@@ -19,6 +19,7 @@ import {
   Loader2
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { InventoryItem } from "@/lib/mock-data";
 import { inventoryApi, itemTypesApi, ItemType } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -58,10 +59,13 @@ interface InventoryClientProps {
 
 export default function InventoryClient({ initialItems, initialTotal, initialTypes }: InventoryClientProps) {
   const { userRole } = useAuth();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") || "all";
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>(initialItems);
   const [itemTypes, setItemTypes] = useState<ItemType[]>(initialTypes);
