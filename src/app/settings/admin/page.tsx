@@ -27,7 +27,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
 import { User } from "@/lib/mock-data";
 export default function SettingsAdminPage() {
-    const { user: currentUser, setSimulatedRole, realRole } = useAuth();
+    const { user: currentUser, setSimulatedRole, realRole, userRole } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
 
@@ -38,7 +38,7 @@ export default function SettingsAdminPage() {
     // Connection State
     const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [userRole, setUserRole] = useState<string | null>(null);
+    // REMOVED local userRole state - using from useAuth
 
     // Seed State
     const [seedLoading, setSeedLoading] = useState(false);
@@ -51,6 +51,7 @@ export default function SettingsAdminPage() {
     }, [currentUser]);
 
     useEffect(() => {
+        // Only fetch users if effectively admin
         if (userRole === 'admin') {
             fetchUsers();
         }
@@ -68,33 +69,8 @@ export default function SettingsAdminPage() {
 
             setConnectionStatus('connected');
 
-            if (currentUser) {
-                const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', currentUser.id)
-                    .single();
-
-                if (profileError && profileError.code === 'PGRST116') {
-                    // Profile not found, try to create it (Self-repair)
-                    // Since this is the admin page, we assume the first user reaching here might need to be admin
-                    // We try to insert. If RLS allows, it works.
-                    const { error: insertError } = await supabase
-                        .from('profiles')
-                        .insert([{
-                            id: currentUser.id,
-                            role: 'admin',
-                            email: currentUser.email // helpful for debugging
-                        }]);
-
-                    if (!insertError) {
-                        setUserRole('admin');
-                        return;
-                    }
-                }
-
-                setUserRole(profile?.role || 'user');
-            }
+            // Note: We rely on AuthProvider for role management now.
+            // verifying specific permissions happens via RLS and API.
         } catch (err: any) {
             console.error("Connection error:", err);
             setConnectionStatus('error');

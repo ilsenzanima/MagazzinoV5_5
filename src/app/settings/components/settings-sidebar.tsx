@@ -12,6 +12,7 @@ import {
   Database,
   HardDrive
 } from "lucide-react";
+import { useAuth } from "@/components/auth-provider";
 
 const sidebarNavItems = [
   {
@@ -50,6 +51,7 @@ interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> { }
 
 export function SidebarNav({ className, ...props }: SidebarNavProps) {
   const pathname = usePathname();
+  const { userRole, realRole } = useAuth();
 
   return (
     <nav
@@ -59,22 +61,30 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
       )}
       {...props}
     >
-      {sidebarNavItems.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={cn(
-            buttonVariants({ variant: "ghost" }),
-            pathname === item.href
-              ? "bg-slate-200 dark:bg-slate-700 text-foreground font-semibold"
-              : "hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground",
-            "justify-start whitespace-nowrap transition-colors"
-          )}
-        >
-          <item.icon className="mr-2 h-4 w-4" />
-          {item.title}
-        </Link>
-      ))}
+      {sidebarNavItems
+        .filter(item => {
+          if (item.href === "/settings/admin") {
+            // Show if effectively admin OR real admin (so they can disable simulation)
+            return userRole === 'admin' || realRole === 'admin';
+          }
+          return true;
+        })
+        .map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              buttonVariants({ variant: "ghost" }),
+              pathname === item.href
+                ? "bg-slate-200 dark:bg-slate-700 text-foreground font-semibold"
+                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground",
+              "justify-start whitespace-nowrap transition-colors"
+            )}
+          >
+            <item.icon className="mr-2 h-4 w-4" />
+            {item.title}
+          </Link>
+        ))}
     </nav>
   );
 }
