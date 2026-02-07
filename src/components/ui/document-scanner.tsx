@@ -4,7 +4,7 @@ import { notify } from "@/lib/notify";
 import { useState, useRef, useCallback, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Camera, RotateCcw, Check, Loader2, Plus, Trash2, FileText, GripVertical, RotateCw, Move } from "lucide-react"
+import { Camera, RotateCcw, Check, Loader2, Plus, Trash2, FileText, GripVertical, RotateCw, Crop } from "lucide-react"
 import { jsPDF } from "jspdf"
 
 interface DocumentScannerProps {
@@ -15,209 +15,25 @@ interface DocumentScannerProps {
 
 interface ScannedPage {
     id: string
-    originalImage: string
     processedImage: string
 }
 
-interface Corner {
+interface CropArea {
     x: number
     y: number
+    width: number
+    height: number
 }
 
-type ScannerStep = 'capture' | 'corners' | 'preview' | 'pages' | 'generating'
-
-// ZoomWindow component for magnifying corner area
-interface ZoomWindowProps {
-    imageSrc: string
-    cornerX: number
-    cornerY: number
-    displayWidth: number
-    displayHeight: number
-    originalWidth: number
-    originalHeight: number
-}
-
-function ZoomWindow({ imageSrc, cornerX, cornerY, displayWidth, displayHeight, originalWidth, originalHeight }: ZoomWindowProps) {
-    const canvasRef = useRef<HTMLCanvasElement>(null)
-
-    useEffect(() => {
-        const canvas = canvasRef.current
-        if (!canvas) return
-
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-
-        const img = new Image()
-        img.onload = () => {
-            const zoomSize = 128 // Canvas size
-            const zoomLevel = 3 // 3x magnification
-            const viewRadius = zoomSize / (2 * zoomLevel) // Radius of view in display coords
-
-            // Scale from display coords to original image coords
-            const scaleX = originalWidth / displayWidth
-            const scaleY = originalHeight / displayHeight
-
-            // Calculate source position in original image
-            const srcX = cornerX * scaleX
-            const srcY = cornerY * scaleY
-
-            // Calculate source region size
-            const srcViewRadius = viewRadius * Math.max(scaleX, scaleY)
-
-            // Clear and draw
-            ctx.fillStyle = '#ffffff'
-            ctx.fillRect(0, 0, zoomSize, zoomSize)
-
-            ctx.drawImage(
-                img,
-                srcX - srcViewRadius, srcY - srcViewRadius,
-                srcViewRadius * 2, srcViewRadius * 2,
-                0, 0,
-                zoomSize, zoomSize
-            )
-
-            // Draw crosshair
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)'
-            ctx.lineWidth = 1
-            ctx.beginPath()
-            ctx.moveTo(zoomSize / 2, 0)
-            ctx.lineTo(zoomSize / 2, zoomSize)
-            ctx.moveTo(0, zoomSize / 2)
-            ctx.lineTo(zoomSize, zoomSize / 2)
-            ctx.stroke()
-
-            // Draw center circle
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)'
-            ctx.lineWidth = 2
-            ctx.beginPath()
-            ctx.arc(zoomSize / 2, zoomSize / 2, 6, 0, Math.PI * 2)
-            ctx.stroke()
-        }
-        img.src = imageSrc
-    }, [imageSrc, cornerX, cornerY, displayWidth, displayHeight, originalWidth, originalHeight])
-
-    return (
-        <div className="absolute top-2 right-2 w-32 h-32 border-2 border-blue-500 rounded-lg overflow-hidden bg-white shadow-xl z-30">
-            <canvas ref={canvasRef} width={128} height={128} className="w-full h-full" />
-        </div>
-    )
-}
-
-// Apply perspective transform using Canvas
-function applyPerspectiveTransform(
-    imageSrc: string,
-    corners: Corner[],
-    outputWidth: number,
-    outputHeight: number
-): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const img = new Image()
-        img.onload = () => {
-            // Create output canvas
-            const canvas = document.createElement('canvas')
-            canvas.width = outputWidth
-            canvas.height = outputHeight
-            const ctx = canvas.getContext('2d')
-
-            if (!ctx) {
-                reject(new Error('No canvas context'))
-                return
-            }
-
-            // For perspective transform, we need to map each pixel
-            // We'll use a simplified approach: divide into triangles and use drawImage with clipping
-
-            // Scale corners to actual image size
-            const scaleX = img.naturalWidth / img.width
-            const scaleY = img.naturalHeight / img.height
-
-            const srcCorners = corners.map(c => ({
-                x: c.x * scaleX,
-                y: c.y * scaleY
-            }))
-
-            // Destination corners (rectangle)
-            const dstCorners = [
-                { x: 0, y: 0 },
-                { x: outputWidth, y: 0 },
-                { x: outputWidth, y: outputHeight },
-                { x: 0, y: outputHeight }
-            ]
-
-            // Use a grid-based approach for better quality - more cells = better quality
-            const gridSize = 40
-            const cellWidth = outputWidth / gridSize
-            const cellHeight = outputHeight / gridSize
-
-            ctx.fillStyle = 'white'
-            ctx.fillRect(0, 0, outputWidth, outputHeight)
-
-            for (let gy = 0; gy < gridSize; gy++) {
-                for (let gx = 0; gx < gridSize; gx++) {
-                    // Calculate source quad for this cell using bilinear interpolation
-                    const u0 = gx / gridSize
-                    const u1 = (gx + 1) / gridSize
-                    const v0 = gy / gridSize
-                    const v1 = (gy + 1) / gridSize
-
-                    // Bilinear interpolation for source points
-                    const getSrcPoint = (u: number, v: number) => {
-                        const top = {
-                            x: srcCorners[0].x + (srcCorners[1].x - srcCorners[0].x) * u,
-                            y: srcCorners[0].y + (srcCorners[1].y - srcCorners[0].y) * u
-                        }
-                        const bottom = {
-                            x: srcCorners[3].x + (srcCorners[2].x - srcCorners[3].x) * u,
-                            y: srcCorners[3].y + (srcCorners[2].y - srcCorners[3].y) * u
-                        }
-                        return {
-                            x: top.x + (bottom.x - top.x) * v,
-                            y: top.y + (bottom.y - top.y) * v
-                        }
-                    }
-
-                    const srcTL = getSrcPoint(u0, v0)
-                    const srcTR = getSrcPoint(u1, v0)
-                    const srcBL = getSrcPoint(u0, v1)
-                    const srcBR = getSrcPoint(u1, v1)
-
-                    // Destination rectangle for this cell
-                    const dstX = gx * cellWidth
-                    const dstY = gy * cellHeight
-
-                    // Calculate the bounding box in source
-                    const srcMinX = Math.min(srcTL.x, srcTR.x, srcBL.x, srcBR.x)
-                    const srcMinY = Math.min(srcTL.y, srcTR.y, srcBL.y, srcBR.y)
-                    const srcMaxX = Math.max(srcTL.x, srcTR.x, srcBL.x, srcBR.x)
-                    const srcMaxY = Math.max(srcTL.y, srcTR.y, srcBL.y, srcBR.y)
-                    const srcWidth = srcMaxX - srcMinX
-                    const srcHeight = srcMaxY - srcMinY
-
-                    // Draw the cell
-                    if (srcWidth > 0 && srcHeight > 0) {
-                        ctx.drawImage(
-                            img,
-                            srcMinX, srcMinY, srcWidth, srcHeight,
-                            dstX, dstY, cellWidth, cellHeight
-                        )
-                    }
-                }
-            }
-
-            resolve(canvas.toDataURL('image/jpeg', 0.9))
-        }
-        img.onerror = () => reject(new Error('Failed to load image'))
-        img.src = imageSrc
-    })
-}
+type ScannerStep = 'capture' | 'crop' | 'preview' | 'pages' | 'generating'
 
 export function DocumentScanner({ open, onOpenChange, onScanComplete }: DocumentScannerProps) {
     const [step, setStep] = useState<ScannerStep>('capture')
     const [currentImage, setCurrentImage] = useState<string | null>(null)
     const [imageSize, setImageSize] = useState({ width: 0, height: 0, displayWidth: 0, displayHeight: 0 })
-    const [corners, setCorners] = useState<Corner[]>([])
-    const [activeCorner, setActiveCorner] = useState<number | null>(null)
-    const [zoomCorner, setZoomCorner] = useState<number | null>(null)
+    const [crop, setCrop] = useState<CropArea>({ x: 0, y: 0, width: 0, height: 0 })
+    const [isDragging, setIsDragging] = useState<string | null>(null)
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
     const [processedImage, setProcessedImage] = useState<string | null>(null)
     const [pages, setPages] = useState<ScannedPage[]>([])
     const [isLoading, setIsLoading] = useState(false)
@@ -226,17 +42,17 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const imageContainerRef = useRef<HTMLDivElement>(null)
-    const zoomCanvasRef = useRef<HTMLCanvasElement>(null)
 
-    // Initialize corners when image loads
-    const initializeCorners = useCallback((width: number, height: number) => {
-        const margin = 0.1 // 10% margin from edges
-        setCorners([
-            { x: width * margin, y: height * margin },           // top-left
-            { x: width * (1 - margin), y: height * margin },     // top-right
-            { x: width * (1 - margin), y: height * (1 - margin) }, // bottom-right
-            { x: width * margin, y: height * (1 - margin) }      // bottom-left
-        ])
+    // Initialize crop area to 80% of image
+    const initializeCrop = useCallback((displayWidth: number, displayHeight: number) => {
+        const marginX = displayWidth * 0.1
+        const marginY = displayHeight * 0.1
+        setCrop({
+            x: marginX,
+            y: marginY,
+            width: displayWidth - marginX * 2,
+            height: displayHeight - marginY * 2
+        })
     }, [])
 
     const handleCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,89 +64,108 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             const imageData = event.target?.result as string
             setCurrentImage(imageData)
 
-            // Get image dimensions
             const img = new Image()
             img.onload = () => {
                 setImageSize({ width: img.width, height: img.height, displayWidth: 0, displayHeight: 0 })
-                // We'll set corners after the container renders
             }
             img.src = imageData
-
-            setStep('corners')
+            setStep('crop')
         }
         reader.readAsDataURL(file)
     }, [])
 
-    // Set corners when container is ready
+    // Set crop when image is displayed
     useEffect(() => {
-        if (step === 'corners' && imageContainerRef.current && currentImage) {
-            const container = imageContainerRef.current
-            const imgElement = container.querySelector('img')
-            if (imgElement) {
-                const rect = imgElement.getBoundingClientRect()
-                const containerRect = container.getBoundingClientRect()
-                const displayWidth = rect.width
-                const displayHeight = rect.height
-                const offsetX = rect.left - containerRect.left
-                const offsetY = rect.top - containerRect.top
+        if (step === 'crop' && imageContainerRef.current && currentImage) {
+            const updateDimensions = () => {
+                const container = imageContainerRef.current
+                const imgElement = container?.querySelector('img')
+                if (imgElement && imgElement.complete) {
+                    const rect = imgElement.getBoundingClientRect()
+                    const displayWidth = rect.width
+                    const displayHeight = rect.height
 
-                initializeCorners(displayWidth, displayHeight)
-                // Store display dimensions for zoom
-                setImageSize(prev => ({
-                    ...prev,
-                    displayWidth,
-                    displayHeight
-                }))
+                    if (displayWidth > 0 && displayHeight > 0) {
+                        setImageSize(prev => ({ ...prev, displayWidth, displayHeight }))
+                        if (crop.width === 0) {
+                            initializeCrop(displayWidth, displayHeight)
+                        }
+                    }
+                }
             }
+
+            // Try immediately and after a short delay
+            updateDimensions()
+            const timer = setTimeout(updateDimensions, 100)
+            return () => clearTimeout(timer)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [step, currentImage])
+    }, [step, currentImage, crop.width, initializeCrop])
 
-    const handleCornerDrag = useCallback((index: number, clientX: number, clientY: number) => {
-        if (!imageContainerRef.current) return
-
-        const container = imageContainerRef.current
-        const imgElement = container.querySelector('img')
-        if (!imgElement) return
-
-        const rect = imgElement.getBoundingClientRect()
-
-        // Calculate position relative to image
-        let x = clientX - rect.left
-        let y = clientY - rect.top
-
-        // Clamp to image bounds
-        x = Math.max(0, Math.min(rect.width, x))
-        y = Math.max(0, Math.min(rect.height, y))
-
-        setCorners(prev => {
-            const newCorners = [...prev]
-            newCorners[index] = { x, y }
-            return newCorners
-        })
-    }, [])
-
-    const handlePointerDown = useCallback((index: number) => {
-        setActiveCorner(index)
-        setZoomCorner(index)
+    const handlePointerDown = useCallback((e: React.PointerEvent, handle: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(handle)
+        setDragStart({ x: e.clientX, y: e.clientY })
     }, [])
 
     const handlePointerMove = useCallback((e: React.PointerEvent) => {
-        if (activeCorner !== null) {
-            handleCornerDrag(activeCorner, e.clientX, e.clientY)
-        }
-    }, [activeCorner, handleCornerDrag])
+        if (!isDragging) return
+
+        const dx = e.clientX - dragStart.x
+        const dy = e.clientY - dragStart.y
+        setDragStart({ x: e.clientX, y: e.clientY })
+
+        setCrop(prev => {
+            let { x, y, width, height } = prev
+            const minSize = 50
+
+            switch (isDragging) {
+                case 'move':
+                    x = Math.max(0, Math.min(imageSize.displayWidth - width, x + dx))
+                    y = Math.max(0, Math.min(imageSize.displayHeight - height, y + dy))
+                    break
+                case 'nw':
+                    if (width - dx >= minSize && x + dx >= 0) { x += dx; width -= dx }
+                    if (height - dy >= minSize && y + dy >= 0) { y += dy; height -= dy }
+                    break
+                case 'ne':
+                    if (width + dx >= minSize && x + width + dx <= imageSize.displayWidth) { width += dx }
+                    if (height - dy >= minSize && y + dy >= 0) { y += dy; height -= dy }
+                    break
+                case 'sw':
+                    if (width - dx >= minSize && x + dx >= 0) { x += dx; width -= dx }
+                    if (height + dy >= minSize && y + height + dy <= imageSize.displayHeight) { height += dy }
+                    break
+                case 'se':
+                    if (width + dx >= minSize && x + width + dx <= imageSize.displayWidth) { width += dx }
+                    if (height + dy >= minSize && y + height + dy <= imageSize.displayHeight) { height += dy }
+                    break
+                case 'n':
+                    if (height - dy >= minSize && y + dy >= 0) { y += dy; height -= dy }
+                    break
+                case 's':
+                    if (height + dy >= minSize && y + height + dy <= imageSize.displayHeight) { height += dy }
+                    break
+                case 'w':
+                    if (width - dx >= minSize && x + dx >= 0) { x += dx; width -= dx }
+                    break
+                case 'e':
+                    if (width + dx >= minSize && x + width + dx <= imageSize.displayWidth) { width += dx }
+                    break
+            }
+
+            return { x, y, width, height }
+        })
+    }, [isDragging, dragStart, imageSize.displayWidth, imageSize.displayHeight])
 
     const handlePointerUp = useCallback(() => {
-        setActiveCorner(null)
-        // Keep zoom visible for a moment
-        setTimeout(() => setZoomCorner(null), 1000)
+        setIsDragging(null)
     }, [])
 
     const handleRetake = useCallback(() => {
         setCurrentImage(null)
         setProcessedImage(null)
-        setCorners([])
+        setCrop({ x: 0, y: 0, width: 0, height: 0 })
         setRotation(0)
         setStep('capture')
         if (fileInputRef.current) {
@@ -338,69 +173,48 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
         }
     }, [])
 
-    const handleApplyTransform = useCallback(async () => {
-        if (!currentImage || corners.length !== 4) return
+    const handleApplyCrop = useCallback(async () => {
+        if (!currentImage || crop.width === 0) return
 
         setIsLoading(true)
         try {
-            // Get the image element to calculate scale
-            const imgElement = imageContainerRef.current?.querySelector('img')
-            if (!imgElement) throw new Error('No image element')
+            const img = new Image()
+            await new Promise<void>((resolve, reject) => {
+                img.onload = () => resolve()
+                img.onerror = reject
+                img.src = currentImage
+            })
 
-            const displayRect = imgElement.getBoundingClientRect()
-            const scaleX = imageSize.width / displayRect.width
-            const scaleY = imageSize.height / displayRect.height
+            // Scale crop coordinates to original image size
+            const scaleX = imageSize.width / imageSize.displayWidth
+            const scaleY = imageSize.height / imageSize.displayHeight
 
-            // Scale corners to original image size
-            const scaledCorners = corners.map(c => ({
-                x: c.x * scaleX,
-                y: c.y * scaleY
-            }))
+            const srcX = crop.x * scaleX
+            const srcY = crop.y * scaleY
+            const srcWidth = crop.width * scaleX
+            const srcHeight = crop.height * scaleY
 
-            // Calculate output size based on actual quad proportions (not forced A4)
-            // Calculate the width and height of the selected quad
-            const topWidth = Math.hypot(
-                scaledCorners[1].x - scaledCorners[0].x,
-                scaledCorners[1].y - scaledCorners[0].y
-            )
-            const bottomWidth = Math.hypot(
-                scaledCorners[2].x - scaledCorners[3].x,
-                scaledCorners[2].y - scaledCorners[3].y
-            )
-            const leftHeight = Math.hypot(
-                scaledCorners[3].x - scaledCorners[0].x,
-                scaledCorners[3].y - scaledCorners[0].y
-            )
-            const rightHeight = Math.hypot(
-                scaledCorners[2].x - scaledCorners[1].x,
-                scaledCorners[2].y - scaledCorners[1].y
-            )
+            // Create cropped image
+            const canvas = document.createElement('canvas')
+            canvas.width = srcWidth
+            canvas.height = srcHeight
+            const ctx = canvas.getContext('2d')
 
-            const avgWidth = (topWidth + bottomWidth) / 2
-            const avgHeight = (leftHeight + rightHeight) / 2
+            if (!ctx) throw new Error('No canvas context')
 
-            // Scale to a reasonable output size while preserving aspect ratio
-            const maxDimension = 1600
-            const scale = maxDimension / Math.max(avgWidth, avgHeight)
-            const outputWidth = Math.round(avgWidth * scale)
-            const outputHeight = Math.round(avgHeight * scale)
+            ctx.fillStyle = 'white'
+            ctx.fillRect(0, 0, srcWidth, srcHeight)
+            ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, srcWidth, srcHeight)
 
-            const processed = await applyPerspectiveTransform(
-                currentImage,
-                scaledCorners,
-                outputWidth,
-                outputHeight
-            )
-
-            setProcessedImage(processed)
+            setProcessedImage(canvas.toDataURL('image/jpeg', 0.92))
             setStep('preview')
         } catch (error) {
-            console.error('Transform failed:', error)
-            notify.error('Errore durante la trasformazione')
+            console.error('Crop failed:', error)
+            notify.error('Errore durante il ritaglio')
         } finally {
             setIsLoading(false)
         }
-    }, [currentImage, corners, imageSize])
+    }, [currentImage, crop, imageSize])
 
     const handleRotate = useCallback(() => {
         setRotation((prev) => (prev + 90) % 360)
@@ -411,8 +225,9 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
 
         setIsLoading(true)
         try {
-            // Apply rotation if needed
             let finalImage = processedImage
+
+            // Apply rotation if needed
             if (rotation !== 0) {
                 const img = new Image()
                 await new Promise<void>((resolve, reject) => {
@@ -436,7 +251,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                         ctx.rotate((rotation * Math.PI) / 180)
                         ctx.drawImage(img, -img.width / 2, -img.height / 2)
 
-                        finalImage = canvas.toDataURL('image/jpeg', 0.9)
+                        finalImage = canvas.toDataURL('image/jpeg', 0.92)
                         resolve()
                     }
                     img.onerror = reject
@@ -446,14 +261,13 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
 
             const newPage: ScannedPage = {
                 id: `page-${Date.now()}`,
-                originalImage: currentImage || processedImage,
                 processedImage: finalImage
             }
 
             setPages(prev => [...prev, newPage])
             setCurrentImage(null)
             setProcessedImage(null)
-            setCorners([])
+            setCrop({ x: 0, y: 0, width: 0, height: 0 })
             setRotation(0)
             setStep('pages')
 
@@ -463,7 +277,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
         } finally {
             setIsLoading(false)
         }
-    }, [processedImage, currentImage, rotation])
+    }, [processedImage, rotation])
 
     const handleAddPage = useCallback(() => {
         setStep('capture')
@@ -551,7 +365,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             setPages([])
             setCurrentImage(null)
             setProcessedImage(null)
-            setCorners([])
+            setCrop({ x: 0, y: 0, width: 0, height: 0 })
             setRotation(0)
             setStep('capture')
             onOpenChange(false)
@@ -568,15 +382,12 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
     const handleClose = () => {
         setCurrentImage(null)
         setProcessedImage(null)
-        setCorners([])
+        setCrop({ x: 0, y: 0, width: 0, height: 0 })
         setPages([])
         setRotation(0)
         setStep('capture')
         onOpenChange(false)
     }
-
-    // Corner labels
-    const cornerLabels = ['TL', 'TR', 'BR', 'BL']
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -603,7 +414,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                     Scatta una foto del documento
                                 </p>
                                 <p className="text-sm text-slate-500 dark:text-slate-500 mb-4">
-                                    Potrai selezionare i 4 angoli per raddrizzarlo
+                                    Cerca di fotografare il documento il più dritto possibile
                                 </p>
                                 <div className="relative inline-block">
                                     <input
@@ -636,12 +447,12 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                         </div>
                     )}
 
-                    {/* Corner selection step */}
-                    {step === 'corners' && currentImage && (
+                    {/* Crop step */}
+                    {step === 'crop' && currentImage && (
                         <div className="space-y-4">
                             <div
                                 ref={imageContainerRef}
-                                className="relative bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden touch-none"
+                                className="relative bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden touch-none select-none"
                                 onPointerMove={handlePointerMove}
                                 onPointerUp={handlePointerUp}
                                 onPointerLeave={handlePointerUp}
@@ -653,96 +464,87 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                     draggable={false}
                                 />
 
-                                {/* Overlay with quad shape */}
-                                {corners.length === 4 && (
-                                    <svg
-                                        className="absolute inset-0 w-full h-full pointer-events-none"
-                                        style={{ position: 'absolute', top: 0, left: 0 }}
-                                    >
-                                        {/* Get image position within container */}
-                                        <defs>
-                                            <mask id="quadMask">
-                                                <rect width="100%" height="100%" fill="white" />
-                                                <polygon
-                                                    points={corners.map(c => `${c.x},${c.y}`).join(' ')}
-                                                    fill="black"
-                                                />
-                                            </mask>
-                                        </defs>
-                                        {/* Semi-transparent overlay outside quad */}
-                                        <rect
-                                            width="100%"
-                                            height="100%"
-                                            fill="rgba(0,0,0,0.5)"
-                                            mask="url(#quadMask)"
+                                {/* Dark overlay outside crop area */}
+                                {crop.width > 0 && imageSize.displayWidth > 0 && (
+                                    <>
+                                        {/* Top overlay */}
+                                        <div
+                                            className="absolute bg-black/50 left-0 right-0 top-0"
+                                            style={{ height: crop.y }}
                                         />
-                                        {/* Quad border */}
-                                        <polygon
-                                            points={corners.map(c => `${c.x},${c.y}`).join(' ')}
-                                            fill="none"
-                                            stroke="#3b82f6"
-                                            strokeWidth="2"
+                                        {/* Bottom overlay */}
+                                        <div
+                                            className="absolute bg-black/50 left-0 right-0 bottom-0"
+                                            style={{ height: imageSize.displayHeight - crop.y - crop.height }}
                                         />
-                                        {/* Edge lines */}
-                                        {corners.map((corner, i) => {
-                                            const next = corners[(i + 1) % 4]
-                                            return (
-                                                <line
-                                                    key={i}
-                                                    x1={corner.x}
-                                                    y1={corner.y}
-                                                    x2={next.x}
-                                                    y2={next.y}
-                                                    stroke="#3b82f6"
-                                                    strokeWidth="2"
-                                                    strokeDasharray="5,5"
-                                                />
-                                            )
-                                        })}
-                                    </svg>
-                                )}
+                                        {/* Left overlay */}
+                                        <div
+                                            className="absolute bg-black/50 left-0"
+                                            style={{
+                                                top: crop.y,
+                                                width: crop.x,
+                                                height: crop.height
+                                            }}
+                                        />
+                                        {/* Right overlay */}
+                                        <div
+                                            className="absolute bg-black/50 right-0"
+                                            style={{
+                                                top: crop.y,
+                                                width: imageSize.displayWidth - crop.x - crop.width,
+                                                height: crop.height
+                                            }}
+                                        />
 
-                                {/* Corner handles */}
-                                {corners.map((corner, index) => (
-                                    <div
-                                        key={index}
-                                        className={`absolute w-8 h-8 -ml-4 -mt-4 cursor-move touch-none
-                                            ${activeCorner === index ? 'z-20' : 'z-10'}`}
-                                        style={{
-                                            left: corner.x,
-                                            top: corner.y,
-                                        }}
-                                        onPointerDown={(e) => {
-                                            e.preventDefault()
-                                            handlePointerDown(index)
-                                        }}
-                                    >
-                                        {/* Handle visual */}
-                                        <div className={`w-8 h-8 rounded-full border-4 border-blue-500 bg-white shadow-lg
-                                            flex items-center justify-center text-xs font-bold text-blue-600
-                                            ${activeCorner === index ? 'ring-4 ring-blue-300' : ''}`}>
-                                            {cornerLabels[index]}
+                                        {/* Crop rectangle border */}
+                                        <div
+                                            className="absolute border-2 border-blue-500 cursor-move"
+                                            style={{
+                                                left: crop.x,
+                                                top: crop.y,
+                                                width: crop.width,
+                                                height: crop.height
+                                            }}
+                                            onPointerDown={(e) => handlePointerDown(e, 'move')}
+                                        >
+                                            {/* Corner handles */}
+                                            {['nw', 'ne', 'sw', 'se'].map(corner => (
+                                                <div
+                                                    key={corner}
+                                                    className={`absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-sm cursor-${corner}-resize touch-none`}
+                                                    style={{
+                                                        ...(corner.includes('n') ? { top: -8 } : { bottom: -8 }),
+                                                        ...(corner.includes('w') ? { left: -8 } : { right: -8 })
+                                                    }}
+                                                    onPointerDown={(e) => handlePointerDown(e, corner)}
+                                                />
+                                            ))}
+
+                                            {/* Edge handles */}
+                                            <div
+                                                className="absolute w-8 h-4 bg-blue-500 border-2 border-white rounded-sm cursor-n-resize left-1/2 -translate-x-1/2 -top-2 touch-none"
+                                                onPointerDown={(e) => handlePointerDown(e, 'n')}
+                                            />
+                                            <div
+                                                className="absolute w-8 h-4 bg-blue-500 border-2 border-white rounded-sm cursor-s-resize left-1/2 -translate-x-1/2 -bottom-2 touch-none"
+                                                onPointerDown={(e) => handlePointerDown(e, 's')}
+                                            />
+                                            <div
+                                                className="absolute w-4 h-8 bg-blue-500 border-2 border-white rounded-sm cursor-w-resize top-1/2 -translate-y-1/2 -left-2 touch-none"
+                                                onPointerDown={(e) => handlePointerDown(e, 'w')}
+                                            />
+                                            <div
+                                                className="absolute w-4 h-8 bg-blue-500 border-2 border-white rounded-sm cursor-e-resize top-1/2 -translate-y-1/2 -right-2 touch-none"
+                                                onPointerDown={(e) => handlePointerDown(e, 'e')}
+                                            />
                                         </div>
-                                    </div>
-                                ))}
-
-                                {/* Zoom window */}
-                                {zoomCorner !== null && corners[zoomCorner] && currentImage && imageSize.displayWidth > 0 && (
-                                    <ZoomWindow
-                                        imageSrc={currentImage}
-                                        cornerX={corners[zoomCorner].x}
-                                        cornerY={corners[zoomCorner].y}
-                                        displayWidth={imageSize.displayWidth}
-                                        displayHeight={imageSize.displayHeight}
-                                        originalWidth={imageSize.width}
-                                        originalHeight={imageSize.height}
-                                    />
+                                    </>
                                 )}
                             </div>
 
                             <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
-                                <Move className="h-4 w-4" />
-                                Trascina i cerchi sui 4 angoli del documento
+                                <Crop className="h-4 w-4" />
+                                Trascina per ritagliare l&apos;area desiderata
                             </div>
 
                             <div className="flex gap-2">
@@ -752,15 +554,15 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                 </Button>
                                 <Button
                                     className="flex-1"
-                                    onClick={handleApplyTransform}
-                                    disabled={isLoading || corners.length !== 4}
+                                    onClick={handleApplyCrop}
+                                    disabled={isLoading || crop.width === 0}
                                 >
                                     {isLoading ? (
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     ) : (
                                         <Check className="mr-2 h-4 w-4" />
                                     )}
-                                    Applica
+                                    Ritaglia
                                 </Button>
                             </div>
                         </div>
@@ -772,7 +574,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                             <div className="relative bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
                                 <img
                                     src={processedImage}
-                                    alt="Documento elaborato"
+                                    alt="Documento ritagliato"
                                     className="w-full max-h-[50vh] object-contain mx-auto"
                                     style={{ transform: `rotate(${rotation}deg)` }}
                                 />
