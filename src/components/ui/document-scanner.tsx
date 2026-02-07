@@ -137,7 +137,7 @@ function applyPerspectiveTransform(
 export function DocumentScanner({ open, onOpenChange, onScanComplete }: DocumentScannerProps) {
     const [step, setStep] = useState<ScannerStep>('capture')
     const [currentImage, setCurrentImage] = useState<string | null>(null)
-    const [imageSize, setImageSize] = useState({ width: 0, height: 0 })
+    const [imageSize, setImageSize] = useState({ width: 0, height: 0, displayWidth: 0, displayHeight: 0 })
     const [corners, setCorners] = useState<Corner[]>([])
     const [activeCorner, setActiveCorner] = useState<number | null>(null)
     const [zoomCorner, setZoomCorner] = useState<number | null>(null)
@@ -173,7 +173,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             // Get image dimensions
             const img = new Image()
             img.onload = () => {
-                setImageSize({ width: img.width, height: img.height })
+                setImageSize({ width: img.width, height: img.height, displayWidth: 0, displayHeight: 0 })
                 // We'll set corners after the container renders
             }
             img.src = imageData
@@ -197,14 +197,12 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                 const offsetY = rect.top - containerRect.top
 
                 initializeCorners(displayWidth, displayHeight)
-                // Store offset for corner positioning
+                // Store display dimensions for zoom
                 setImageSize(prev => ({
                     ...prev,
                     displayWidth,
-                    displayHeight,
-                    offsetX,
-                    offsetY
-                } as typeof prev & { displayWidth: number, displayHeight: number, offsetX: number, offsetY: number }))
+                    displayHeight
+                }))
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -281,10 +279,33 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                 y: c.y * scaleY
             }))
 
-            // Calculate output size based on A4 ratio
-            const a4Ratio = 297 / 210
-            const outputWidth = 1200 // Fixed width for good quality
-            const outputHeight = Math.round(outputWidth * a4Ratio)
+            // Calculate output size based on actual quad proportions (not forced A4)
+            // Calculate the width and height of the selected quad
+            const topWidth = Math.hypot(
+                scaledCorners[1].x - scaledCorners[0].x,
+                scaledCorners[1].y - scaledCorners[0].y
+            )
+            const bottomWidth = Math.hypot(
+                scaledCorners[2].x - scaledCorners[3].x,
+                scaledCorners[2].y - scaledCorners[3].y
+            )
+            const leftHeight = Math.hypot(
+                scaledCorners[3].x - scaledCorners[0].x,
+                scaledCorners[3].y - scaledCorners[0].y
+            )
+            const rightHeight = Math.hypot(
+                scaledCorners[2].x - scaledCorners[1].x,
+                scaledCorners[2].y - scaledCorners[1].y
+            )
+
+            const avgWidth = (topWidth + bottomWidth) / 2
+            const avgHeight = (leftHeight + rightHeight) / 2
+
+            // Scale to a reasonable output size while preserving aspect ratio
+            const maxDimension = 1600
+            const scale = maxDimension / Math.max(avgWidth, avgHeight)
+            const outputWidth = Math.round(avgWidth * scale)
+            const outputHeight = Math.round(avgHeight * scale)
 
             const processed = await applyPerspectiveTransform(
                 currentImage,
@@ -634,7 +655,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                             className="w-full h-full"
                                             style={{
                                                 backgroundImage: `url(${currentImage})`,
-                                                backgroundSize: `${imageSize.width * 3}px ${imageSize.height * 3}px`,
+                                                backgroundSize: `${imageSize.displayWidth * 3}px ${imageSize.displayHeight * 3}px`,
                                                 backgroundPosition: `${-corners[zoomCorner].x * 3 + 64}px ${-corners[zoomCorner].y * 3 + 64}px`,
                                             }}
                                         />
