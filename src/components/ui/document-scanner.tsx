@@ -26,6 +26,83 @@ interface Corner {
 
 type ScannerStep = 'capture' | 'corners' | 'preview' | 'pages' | 'generating'
 
+// ZoomWindow component for magnifying corner area
+interface ZoomWindowProps {
+    imageSrc: string
+    cornerX: number
+    cornerY: number
+    displayWidth: number
+    displayHeight: number
+    originalWidth: number
+    originalHeight: number
+}
+
+function ZoomWindow({ imageSrc, cornerX, cornerY, displayWidth, displayHeight, originalWidth, originalHeight }: ZoomWindowProps) {
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+
+    useEffect(() => {
+        const canvas = canvasRef.current
+        if (!canvas) return
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        const img = new Image()
+        img.onload = () => {
+            const zoomSize = 128 // Canvas size
+            const zoomLevel = 3 // 3x magnification
+            const viewRadius = zoomSize / (2 * zoomLevel) // Radius of view in display coords
+
+            // Scale from display coords to original image coords
+            const scaleX = originalWidth / displayWidth
+            const scaleY = originalHeight / displayHeight
+
+            // Calculate source position in original image
+            const srcX = cornerX * scaleX
+            const srcY = cornerY * scaleY
+
+            // Calculate source region size
+            const srcViewRadius = viewRadius * Math.max(scaleX, scaleY)
+
+            // Clear and draw
+            ctx.fillStyle = '#ffffff'
+            ctx.fillRect(0, 0, zoomSize, zoomSize)
+
+            ctx.drawImage(
+                img,
+                srcX - srcViewRadius, srcY - srcViewRadius,
+                srcViewRadius * 2, srcViewRadius * 2,
+                0, 0,
+                zoomSize, zoomSize
+            )
+
+            // Draw crosshair
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)'
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(zoomSize / 2, 0)
+            ctx.lineTo(zoomSize / 2, zoomSize)
+            ctx.moveTo(0, zoomSize / 2)
+            ctx.lineTo(zoomSize, zoomSize / 2)
+            ctx.stroke()
+
+            // Draw center circle
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)'
+            ctx.lineWidth = 2
+            ctx.beginPath()
+            ctx.arc(zoomSize / 2, zoomSize / 2, 6, 0, Math.PI * 2)
+            ctx.stroke()
+        }
+        img.src = imageSrc
+    }, [imageSrc, cornerX, cornerY, displayWidth, displayHeight, originalWidth, originalHeight])
+
+    return (
+        <div className="absolute top-2 right-2 w-32 h-32 border-2 border-blue-500 rounded-lg overflow-hidden bg-white shadow-xl z-30">
+            <canvas ref={canvasRef} width={128} height={128} className="w-full h-full" />
+        </div>
+    )
+}
+
 // Apply perspective transform using Canvas
 function applyPerspectiveTransform(
     imageSrc: string,
@@ -67,8 +144,8 @@ function applyPerspectiveTransform(
                 { x: 0, y: outputHeight }
             ]
 
-            // Use a grid-based approach for better quality
-            const gridSize = 10
+            // Use a grid-based approach for better quality - more cells = better quality
+            const gridSize = 40
             const cellWidth = outputWidth / gridSize
             const cellHeight = outputHeight / gridSize
 
@@ -149,6 +226,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const imageContainerRef = useRef<HTMLDivElement>(null)
+    const zoomCanvasRef = useRef<HTMLCanvasElement>(null)
 
     // Initialize corners when image loads
     const initializeCorners = useCallback((width: number, height: number) => {
@@ -649,23 +727,16 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                 ))}
 
                                 {/* Zoom window */}
-                                {zoomCorner !== null && corners[zoomCorner] && currentImage && (
-                                    <div className="absolute top-2 right-2 w-32 h-32 border-2 border-blue-500 rounded-lg overflow-hidden bg-white shadow-xl z-30">
-                                        <div
-                                            className="w-full h-full"
-                                            style={{
-                                                backgroundImage: `url(${currentImage})`,
-                                                backgroundSize: `${imageSize.displayWidth * 3}px ${imageSize.displayHeight * 3}px`,
-                                                backgroundPosition: `${-corners[zoomCorner].x * 3 + 64}px ${-corners[zoomCorner].y * 3 + 64}px`,
-                                            }}
-                                        />
-                                        {/* Crosshair */}
-                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                            <div className="w-px h-full bg-red-500 opacity-50" />
-                                            <div className="absolute w-full h-px bg-red-500 opacity-50" />
-                                            <div className="absolute w-3 h-3 border-2 border-red-500 rounded-full" />
-                                        </div>
-                                    </div>
+                                {zoomCorner !== null && corners[zoomCorner] && currentImage && imageSize.displayWidth > 0 && (
+                                    <ZoomWindow
+                                        imageSrc={currentImage}
+                                        cornerX={corners[zoomCorner].x}
+                                        cornerY={corners[zoomCorner].y}
+                                        displayWidth={imageSize.displayWidth}
+                                        displayHeight={imageSize.displayHeight}
+                                        originalWidth={imageSize.width}
+                                        originalHeight={imageSize.height}
+                                    />
                                 )}
                             </div>
 
