@@ -4,7 +4,7 @@ import { notify } from "@/lib/notify";
 import { useState, useRef, useCallback, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Camera, RotateCcw, Check, Loader2, Plus, Trash2, FileText, GripVertical, Wand2, RotateCw } from "lucide-react"
+import { Camera, RotateCcw, Check, Loader2, Plus, Trash2, FileText, GripVertical, RotateCw, Move } from "lucide-react"
 import { jsPDF } from "jspdf"
 
 interface DocumentScannerProps {
@@ -19,325 +19,242 @@ interface ScannedPage {
     processedImage: string
 }
 
-type ScannerStep = 'capture' | 'processing' | 'preview' | 'pages' | 'generating'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OpenCV = any
-
-declare global {
-    interface Window {
-        cv: OpenCV
-        Module: {
-            onRuntimeInitialized: () => void
-        }
-    }
+interface Corner {
+    x: number
+    y: number
 }
 
-let cvPromise: Promise<OpenCV> | null = null
-let cvLoaded = false
+type ScannerStep = 'capture' | 'corners' | 'preview' | 'pages' | 'generating'
 
-// Load OpenCV from public folder
-const loadOpenCV = (): Promise<OpenCV> => {
-    if (cvLoaded && window.cv) {
-        return Promise.resolve(window.cv)
-    }
+// Apply perspective transform using Canvas
+function applyPerspectiveTransform(
+    imageSrc: string,
+    corners: Corner[],
+    outputWidth: number,
+    outputHeight: number
+): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+            // Create output canvas
+            const canvas = document.createElement('canvas')
+            canvas.width = outputWidth
+            canvas.height = outputHeight
+            const ctx = canvas.getContext('2d')
 
-    if (cvPromise) return cvPromise
-
-    cvPromise = new Promise((resolve, reject) => {
-        // Check if already loaded
-        if (window.cv && window.cv.Mat) {
-            cvLoaded = true
-            resolve(window.cv)
-            return
-        }
-
-        const script = document.createElement('script')
-        script.src = '/opencv.js'
-        script.async = true
-
-        // OpenCV.js uses Module.onRuntimeInitialized
-        window.Module = {
-            onRuntimeInitialized: () => {
-                cvLoaded = true
-                resolve(window.cv)
+            if (!ctx) {
+                reject(new Error('No canvas context'))
+                return
             }
-        }
 
-        script.onerror = () => {
-            cvPromise = null
-            reject(new Error('Failed to load OpenCV.js'))
-        }
+            // For perspective transform, we need to map each pixel
+            // We'll use a simplified approach: divide into triangles and use drawImage with clipping
 
-        document.head.appendChild(script)
+            // Scale corners to actual image size
+            const scaleX = img.naturalWidth / img.width
+            const scaleY = img.naturalHeight / img.height
 
-        // Timeout fallback
-        setTimeout(() => {
-            if (window.cv && window.cv.Mat) {
-                cvLoaded = true
-                resolve(window.cv)
+            const srcCorners = corners.map(c => ({
+                x: c.x * scaleX,
+                y: c.y * scaleY
+            }))
+
+            // Destination corners (rectangle)
+            const dstCorners = [
+                { x: 0, y: 0 },
+                { x: outputWidth, y: 0 },
+                { x: outputWidth, y: outputHeight },
+                { x: 0, y: outputHeight }
+            ]
+
+            // Use a grid-based approach for better quality
+            const gridSize = 10
+            const cellWidth = outputWidth / gridSize
+            const cellHeight = outputHeight / gridSize
+
+            ctx.fillStyle = 'white'
+            ctx.fillRect(0, 0, outputWidth, outputHeight)
+
+            for (let gy = 0; gy < gridSize; gy++) {
+                for (let gx = 0; gx < gridSize; gx++) {
+                    // Calculate source quad for this cell using bilinear interpolation
+                    const u0 = gx / gridSize
+                    const u1 = (gx + 1) / gridSize
+                    const v0 = gy / gridSize
+                    const v1 = (gy + 1) / gridSize
+
+                    // Bilinear interpolation for source points
+                    const getSrcPoint = (u: number, v: number) => {
+                        const top = {
+                            x: srcCorners[0].x + (srcCorners[1].x - srcCorners[0].x) * u,
+                            y: srcCorners[0].y + (srcCorners[1].y - srcCorners[0].y) * u
+                        }
+                        const bottom = {
+                            x: srcCorners[3].x + (srcCorners[2].x - srcCorners[3].x) * u,
+                            y: srcCorners[3].y + (srcCorners[2].y - srcCorners[3].y) * u
+                        }
+                        return {
+                            x: top.x + (bottom.x - top.x) * v,
+                            y: top.y + (bottom.y - top.y) * v
+                        }
+                    }
+
+                    const srcTL = getSrcPoint(u0, v0)
+                    const srcTR = getSrcPoint(u1, v0)
+                    const srcBL = getSrcPoint(u0, v1)
+                    const srcBR = getSrcPoint(u1, v1)
+
+                    // Destination rectangle for this cell
+                    const dstX = gx * cellWidth
+                    const dstY = gy * cellHeight
+
+                    // Calculate the bounding box in source
+                    const srcMinX = Math.min(srcTL.x, srcTR.x, srcBL.x, srcBR.x)
+                    const srcMinY = Math.min(srcTL.y, srcTR.y, srcBL.y, srcBR.y)
+                    const srcMaxX = Math.max(srcTL.x, srcTR.x, srcBL.x, srcBR.x)
+                    const srcMaxY = Math.max(srcTL.y, srcTR.y, srcBL.y, srcBR.y)
+                    const srcWidth = srcMaxX - srcMinX
+                    const srcHeight = srcMaxY - srcMinY
+
+                    // Draw the cell
+                    if (srcWidth > 0 && srcHeight > 0) {
+                        ctx.drawImage(
+                            img,
+                            srcMinX, srcMinY, srcWidth, srcHeight,
+                            dstX, dstY, cellWidth, cellHeight
+                        )
+                    }
+                }
             }
-        }, 5000)
+
+            resolve(canvas.toDataURL('image/jpeg', 0.9))
+        }
+        img.onerror = () => reject(new Error('Failed to load image'))
+        img.src = imageSrc
     })
-
-    return cvPromise
-}
-
-// Find document corners using contour detection
-function findDocumentCorners(cv: OpenCV, src: OpenCV): { x: number, y: number }[] | null {
-    const gray = new cv.Mat()
-    const blurred = new cv.Mat()
-    const edges = new cv.Mat()
-    const dilated = new cv.Mat()
-    const contours = new cv.MatVector()
-    const hierarchy = new cv.Mat()
-
-    try {
-        // Convert to grayscale
-        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY)
-
-        // Blur to reduce noise
-        cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0)
-
-        // Edge detection
-        cv.Canny(blurred, edges, 75, 200)
-
-        // Dilate edges to close gaps
-        const kernel = cv.Mat.ones(3, 3, cv.CV_8U)
-        cv.dilate(edges, dilated, kernel)
-        kernel.delete()
-
-        // Find contours
-        cv.findContours(dilated, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-
-        // Find the largest quadrilateral contour
-        let maxArea = 0
-        let bestCorners: { x: number, y: number }[] | null = null
-
-        for (let i = 0; i < contours.size(); i++) {
-            const contour = contours.get(i)
-            const area = cv.contourArea(contour)
-
-            if (area > maxArea) {
-                const peri = cv.arcLength(contour, true)
-                const approx = new cv.Mat()
-                cv.approxPolyDP(contour, approx, 0.02 * peri, true)
-
-                // Check if it's a quadrilateral
-                if (approx.rows === 4) {
-                    maxArea = area
-
-                    // Extract corners
-                    const corners: { x: number, y: number }[] = []
-                    for (let j = 0; j < 4; j++) {
-                        corners.push({
-                            x: approx.data32S[j * 2],
-                            y: approx.data32S[j * 2 + 1]
-                        })
-                    }
-                    bestCorners = corners
-                }
-                approx.delete()
-            }
-        }
-
-        // Only use if area is significant (at least 10% of image)
-        if (bestCorners && maxArea > (src.rows * src.cols * 0.1)) {
-            // Sort corners: top-left, top-right, bottom-right, bottom-left
-            bestCorners.sort((a, b) => a.y - b.y)
-            const top = bestCorners.slice(0, 2).sort((a, b) => a.x - b.x)
-            const bottom = bestCorners.slice(2, 4).sort((a, b) => a.x - b.x)
-            return [top[0], top[1], bottom[1], bottom[0]]
-        }
-
-        return null
-    } finally {
-        gray.delete()
-        blurred.delete()
-        edges.delete()
-        dilated.delete()
-        contours.delete()
-        hierarchy.delete()
-    }
-}
-
-// Apply perspective correction
-function applyPerspectiveCorrection(
-    cv: OpenCV,
-    src: OpenCV,
-    corners: { x: number, y: number }[]
-): OpenCV {
-    // Calculate output dimensions
-    const width = Math.max(
-        Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y),
-        Math.hypot(corners[2].x - corners[3].x, corners[2].y - corners[3].y)
-    )
-    const height = Math.max(
-        Math.hypot(corners[3].x - corners[0].x, corners[3].y - corners[0].y),
-        Math.hypot(corners[2].x - corners[1].x, corners[2].y - corners[1].y)
-    )
-
-    // A4 aspect ratio adjustment
-    const a4Ratio = 297 / 210
-    let outWidth = Math.round(width)
-    let outHeight = Math.round(height)
-
-    if (outHeight / outWidth > a4Ratio) {
-        outWidth = Math.round(outHeight / a4Ratio)
-    } else {
-        outHeight = Math.round(outWidth * a4Ratio)
-    }
-
-    // Source points (detected corners)
-    const srcPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        corners[0].x, corners[0].y,
-        corners[1].x, corners[1].y,
-        corners[2].x, corners[2].y,
-        corners[3].x, corners[3].y
-    ])
-
-    // Destination points (rectangle)
-    const dstPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        0, 0,
-        outWidth, 0,
-        outWidth, outHeight,
-        0, outHeight
-    ])
-
-    // Get perspective transform matrix
-    const M = cv.getPerspectiveTransform(srcPoints, dstPoints)
-
-    // Apply transformation
-    const dst = new cv.Mat()
-    cv.warpPerspective(src, dst, M, new cv.Size(outWidth, outHeight))
-
-    // Cleanup
-    srcPoints.delete()
-    dstPoints.delete()
-    M.delete()
-
-    return dst
-}
-
-// Process image with OpenCV
-async function processImageWithOpenCV(imageData: string): Promise<{ processed: string, wasProcessed: boolean }> {
-    try {
-        const cv = await loadOpenCV()
-
-        return new Promise((resolve) => {
-            const img = new Image()
-            img.onload = () => {
-                // Create canvas to load image
-                const canvas = document.createElement('canvas')
-                canvas.width = img.width
-                canvas.height = img.height
-                const ctx = canvas.getContext('2d')
-                if (!ctx) {
-                    resolve({ processed: imageData, wasProcessed: false })
-                    return
-                }
-                ctx.drawImage(img, 0, 0)
-
-                try {
-                    // Read image into OpenCV
-                    const src = cv.imread(canvas)
-
-                    // Try to find document corners
-                    const corners = findDocumentCorners(cv, src)
-
-                    if (corners) {
-                        // Apply perspective correction
-                        const result = applyPerspectiveCorrection(cv, src, corners)
-
-                        // Convert result back to image
-                        const outCanvas = document.createElement('canvas')
-                        cv.imshow(outCanvas, result)
-
-                        // Cleanup
-                        src.delete()
-                        result.delete()
-
-                        resolve({ processed: outCanvas.toDataURL('image/jpeg', 0.9), wasProcessed: true })
-                    } else {
-                        // No document detected, use original
-                        src.delete()
-                        resolve({ processed: imageData, wasProcessed: false })
-                    }
-                } catch (error) {
-                    console.error('OpenCV processing error:', error)
-                    resolve({ processed: imageData, wasProcessed: false })
-                }
-            }
-            img.onerror = () => resolve({ processed: imageData, wasProcessed: false })
-            img.src = imageData
-        })
-    } catch (error) {
-        console.error('Failed to load OpenCV:', error)
-        return { processed: imageData, wasProcessed: false }
-    }
 }
 
 export function DocumentScanner({ open, onOpenChange, onScanComplete }: DocumentScannerProps) {
     const [step, setStep] = useState<ScannerStep>('capture')
     const [currentImage, setCurrentImage] = useState<string | null>(null)
+    const [imageSize, setImageSize] = useState({ width: 0, height: 0 })
+    const [corners, setCorners] = useState<Corner[]>([])
+    const [activeCorner, setActiveCorner] = useState<number | null>(null)
+    const [zoomCorner, setZoomCorner] = useState<number | null>(null)
     const [processedImage, setProcessedImage] = useState<string | null>(null)
-    const [wasAutoProcessed, setWasAutoProcessed] = useState(false)
     const [pages, setPages] = useState<ScannedPage[]>([])
     const [isLoading, setIsLoading] = useState(false)
-    const [loadingMessage, setLoadingMessage] = useState('')
     const [rotation, setRotation] = useState(0)
     const [draggedPage, setDraggedPage] = useState<string | null>(null)
-    const [cvReady, setCvReady] = useState(false)
 
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const imageContainerRef = useRef<HTMLDivElement>(null)
 
-    // Preload OpenCV when dialog opens
-    useEffect(() => {
-        if (open && !cvReady) {
-            loadOpenCV()
-                .then(() => setCvReady(true))
-                .catch((err) => {
-                    console.error('OpenCV preload failed:', err)
-                    setCvReady(true) // Allow usage without auto-detection
-                })
-        }
-    }, [open, cvReady])
+    // Initialize corners when image loads
+    const initializeCorners = useCallback((width: number, height: number) => {
+        const margin = 0.1 // 10% margin from edges
+        setCorners([
+            { x: width * margin, y: height * margin },           // top-left
+            { x: width * (1 - margin), y: height * margin },     // top-right
+            { x: width * (1 - margin), y: height * (1 - margin) }, // bottom-right
+            { x: width * margin, y: height * (1 - margin) }      // bottom-left
+        ])
+    }, [])
 
     const handleCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
         const reader = new FileReader()
-        reader.onload = async (event) => {
+        reader.onload = (event) => {
             const imageData = event.target?.result as string
             setCurrentImage(imageData)
-            setRotation(0)
-            setStep('processing')
-            setIsLoading(true)
-            setLoadingMessage('Rilevamento documento...')
 
-            const { processed, wasProcessed } = await processImageWithOpenCV(imageData)
-            setProcessedImage(processed)
-            setWasAutoProcessed(wasProcessed)
-            setStep('preview')
-            setIsLoading(false)
-            setLoadingMessage('')
-
-            if (!wasProcessed) {
-                notify.info('Documento non rilevato. Puoi usare l\'immagine originale.')
+            // Get image dimensions
+            const img = new Image()
+            img.onload = () => {
+                setImageSize({ width: img.width, height: img.height })
+                // We'll set corners after the container renders
             }
+            img.src = imageData
+
+            setStep('corners')
         }
         reader.readAsDataURL(file)
     }, [])
 
-    const handleRotate = useCallback(() => {
-        setRotation((prev) => (prev + 90) % 360)
+    // Set corners when container is ready
+    useEffect(() => {
+        if (step === 'corners' && imageContainerRef.current && currentImage) {
+            const container = imageContainerRef.current
+            const imgElement = container.querySelector('img')
+            if (imgElement) {
+                const rect = imgElement.getBoundingClientRect()
+                const containerRect = container.getBoundingClientRect()
+                const displayWidth = rect.width
+                const displayHeight = rect.height
+                const offsetX = rect.left - containerRect.left
+                const offsetY = rect.top - containerRect.top
+
+                initializeCorners(displayWidth, displayHeight)
+                // Store offset for corner positioning
+                setImageSize(prev => ({
+                    ...prev,
+                    displayWidth,
+                    displayHeight,
+                    offsetX,
+                    offsetY
+                } as typeof prev & { displayWidth: number, displayHeight: number, offsetX: number, offsetY: number }))
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step, currentImage])
+
+    const handleCornerDrag = useCallback((index: number, clientX: number, clientY: number) => {
+        if (!imageContainerRef.current) return
+
+        const container = imageContainerRef.current
+        const imgElement = container.querySelector('img')
+        if (!imgElement) return
+
+        const rect = imgElement.getBoundingClientRect()
+
+        // Calculate position relative to image
+        let x = clientX - rect.left
+        let y = clientY - rect.top
+
+        // Clamp to image bounds
+        x = Math.max(0, Math.min(rect.width, x))
+        y = Math.max(0, Math.min(rect.height, y))
+
+        setCorners(prev => {
+            const newCorners = [...prev]
+            newCorners[index] = { x, y }
+            return newCorners
+        })
+    }, [])
+
+    const handlePointerDown = useCallback((index: number) => {
+        setActiveCorner(index)
+        setZoomCorner(index)
+    }, [])
+
+    const handlePointerMove = useCallback((e: React.PointerEvent) => {
+        if (activeCorner !== null) {
+            handleCornerDrag(activeCorner, e.clientX, e.clientY)
+        }
+    }, [activeCorner, handleCornerDrag])
+
+    const handlePointerUp = useCallback(() => {
+        setActiveCorner(null)
+        // Keep zoom visible for a moment
+        setTimeout(() => setZoomCorner(null), 1000)
     }, [])
 
     const handleRetake = useCallback(() => {
         setCurrentImage(null)
         setProcessedImage(null)
-        setWasAutoProcessed(false)
+        setCorners([])
         setRotation(0)
         setStep('capture')
         if (fileInputRef.current) {
@@ -345,11 +262,50 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
         }
     }, [])
 
-    const handleUseOriginal = useCallback(() => {
-        if (!currentImage) return
-        setProcessedImage(currentImage)
-        setWasAutoProcessed(false)
-    }, [currentImage])
+    const handleApplyTransform = useCallback(async () => {
+        if (!currentImage || corners.length !== 4) return
+
+        setIsLoading(true)
+        try {
+            // Get the image element to calculate scale
+            const imgElement = imageContainerRef.current?.querySelector('img')
+            if (!imgElement) throw new Error('No image element')
+
+            const displayRect = imgElement.getBoundingClientRect()
+            const scaleX = imageSize.width / displayRect.width
+            const scaleY = imageSize.height / displayRect.height
+
+            // Scale corners to original image size
+            const scaledCorners = corners.map(c => ({
+                x: c.x * scaleX,
+                y: c.y * scaleY
+            }))
+
+            // Calculate output size based on A4 ratio
+            const a4Ratio = 297 / 210
+            const outputWidth = 1200 // Fixed width for good quality
+            const outputHeight = Math.round(outputWidth * a4Ratio)
+
+            const processed = await applyPerspectiveTransform(
+                currentImage,
+                scaledCorners,
+                outputWidth,
+                outputHeight
+            )
+
+            setProcessedImage(processed)
+            setStep('preview')
+        } catch (error) {
+            console.error('Transform failed:', error)
+            notify.error('Errore durante la trasformazione')
+        } finally {
+            setIsLoading(false)
+        }
+    }, [currentImage, corners, imageSize])
+
+    const handleRotate = useCallback(() => {
+        setRotation((prev) => (prev + 90) % 360)
+    }, [])
 
     const handleAcceptImage = useCallback(async () => {
         if (!processedImage) return
@@ -398,7 +354,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             setPages(prev => [...prev, newPage])
             setCurrentImage(null)
             setProcessedImage(null)
-            setWasAutoProcessed(false)
+            setCorners([])
             setRotation(0)
             setStep('pages')
 
@@ -448,7 +404,6 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
 
         setStep('generating')
         setIsLoading(true)
-        setLoadingMessage('Generazione PDF...')
 
         try {
             const pdf = new jsPDF({
@@ -497,6 +452,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             setPages([])
             setCurrentImage(null)
             setProcessedImage(null)
+            setCorners([])
             setRotation(0)
             setStep('capture')
             onOpenChange(false)
@@ -507,18 +463,21 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             setStep('pages')
         } finally {
             setIsLoading(false)
-            setLoadingMessage('')
         }
     }, [pages, onScanComplete, onOpenChange])
 
     const handleClose = () => {
         setCurrentImage(null)
         setProcessedImage(null)
+        setCorners([])
         setPages([])
         setRotation(0)
         setStep('capture')
         onOpenChange(false)
     }
+
+    // Corner labels
+    const cornerLabels = ['TL', 'TR', 'BR', 'BL']
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -536,18 +495,8 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    {/* Loading overlay */}
-                    {isLoading && (
-                        <div className="text-center py-12">
-                            <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-blue-600" />
-                            <p className="text-slate-600 dark:text-slate-400">
-                                {loadingMessage}
-                            </p>
-                        </div>
-                    )}
-
                     {/* Capture step */}
-                    {step === 'capture' && !isLoading && (
+                    {step === 'capture' && (
                         <div className="text-center py-8">
                             <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-8 bg-slate-50 dark:bg-slate-800">
                                 <Camera className="h-12 w-12 mx-auto mb-4 text-slate-400" />
@@ -555,7 +504,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                     Scatta una foto del documento
                                 </p>
                                 <p className="text-sm text-slate-500 dark:text-slate-500 mb-4">
-                                    Il documento verrà rilevato e raddrizzato automaticamente
+                                    Potrai selezionare i 4 angoli per raddrizzarlo
                                 </p>
                                 <div className="relative inline-block">
                                     <input
@@ -588,8 +537,145 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                         </div>
                     )}
 
+                    {/* Corner selection step */}
+                    {step === 'corners' && currentImage && (
+                        <div className="space-y-4">
+                            <div
+                                ref={imageContainerRef}
+                                className="relative bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden touch-none"
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={handlePointerUp}
+                                onPointerLeave={handlePointerUp}
+                            >
+                                <img
+                                    src={currentImage}
+                                    alt="Documento"
+                                    className="w-full max-h-[50vh] object-contain mx-auto"
+                                    draggable={false}
+                                />
+
+                                {/* Overlay with quad shape */}
+                                {corners.length === 4 && (
+                                    <svg
+                                        className="absolute inset-0 w-full h-full pointer-events-none"
+                                        style={{ position: 'absolute', top: 0, left: 0 }}
+                                    >
+                                        {/* Get image position within container */}
+                                        <defs>
+                                            <mask id="quadMask">
+                                                <rect width="100%" height="100%" fill="white" />
+                                                <polygon
+                                                    points={corners.map(c => `${c.x},${c.y}`).join(' ')}
+                                                    fill="black"
+                                                />
+                                            </mask>
+                                        </defs>
+                                        {/* Semi-transparent overlay outside quad */}
+                                        <rect
+                                            width="100%"
+                                            height="100%"
+                                            fill="rgba(0,0,0,0.5)"
+                                            mask="url(#quadMask)"
+                                        />
+                                        {/* Quad border */}
+                                        <polygon
+                                            points={corners.map(c => `${c.x},${c.y}`).join(' ')}
+                                            fill="none"
+                                            stroke="#3b82f6"
+                                            strokeWidth="2"
+                                        />
+                                        {/* Edge lines */}
+                                        {corners.map((corner, i) => {
+                                            const next = corners[(i + 1) % 4]
+                                            return (
+                                                <line
+                                                    key={i}
+                                                    x1={corner.x}
+                                                    y1={corner.y}
+                                                    x2={next.x}
+                                                    y2={next.y}
+                                                    stroke="#3b82f6"
+                                                    strokeWidth="2"
+                                                    strokeDasharray="5,5"
+                                                />
+                                            )
+                                        })}
+                                    </svg>
+                                )}
+
+                                {/* Corner handles */}
+                                {corners.map((corner, index) => (
+                                    <div
+                                        key={index}
+                                        className={`absolute w-8 h-8 -ml-4 -mt-4 cursor-move touch-none
+                                            ${activeCorner === index ? 'z-20' : 'z-10'}`}
+                                        style={{
+                                            left: corner.x,
+                                            top: corner.y,
+                                        }}
+                                        onPointerDown={(e) => {
+                                            e.preventDefault()
+                                            handlePointerDown(index)
+                                        }}
+                                    >
+                                        {/* Handle visual */}
+                                        <div className={`w-8 h-8 rounded-full border-4 border-blue-500 bg-white shadow-lg
+                                            flex items-center justify-center text-xs font-bold text-blue-600
+                                            ${activeCorner === index ? 'ring-4 ring-blue-300' : ''}`}>
+                                            {cornerLabels[index]}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Zoom window */}
+                                {zoomCorner !== null && corners[zoomCorner] && currentImage && (
+                                    <div className="absolute top-2 right-2 w-32 h-32 border-2 border-blue-500 rounded-lg overflow-hidden bg-white shadow-xl z-30">
+                                        <div
+                                            className="w-full h-full"
+                                            style={{
+                                                backgroundImage: `url(${currentImage})`,
+                                                backgroundSize: `${imageSize.width * 3}px ${imageSize.height * 3}px`,
+                                                backgroundPosition: `${-corners[zoomCorner].x * 3 + 64}px ${-corners[zoomCorner].y * 3 + 64}px`,
+                                            }}
+                                        />
+                                        {/* Crosshair */}
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <div className="w-px h-full bg-red-500 opacity-50" />
+                                            <div className="absolute w-full h-px bg-red-500 opacity-50" />
+                                            <div className="absolute w-3 h-3 border-2 border-red-500 rounded-full" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
+                                <Move className="h-4 w-4" />
+                                Trascina i cerchi sui 4 angoli del documento
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button variant="outline" className="flex-1" onClick={handleRetake}>
+                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                    Riprova
+                                </Button>
+                                <Button
+                                    className="flex-1"
+                                    onClick={handleApplyTransform}
+                                    disabled={isLoading || corners.length !== 4}
+                                >
+                                    {isLoading ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Check className="mr-2 h-4 w-4" />
+                                    )}
+                                    Applica
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Preview step */}
-                    {step === 'preview' && processedImage && !isLoading && (
+                    {step === 'preview' && processedImage && (
                         <div className="space-y-4">
                             <div className="relative bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
                                 <img
@@ -598,12 +684,6 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                     className="w-full max-h-[50vh] object-contain mx-auto"
                                     style={{ transform: `rotate(${rotation}deg)` }}
                                 />
-                                {wasAutoProcessed && (
-                                    <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                                        <Wand2 className="h-3 w-3" />
-                                        Auto-raddrizzato
-                                    </div>
-                                )}
                             </div>
 
                             <div className="flex gap-2">
@@ -614,13 +694,12 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                     <RotateCcw className="mr-2 h-4 w-4" />
                                     Riprova
                                 </Button>
-                                {wasAutoProcessed && (
-                                    <Button variant="outline" onClick={handleUseOriginal}>
-                                        Originale
-                                    </Button>
-                                )}
-                                <Button className="flex-1" onClick={handleAcceptImage}>
-                                    <Check className="mr-2 h-4 w-4" />
+                                <Button className="flex-1" onClick={handleAcceptImage} disabled={isLoading}>
+                                    {isLoading ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Check className="mr-2 h-4 w-4" />
+                                    )}
                                     Conferma
                                 </Button>
                             </div>
@@ -628,7 +707,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                     )}
 
                     {/* Pages list step */}
-                    {step === 'pages' && !isLoading && (
+                    {step === 'pages' && (
                         <div className="space-y-4">
                             <div className="grid grid-cols-3 gap-2">
                                 {pages.map((page, index) => (
