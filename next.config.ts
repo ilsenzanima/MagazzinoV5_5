@@ -31,9 +31,9 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
       "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.openstreetmap.org https://*.tile.openstreetmap.org",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.github.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org https://docs.opencv.org https://cdn.jsdelivr.net",
+      "connect-src 'self' data: blob: https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.github.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org https://docs.opencv.org https://cdn.jsdelivr.net",
       "frame-src 'self' https://www.google.com https://maps.google.com https://*.openstreetmap.org", // For map embeds
-      "worker-src 'self'", // For Service Worker
+      "worker-src 'self' blob:", // For Service Worker and OpenCV.js WASM
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
