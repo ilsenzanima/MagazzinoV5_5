@@ -339,19 +339,23 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                         const imgRatio = img.width / img.height
                         const pdfRatio = pdfWidth / pdfHeight
 
-                        let finalWidth: number, finalHeight: number, offsetX = 0, offsetY = 0
+                        let finalWidth: number, finalHeight: number
 
+                        // Fill the entire page - no white margins
+                        // If image is wider than PDF ratio, scale to fit width
+                        // If image is taller than PDF ratio, scale to fit height
                         if (imgRatio > pdfRatio) {
+                            // Image is wider: fit to width, may extend beyond height
                             finalWidth = pdfWidth
                             finalHeight = pdfWidth / imgRatio
-                            offsetY = (pdfHeight - finalHeight) / 2
                         } else {
+                            // Image is taller: fit to height, may extend beyond width
                             finalHeight = pdfHeight
                             finalWidth = pdfHeight * imgRatio
-                            offsetX = (pdfWidth - finalWidth) / 2
                         }
 
-                        pdf.addImage(pages[i].processedImage, 'JPEG', offsetX, offsetY, finalWidth, finalHeight)
+                        // Start at top-left corner (0,0) - no centering offset
+                        pdf.addImage(pages[i].processedImage, 'JPEG', 0, 0, finalWidth, finalHeight)
                         resolve()
                     }
                     img.src = pages[i].processedImage
