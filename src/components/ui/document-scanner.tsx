@@ -4,7 +4,7 @@ import { notify } from "@/lib/notify";
 import { useState, useRef, useCallback, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Camera, RotateCcw, Check, Loader2, Plus, Trash2, FileText, GripVertical, Wand2 } from "lucide-react"
+import { Camera, RotateCcw, Check, Loader2, Plus, Trash2, FileText, GripVertical, Wand2, RotateCw } from "lucide-react"
 import { jsPDF } from "jspdf"
 
 interface DocumentScannerProps {
@@ -19,186 +19,396 @@ interface ScannedPage {
     processedImage: string
 }
 
-type ScannerStep = 'capture' | 'processing' | 'crop' | 'pages' | 'generating'
+type ScannerStep = 'capture' | 'processing' | 'preview' | 'pages' | 'generating'
 
-// Type declarations for jscanify
-interface JscanifyInstance {
-    highlightPaper: (image: HTMLImageElement | HTMLCanvasElement, options?: { color?: string }) => HTMLCanvasElement
-    extractPaper: (image: HTMLImageElement | HTMLCanvasElement, paperWidth?: number, paperHeight?: number) => HTMLCanvasElement
-    getCornerPoints: (image: HTMLImageElement | HTMLCanvasElement) => { topLeftCorner: {x: number, y: number}, topRightCorner: {x: number, y: number}, bottomLeftCorner: {x: number, y: number}, bottomRightCorner: {x: number, y: number} } | null
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type OpenCV = any
 
 declare global {
     interface Window {
-        cv: unknown
-        Jscanify: new () => JscanifyInstance
+        cv: OpenCV
+        Module: {
+            onRuntimeInitialized: () => void
+        }
     }
 }
 
-// Load OpenCV.js dynamically
-const loadOpenCV = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if (window.cv) {
-            resolve()
+let cvPromise: Promise<OpenCV> | null = null
+let cvLoaded = false
+
+// Load OpenCV from public folder
+const loadOpenCV = (): Promise<OpenCV> => {
+    if (cvLoaded && window.cv) {
+        return Promise.resolve(window.cv)
+    }
+
+    if (cvPromise) return cvPromise
+
+    cvPromise = new Promise((resolve, reject) => {
+        // Check if already loaded
+        if (window.cv && window.cv.Mat) {
+            cvLoaded = true
+            resolve(window.cv)
             return
         }
 
         const script = document.createElement('script')
-        script.src = 'https://docs.opencv.org/4.7.0/opencv.js'
+        script.src = '/opencv.js'
         script.async = true
-        script.onload = () => {
-            // OpenCV.js needs time to initialize
-            const checkCV = () => {
-                if (window.cv && (window.cv as { getBuildInformation?: () => string }).getBuildInformation) {
-                    resolve()
-                } else {
-                    setTimeout(checkCV, 100)
-                }
+
+        // OpenCV.js uses Module.onRuntimeInitialized
+        window.Module = {
+            onRuntimeInitialized: () => {
+                cvLoaded = true
+                resolve(window.cv)
             }
-            checkCV()
         }
-        script.onerror = () => reject(new Error('Failed to load OpenCV.js'))
+
+        script.onerror = () => {
+            cvPromise = null
+            reject(new Error('Failed to load OpenCV.js'))
+        }
+
         document.head.appendChild(script)
+
+        // Timeout fallback
+        setTimeout(() => {
+            if (window.cv && window.cv.Mat) {
+                cvLoaded = true
+                resolve(window.cv)
+            }
+        }, 5000)
     })
+
+    return cvPromise
 }
 
-// Load jscanify dynamically
-const loadJscanify = async (): Promise<JscanifyInstance> => {
-    await loadOpenCV()
-    
-    if (window.Jscanify) {
-        return new window.Jscanify()
-    }
+// Find document corners using contour detection
+function findDocumentCorners(cv: OpenCV, src: OpenCV): { x: number, y: number }[] | null {
+    const gray = new cv.Mat()
+    const blurred = new cv.Mat()
+    const edges = new cv.Mat()
+    const dilated = new cv.Mat()
+    const contours = new cv.MatVector()
+    const hierarchy = new cv.Mat()
 
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script')
-        script.src = 'https://cdn.jsdelivr.net/gh/nicokratky/jscanify@master/src/jscanify.min.js'
-        script.async = true
-        script.onload = () => {
-            if (window.Jscanify) {
-                resolve(new window.Jscanify())
-            } else {
-                reject(new Error('Jscanify not found after loading'))
+    try {
+        // Convert to grayscale
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY)
+
+        // Blur to reduce noise
+        cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0)
+
+        // Edge detection
+        cv.Canny(blurred, edges, 75, 200)
+
+        // Dilate edges to close gaps
+        const kernel = cv.Mat.ones(3, 3, cv.CV_8U)
+        cv.dilate(edges, dilated, kernel)
+        kernel.delete()
+
+        // Find contours
+        cv.findContours(dilated, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+        // Find the largest quadrilateral contour
+        let maxArea = 0
+        let bestCorners: { x: number, y: number }[] | null = null
+
+        for (let i = 0; i < contours.size(); i++) {
+            const contour = contours.get(i)
+            const area = cv.contourArea(contour)
+
+            if (area > maxArea) {
+                const peri = cv.arcLength(contour, true)
+                const approx = new cv.Mat()
+                cv.approxPolyDP(contour, approx, 0.02 * peri, true)
+
+                // Check if it's a quadrilateral
+                if (approx.rows === 4) {
+                    maxArea = area
+
+                    // Extract corners
+                    const corners: { x: number, y: number }[] = []
+                    for (let j = 0; j < 4; j++) {
+                        corners.push({
+                            x: approx.data32S[j * 2],
+                            y: approx.data32S[j * 2 + 1]
+                        })
+                    }
+                    bestCorners = corners
+                }
+                approx.delete()
             }
         }
-        script.onerror = () => reject(new Error('Failed to load jscanify'))
-        document.head.appendChild(script)
-    })
+
+        // Only use if area is significant (at least 10% of image)
+        if (bestCorners && maxArea > (src.rows * src.cols * 0.1)) {
+            // Sort corners: top-left, top-right, bottom-right, bottom-left
+            bestCorners.sort((a, b) => a.y - b.y)
+            const top = bestCorners.slice(0, 2).sort((a, b) => a.x - b.x)
+            const bottom = bestCorners.slice(2, 4).sort((a, b) => a.x - b.x)
+            return [top[0], top[1], bottom[1], bottom[0]]
+        }
+
+        return null
+    } finally {
+        gray.delete()
+        blurred.delete()
+        edges.delete()
+        dilated.delete()
+        contours.delete()
+        hierarchy.delete()
+    }
+}
+
+// Apply perspective correction
+function applyPerspectiveCorrection(
+    cv: OpenCV,
+    src: OpenCV,
+    corners: { x: number, y: number }[]
+): OpenCV {
+    // Calculate output dimensions
+    const width = Math.max(
+        Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y),
+        Math.hypot(corners[2].x - corners[3].x, corners[2].y - corners[3].y)
+    )
+    const height = Math.max(
+        Math.hypot(corners[3].x - corners[0].x, corners[3].y - corners[0].y),
+        Math.hypot(corners[2].x - corners[1].x, corners[2].y - corners[1].y)
+    )
+
+    // A4 aspect ratio adjustment
+    const a4Ratio = 297 / 210
+    let outWidth = Math.round(width)
+    let outHeight = Math.round(height)
+
+    if (outHeight / outWidth > a4Ratio) {
+        outWidth = Math.round(outHeight / a4Ratio)
+    } else {
+        outHeight = Math.round(outWidth * a4Ratio)
+    }
+
+    // Source points (detected corners)
+    const srcPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+        corners[0].x, corners[0].y,
+        corners[1].x, corners[1].y,
+        corners[2].x, corners[2].y,
+        corners[3].x, corners[3].y
+    ])
+
+    // Destination points (rectangle)
+    const dstPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+        0, 0,
+        outWidth, 0,
+        outWidth, outHeight,
+        0, outHeight
+    ])
+
+    // Get perspective transform matrix
+    const M = cv.getPerspectiveTransform(srcPoints, dstPoints)
+
+    // Apply transformation
+    const dst = new cv.Mat()
+    cv.warpPerspective(src, dst, M, new cv.Size(outWidth, outHeight))
+
+    // Cleanup
+    srcPoints.delete()
+    dstPoints.delete()
+    M.delete()
+
+    return dst
+}
+
+// Process image with OpenCV
+async function processImageWithOpenCV(imageData: string): Promise<{ processed: string, wasProcessed: boolean }> {
+    try {
+        const cv = await loadOpenCV()
+
+        return new Promise((resolve) => {
+            const img = new Image()
+            img.onload = () => {
+                // Create canvas to load image
+                const canvas = document.createElement('canvas')
+                canvas.width = img.width
+                canvas.height = img.height
+                const ctx = canvas.getContext('2d')
+                if (!ctx) {
+                    resolve({ processed: imageData, wasProcessed: false })
+                    return
+                }
+                ctx.drawImage(img, 0, 0)
+
+                try {
+                    // Read image into OpenCV
+                    const src = cv.imread(canvas)
+
+                    // Try to find document corners
+                    const corners = findDocumentCorners(cv, src)
+
+                    if (corners) {
+                        // Apply perspective correction
+                        const result = applyPerspectiveCorrection(cv, src, corners)
+
+                        // Convert result back to image
+                        const outCanvas = document.createElement('canvas')
+                        cv.imshow(outCanvas, result)
+
+                        // Cleanup
+                        src.delete()
+                        result.delete()
+
+                        resolve({ processed: outCanvas.toDataURL('image/jpeg', 0.9), wasProcessed: true })
+                    } else {
+                        // No document detected, use original
+                        src.delete()
+                        resolve({ processed: imageData, wasProcessed: false })
+                    }
+                } catch (error) {
+                    console.error('OpenCV processing error:', error)
+                    resolve({ processed: imageData, wasProcessed: false })
+                }
+            }
+            img.onerror = () => resolve({ processed: imageData, wasProcessed: false })
+            img.src = imageData
+        })
+    } catch (error) {
+        console.error('Failed to load OpenCV:', error)
+        return { processed: imageData, wasProcessed: false }
+    }
 }
 
 export function DocumentScanner({ open, onOpenChange, onScanComplete }: DocumentScannerProps) {
     const [step, setStep] = useState<ScannerStep>('capture')
     const [currentImage, setCurrentImage] = useState<string | null>(null)
     const [processedImage, setProcessedImage] = useState<string | null>(null)
+    const [wasAutoProcessed, setWasAutoProcessed] = useState(false)
     const [pages, setPages] = useState<ScannedPage[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [loadingMessage, setLoadingMessage] = useState('')
-    const [scannerReady, setScannerReady] = useState(false)
+    const [rotation, setRotation] = useState(0)
     const [draggedPage, setDraggedPage] = useState<string | null>(null)
-    
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const scannerRef = useRef<JscanifyInstance | null>(null)
-    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const [cvReady, setCvReady] = useState(false)
 
-    // Initialize scanner when dialog opens
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Preload OpenCV when dialog opens
     useEffect(() => {
-        if (open && !scannerReady) {
-            setLoadingMessage('Caricamento scanner...')
-            setIsLoading(true)
-            loadJscanify()
-                .then((scanner) => {
-                    scannerRef.current = scanner
-                    setScannerReady(true)
-                    setIsLoading(false)
-                    setLoadingMessage('')
-                })
-                .catch((error) => {
-                    console.error('Failed to load scanner:', error)
-                    // Still allow usage without perspective correction
-                    setScannerReady(true)
-                    setIsLoading(false)
-                    setLoadingMessage('')
-                    notify.warning('Scanner avanzato non disponibile. Funzionalità base attiva.')
+        if (open && !cvReady) {
+            loadOpenCV()
+                .then(() => setCvReady(true))
+                .catch((err) => {
+                    console.error('OpenCV preload failed:', err)
+                    setCvReady(true) // Allow usage without auto-detection
                 })
         }
-    }, [open, scannerReady])
+    }, [open, cvReady])
 
     const handleCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
         const reader = new FileReader()
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             const imageData = event.target?.result as string
             setCurrentImage(imageData)
+            setRotation(0)
             setStep('processing')
-            
-            // Process the image
-            processImage(imageData)
+            setIsLoading(true)
+            setLoadingMessage('Rilevamento documento...')
+
+            const { processed, wasProcessed } = await processImageWithOpenCV(imageData)
+            setProcessedImage(processed)
+            setWasAutoProcessed(wasProcessed)
+            setStep('preview')
+            setIsLoading(false)
+            setLoadingMessage('')
+
+            if (!wasProcessed) {
+                notify.info('Documento non rilevato. Puoi usare l\'immagine originale.')
+            }
         }
         reader.readAsDataURL(file)
     }, [])
 
-    const processImage = async (imageData: string) => {
-        setLoadingMessage('Elaborazione immagine...')
-        setIsLoading(true)
-
-        const img = new Image()
-        img.onload = async () => {
-            try {
-                if (scannerRef.current) {
-                    setLoadingMessage('Rilevamento documento...')
-                    
-                    // Try to extract the paper with perspective correction
-                    const extractedCanvas = scannerRef.current.extractPaper(img, 595, 842) // A4 at 72 DPI
-                    const processedData = extractedCanvas.toDataURL('image/jpeg', 0.9)
-                    setProcessedImage(processedData)
-                } else {
-                    // Fallback: use original image
-                    setProcessedImage(imageData)
-                }
-                
-                setStep('crop')
-            } catch (error) {
-                console.error('Image processing error:', error)
-                // Fallback to original image
-                setProcessedImage(imageData)
-                setStep('crop')
-            } finally {
-                setIsLoading(false)
-                setLoadingMessage('')
-            }
-        }
-        img.src = imageData
-    }
+    const handleRotate = useCallback(() => {
+        setRotation((prev) => (prev + 90) % 360)
+    }, [])
 
     const handleRetake = useCallback(() => {
         setCurrentImage(null)
         setProcessedImage(null)
+        setWasAutoProcessed(false)
+        setRotation(0)
         setStep('capture')
         if (fileInputRef.current) {
             fileInputRef.current.value = ''
         }
     }, [])
 
-    const handleAcceptCrop = useCallback(() => {
+    const handleUseOriginal = useCallback(() => {
+        if (!currentImage) return
+        setProcessedImage(currentImage)
+        setWasAutoProcessed(false)
+    }, [currentImage])
+
+    const handleAcceptImage = useCallback(async () => {
         if (!processedImage) return
 
-        const newPage: ScannedPage = {
-            id: `page-${Date.now()}`,
-            originalImage: currentImage || processedImage,
-            processedImage: processedImage
-        }
+        setIsLoading(true)
+        try {
+            // Apply rotation if needed
+            let finalImage = processedImage
+            if (rotation !== 0) {
+                const img = new Image()
+                await new Promise<void>((resolve, reject) => {
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas')
+                        const ctx = canvas.getContext('2d')
+                        if (!ctx) {
+                            reject(new Error('No context'))
+                            return
+                        }
 
-        setPages(prev => [...prev, newPage])
-        setCurrentImage(null)
-        setProcessedImage(null)
-        setStep('pages')
-        
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''
+                        if (rotation === 90 || rotation === 270) {
+                            canvas.width = img.height
+                            canvas.height = img.width
+                        } else {
+                            canvas.width = img.width
+                            canvas.height = img.height
+                        }
+
+                        ctx.translate(canvas.width / 2, canvas.height / 2)
+                        ctx.rotate((rotation * Math.PI) / 180)
+                        ctx.drawImage(img, -img.width / 2, -img.height / 2)
+
+                        finalImage = canvas.toDataURL('image/jpeg', 0.9)
+                        resolve()
+                    }
+                    img.onerror = reject
+                    img.src = processedImage
+                })
+            }
+
+            const newPage: ScannedPage = {
+                id: `page-${Date.now()}`,
+                originalImage: currentImage || processedImage,
+                processedImage: finalImage
+            }
+
+            setPages(prev => [...prev, newPage])
+            setCurrentImage(null)
+            setProcessedImage(null)
+            setWasAutoProcessed(false)
+            setRotation(0)
+            setStep('pages')
+
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
+        } finally {
+            setIsLoading(false)
         }
-    }, [processedImage, currentImage])
+    }, [processedImage, currentImage, rotation])
 
     const handleAddPage = useCallback(() => {
         setStep('capture')
@@ -219,7 +429,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
         setPages(prev => {
             const draggedIndex = prev.findIndex(p => p.id === draggedPage)
             const targetIndex = prev.findIndex(p => p.id === targetId)
-            
+
             if (draggedIndex === -1 || targetIndex === -1) return prev
 
             const newPages = [...prev]
@@ -237,8 +447,8 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
         if (pages.length === 0) return
 
         setStep('generating')
-        setLoadingMessage('Generazione PDF...')
         setIsLoading(true)
+        setLoadingMessage('Generazione PDF...')
 
         try {
             const pdf = new jsPDF({
@@ -260,32 +470,17 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                     img.onload = () => {
                         const imgRatio = img.width / img.height
                         const pdfRatio = pdfWidth / pdfHeight
-                        const isLandscape = imgRatio > 1.2
 
                         let finalWidth: number, finalHeight: number, offsetX = 0, offsetY = 0
 
-                        if (isLandscape) {
-                            // Landscape image - rotate or fit
-                            if (imgRatio > pdfRatio) {
-                                finalWidth = pdfWidth
-                                finalHeight = pdfWidth / imgRatio
-                                offsetY = (pdfHeight - finalHeight) / 2
-                            } else {
-                                finalHeight = pdfHeight
-                                finalWidth = pdfHeight * imgRatio
-                                offsetX = (pdfWidth - finalWidth) / 2
-                            }
+                        if (imgRatio > pdfRatio) {
+                            finalWidth = pdfWidth
+                            finalHeight = pdfWidth / imgRatio
+                            offsetY = (pdfHeight - finalHeight) / 2
                         } else {
-                            // Portrait image
-                            if (imgRatio > pdfRatio) {
-                                finalWidth = pdfWidth
-                                finalHeight = pdfWidth / imgRatio
-                                offsetY = (pdfHeight - finalHeight) / 2
-                            } else {
-                                finalHeight = pdfHeight
-                                finalWidth = pdfHeight * imgRatio
-                                offsetX = (pdfWidth - finalWidth) / 2
-                            }
+                            finalHeight = pdfHeight
+                            finalWidth = pdfHeight * imgRatio
+                            offsetX = (pdfWidth - finalWidth) / 2
                         }
 
                         pdf.addImage(pages[i].processedImage, 'JPEG', offsetX, offsetY, finalWidth, finalHeight)
@@ -302,6 +497,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
             setPages([])
             setCurrentImage(null)
             setProcessedImage(null)
+            setRotation(0)
             setStep('capture')
             onOpenChange(false)
 
@@ -319,14 +515,10 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
         setCurrentImage(null)
         setProcessedImage(null)
         setPages([])
+        setRotation(0)
         setStep('capture')
         onOpenChange(false)
     }
-
-    const handleUseOriginal = useCallback(() => {
-        if (!currentImage) return
-        setProcessedImage(currentImage)
-    }, [currentImage])
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -342,8 +534,6 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                         )}
                     </DialogTitle>
                 </DialogHeader>
-
-                <canvas ref={canvasRef} className="hidden" />
 
                 <div className="space-y-4">
                     {/* Loading overlay */}
@@ -383,11 +573,10 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                 </div>
                             </div>
 
-                            {/* Show existing pages preview if any */}
                             {pages.length > 0 && (
                                 <div className="mt-4">
-                                    <Button 
-                                        variant="outline" 
+                                    <Button
+                                        variant="outline"
                                         className="w-full"
                                         onClick={() => setStep('pages')}
                                     >
@@ -399,30 +588,38 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                         </div>
                     )}
 
-                    {/* Crop/Preview step */}
-                    {step === 'crop' && processedImage && !isLoading && (
+                    {/* Preview step */}
+                    {step === 'preview' && processedImage && !isLoading && (
                         <div className="space-y-4">
-                            <div className="relative aspect-[3/4] bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
+                            <div className="relative bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
                                 <img
                                     src={processedImage}
                                     alt="Documento elaborato"
-                                    className="w-full h-full object-contain"
+                                    className="w-full max-h-[50vh] object-contain mx-auto"
+                                    style={{ transform: `rotate(${rotation}deg)` }}
                                 />
-                                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                                    <Wand2 className="h-3 w-3" />
-                                    Auto-raddrizzato
-                                </div>
+                                {wasAutoProcessed && (
+                                    <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                                        <Wand2 className="h-3 w-3" />
+                                        Auto-raddrizzato
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-2">
+                                <Button variant="outline" size="icon" onClick={handleRotate} title="Ruota 90°">
+                                    <RotateCw className="h-4 w-4" />
+                                </Button>
                                 <Button variant="outline" className="flex-1" onClick={handleRetake}>
                                     <RotateCcw className="mr-2 h-4 w-4" />
                                     Riprova
                                 </Button>
-                                <Button variant="outline" onClick={handleUseOriginal}>
-                                    Usa Originale
-                                </Button>
-                                <Button className="flex-1" onClick={handleAcceptCrop}>
+                                {wasAutoProcessed && (
+                                    <Button variant="outline" onClick={handleUseOriginal}>
+                                        Originale
+                                    </Button>
+                                )}
+                                <Button className="flex-1" onClick={handleAcceptImage}>
                                     <Check className="mr-2 h-4 w-4" />
                                     Conferma
                                 </Button>
@@ -441,9 +638,8 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                         onDragStart={() => handleDragStart(page.id)}
                                         onDragOver={(e) => handleDragOver(e, page.id)}
                                         onDragEnd={handleDragEnd}
-                                        className={`relative aspect-[3/4] bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden cursor-move group ${
-                                            draggedPage === page.id ? 'opacity-50' : ''
-                                        }`}
+                                        className={`relative aspect-[3/4] bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden cursor-move group ${draggedPage === page.id ? 'opacity-50' : ''
+                                            }`}
                                     >
                                         <img
                                             src={page.processedImage}
@@ -468,7 +664,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                         </div>
                                     </div>
                                 ))}
-                                
+
                                 {/* Add page button */}
                                 <button
                                     onClick={handleAddPage}
@@ -487,8 +683,8 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                 <Button variant="outline" className="flex-1" onClick={handleClose}>
                                     Annulla
                                 </Button>
-                                <Button 
-                                    className="flex-1" 
+                                <Button
+                                    className="flex-1"
                                     onClick={handleGeneratePDF}
                                     disabled={pages.length === 0}
                                 >
