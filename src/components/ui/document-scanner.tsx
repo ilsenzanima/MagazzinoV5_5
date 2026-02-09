@@ -464,7 +464,7 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
                                 <img
                                     src={currentImage}
                                     alt="Documento"
-                                    className="w-full max-h-[50vh] object-contain mx-auto"
+                                    className="w-full block"
                                     draggable={false}
                                 />
 
