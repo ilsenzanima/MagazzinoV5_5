@@ -319,43 +319,40 @@ export function DocumentScanner({ open, onOpenChange, onScanComplete }: Document
         setIsLoading(true)
 
         try {
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
+            // Load first image to determine initial page size
+            const firstImg = new Image()
+            await new Promise<void>((resolve) => {
+                firstImg.onload = () => resolve()
+                firstImg.src = pages[0].processedImage
             })
 
-            const pdfWidth = 210
-            const pdfHeight = 297
+            // Calculate page size based on first image (max 210mm width for reasonable size)
+            const maxWidth = 210 // mm
+            const firstImgRatio = firstImg.width / firstImg.height
+            const firstPageWidth = maxWidth
+            const firstPageHeight = maxWidth / firstImgRatio
 
-            for (let i = 0; i < pages.length; i++) {
-                if (i > 0) {
-                    pdf.addPage()
-                }
+            const pdf = new jsPDF({
+                orientation: firstImgRatio > 1 ? 'landscape' : 'portrait',
+                unit: 'mm',
+                format: [firstPageWidth, firstPageHeight]
+            })
 
+            // Add first image (fill entire page)
+            pdf.addImage(pages[0].processedImage, 'JPEG', 0, 0, firstPageWidth, firstPageHeight)
+
+            // Add remaining pages
+            for (let i = 1; i < pages.length; i++) {
                 const img = new Image()
                 await new Promise<void>((resolve) => {
                     img.onload = () => {
                         const imgRatio = img.width / img.height
-                        const pdfRatio = pdfWidth / pdfHeight
+                        const pageWidth = maxWidth
+                        const pageHeight = maxWidth / imgRatio
 
-                        let finalWidth: number, finalHeight: number
-
-                        // Fill the entire page - no white margins
-                        // If image is wider than PDF ratio, scale to fit width
-                        // If image is taller than PDF ratio, scale to fit height
-                        if (imgRatio > pdfRatio) {
-                            // Image is wider: fit to width, may extend beyond height
-                            finalWidth = pdfWidth
-                            finalHeight = pdfWidth / imgRatio
-                        } else {
-                            // Image is taller: fit to height, may extend beyond width
-                            finalHeight = pdfHeight
-                            finalWidth = pdfHeight * imgRatio
-                        }
-
-                        // Start at top-left corner (0,0) - no centering offset
-                        pdf.addImage(pages[i].processedImage, 'JPEG', 0, 0, finalWidth, finalHeight)
+                        // Add new page with custom size
+                        pdf.addPage([pageWidth, pageHeight], imgRatio > 1 ? 'landscape' : 'portrait')
+                        pdf.addImage(pages[i].processedImage, 'JPEG', 0, 0, pageWidth, pageHeight)
                         resolve()
                     }
                     img.src = pages[i].processedImage
