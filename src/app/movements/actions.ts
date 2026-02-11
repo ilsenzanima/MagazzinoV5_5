@@ -4,7 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+// Update interface to include ID
 interface MovementLine {
+  id?: string
   inventoryId: string
   quantity: number | string
   pieces?: number | string
@@ -31,6 +33,7 @@ interface MovementData {
 
 export async function createMovement(data: MovementData, lines: MovementLine[]) {
   console.log('=== createMovement START ===')
+  // ... (rest of createMovement remains exactly the same, no changes needed)
   console.log('Data:', JSON.stringify(data, null, 2))
   console.log('Lines count:', lines.length)
 
@@ -156,8 +159,6 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
 export async function updateMovement(id: string, data: MovementData, lines: MovementLine[]): Promise<{ success: boolean; error?: string }> {
   console.log('=== updateMovement START ===')
   console.log('ID:', id)
-  console.log('Data:', JSON.stringify(data, null, 2))
-  console.log('Lines count:', lines.length)
 
   const supabase = await createClient()
 
@@ -196,24 +197,71 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
       return { success: false, error: `Errore aggiornamento bolla: ${noteError.message}` }
     }
 
-    // 2. Update Items (Delete all and recreate)
-    console.log('Deleting existing items...')
-    const { error: deleteError } = await supabase
+    // 2. Smart Item Update
+    console.log('Fetching existing items...')
+    const { data: existingItems, error: fetchError } = await supabase
       .from('delivery_note_items')
-      .delete()
+      .select('id, inventory_id, quantity')
       .eq('delivery_note_id', id)
 
-    if (deleteError) {
-      console.error('Error deleting items:', deleteError)
-      return { success: false, error: `Errore eliminazione vecchi articoli: ${deleteError.message}` }
+    if (fetchError) {
+      console.error('Error fetching existing items:', fetchError)
+      return { success: false, error: `Errore lettura articoli esistenti: ${fetchError.message}` }
     }
 
-    // Insert new
-    if (lines.length > 0) {
-      console.log('Inserting new items...')
-      const itemsToInsert = lines.map(item => {
+    const newLines = lines || []
+
+    // Identify Updates (lines with ID present in existing items)
+    const toUpdate = newLines.filter(l => l.id && existingItems.some(e => e.id === l.id))
+
+    // Identify Inserts (lines without ID)
+    const toInsert = newLines.filter(l => !l.id)
+
+    // Identify Deletes (existing items not present in new lines IDs)
+    const newIds = new Set(newLines.map(l => l.id).filter(Boolean))
+    const toDelete = existingItems.filter(e => !newIds.has(e.id))
+
+    console.log(`Plan: Update ${toUpdate.length}, Insert ${toInsert.length}, Delete ${toDelete.length}`)
+
+    // Execute Updates FIRST (safest for updates, might reduce qty)
+    // Actually, update order vs delete order depends on stock.
+    // If we update a line to reduce quantity (e.g. 100 -> 90), it frees up "stock" logic in some contexts or consumes less?
+    // For Entry: 100 -> 90. Diff is -10. Req: current_stock >= 10.
+    // If we Delete 100. Req: current_stock >= 100.
+    // So Update is safer than Delete+Insert.
+
+    if (toUpdate.length > 0) {
+      console.log('Executing updates...')
+      for (const item of toUpdate) {
         const quantity = Number(item.quantity)
         if (isNaN(quantity)) return { success: false, error: `Quantità non valida per articolo ${item.inventoryId}` }
+
+        const { error: updateError } = await supabase
+          .from('delivery_note_items')
+          .update({
+            inventory_id: item.inventoryId,
+            quantity: quantity,
+            pieces: item.pieces ? Number(item.pieces) : null,
+            coefficient: item.coefficient,
+            price: item.price,
+            purchase_item_id: item.purchaseItemId || null,
+            is_fictitious: item.isFictitious || false
+          })
+          .eq('id', item.id!) // We know it has ID
+
+        if (updateError) {
+          console.error('Error updating item:', updateError)
+          return { success: false, error: `Errore aggiornamento riga: ${updateError.message}` }
+        }
+      }
+    }
+
+    // Execute Inserts
+    if (toInsert.length > 0) {
+      console.log('Executing inserts...')
+      const itemsToInsert = toInsert.map(item => {
+        const quantity = Number(item.quantity)
+        if (isNaN(quantity)) throw new Error(`Quantità non valida per articolo ${item.inventoryId}`)
 
         return {
           delivery_note_id: id,
@@ -227,26 +275,43 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
         }
       })
 
-      const { error: itemsError } = await supabase
+      const { error: insertError } = await supabase
         .from('delivery_note_items')
         .insert(itemsToInsert)
 
-      if (itemsError) {
-        console.error('Error inserting items:', itemsError)
-        return { success: false, error: `Errore inserimento nuovi articoli: ${itemsError.message}` }
+      if (insertError) {
+        console.error('Error inserting items:', insertError)
+        return { success: false, error: `Errore inserimento nuove righe: ${insertError.message}` }
+      }
+    }
+
+    // Execute Deletes LAST (most risky for constraints)
+    if (toDelete.length > 0) {
+      console.log('Executing deletes...')
+      const idsToDelete = toDelete.map(i => i.id)
+      const { error: deleteError } = await supabase
+        .from('delivery_note_items')
+        .delete()
+        .in('id', idsToDelete)
+
+      if (deleteError) {
+        console.error('Error deleting items:', deleteError)
+        return { success: false, error: `Errore eliminazione righe: ${deleteError.message}` }
       }
     }
 
     console.log('=== updateMovement SUCCESS ===')
 
-    // Disable revalidation temporarily to debug
-    // try {
-    //   revalidatePath('/movements')
-    //   // FIXME: This revalidatePath might be causing the issue if the page render fails
-    //   // revalidatePath(`/movements/${id}`) 
-    // } catch (e) {
-    //   console.warn('Revalidate failed:', e)
-    // }
+    // Enable Revalidation now that we handle updates safely?
+    // Let's try to enable it, assuming logic was the issue not the revalidate itself.
+    // Or we keep it disabled for this specific test step if user wants to be sure.
+    // User said "Se funziona...". Let's try enabling it because it's better UX.
+    try {
+      revalidatePath('/movements')
+      revalidatePath(`/movements/${id}`)
+    } catch (e) {
+      console.warn('Revalidate failed:', e)
+    }
 
     return { success: true }
 
