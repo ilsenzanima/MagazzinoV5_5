@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         */
         const { data, error } = await fetchWithTimeout(
           supabase.rpc('get_my_role'),
-          5000 // Reduced from 20s to 5s for faster failure fallback
+          15000 // Increased to 15s to reduce timeouts on slow connections
         );
 
         if (!isMountedRef.current) return;
@@ -146,11 +146,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Use cached role instead of degrading to 'user'
             console.log("Using cached role on error:", cachedRole);
             setRealRole(cachedRole);
+
+            // Update timestamp to prevent immediate retry loop
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(STORAGE_KEY_ROLE_TS, Date.now().toString());
+              lastFetchedRef.current = Date.now();
+            }
           } else if (!realRole) {
             // Only fallback to 'user' if no cached role AND no current role
             setRealRole('user');
           }
-          // Don't update timestamps on error - let it retry next time
         }
       } finally {
         fetchPromiseRef.current = null;
