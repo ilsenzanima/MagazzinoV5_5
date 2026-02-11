@@ -59,6 +59,18 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     // Items State (for local manipulation before save)
     const [items, setItems] = useState<DeliveryNoteItem[]>(initialMovement.items || []);
 
+    // Helper for role-based visibility
+    const canSeePrices = userRole === 'admin' || userRole === 'operativo';
+
+    // Calculate Grand Total
+    const grandTotal = useMemo(() => {
+        return items.reduce((sum, item) => sum + (item.quantity * (item.price || 0)), 0);
+    }, [items]);
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
+    };
+
     // Fetch inventory items on demand
     const handleSearchInventory = async (term: string) => {
         setIsSearchingInventory(true);
@@ -168,7 +180,8 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
             inventoryName: inventoryItem.name,
             inventoryModel: inventoryItem.model,
             inventoryUnit: inventoryItem.unit,
-            inventoryDescription: inventoryItem.description
+            inventoryDescription: inventoryItem.description,
+            price: inventoryItem.price || 0
         };
 
         setItems([...items, newItem]);
@@ -375,14 +388,20 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     <TableHead>Codice</TableHead>
                                     <TableHead>Descrizione</TableHead>
                                     <TableHead>Rif. Acquisto</TableHead>
-                                    <TableHead className="w-[100px]">Quantità</TableHead>
+                                    <TableHead className="w-[100px] text-right">Quantità</TableHead>
+                                    {canSeePrices && (
+                                        <>
+                                            <TableHead className="w-[120px] text-right">Prezzo Unit.</TableHead>
+                                            <TableHead className="w-[120px] text-right">Totale</TableHead>
+                                        </>
+                                    )}
                                     {isEditing && <TableHead className="w-[50px]"></TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {items.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="text-center py-8 text-slate-400 dark:text-slate-500">
+                                        <TableCell colSpan={canSeePrices ? 6 : 4} className="text-center py-8 text-slate-400 dark:text-slate-500">
                                             Nessun articolo inserito
                                         </TableCell>
                                     </TableRow>
@@ -413,19 +432,29 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                                     <span className="text-xs text-slate-400">-</span>
                                                 )}
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="text-right">
                                                 {isEditing ? (
                                                     <Input
                                                         type="number"
                                                         min="1"
                                                         value={item.quantity}
                                                         onChange={(e) => handleUpdateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                                                        className="w-20"
+                                                        className="w-20 ml-auto"
                                                     />
                                                 ) : (
                                                     <Badge variant="secondary">{item.quantity} {item.inventoryUnit}</Badge>
                                                 )}
                                             </TableCell>
+                                            {canSeePrices && (
+                                                <>
+                                                    <TableCell className="text-right font-medium text-slate-600">
+                                                        {formatCurrency(item.price || 0)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold text-slate-900">
+                                                        {formatCurrency((item.price || 0) * item.quantity)}
+                                                    </TableCell>
+                                                </>
+                                            )}
                                             {isEditing && (
                                                 <TableCell>
                                                     <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
@@ -491,10 +520,31 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                             )}
                                         </div>
                                     </div>
+                                    {canSeePrices && (
+                                        <div className="flex justify-between items-center border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+                                            <div className="text-xs text-slate-500">
+                                                {formatCurrency(item.price || 0)} / unità
+                                            </div>
+                                            <div className="font-bold text-slate-900 dark:text-slate-100">
+                                                {formatCurrency((item.price || 0) * item.quantity)}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}
                     </div>
+                    {/* Footer Total */}
+                    {canSeePrices && items.length > 0 && (
+                        <div className="mt-6 flex justify-end border-t pt-4">
+                            <div className="text-right">
+                                <span className="text-sm text-slate-500 uppercase tracking-wider font-semibold mr-4">Totale Documento</span>
+                                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                                    {formatCurrency(grandTotal)}
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
