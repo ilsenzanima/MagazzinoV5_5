@@ -395,7 +395,13 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             setLoading(true);
             if (isEditing && editingId) {
                 // Edit mode: update existing movement
-                await updateMovement(editingId, noteData, itemsData);
+                const result = await updateMovement(editingId, noteData, itemsData);
+                if (result && !result.success) {
+                    throw new Error(result.error);
+                }
+                // Redirect user manually since we removed server-side redirect
+                router.push('/movements');
+                router.refresh(); // Ensure cache is refreshed since we disabled revalidatePath
             } else {
                 // Create mode: create new movement
                 await createMovement(noteData, itemsData);
