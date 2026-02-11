@@ -447,10 +447,10 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                             </TableCell>
                                             {canSeePrices && (
                                                 <>
-                                                    <TableCell className="text-right font-medium text-slate-600">
+                                                    <TableCell className="text-right font-medium text-slate-600 dark:text-slate-400">
                                                         {formatCurrency(item.price || 0)}
                                                     </TableCell>
-                                                    <TableCell className="text-right font-bold text-slate-900">
+                                                    <TableCell className="text-right font-bold text-slate-900 dark:text-slate-100">
                                                         {formatCurrency((item.price || 0) * item.quantity)}
                                                     </TableCell>
                                                 </>
@@ -522,7 +522,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     </div>
                                     {canSeePrices && (
                                         <div className="flex justify-between items-center border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
-                                            <div className="text-xs text-slate-500">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">
                                                 {formatCurrency(item.price || 0)} / unità
                                             </div>
                                             <div className="font-bold text-slate-900 dark:text-slate-100">
@@ -536,9 +536,9 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                     </div>
                     {/* Footer Total */}
                     {canSeePrices && items.length > 0 && (
-                        <div className="mt-6 flex justify-end border-t pt-4">
+                        <div className="mt-6 flex justify-end border-t border-slate-200 dark:border-slate-700 pt-4">
                             <div className="text-right">
-                                <span className="text-sm text-slate-500 uppercase tracking-wider font-semibold mr-4">Totale Documento</span>
+                                <span className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold mr-4">Totale Documento</span>
                                 <span className="text-2xl font-bold text-slate-900 dark:text-white">
                                     {formatCurrency(grandTotal)}
                                 </span>
