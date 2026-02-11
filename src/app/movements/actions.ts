@@ -153,7 +153,7 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
   redirect('/movements')
 }
 
-export async function updateMovement(id: string, data: MovementData, lines: MovementLine[]) {
+export async function updateMovement(id: string, data: MovementData, lines: MovementLine[]): Promise<{ success: boolean; error?: string }> {
   console.log('=== updateMovement START ===')
   console.log('ID:', id)
   console.log('Data:', JSON.stringify(data, null, 2))
@@ -166,7 +166,7 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
     const { data: authData, error: userError } = await supabase.auth.getUser()
     if (userError || !authData.user) {
       console.error('Auth error in updateMovement:', userError)
-      throw new Error('Non sei autenticato. Effettua il login e riprova.')
+      return { success: false, error: 'Non sei autenticato. Effettua il login e riprova.' }
     }
 
     // 1. Update Note
@@ -193,7 +193,7 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
 
     if (noteError) {
       console.error('Error updating delivery note:', noteError)
-      throw new Error(`Errore aggiornamento bolla: ${noteError.message}`)
+      return { success: false, error: `Errore aggiornamento bolla: ${noteError.message}` }
     }
 
     // 2. Update Items (Delete all and recreate)
@@ -205,7 +205,7 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
 
     if (deleteError) {
       console.error('Error deleting items:', deleteError)
-      throw new Error(`Errore eliminazione vecchi articoli: ${deleteError.message}`)
+      return { success: false, error: `Errore eliminazione vecchi articoli: ${deleteError.message}` }
     }
 
     // Insert new
@@ -213,7 +213,7 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
       console.log('Inserting new items...')
       const itemsToInsert = lines.map(item => {
         const quantity = Number(item.quantity)
-        if (isNaN(quantity)) throw new Error(`Quantità non valida per articolo ${item.inventoryId}`)
+        if (isNaN(quantity)) return { success: false, error: `Quantità non valida per articolo ${item.inventoryId}` }
 
         return {
           delivery_note_id: id,
@@ -233,24 +233,25 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
 
       if (itemsError) {
         console.error('Error inserting items:', itemsError)
-        throw new Error(`Errore inserimento nuovi articoli: ${itemsError.message}`)
+        return { success: false, error: `Errore inserimento nuovi articoli: ${itemsError.message}` }
       }
     }
 
     console.log('=== updateMovement SUCCESS ===')
+
+    // Disable revalidation temporarily to debug
+    // try {
+    //   revalidatePath('/movements')
+    //   // FIXME: This revalidatePath might be causing the issue if the page render fails
+    //   // revalidatePath(`/movements/${id}`) 
+    // } catch (e) {
+    //   console.warn('Revalidate failed:', e)
+    // }
+
+    return { success: true }
+
   } catch (e: any) {
     console.error('updateMovement FAILED:', e)
-    if (e instanceof Error) throw e
-    throw new Error('Errore sconosciuto durante aggiornamento bolla: ' + JSON.stringify(e))
+    return { success: false, error: 'Errore sconosciuto durante aggiornamento bolla: ' + (e.message || JSON.stringify(e)) }
   }
-
-  try {
-    revalidatePath('/movements')
-    // FIXME: This revalidatePath might be causing the issue if the page render fails
-    // revalidatePath(`/movements/${id}`) 
-  } catch (e) {
-    console.warn('Revalidate failed:', e)
-  }
-
-  redirect('/movements')
 }
