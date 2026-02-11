@@ -154,12 +154,24 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
 }
 
 export async function updateMovement(id: string, data: MovementData, lines: MovementLine[]) {
+  console.log('=== updateMovement START ===')
+  console.log('ID:', id)
+  console.log('Data:', JSON.stringify(data, null, 2))
+  console.log('Lines count:', lines.length)
+
   const supabase = await createClient()
 
-  // 1. Update Note
-  const { error: noteError } = await supabase
-    .from('delivery_notes')
-    .update({
+  try {
+    // 0. Verify user is authenticated
+    const { data: authData, error: userError } = await supabase.auth.getUser()
+    if (userError || !authData.user) {
+      console.error('Auth error in updateMovement:', userError)
+      throw new Error('Non sei autenticato. Effettua il login e riprova.')
+    }
+
+    // 1. Update Note
+    console.log('Updating delivery_note...')
+    const updateData = {
       type: data.type,
       number: data.number,
       date: data.date,
@@ -172,52 +184,73 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
       appearance: data.appearance,
       packages_count: data.packagesCount,
       notes: data.notes
-    })
-    .eq('id', id)
-
-  if (noteError) {
-    console.error('Error updating delivery note:', noteError)
-    throw new Error(noteError.message)
-  }
-
-  // 2. Update Items (Delete all and recreate)
-  // Delete existing
-  const { error: deleteError } = await supabase
-    .from('delivery_note_items')
-    .delete()
-    .eq('delivery_note_id', id)
-
-  if (deleteError) {
-    throw new Error(deleteError.message)
-  }
-
-  // Insert new
-  if (lines.length > 0) {
-    const itemsToInsert = lines.map(item => ({
-      delivery_note_id: id,
-      inventory_id: item.inventoryId,
-      quantity: Number(item.quantity),
-      pieces: item.pieces ? Number(item.pieces) : null,
-      coefficient: item.coefficient,
-      price: item.price,
-      purchase_item_id: item.purchaseItemId || null,
-      is_fictitious: item.isFictitious || false
-    }))
-
-    const { error: itemsError } = await supabase
-      .from('delivery_note_items')
-      .insert(itemsToInsert)
-
-    if (itemsError) {
-      throw new Error(itemsError.message)
     }
+
+    const { error: noteError } = await supabase
+      .from('delivery_notes')
+      .update(updateData)
+      .eq('id', id)
+
+    if (noteError) {
+      console.error('Error updating delivery note:', noteError)
+      throw new Error(`Errore aggiornamento bolla: ${noteError.message}`)
+    }
+
+    // 2. Update Items (Delete all and recreate)
+    console.log('Deleting existing items...')
+    const { error: deleteError } = await supabase
+      .from('delivery_note_items')
+      .delete()
+      .eq('delivery_note_id', id)
+
+    if (deleteError) {
+      console.error('Error deleting items:', deleteError)
+      throw new Error(`Errore eliminazione vecchi articoli: ${deleteError.message}`)
+    }
+
+    // Insert new
+    if (lines.length > 0) {
+      console.log('Inserting new items...')
+      const itemsToInsert = lines.map(item => {
+        const quantity = Number(item.quantity)
+        if (isNaN(quantity)) throw new Error(`Quantità non valida per articolo ${item.inventoryId}`)
+
+        return {
+          delivery_note_id: id,
+          inventory_id: item.inventoryId,
+          quantity: quantity,
+          pieces: item.pieces ? Number(item.pieces) : null,
+          coefficient: item.coefficient,
+          price: item.price,
+          purchase_item_id: item.purchaseItemId || null,
+          is_fictitious: item.isFictitious || false
+        }
+      })
+
+      const { error: itemsError } = await supabase
+        .from('delivery_note_items')
+        .insert(itemsToInsert)
+
+      if (itemsError) {
+        console.error('Error inserting items:', itemsError)
+        throw new Error(`Errore inserimento nuovi articoli: ${itemsError.message}`)
+      }
+    }
+
+    console.log('=== updateMovement SUCCESS ===')
+  } catch (e: any) {
+    console.error('updateMovement FAILED:', e)
+    if (e instanceof Error) throw e
+    throw new Error('Errore sconosciuto durante aggiornamento bolla: ' + JSON.stringify(e))
   }
 
   try {
     revalidatePath('/movements')
-    revalidatePath(`/movements/${id}`)
+    // FIXME: This revalidatePath might be causing the issue if the page render fails
+    // revalidatePath(`/movements/${id}`) 
   } catch (e) {
     console.warn('Revalidate failed:', e)
   }
+
   redirect('/movements')
 }
