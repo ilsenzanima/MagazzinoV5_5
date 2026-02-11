@@ -9,6 +9,7 @@ import { createMovement, updateMovement } from "@/app/movements/actions";
 import { notify } from "@/lib/notify";
 
 export interface MovementLine {
+    id?: string; // Database ID for existing items
     tempId: string;
     itemId: string;
     itemName: string;
@@ -74,6 +75,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     // Line State - Initialize from initialNote items if editing
     const [lines, setLines] = useState<MovementLine[]>(
         initialNote?.items ? initialNote.items.map(item => ({
+            id: item.id,
             tempId: item.id || Math.random().toString(36).substr(2, 9),
             itemId: item.inventoryId,
             itemName: item.inventoryName || "",
@@ -382,6 +384,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         };
 
         const itemsData = lines.map(l => ({
+            id: l.id,
             inventoryId: l.itemId,
             quantity: l.quantity,
             pieces: l.pieces,
