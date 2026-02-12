@@ -110,6 +110,27 @@ export default function NewPurchasePage() {
     const [selectedJobForLine, setSelectedJobForLine] = useState<Job | null>(null);
     const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
 
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+            setSelectedFile(file);
+        }
+    };
+
     useEffect(() => {
         loadData();
     }, []);
@@ -610,14 +631,38 @@ export default function NewPurchasePage() {
                                     )}
                                 </div>
                             </div>
+
+
                             <div className="space-y-2 md:col-span-4 border-t pt-2">
                                 <Label>Documento Allegato (PDF, Immagine)</Label>
-                                <Input
-                                    type="file"
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                                    className="cursor-pointer"
-                                />
+                                <div
+                                    className={`relative border-2 border-dashed rounded-md p-4 transition-colors text-center ${isDragging
+                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                        : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        }`}
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={handleDrop}
+                                >
+                                    <Input
+                                        type="file"
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    />
+                                    <div className="pointer-events-none flex flex-col items-center justify-center gap-1">
+                                        <Upload className={`h-8 w-8 ${isDragging ? "text-blue-500" : "text-slate-400"}`} />
+                                        {selectedFile ? (
+                                            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                                                {selectedFile.name}
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                {isDragging ? "Rilascia il file qui..." : "Clicca o trascina qui un file"}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

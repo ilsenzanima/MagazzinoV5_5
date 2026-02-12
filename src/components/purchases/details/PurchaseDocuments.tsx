@@ -18,11 +18,9 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const uploadFile = async (file: File) => {
     try {
       setIsUploading(true);
       const url = await purchasesApi.uploadDocument(file);
@@ -33,8 +31,32 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
       notify.error("Errore durante il caricamento del documento");
     } finally {
       setIsUploading(false);
-      // Reset input value to allow re-uploading same file if needed
-      e.target.value = "";
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadFile(file);
+    e.target.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await uploadFile(file);
     }
   };
 
@@ -71,7 +93,12 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
 
   return (
     <>
-      <Card>
+      <Card
+        className={`transition-colors duration-200 ${isDragging ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <CardHeader className="flex flex-row items-center justify-between py-4">
           <CardTitle className="text-base font-semibold">Documento (DDT / Fattura)</CardTitle>
           {!documentUrl && (
@@ -135,7 +162,9 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
           ) : (
             <div className="text-center py-6 text-slate-400 dark:text-slate-500 border-2 border-dashed dark:border-slate-600 rounded-md bg-slate-50/50 dark:bg-slate-800/50">
               <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Nessun documento allegato</p>
+              <p className="text-sm">
+                {isDragging ? "Rilascia il file qui..." : "Trascina qui un file o usa il pulsante Carica"}
+              </p>
             </div>
           )}
         </CardContent>
