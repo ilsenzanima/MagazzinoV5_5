@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Loader2, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText } from "lucide-react";
+import { ArrowLeft, Save, Loader2, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Recycle } from "lucide-react";
 import Link from "next/link";
 import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
@@ -99,7 +99,7 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
 
             {/* Tabs - Type Selection */}
             <Tabs value={form.activeTab} onValueChange={(v: any) => form.setActiveTab(v)} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsList className="grid w-full grid-cols-4 mb-6">
                     <TabsTrigger value="entry" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800">
                         <ArrowDownRight className="mr-2 h-4 w-4" />
                         Entrata / Reso
@@ -111,6 +111,10 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                     <TabsTrigger value="sale" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800">
                         <ShoppingBag className="mr-2 h-4 w-4" />
                         Vendita
+                    </TabsTrigger>
+                    <TabsTrigger value="waste" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800">
+                        <Recycle className="mr-2 h-4 w-4" />
+                        Immondizie
                     </TabsTrigger>
                 </TabsList>
 

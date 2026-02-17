@@ -55,7 +55,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     const [itemsLoading, setItemsLoading] = useState(false);
 
     // Form State - Initialize from initialNote if editing
-    const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale'>(initialNote?.type || 'entry');
+    const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale' | 'waste'>(initialNote?.type || 'entry');
     const [numberPart, setNumberPart] = useState(initialNote?.number.split('/')[0] || "");
     const [date, setDate] = useState(initialNote?.date.split('T')[0] || new Date().toISOString().split('T')[0]);
     const [selectedJob, setSelectedJob] = useState<Job | null>(
@@ -160,6 +160,11 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             setPickupLocation(warehouseAddress);
             setDeliveryLocation("Cliente");
             setTransportTime("08:00"); // Default per vendite
+        } else if (activeTab === 'waste') {
+            setCausal("Trasporto rifiuti cantiere");
+            setPickupLocation(jobAddress || "CANTIERE");
+            setDeliveryLocation("OPI FIRESAFE S.R.L. DEPOSITO TEMPORANEO\nVia Monfalcone, 33 - 33052 - Cervignano del Friuli (UD)");
+            setTransportTime("08:00");
         }
 
         if (selectedJob) {
@@ -336,7 +341,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             pieces: currentLine.pieces ? parseFloat(currentLine.pieces) : undefined,
             coefficient: currentLine.coefficient,
             purchaseItemId: currentLine.purchaseItemId || undefined,
-            isFictitious: currentLine.isFictitious || false,
+            isFictitious: activeTab === 'waste' ? true : (currentLine.isFictitious || false),
             purchaseRef: availableBatches.find(b => b.id === currentLine.purchaseItemId)?.purchaseRef
         };
 
@@ -368,8 +373,17 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             return;
         }
 
+        // Build waste transport note if applicable
+        let finalNotes = notes;
+        if (activeTab === 'waste') {
+            // Extract site address from the job
+            const siteAddr = selectedJob?.siteAddress || selectedJob?.clientAddress || pickupLocation || 'cantiere';
+            const wasteNote = `Trasporto di materiale prodotto nel cantiere di ${siteAddr} verso la sede di Cervignano del Friuli (UD) in via Monfalcone n.33 per deposito temporaneo.`;
+            finalNotes = finalNotes ? `${finalNotes}\n${wasteNote}` : wasteNote;
+        }
+
         const noteData = {
-            type: activeTab,
+            type: activeTab === 'waste' ? 'exit' : activeTab,
             number: fullNumber,
             date: date,
             jobId: selectedJob?.id,
@@ -380,7 +394,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             transportTime: transportTime,
             appearance: appearance,
             packagesCount: parseInt(packagesCount) || 1,
-            notes: notes
+            notes: finalNotes
         };
 
         const itemsData = lines.map(l => ({
@@ -390,7 +404,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             pieces: l.pieces,
             coefficient: l.coefficient,
             purchaseItemId: l.purchaseItemId,
-            isFictitious: l.isFictitious,
+            isFictitious: activeTab === 'waste' ? true : l.isFictitious,
             price: 0
         }));
 
