@@ -5,7 +5,7 @@ import { notify } from "@/lib/notify";;
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, ChevronLeft, ChevronRight, Printer } from "lucide-react";
+import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, ChevronLeft, ChevronRight, Printer, Recycle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useDeferredValue } from "react";
 import { deliveryNotesApi, DeliveryNote, DeliveryNoteItem } from "@/lib/api";
@@ -95,8 +95,12 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
     setPage(1); // Reset page on search
   };
 
-  const getTypeConfig = (type: string) => {
-    switch (type) {
+  const getTypeConfig = (movement: DeliveryNote) => {
+    if (movement.type === 'exit' && movement.causal === 'Trasporto rifiuti cantiere') {
+      return { label: 'Immondizie', color: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100', icon: Recycle };
+    }
+
+    switch (movement.type) {
       case 'entry':
         return { label: 'Entrata', color: 'bg-green-100 text-green-700 hover:bg-green-100', icon: ArrowDownRight };
       case 'exit':
@@ -104,7 +108,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
       case 'sale':
         return { label: 'Vendita', color: 'bg-blue-100 text-blue-700 hover:bg-blue-100', icon: ShoppingBag };
       default:
-        return { label: type, color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300', icon: FileText };
+        return { label: movement.type, color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300', icon: FileText };
     }
   };
 
@@ -160,7 +164,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
               </div>
             ) : (
               movements.map((movement) => {
-                const typeConfig = getTypeConfig(movement.type);
+                const typeConfig = getTypeConfig(movement);
                 const Icon = typeConfig.icon;
 
                 const handleQuickPrint = async (e: React.MouseEvent) => {
