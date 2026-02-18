@@ -349,7 +349,10 @@ export async function generateDeliveryNotePDF(
         .replace(/[^a-zA-Z0-9\s]/g, '')
         .replace(/\s+/g, '_')
         .substring(0, 30);
-    const typeLabel = typeLabels[movement.type] || movement.type;
+    let typeLabel = typeLabels[movement.type] || movement.type;
+    if (movement.type === 'exit' && movement.causal === 'Trasporto rifiuti cantiere') {
+        typeLabel = 'immondizia';
+    }
     // Pad bolla number with zeros for proper file sorting (e.g., 001 instead of 1)
     const bollaNumber = movement.number.replace('/', '_').replace(/^(\d+)/, (match) => match.padStart(3, '0'));
 
