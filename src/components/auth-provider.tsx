@@ -73,16 +73,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // 3. LocalStorage Timestamp Check
+    // 3. LocalStorage Stale-While-Revalidate Check
     if (typeof window !== 'undefined') {
       const ts = localStorage.getItem(STORAGE_KEY_ROLE_TS);
       const savedRole = localStorage.getItem(STORAGE_KEY_ROLE);
+
+      // If we have a cached role, apply it immediately to unblock UI
+      if (savedRole && isMountedRef.current) {
+        setRealRole(savedRole as 'admin' | 'user' | 'operativo');
+      }
+
+      // If cache is still fresh, we stop here.
       if (ts && savedRole && (Date.now() - Number(ts) < MIN_CACHE_TTL)) {
         console.log("Role cache valid from storage");
         lastFetchedRef.current = Number(ts);
-        if (isMountedRef.current) setRealRole(savedRole as 'admin' | 'user' | 'operativo');
         return;
       }
+
+      // Otherwise, we continue with the background fetch to refresh it.
+      console.log("Role cache expired, fetching in background...");
     }
 
     const fetcher = async () => {

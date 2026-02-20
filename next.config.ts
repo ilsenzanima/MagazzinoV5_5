@@ -28,11 +28,11 @@ const nextConfig: NextConfig = {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://docs.opencv.org https://cdn.jsdelivr.net", // Required for Next.js + OpenCV.js for document scanner
       "script-src-elem 'self' 'unsafe-inline' https://vercel.live https://docs.opencv.org https://cdn.jsdelivr.net", // For Chrome's stricter CSP + OpenCV.js
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
-      "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
-      "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.openstreetmap.org https://*.tile.openstreetmap.org",
-      "connect-src 'self' data: blob: https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.github.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org https://docs.opencv.org https://cdn.jsdelivr.net",
-      "frame-src 'self' https://www.google.com https://maps.google.com https://*.openstreetmap.org", // For map embeds
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://vercel.live",
+      "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://vercel.live",
+      "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.openstreetmap.org https://*.tile.openstreetmap.org https://vercel.live",
+      "connect-src 'self' data: blob: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.vercel.live https://vercel.live https://api.github.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org https://docs.opencv.org https://cdn.jsdelivr.net",
+      "frame-src 'self' https://www.google.com https://maps.google.com https://*.openstreetmap.org https://vercel.live", // For map embeds
       "worker-src 'self' blob:", // For Service Worker and OpenCV.js WASM
       "frame-ancestors 'none'",
       "base-uri 'self'",
