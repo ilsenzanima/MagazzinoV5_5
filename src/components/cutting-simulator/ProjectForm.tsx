@@ -209,8 +209,10 @@ export function ProjectForm({ onCalculateProject }: ProjectFormProps) {
                                     const prev = project.segments[idx - 1];
                                     const next = project.segments[idx + 1];
                                     let deduction = 0;
-                                    if (prev && prev.type === 'elbow90') deduction += prev.armB;
-                                    if (next && next.type === 'elbow90') deduction += next.armA;
+                                    const outerWidth = project.section.innerWidth + (2 * project.section.thickness);
+
+                                    if (prev && prev.type === 'elbow90') deduction += prev.armB + outerWidth;
+                                    if (next && next.type === 'elbow90') deduction += next.armA + outerWidth;
 
                                     if (deduction > 0) {
                                         const actualLength = Math.max(0, seg.length - deduction);

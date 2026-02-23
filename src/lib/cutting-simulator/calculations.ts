@@ -426,14 +426,15 @@ export function calculateProject(project: DuctProject): CalculationResult {
                 const prev = segments[idx - 1];
                 const next = segments[idx + 1];
                 let deduction = 0;
+                const outerWidth = section.innerWidth + 2 * section.thickness;
 
                 // Il segmento precedente si aggancia con il suo braccio B all'ingresso di questo
                 if (prev && prev.type === 'elbow90') {
-                    deduction += prev.armB;
+                    deduction += prev.armB + outerWidth;
                 }
                 // Il segmento successivo si aggancia con il suo braccio A all'uscita di questo
                 if (next && next.type === 'elbow90') {
-                    deduction += next.armA;
+                    deduction += next.armA + outerWidth;
                 }
 
                 if (deduction > 0) {
