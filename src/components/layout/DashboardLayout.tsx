@@ -19,7 +19,8 @@ import {
   Users,
   Building2,
   HardHat,
-  Calendar
+  Calendar,
+  Scissors
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -112,6 +113,16 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           icon: BarChart3,
           href: "/reports",
           active: pathname === "/reports",
+        },
+      ]
+    },
+    {
+      items: [
+        {
+          label: "Disegno e Taglio",
+          icon: Scissors,
+          href: "/disegno-taglio",
+          active: pathname === "/disegno-taglio" || pathname.startsWith("/disegno-taglio/"),
         },
       ]
     }
