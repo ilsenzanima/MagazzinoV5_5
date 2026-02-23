@@ -158,6 +158,30 @@ export function ProjectForm({ onCalculateProject }: ProjectFormProps) {
                         )}
                     </div>
 
+                    {/* === IMPOSTAZIONI MISURE === */}
+                    <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
+                        <div className="space-y-0.5 pr-4">
+                            <Label className="text-xs font-medium cursor-pointer" onClick={() => setProject(p => ({ ...p, globalMeasurements: !p.globalMeasurements }))}>
+                                Misure finite (globali)
+                            </Label>
+                            <p className="text-[10px] text-muted-foreground leading-tight">
+                                Sottrae in automatico l'ingombro delle curve dai tratti dritti adiacenti
+                            </p>
+                        </div>
+                        <button type="button"
+                            onClick={() => setProject(p => ({ ...p, globalMeasurements: !p.globalMeasurements }))}
+                            className={cn(
+                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+                                project.globalMeasurements ? "bg-primary" : "bg-input"
+                            )}
+                        >
+                            <span className={cn(
+                                "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                                project.globalMeasurements ? "translate-x-4" : "translate-x-0"
+                            )} />
+                        </button>
+                    </div>
+
                     {/* === SEGMENTI === */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
