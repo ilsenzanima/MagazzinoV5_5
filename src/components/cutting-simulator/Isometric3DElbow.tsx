@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Vista isometrica (pseudo-3D) di un gomito a 90°, resa in SVG puro.
- * Mostra i due bracci del cassonetto che si incontrano a 90°.
+ * Vista isometrica (pseudo-3D) di un gomito a 90°.
+ * Disegna un solido a L con i due bracci che si incontrano all'angolo.
+ * Usa wireframe con facce semitrasparenti per massima chiarezza.
  */
 
 interface Isometric3DElbowProps {
@@ -13,23 +14,20 @@ interface Isometric3DElbowProps {
     thickness: number;
 }
 
-// Proiezione isometrica
-function iso(x: number, y: number, z: number): { px: number; py: number } {
+function iso(x: number, y: number, z: number): [number, number] {
     const cos30 = 0.866;
     const sin30 = 0.5;
-    return {
-        px: (x - y) * cos30,
-        py: (x + y) * sin30 - z,
-    };
+    return [(x - y) * cos30, (x + y) * sin30 - z];
 }
 
-function isoPath(points: { x: number; y: number; z: number }[]): string {
-    return points
-        .map((p, i) => {
-            const { px, py } = iso(p.x, p.y, p.z);
-            return `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`;
-        })
-        .join(" ") + " Z";
+function pt(x: number, y: number, z: number): string {
+    const [px, py] = iso(x, y, z);
+    return `${px.toFixed(1)},${py.toFixed(1)}`;
+}
+
+function face(points: [number, number, number][], fill: string, stroke: string, sw = 1, dash?: string): string {
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${pt(p[0], p[1], p[2])}`).join(" ") + " Z";
+    return `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash ? ` stroke-dasharray="${dash}"` : ""} />`;
 }
 
 export function Isometric3DElbow({
@@ -41,97 +39,114 @@ export function Isometric3DElbow({
 }: Isometric3DElbowProps) {
     if (!innerWidth || !innerHeight || !armA || !armB || !thickness) return null;
 
-    const W = innerWidth + 2 * thickness; // larghezza esterna
-    const H = innerHeight + 2 * thickness; // altezza esterna
+    const W = innerWidth + 2 * thickness;
+    const H = innerHeight + 2 * thickness;
 
-    // Scala
-    const maxDim = Math.max(W + armB, W + armA, H);
-    const s = maxDim > 0 ? 100 / maxDim : 1;
+    // Scala per adattarsi
+    const maxDim = Math.max(W + armB, armA + W, H);
+    const s = maxDim > 0 ? 90 / maxDim : 1;
 
-    const sW = W * s;
-    const sH = H * s;
-    const sA = armA * s;
-    const sB = armB * s;
+    const w = W * s;
+    const h = H * s;
+    const a = armA * s;
+    const b = armB * s;
+    const t = thickness * s;
 
-    // Calcola bounding box
-    // Braccio A va in direzione Y (profondità), Braccio B in direzione X (destra)
-    const allCorners = [
-        // Braccio A (colonna verticale in profondità)
-        iso(0, 0, 0), iso(sW, 0, 0), iso(sW, sA + sW, 0), iso(0, sA + sW, 0),
-        iso(0, 0, sH), iso(sW, 0, sH), iso(sW, sA + sW, sH), iso(0, sA + sW, sH),
-        // Braccio B (va verso destra)
-        iso(sW, sA, 0), iso(sW + sB, sA, 0), iso(sW + sB, sA + sW, 0),
-        iso(sW, sA, sH), iso(sW + sB, sA, sH), iso(sW + sB, sA + sW, sH),
+    // L'L-shape visto dall'alto:
+    // Braccio A va in direzione Y (profondità): da y=0 a y=a
+    // Zona angolo: da y=a a y=a+w (quadrato w×w)
+    // Braccio B va in direzione X (destra): da x=w a x=w+b
+
+    // Bounding box
+    const allPts: [number, number][] = [
+        iso(0, 0, 0), iso(w, 0, 0), iso(0, a + w, 0), iso(w + b, a, 0),
+        iso(w + b, a + w, 0), iso(0, 0, h), iso(w, 0, h), iso(0, a + w, h),
+        iso(w + b, a, h), iso(w + b, a + w, h),
     ];
+    const minPx = Math.min(...allPts.map(p => p[0]));
+    const maxPx = Math.max(...allPts.map(p => p[0]));
+    const minPy = Math.min(...allPts.map(p => p[1]));
+    const maxPy = Math.max(...allPts.map(p => p[1]));
 
-    const minPx = Math.min(...allCorners.map(c => c.px));
-    const maxPx = Math.max(...allCorners.map(c => c.px));
-    const minPy = Math.min(...allCorners.map(c => c.py));
-    const maxPy = Math.max(...allCorners.map(c => c.py));
-
-    const pad = 16;
+    const pad = 20;
     const vw = maxPx - minPx + pad * 2;
     const vh = maxPy - minPy + pad * 2;
-    const offsetX = -minPx + pad;
-    const offsetY = -minPy + pad;
+    const ox = -minPx + pad;
+    const oy = -minPy + pad;
 
     const blue = "#3b82f6";
     const green = "#22c55e";
     const amber = "#f59e0b";
 
-    // Braccio A: box dal fondo verso la zona angolo (direzione Y)
-    const armATop = [
-        { x: 0, y: 0, z: sH },
-        { x: sW, y: 0, z: sH },
-        { x: sW, y: sA, z: sH },
-        { x: 0, y: sA, z: sH },
-    ];
-    const armALeft = [
-        { x: 0, y: 0, z: 0 },
-        { x: 0, y: 0, z: sH },
-        { x: 0, y: sA + sW, z: sH },
-        { x: 0, y: sA + sW, z: 0 },
-    ];
-    const armAFront = [
-        { x: 0, y: 0, z: 0 },
-        { x: sW, y: 0, z: 0 },
-        { x: sW, y: 0, z: sH },
-        { x: 0, y: 0, z: sH },
-    ];
+    // Genero le facce dell'L-shape come un unico solido
+    const faces: string[] = [];
 
-    // Zona angolo (cubo di giunzione)
-    const junctionTop = [
-        { x: 0, y: sA, z: sH },
-        { x: sW, y: sA, z: sH },
-        { x: sW, y: sA + sW, z: sH },
-        { x: 0, y: sA + sW, z: sH },
-    ];
+    // === FACCE POSTERIORI (disegnate prima) ===
 
-    // Braccio B: box dalla zona angolo verso destra (direzione X)
-    const armBTop = [
-        { x: sW, y: sA, z: sH },
-        { x: sW + sB, y: sA, z: sH },
-        { x: sW + sB, y: sA + sW, z: sH },
-        { x: sW, y: sA + sW, z: sH },
-    ];
-    const armBRight = [
-        { x: sW + sB, y: sA, z: 0 },
-        { x: sW + sB, y: sA, z: sH },
-        { x: sW + sB, y: sA + sW, z: sH },
-        { x: sW + sB, y: sA + sW, z: 0 },
-    ];
-    const armBFront = [
-        { x: sW, y: sA, z: 0 },
-        { x: sW + sB, y: sA, z: 0 },
-        { x: sW + sB, y: sA, z: sH },
-        { x: sW, y: sA, z: sH },
-    ];
-    const armBBottom = [
-        { x: 0, y: sA + sW, z: 0 },
-        { x: sW + sB, y: sA + sW, z: 0 },
-        { x: sW + sB, y: sA + sW, z: sH },
-        { x: 0, y: sA + sW, z: sH },
-    ];
+    // Lato sinistro di arm A + angolo (x=0, da y=0 a y=a+w)
+    faces.push(face(
+        [[0, 0, 0], [0, 0, h], [0, a + w, h], [0, a + w, 0]],
+        blue + "18", blue, 1
+    ));
+
+    // Lato fondo (y=a+w, da x=0 a x=w+b) — parete esterna braccio B
+    faces.push(face(
+        [[0, a + w, 0], [0, a + w, h], [w + b, a + w, h], [w + b, a + w, 0]],
+        green + "18", green, 1
+    ));
+
+    // === FACCE LATERALI ===
+
+    // Faccia frontale arm A (y=0, da x=0 a x=w) — apertura arm A
+    faces.push(face(
+        [[0, 0, 0], [w, 0, 0], [w, 0, h], [0, 0, h]],
+        blue + "30", blue, 1.2
+    ));
+
+    // Faccia destra arm B (x=w+b, da y=a a y=a+w) — apertura arm B
+    faces.push(face(
+        [[w + b, a, 0], [w + b, a + w, 0], [w + b, a + w, h], [w + b, a, h]],
+        green + "30", green, 1.2
+    ));
+
+    // Faccia "interna" arm A destra (x=w, da y=0 a y=a) — parete interna dello spigolo
+    faces.push(face(
+        [[w, 0, 0], [w, a, 0], [w, a, h], [w, 0, h]],
+        "hsl(var(--foreground) / 0.05)", "hsl(var(--foreground) / 0.2)", 0.8, "4,3"
+    ));
+
+    // Faccia "interna" arm B top (y=a, da x=w a x=w+b)
+    faces.push(face(
+        [[w, a, 0], [w + b, a, 0], [w + b, a, h], [w, a, h]],
+        "hsl(var(--foreground) / 0.05)", "hsl(var(--foreground) / 0.2)", 0.8, "4,3"
+    ));
+
+    // === FACCE SUPERIORI (disegnate per ultime) ===
+
+    // Coperchio arm A (z=h, da y=0 a y=a, x=0 a x=w)
+    faces.push(face(
+        [[0, 0, h], [w, 0, h], [w, a, h], [0, a, h]],
+        blue + "40", blue, 1.3
+    ));
+
+    // Coperchio zona angolo (z=h)
+    faces.push(face(
+        [[0, a, h], [w, a, h], [w, a + w, h], [0, a + w, h]],
+        amber + "40", amber, 1.5, "5,3"
+    ));
+
+    // Coperchio arm B (z=h, da x=w a x=w+b, y=a a y=a+w)
+    faces.push(face(
+        [[w, a, h], [w + b, a, h], [w + b, a + w, h], [w, a + w, h]],
+        green + "40", green, 1.3
+    ));
+
+    // Label 45° sulla zona angolo
+    const [cx, cy] = iso(w / 2, a + w / 2, h + 6);
+
+    // Labels bracci
+    const [ax, ay] = iso(w / 2, a / 2, h + 10);
+    const [bx, by] = iso(w + b / 2, a + w / 2, h + 10);
 
     return (
         <svg
@@ -139,34 +154,17 @@ export function Isometric3DElbow({
             className="w-full max-w-[320px] mx-auto"
             style={{ height: Math.min(vh, 220) }}
         >
-            <g transform={`translate(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`}>
-                {/* Facce posteriori (disegnate prima) */}
-                <path d={isoPath(armBBottom)} fill={green + "10"} stroke={green} strokeWidth={0.8} />
-                <path d={isoPath(armALeft)} fill={blue + "15"} stroke={blue} strokeWidth={0.8} />
-
-                {/* Facce frontali */}
-                <path d={isoPath(armAFront)} fill={blue + "25"} stroke={blue} strokeWidth={1} />
-                <path d={isoPath(armBFront)} fill={green + "15"} stroke={green} strokeWidth={0.8} />
-                <path d={isoPath(armBRight)} fill={green + "25"} stroke={green} strokeWidth={1} />
-
-                {/* Facce superiori */}
-                <path d={isoPath(armATop)} fill={blue + "35"} stroke={blue} strokeWidth={1.2} />
-                <path d={isoPath(junctionTop)} fill={amber + "40"} stroke={amber} strokeWidth={1.5} strokeDasharray="4,3" />
-                <path d={isoPath(armBTop)} fill={green + "35"} stroke={green} strokeWidth={1.2} />
-
-                {/* Labels */}
-                {(() => {
-                    const labelA = iso(sW / 2, sA / 2, sH + 8);
-                    const labelB = iso(sW + sB / 2, sA + sW / 2, sH + 8);
-                    return (
-                        <>
-                            <text x={labelA.px} y={labelA.py} textAnchor="middle"
-                                className="fill-blue-400 text-[8px] font-mono font-bold">A</text>
-                            <text x={labelB.px} y={labelB.py} textAnchor="middle"
-                                className="fill-green-400 text-[8px] font-mono font-bold">B</text>
-                        </>
-                    );
-                })()}
+            <g
+                transform={`translate(${ox.toFixed(1)}, ${oy.toFixed(1)})`}
+                dangerouslySetInnerHTML={{ __html: faces.join("\n") }}
+            />
+            <g transform={`translate(${ox.toFixed(1)}, ${oy.toFixed(1)})`}>
+                <text x={cx} y={cy} textAnchor="middle"
+                    className="fill-amber-400 text-[8px] font-bold">90°</text>
+                <text x={ax} y={ay} textAnchor="middle"
+                    className="fill-blue-400 text-[9px] font-mono font-bold">A</text>
+                <text x={bx} y={by} textAnchor="middle"
+                    className="fill-green-400 text-[9px] font-mono font-bold">B</text>
             </g>
         </svg>
     );

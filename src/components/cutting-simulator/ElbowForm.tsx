@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -32,6 +33,7 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
     const [armA, setArmA] = useState<string>("500");
     const [armB, setArmB] = useState<string>("500");
     const [extraMargin, setExtraMargin] = useState<string>("0");
+    const [baseMode, setBaseMode] = useState<'split' | 'single'>('split');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -42,6 +44,7 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
             armA: parseFloat(armA) || 0,
             armB: parseFloat(armB) || 0,
             extraMargin: parseFloat(extraMargin) || 0,
+            baseMode,
         });
     };
 
@@ -52,6 +55,7 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
         setArmA("500");
         setArmB("500");
         setExtraMargin("0");
+        setBaseMode('split');
     };
 
     const w = parseFloat(innerWidth) || 0;
@@ -75,6 +79,31 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Selettore modalità base */}
+                    <div className="flex gap-1.5 p-1 bg-muted/50 rounded-lg">
+                        <button type="button"
+                            onClick={() => setBaseMode('split')}
+                            className={cn(
+                                "flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                baseMode === 'split'
+                                    ? "bg-background shadow-sm text-foreground"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            Base Separata
+                        </button>
+                        <button type="button"
+                            onClick={() => setBaseMode('single')}
+                            className={cn(
+                                "flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                baseMode === 'single'
+                                    ? "bg-background shadow-sm text-foreground"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            Base Unica (L)
+                        </button>
+                    </div>
                     {/* Sezione interna */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">

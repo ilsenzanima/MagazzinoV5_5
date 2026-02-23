@@ -196,6 +196,8 @@ export interface ElbowInput {
     armB: number;
     /** Margine extra in mm */
     extraMargin: number;
+    /** Modalità base: 'split' = 2 pezzi separati, 'single' = 1 pezzo a L */
+    baseMode: 'split' | 'single';
 }
 
 /**
@@ -221,26 +223,17 @@ export interface ElbowInput {
  * 5. Fianco interno B: fino allo spigolo interno
  */
 export function calculateElbow90(input: ElbowInput): CalculationResult {
-    const { innerWidth, innerHeight, thickness, armA, armB, extraMargin } = input;
+    const { innerWidth, innerHeight, thickness, armA, armB, extraMargin, baseMode } = input;
 
     const outerWidth = innerWidth + 2 * thickness;
     const outerHeight = innerHeight + 2 * thickness;
 
-    // Base/Coperchio braccio A: include la zona di raccordo
-    const baseAWidth = outerWidth + extraMargin;
-    const baseAHeight = armA + outerWidth;
-
-    // Base/Coperchio braccio B
-    const baseBWidth = outerWidth + extraMargin;
-    const baseBHeight = armB;
-
-    // Fianchi esterni: 2 pezzi separati (uno per braccio), con sormonto nella zona angolo.
-    // Ogni fianco esterno copre il proprio braccio + lo spessore del materiale per il sormonto.
+    // Fianchi esterni: 2 pezzi separati (uno per braccio).
     const extSideAWidth = innerHeight + extraMargin;
-    const extSideAHeight = armA + thickness; // sormonto = spessore
+    const extSideAHeight = armA - thickness;
 
     const extSideBWidth = innerHeight + extraMargin;
-    const extSideBHeight = armB + outerWidth + thickness; // arriva fin oltre l'angolo + sormonto
+    const extSideBHeight = armB + outerWidth;
 
     // Fianchi interni: 2 pezzi separati, si fermano allo spigolo
     const intSideAWidth = innerHeight + extraMargin;
@@ -249,25 +242,56 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
     const intSideBWidth = innerHeight + extraMargin;
     const intSideBHeight = armB;
 
-    const pieces: CutPiece[] = [
-        {
-            id: 'base-a',
-            label: 'Base/Coperchio - Braccio A',
-            width: baseAWidth,
-            height: baseAHeight,
+    const pieces: CutPiece[] = [];
+
+    if (baseMode === 'single') {
+        // BASE UNICA: un solo pezzo a L per base e uno per coperchio.
+        // La L ha:
+        //   - Braccio verticale: outerWidth × (armA + outerWidth)
+        //   - Braccio orizzontale: armB × outerWidth (si estende dal lato)
+        // Come rettangolo di taglio, prendiamo il bounding box:
+        // Larghezza = outerWidth + armB, Altezza = armA + outerWidth
+        const baseLWidth = outerWidth + armB + extraMargin;
+        const baseLHeight = armA + outerWidth;
+        pieces.push({
+            id: 'base-l',
+            label: 'Base/Coperchio a L (pezzo unico)',
+            width: baseLWidth,
+            height: baseLHeight,
             quantity: 2,
             color: PIECE_COLORS[0],
-            formula: `${outerWidth}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} + ${outerWidth})`,
-        },
-        {
-            id: 'base-b',
-            label: 'Base/Coperchio - Braccio B',
-            width: baseBWidth,
-            height: baseBHeight,
-            quantity: 2,
-            color: PIECE_COLORS[2],
-            formula: `${outerWidth}${extraMargin ? ` + ${extraMargin}` : ''} × ${armB}`,
-        },
+            formula: `(${outerWidth} + ${armB}) × (${armA} + ${outerWidth}) = ${baseLWidth} × ${baseLHeight}`,
+        });
+    } else {
+        // BASE SEPARATA: 2 pezzi per braccio
+        const baseAWidth = outerWidth + extraMargin;
+        const baseAHeight = armA + outerWidth;
+        const baseBWidth = outerWidth + extraMargin;
+        const baseBHeight = armB;
+        pieces.push(
+            {
+                id: 'base-a',
+                label: 'Base/Coperchio - Braccio A',
+                width: baseAWidth,
+                height: baseAHeight,
+                quantity: 2,
+                color: PIECE_COLORS[0],
+                formula: `${outerWidth}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} + ${outerWidth})`,
+            },
+            {
+                id: 'base-b',
+                label: 'Base/Coperchio - Braccio B',
+                width: baseBWidth,
+                height: baseBHeight,
+                quantity: 2,
+                color: PIECE_COLORS[2],
+                formula: `${outerWidth}${extraMargin ? ` + ${extraMargin}` : ''} × ${armB}`,
+            },
+        );
+    }
+
+    // Fianchi (sempre gli stessi indipendentemente dalla modalità base)
+    pieces.push(
         {
             id: 'fianco-ext-a',
             label: 'Fianco Esterno - Braccio A',
@@ -275,7 +299,7 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
             height: extSideAHeight,
             quantity: 1,
             color: PIECE_COLORS[1],
-            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} + ${thickness}) — sormonto ${thickness}mm`,
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} − ${thickness}) = ${extSideAWidth} × ${extSideAHeight}`,
         },
         {
             id: 'fianco-ext-b',
@@ -284,7 +308,7 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
             height: extSideBHeight,
             quantity: 1,
             color: PIECE_COLORS[5],
-            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armB} + ${outerWidth} + ${thickness}) — sormonto ${thickness}mm`,
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armB} + ${outerWidth}) = ${extSideBWidth} × ${extSideBHeight}`,
         },
         {
             id: 'fianco-int-a',
@@ -304,14 +328,16 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
             color: PIECE_COLORS[4],
             formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × ${armB}`,
         },
-    ];
+    );
+
+    const modeLabel = baseMode === 'single' ? 'Base unica a L' : 'Base separata';
 
     const totalArea = pieces.reduce(
         (sum, p) => sum + p.width * p.height * p.quantity, 0
     );
 
     const summaryLines = [
-        `Angolo 90°: sezione interna ${innerWidth}×${innerHeight} mm`,
+        `Angolo 90° (${modeLabel}): sezione interna ${innerWidth}×${innerHeight} mm`,
         `Dimensione esterna: ${outerWidth}×${outerHeight} mm`,
         `Braccio A: ${armA} mm — Braccio B: ${armB} mm`,
         `Spessore: ${thickness} mm`,
