@@ -31,7 +31,7 @@ export function CuttingSimulatorClient() {
     const [calcResult, setCalcResult] = useState<CalculationResult | null>(null);
     const [nestingResult, setNestingResult] = useState<NestingResult | null>(null);
     const [sheetConfig, setSheetConfig] = useState<SheetConfig>({
-        width: 2000,
+        width: 2500,
         height: 1200,
         gap: 5,
     });
