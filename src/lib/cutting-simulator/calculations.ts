@@ -234,11 +234,15 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
     const baseBWidth = outerWidth + extraMargin;
     const baseBHeight = armB;
 
-    // Fianco esterno continuo (segue la curva esterna)
-    const extSideWidth = innerHeight + extraMargin;
-    const extSideHeight = armA + armB + outerWidth;
+    // Fianchi esterni: 2 pezzi separati (uno per braccio), con sormonto nella zona angolo.
+    // Ogni fianco esterno copre il proprio braccio + lo spessore del materiale per il sormonto.
+    const extSideAWidth = innerHeight + extraMargin;
+    const extSideAHeight = armA + thickness; // sormonto = spessore
 
-    // Fianco interno: 2 pezzi separati, si fermano allo spigolo
+    const extSideBWidth = innerHeight + extraMargin;
+    const extSideBHeight = armB + outerWidth + thickness; // arriva fin oltre l'angolo + sormonto
+
+    // Fianchi interni: 2 pezzi separati, si fermano allo spigolo
     const intSideAWidth = innerHeight + extraMargin;
     const intSideAHeight = armA;
 
@@ -265,13 +269,22 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
             formula: `${outerWidth}${extraMargin ? ` + ${extraMargin}` : ''} × ${armB}`,
         },
         {
-            id: 'fianco-ext',
-            label: 'Fianco Esterno (continuo)',
-            width: extSideWidth,
-            height: extSideHeight,
+            id: 'fianco-ext-a',
+            label: 'Fianco Esterno - Braccio A',
+            width: extSideAWidth,
+            height: extSideAHeight,
             quantity: 1,
             color: PIECE_COLORS[1],
-            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} + ${armB} + ${outerWidth})`,
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} + ${thickness}) — sormonto ${thickness}mm`,
+        },
+        {
+            id: 'fianco-ext-b',
+            label: 'Fianco Esterno - Braccio B',
+            width: extSideBWidth,
+            height: extSideBHeight,
+            quantity: 1,
+            color: PIECE_COLORS[5],
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armB} + ${outerWidth} + ${thickness}) — sormonto ${thickness}mm`,
         },
         {
             id: 'fianco-int-a',

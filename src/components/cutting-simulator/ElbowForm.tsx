@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CornerDownRight, Plus, RotateCcw, Info } from "lucide-react";
 import { PreviewPopup } from "@/components/cutting-simulator/PreviewPopup";
+import { Isometric3DElbow } from "@/components/cutting-simulator/Isometric3DElbow";
 import type { ElbowInput } from "@/lib/cutting-simulator/calculations";
 
 interface ElbowFormProps {
@@ -163,13 +164,29 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
                         </div>
                     </div>
 
-                    {/* Preview angolo — cliccabile per ingrandimento */}
-                    <PreviewPopup title="Schema Gomito 90° — Vista dall'Alto">
-                        <div className="border border-dashed border-border/50 rounded-lg p-3 bg-muted/30">
-                            <p className="text-xs text-muted-foreground text-center mb-2">Schema del gomito (vista dall&apos;alto)</p>
-                            <ElbowPreview innerWidth={w} thickness={t} armA={a} armB={b} />
+                    {/* Anteprime: vista dall'alto + vista 3D — cliccabili per ingrandimento */}
+                    <div className="border border-dashed border-border/50 rounded-lg bg-muted/30 overflow-hidden">
+                        <div className="grid grid-cols-2 divide-x divide-border/30">
+                            <PreviewPopup title="Schema Gomito 90° — Vista dall'Alto">
+                                <div className="p-3">
+                                    <p className="text-xs text-muted-foreground text-center mb-2">Vista dall&apos;Alto</p>
+                                    <ElbowPreview innerWidth={w} thickness={t} armA={a} armB={b} />
+                                </div>
+                            </PreviewPopup>
+                            <PreviewPopup title="Vista 3D Isometrica — Gomito 90°">
+                                <div className="p-3">
+                                    <p className="text-xs text-muted-foreground text-center mb-2">Vista 3D</p>
+                                    <Isometric3DElbow
+                                        innerWidth={w}
+                                        innerHeight={h}
+                                        armA={a}
+                                        armB={b}
+                                        thickness={t}
+                                    />
+                                </div>
+                            </PreviewPopup>
                         </div>
-                    </PreviewPopup>
+                    </div>
 
                     <div className="flex gap-2 pt-2">
                         <Button type="submit" className="flex-1 h-11 font-semibold">
