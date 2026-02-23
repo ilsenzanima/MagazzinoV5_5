@@ -358,3 +358,115 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
     };
 }
 
+// ==================== CALCOLO PROGETTO COMPLETO ====================
+
+import type { DuctProject, DuctSides, Segment } from '@/lib/cutting-simulator/project-model';
+
+/**
+ * Filtra i pezzi in base a quali lati sono attivi.
+ * Logica: base/coperchio corrispondono a top/bottom, fianchi a left/right.
+ */
+function filterBySides(pieces: CutPiece[], sides: DuctSides): CutPiece[] {
+    return pieces.filter(p => {
+        const id = p.id.toLowerCase();
+        // Base/coperchio
+        if (id.includes('base') || id.includes('coperchio')) {
+            // Base = bottom, Coperchio = top. Nei pezzi qty=2 → base E coperchio.
+            // Se qty=2 e un lato è disattivato, dimezziamo.
+            if (!sides.top && !sides.bottom) return false;
+            if (!sides.top || !sides.bottom) {
+                return { ...p, quantity: 1 }; // ridotto dopo
+            }
+            return true;
+        }
+        // Fianchi
+        if (id.includes('fianco') || id.includes('side')) {
+            if (id.includes('int')) {
+                // Fianchi interni → corrispondono ai lati left/right
+                if (id.includes('-a') && !sides.left) return false;
+                if (id.includes('-b') && !sides.right) return false;
+            }
+            if (id.includes('ext')) {
+                if (id.includes('-a') && !sides.left) return false;
+                if (id.includes('-b') && !sides.right) return false;
+            }
+            return true;
+        }
+        return true;
+    }).map(p => {
+        const id = p.id.toLowerCase();
+        if ((id.includes('base') || id.includes('coperchio')) && p.quantity === 2) {
+            if (!sides.top || !sides.bottom) {
+                return { ...p, quantity: 1 };
+            }
+        }
+        return p;
+    });
+}
+
+/**
+ * Calcola tutti i pezzi per un intero progetto di canalizzazione.
+ * Itera sui segmenti, calcola i pezzi di ognuno, filtra per lati attivi
+ * e rinomina con prefisso progressivo per evitare conflitti.
+ */
+export function calculateProject(project: DuctProject): CalculationResult {
+    const { section, segments } = project;
+    const allPieces: CutPiece[] = [];
+
+    segments.forEach((seg, idx) => {
+        const prefix = `S${idx + 1}`;
+        let result: CalculationResult;
+
+        if (seg.type === 'straight') {
+            result = calculateRectangularDuct({
+                innerWidth: section.innerWidth,
+                innerHeight: section.innerHeight,
+                length: seg.length,
+                thickness: section.thickness,
+                extraMargin: section.extraMargin,
+            });
+        } else {
+            result = calculateElbow90({
+                innerWidth: section.innerWidth,
+                innerHeight: section.innerHeight,
+                thickness: section.thickness,
+                armA: seg.armA,
+                armB: seg.armB,
+                extraMargin: section.extraMargin,
+                baseMode: seg.baseMode,
+            });
+        }
+
+        // Filtra per lati attivi e rinomina
+        const filtered = filterBySides(result.pieces, section.sides);
+        filtered.forEach(p => {
+            allPieces.push({
+                ...p,
+                id: `${prefix}-${p.id}`,
+                label: `[${prefix}] ${p.label}`,
+            });
+        });
+    });
+
+    const totalArea = allPieces.reduce(
+        (sum, p) => sum + p.width * p.height * p.quantity, 0
+    );
+
+    const outerWidth = section.innerWidth + 2 * section.thickness;
+    const outerHeight = section.innerHeight + 2 * section.thickness;
+
+    const summaryLines = [
+        `Progetto: ${project.name}`,
+        `Sezione: ${section.innerWidth}×${section.innerHeight} mm (esterna ${outerWidth}×${outerHeight})`,
+        `Segmenti: ${segments.length} — Pezzi totali: ${allPieces.reduce((s, p) => s + p.quantity, 0)}`,
+        `Superficie totale: ${(totalArea / 1_000_000).toFixed(3)} m²`,
+    ];
+
+    return {
+        pieces: allPieces,
+        totalArea,
+        summary: summaryLines.join('\n'),
+        outerWidth,
+        outerHeight,
+    };
+}
