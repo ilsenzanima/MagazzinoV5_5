@@ -1,6 +1,15 @@
 /**
  * Motore di calcolo per il Simulatore di Taglio.
  * Calcola i pezzi necessari dato un canale rettangolare e lo spessore del materiale.
+ *
+ * LOGICA PER CASSONETTI / CANALIZZAZIONI:
+ * I pannelli orizzontali (base + coperchio) "avvolgono" quelli verticali (fianchi).
+ * Questo significa che lo spessore del materiale è già il sormonto strutturale.
+ *
+ * Esempio con sezione interna 200×200 mm e spessore 50 mm:
+ *   - Base/Coperchio: 200 + 2×50 = 300 mm (coprono i fianchi)
+ *   - Fianchi: 200 mm (si inseriscono tra base e coperchio)
+ *   - Dimensioni esterne risultanti: 300×300 mm ✓
  */
 
 export interface DuctInput {
@@ -12,8 +21,12 @@ export interface DuctInput {
     length: number;
     /** Spessore del materiale in mm */
     thickness: number;
-    /** Sormonto / sovrapposizione in mm (margine aggiuntivo per giunzioni) */
-    overlap: number;
+    /**
+     * Margine extra in mm da aggiungere ad ogni pezzo.
+     * Per cassonetti standard = 0 (il sormonto è già lo spessore).
+     * Utile solo se servono lembi aggiuntivi per sigillature o fissaggi speciali.
+     */
+    extraMargin: number;
 }
 
 export interface CutPiece {
@@ -29,6 +42,8 @@ export interface CutPiece {
     quantity: number;
     /** Colore per la visualizzazione */
     color: string;
+    /** Descrizione del calcolo per trasparenza */
+    formula: string;
 }
 
 export interface CalculationResult {
@@ -37,6 +52,9 @@ export interface CalculationResult {
     totalArea: number;
     /** Riepilogo testuale */
     summary: string;
+    /** Dimensioni esterne del cassonetto */
+    outerWidth: number;
+    outerHeight: number;
 }
 
 const PIECE_COLORS = [
@@ -51,46 +69,65 @@ const PIECE_COLORS = [
 ];
 
 /**
- * Calcola i pezzi necessari per un canale rettangolare dritto.
+ * Calcola i pezzi necessari per un canale rettangolare dritto (cassonetto).
  *
- * Per un canale con sezione interna W x H e spessore T:
- * - 2 pannelli "Lato Orizzontale" (base/coperchio):
- *     larghezza = W + 2*T (coprono anche lo spessore laterale)
- *     altezza   = lunghezza del tratto
+ * Schema della sezione (vista frontale):
  *
- * - 2 pannelli "Lato Verticale" (fianchi):
- *     larghezza = H (solo la misura interna, i pannelli orizzontali li avvolgono)
- *     altezza   = lunghezza del tratto
+ *   ┌─────────────────────────┐  ← Base (larg. interna + 2×spessore)
+ *   │  ┌───────────────────┐  │
+ *   │  │                   │  │  ← Fianco (solo altezza interna)
+ *   │  │    CAVITÀ          │  │
+ *   │  │   (aria/fumi)     │  │
+ *   │  │                   │  │
+ *   │  └───────────────────┘  │
+ *   └─────────────────────────┘  ← Coperchio (larg. interna + 2×spessore)
  *
- * Il sormonto viene aggiunto alla larghezza di ogni pezzo.
+ * I pannelli orizzontali (base/coperchio) coprono lo spessore dei fianchi.
+ * I pannelli verticali (fianchi) sono alti esattamente quanto la misura interna.
  */
 export function calculateRectangularDuct(input: DuctInput): CalculationResult {
-    const { innerWidth, innerHeight, length, thickness, overlap } = input;
+    const { innerWidth, innerHeight, length, thickness, extraMargin } = input;
 
-    // Pannelli orizzontali (base e coperchio): coprono larghezza interna + 2 spessori + sormonto
-    const horizontalWidth = innerWidth + 2 * thickness + overlap;
+    // Pannelli orizzontali (base e coperchio):
+    // larghezza = cavità interna + 2 × spessore materiale (avvolgono i fianchi)
+    const horizontalWidth = innerWidth + 2 * thickness + extraMargin;
     const horizontalHeight = length;
 
-    // Pannelli verticali (fianchi): solo altezza interna + sormonto
-    const verticalWidth = innerHeight + overlap;
+    // Pannelli verticali (fianchi):
+    // larghezza = solo altezza interna (si inseriscono tra base e coperchio)
+    const verticalWidth = innerHeight + extraMargin;
     const verticalHeight = length;
+
+    // Dimensioni esterne del cassonetto finito
+    const outerWidth = innerWidth + 2 * thickness;
+    const outerHeight = innerHeight + 2 * thickness;
+
+    const horizFormula = extraMargin > 0
+        ? `${innerWidth} + 2×${thickness} + ${extraMargin} = ${horizontalWidth}`
+        : `${innerWidth} + 2×${thickness} = ${horizontalWidth}`;
+
+    const vertFormula = extraMargin > 0
+        ? `${innerHeight} + ${extraMargin} = ${verticalWidth}`
+        : `${innerHeight}`;
 
     const pieces: CutPiece[] = [
         {
-            id: 'horiz',
-            label: `Base / Coperchio (${horizontalWidth.toFixed(0)}×${horizontalHeight.toFixed(0)} mm)`,
+            id: 'base',
+            label: 'Base / Coperchio',
             width: horizontalWidth,
             height: horizontalHeight,
             quantity: 2,
             color: PIECE_COLORS[0],
+            formula: horizFormula,
         },
         {
-            id: 'vert',
-            label: `Fianco (${verticalWidth.toFixed(0)}×${verticalHeight.toFixed(0)} mm)`,
+            id: 'fianco',
+            label: 'Fianco',
             width: verticalWidth,
             height: verticalHeight,
             quantity: 2,
             color: PIECE_COLORS[1],
+            formula: vertFormula,
         },
     ];
 
@@ -98,14 +135,26 @@ export function calculateRectangularDuct(input: DuctInput): CalculationResult {
         horizontalWidth * horizontalHeight * 2 +
         verticalWidth * verticalHeight * 2;
 
-    const summary = [
-        `Canale rettangolare ${innerWidth}×${innerHeight} mm, lungo ${length} mm`,
-        `Spessore materiale: ${thickness} mm | Sormonto: ${overlap} mm`,
-        `Pezzi totali: 4 (2 orizzontali + 2 verticali)`,
-        `Superficie totale: ${(totalArea / 1_000_000).toFixed(3)} m²`,
-    ].join('\n');
+    const summaryLines = [
+        `Canale rettangolare: sezione interna ${innerWidth}×${innerHeight} mm`,
+        `Dimensione esterna: ${outerWidth}×${outerHeight} mm`,
+        `Lunghezza tratto: ${length} mm — Spessore: ${thickness} mm`,
+    ];
+    if (extraMargin > 0) {
+        summaryLines.push(`Margine extra: ${extraMargin} mm`);
+    }
+    summaryLines.push(
+        `Pezzi totali: 4 (2 base/coperchio + 2 fianchi)`,
+        `Superficie totale: ${(totalArea / 1_000_000).toFixed(3)} m²`
+    );
 
-    return { pieces, totalArea, summary };
+    return {
+        pieces,
+        totalArea,
+        summary: summaryLines.join('\n'),
+        outerWidth,
+        outerHeight,
+    };
 }
 
 /**

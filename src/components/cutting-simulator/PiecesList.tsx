@@ -28,21 +28,30 @@ export function PiecesList({ pieces, totalArea, summary }: PiecesListProps) {
                 {pieces.map((piece) => (
                     <div
                         key={piece.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-muted/20"
+                        className="p-3 rounded-lg border border-border/40 bg-muted/20 space-y-1"
                     >
-                        <div
-                            className="w-4 h-4 rounded-sm flex-shrink-0"
-                            style={{ backgroundColor: piece.color }}
-                        />
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{piece.label}</p>
-                            <p className="text-xs text-muted-foreground font-mono">
+                        <div className="flex items-center gap-3">
+                            <div
+                                className="w-4 h-4 rounded-sm flex-shrink-0"
+                                style={{ backgroundColor: piece.color }}
+                            />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{piece.label}</p>
+                            </div>
+                            <Badge variant="secondary" className="font-mono text-xs">
+                                ×{piece.quantity}
+                            </Badge>
+                        </div>
+                        <div className="pl-7 space-y-0.5">
+                            <p className="text-sm font-mono text-primary">
                                 {piece.width.toFixed(0)} × {piece.height.toFixed(0)} mm
                             </p>
+                            {piece.formula && (
+                                <p className="text-xs text-muted-foreground font-mono">
+                                    Calcolo: {piece.formula}
+                                </p>
+                            )}
                         </div>
-                        <Badge variant="secondary" className="font-mono text-xs">
-                            ×{piece.quantity}
-                        </Badge>
                     </div>
                 ))}
 

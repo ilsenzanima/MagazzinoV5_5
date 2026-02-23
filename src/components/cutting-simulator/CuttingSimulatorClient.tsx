@@ -9,7 +9,6 @@ import {
     calculateRectangularDuct,
     explodePieces,
     type DuctInput,
-    type CutPiece,
     type CalculationResult,
 } from "@/lib/cutting-simulator/calculations";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
