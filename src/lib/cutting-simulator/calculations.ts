@@ -178,3 +178,143 @@ export function explodePieces(pieces: CutPiece[]): CutPiece[] {
     }
     return result;
 }
+
+// ============================================================
+// ANGOLO A 90° (GOMITO)
+// ============================================================
+
+export interface ElbowInput {
+    /** Larghezza interna del canale in mm */
+    innerWidth: number;
+    /** Altezza interna del canale in mm */
+    innerHeight: number;
+    /** Spessore del materiale in mm */
+    thickness: number;
+    /** Lunghezza del braccio A (ingresso) in mm */
+    armA: number;
+    /** Lunghezza del braccio B (uscita) in mm */
+    armB: number;
+    /** Margine extra in mm */
+    extraMargin: number;
+}
+
+/**
+ * Calcola i pezzi per un angolo a 90° (gomito) di un cassonetto rettangolare.
+ *
+ * Schema visto dall'alto:
+ *
+ *   Braccio A (ingresso, verticale)
+ *       │         │
+ *       │  cavità │
+ *       │         │╲  taglio a 45°
+ *       │         │  ╲
+ *       │         │    ╲
+ *       │                ╲──────── Braccio B (uscita, orizzontale)
+ *       │                         │
+ *       └─────────────────────────┘
+ *
+ * Pezzi generati:
+ * 1. Base/Coperchio braccio A: copertura sopra+sotto del tratto verticale
+ * 2. Base/Coperchio braccio B: copertura sopra+sotto del tratto orizzontale
+ * 3. Fianco esterno: pezzo continuo che segue l'angolo esterno
+ * 4. Fianco interno A: fino allo spigolo interno
+ * 5. Fianco interno B: fino allo spigolo interno
+ */
+export function calculateElbow90(input: ElbowInput): CalculationResult {
+    const { innerWidth, innerHeight, thickness, armA, armB, extraMargin } = input;
+
+    const outerWidth = innerWidth + 2 * thickness;
+    const outerHeight = innerHeight + 2 * thickness;
+
+    // Base/Coperchio braccio A: include la zona di raccordo
+    const baseAWidth = outerWidth + extraMargin;
+    const baseAHeight = armA + outerWidth;
+
+    // Base/Coperchio braccio B
+    const baseBWidth = outerWidth + extraMargin;
+    const baseBHeight = armB;
+
+    // Fianco esterno continuo (segue la curva esterna)
+    const extSideWidth = innerHeight + extraMargin;
+    const extSideHeight = armA + armB + outerWidth;
+
+    // Fianco interno: 2 pezzi separati, si fermano allo spigolo
+    const intSideAWidth = innerHeight + extraMargin;
+    const intSideAHeight = armA;
+
+    const intSideBWidth = innerHeight + extraMargin;
+    const intSideBHeight = armB;
+
+    const pieces: CutPiece[] = [
+        {
+            id: 'base-a',
+            label: 'Base/Coperchio - Braccio A',
+            width: baseAWidth,
+            height: baseAHeight,
+            quantity: 2,
+            color: PIECE_COLORS[0],
+            formula: `${outerWidth}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} + ${outerWidth})`,
+        },
+        {
+            id: 'base-b',
+            label: 'Base/Coperchio - Braccio B',
+            width: baseBWidth,
+            height: baseBHeight,
+            quantity: 2,
+            color: PIECE_COLORS[2],
+            formula: `${outerWidth}${extraMargin ? ` + ${extraMargin}` : ''} × ${armB}`,
+        },
+        {
+            id: 'fianco-ext',
+            label: 'Fianco Esterno (continuo)',
+            width: extSideWidth,
+            height: extSideHeight,
+            quantity: 1,
+            color: PIECE_COLORS[1],
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} + ${armB} + ${outerWidth})`,
+        },
+        {
+            id: 'fianco-int-a',
+            label: 'Fianco Interno - Braccio A',
+            width: intSideAWidth,
+            height: intSideAHeight,
+            quantity: 1,
+            color: PIECE_COLORS[3],
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × ${armA}`,
+        },
+        {
+            id: 'fianco-int-b',
+            label: 'Fianco Interno - Braccio B',
+            width: intSideBWidth,
+            height: intSideBHeight,
+            quantity: 1,
+            color: PIECE_COLORS[4],
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × ${armB}`,
+        },
+    ];
+
+    const totalArea = pieces.reduce(
+        (sum, p) => sum + p.width * p.height * p.quantity, 0
+    );
+
+    const summaryLines = [
+        `Angolo 90°: sezione interna ${innerWidth}×${innerHeight} mm`,
+        `Dimensione esterna: ${outerWidth}×${outerHeight} mm`,
+        `Braccio A: ${armA} mm — Braccio B: ${armB} mm`,
+        `Spessore: ${thickness} mm`,
+    ];
+    if (extraMargin > 0) summaryLines.push(`Margine extra: ${extraMargin} mm`);
+    summaryLines.push(
+        `Pezzi: ${pieces.reduce((s, p) => s + p.quantity, 0)} — Taglio a 45° sulla zona angolo`,
+        `Superficie totale: ${(totalArea / 1_000_000).toFixed(3)} m²`
+    );
+
+    return {
+        pieces,
+        totalArea,
+        summary: summaryLines.join('\n'),
+        outerWidth,
+        outerHeight,
+    };
+}
+

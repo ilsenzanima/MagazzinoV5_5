@@ -2,19 +2,27 @@
 
 import { useState, useCallback } from "react";
 import { DuctForm } from "@/components/cutting-simulator/DuctForm";
+import { ElbowForm } from "@/components/cutting-simulator/ElbowForm";
 import { CutPlanViewer } from "@/components/cutting-simulator/CutPlanViewer";
 import { SheetConfigForm } from "@/components/cutting-simulator/SheetConfigForm";
 import { PiecesList } from "@/components/cutting-simulator/PiecesList";
 import {
     calculateRectangularDuct,
+    calculateElbow90,
     explodePieces,
     type DuctInput,
+    type ElbowInput,
     type CalculationResult,
 } from "@/lib/cutting-simulator/calculations";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
-import { Scissors, Sparkles } from "lucide-react";
+import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+type PieceType = "straight" | "elbow90";
 
 export function CuttingSimulatorClient() {
+    const [pieceType, setPieceType] = useState<PieceType>("straight");
     const [calcResult, setCalcResult] = useState<CalculationResult | null>(null);
     const [nestingResult, setNestingResult] = useState<NestingResult | null>(null);
     const [sheetConfig, setSheetConfig] = useState<SheetConfig>({
@@ -23,31 +31,45 @@ export function CuttingSimulatorClient() {
         gap: 5,
     });
 
-    const handleCalculate = useCallback(
+    const runNesting = useCallback((result: CalculationResult, config: SheetConfig) => {
+        const exploded = explodePieces(result.pieces);
+        const nesting = nestPieces(exploded, config);
+        setNestingResult(nesting);
+    }, []);
+
+    const handleCalculateStraight = useCallback(
         (input: DuctInput) => {
             const result = calculateRectangularDuct(input);
             setCalcResult(result);
-
-            // Esplode e nesta automaticamente
-            const exploded = explodePieces(result.pieces);
-            const nesting = nestPieces(exploded, sheetConfig);
-            setNestingResult(nesting);
+            runNesting(result, sheetConfig);
         },
-        [sheetConfig]
+        [sheetConfig, runNesting]
+    );
+
+    const handleCalculateElbow = useCallback(
+        (input: ElbowInput) => {
+            const result = calculateElbow90(input);
+            setCalcResult(result);
+            runNesting(result, sheetConfig);
+        },
+        [sheetConfig, runNesting]
     );
 
     const handleSheetConfigChange = useCallback(
         (newConfig: SheetConfig) => {
             setSheetConfig(newConfig);
-            // Ricalcola automaticamente se ci sono pezzi
             if (calcResult) {
-                const exploded = explodePieces(calcResult.pieces);
-                const nesting = nestPieces(exploded, newConfig);
-                setNestingResult(nesting);
+                runNesting(calcResult, newConfig);
             }
         },
-        [calcResult]
+        [calcResult, runNesting]
     );
+
+    const handleTypeChange = (type: PieceType) => {
+        setPieceType(type);
+        setCalcResult(null);
+        setNestingResult(null);
+    };
 
     return (
         <div className="space-y-6">
@@ -66,11 +88,44 @@ export function CuttingSimulatorClient() {
                 </div>
             </div>
 
+            {/* Selettore tipo pezzo */}
+            <div className="flex gap-2 p-1 bg-muted/50 rounded-lg w-fit">
+                <Button
+                    variant={pieceType === "straight" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => handleTypeChange("straight")}
+                    className={cn(
+                        "gap-2 transition-all",
+                        pieceType === "straight" && "shadow-md"
+                    )}
+                >
+                    <RectangleHorizontal className="h-4 w-4" />
+                    Tratto Dritto
+                </Button>
+                <Button
+                    variant={pieceType === "elbow90" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => handleTypeChange("elbow90")}
+                    className={cn(
+                        "gap-2 transition-all",
+                        pieceType === "elbow90" && "shadow-md"
+                    )}
+                >
+                    <CornerDownRight className="h-4 w-4" />
+                    Angolo 90°
+                </Button>
+            </div>
+
             {/* Contenuto principale: layout responsive */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Colonna sinistra: input */}
                 <div className="lg:col-span-4 space-y-4">
-                    <DuctForm onCalculate={handleCalculate} />
+                    {pieceType === "straight" ? (
+                        <DuctForm onCalculate={handleCalculateStraight} />
+                    ) : (
+                        <ElbowForm onCalculate={handleCalculateElbow} />
+                    )}
+
                     <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
 
                     {calcResult && (

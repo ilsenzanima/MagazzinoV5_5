@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Ruler, Plus, RotateCcw, Info } from "lucide-react";
+import { Isometric3DView } from "@/components/cutting-simulator/Isometric3DView";
 import type { DuctInput } from "@/lib/cutting-simulator/calculations";
 
 interface DuctFormProps {
@@ -176,14 +177,27 @@ export function DuctForm({ onCalculate }: DuctFormProps) {
                         </div>
                     </div>
 
-                    {/* Anteprima del cassonetto assemblato */}
-                    <div className="border border-dashed border-border/50 rounded-lg p-3 bg-muted/30">
-                        <p className="text-xs text-muted-foreground text-center mb-2">Sezione del cassonetto (vista frontale)</p>
-                        <DuctAssemblyPreview
-                            innerWidth={w}
-                            innerHeight={h}
-                            thickness={t}
-                        />
+                    {/* Anteprime: sezione frontale + vista 3D */}
+                    <div className="border border-dashed border-border/50 rounded-lg bg-muted/30 overflow-hidden">
+                        <div className="grid grid-cols-2 divide-x divide-border/30">
+                            <div className="p-3">
+                                <p className="text-xs text-muted-foreground text-center mb-2">Vista Frontale</p>
+                                <DuctAssemblyPreview
+                                    innerWidth={w}
+                                    innerHeight={h}
+                                    thickness={t}
+                                />
+                            </div>
+                            <div className="p-3">
+                                <p className="text-xs text-muted-foreground text-center mb-2">Vista 3D</p>
+                                <Isometric3DView
+                                    innerWidth={w}
+                                    innerHeight={h}
+                                    length={parseFloat(length) || 0}
+                                    thickness={t}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     <div className="flex gap-2 pt-2">
