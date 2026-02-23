@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Ruler, Plus, RotateCcw, Info } from "lucide-react";
 import { Isometric3DView } from "@/components/cutting-simulator/Isometric3DView";
+import { PreviewPopup } from "@/components/cutting-simulator/PreviewPopup";
 import type { DuctInput } from "@/lib/cutting-simulator/calculations";
 
 interface DuctFormProps {
@@ -177,26 +178,30 @@ export function DuctForm({ onCalculate }: DuctFormProps) {
                         </div>
                     </div>
 
-                    {/* Anteprime: sezione frontale + vista 3D */}
+                    {/* Anteprime: sezione frontale + vista 3D — cliccabili per ingrandimento */}
                     <div className="border border-dashed border-border/50 rounded-lg bg-muted/30 overflow-hidden">
                         <div className="grid grid-cols-2 divide-x divide-border/30">
-                            <div className="p-3">
-                                <p className="text-xs text-muted-foreground text-center mb-2">Vista Frontale</p>
-                                <DuctAssemblyPreview
-                                    innerWidth={w}
-                                    innerHeight={h}
-                                    thickness={t}
-                                />
-                            </div>
-                            <div className="p-3">
-                                <p className="text-xs text-muted-foreground text-center mb-2">Vista 3D</p>
-                                <Isometric3DView
-                                    innerWidth={w}
-                                    innerHeight={h}
-                                    length={parseFloat(length) || 0}
-                                    thickness={t}
-                                />
-                            </div>
+                            <PreviewPopup title="Vista Frontale — Sezione del Cassonetto">
+                                <div className="p-3">
+                                    <p className="text-xs text-muted-foreground text-center mb-2">Vista Frontale</p>
+                                    <DuctAssemblyPreview
+                                        innerWidth={w}
+                                        innerHeight={h}
+                                        thickness={t}
+                                    />
+                                </div>
+                            </PreviewPopup>
+                            <PreviewPopup title="Vista 3D Isometrica — Cassonetto Assemblato">
+                                <div className="p-3">
+                                    <p className="text-xs text-muted-foreground text-center mb-2">Vista 3D</p>
+                                    <Isometric3DView
+                                        innerWidth={w}
+                                        innerHeight={h}
+                                        length={parseFloat(length) || 0}
+                                        thickness={t}
+                                    />
+                                </div>
+                            </PreviewPopup>
                         </div>
                     </div>
 

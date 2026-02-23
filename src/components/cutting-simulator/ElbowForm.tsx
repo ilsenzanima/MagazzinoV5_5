@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CornerDownRight, Plus, RotateCcw, Info } from "lucide-react";
+import { PreviewPopup } from "@/components/cutting-simulator/PreviewPopup";
 import type { ElbowInput } from "@/lib/cutting-simulator/calculations";
 
 interface ElbowFormProps {
@@ -111,7 +112,7 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
                                     <FieldTip text="La lunghezza del primo tratto dritto del gomito, prima della curva. Il canale arriva da questa direzione." />
                                 </Label>
                                 <div className="relative">
-                                    <Input id="armA" type="number" min="1" step="10"
+                                    <Input id="armA" type="number" min="1" step="1"
                                         value={armA} onChange={(e) => setArmA(e.target.value)}
                                         className="h-11 text-lg font-mono bg-background/50 border-border/50 focus:border-primary pr-12" />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">mm</span>
@@ -123,7 +124,7 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
                                     <FieldTip text="La lunghezza del secondo tratto dritto, dopo la curva. Il canale prosegue in questa direzione a 90°." />
                                 </Label>
                                 <div className="relative">
-                                    <Input id="armB" type="number" min="1" step="10"
+                                    <Input id="armB" type="number" min="1" step="1"
                                         value={armB} onChange={(e) => setArmB(e.target.value)}
                                         className="h-11 text-lg font-mono bg-background/50 border-border/50 focus:border-primary pr-12" />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">mm</span>
@@ -162,11 +163,13 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
                         </div>
                     </div>
 
-                    {/* Preview angolo */}
-                    <div className="border border-dashed border-border/50 rounded-lg p-3 bg-muted/30">
-                        <p className="text-xs text-muted-foreground text-center mb-2">Schema del gomito (vista dall&apos;alto)</p>
-                        <ElbowPreview innerWidth={w} thickness={t} armA={a} armB={b} />
-                    </div>
+                    {/* Preview angolo — cliccabile per ingrandimento */}
+                    <PreviewPopup title="Schema Gomito 90° — Vista dall'Alto">
+                        <div className="border border-dashed border-border/50 rounded-lg p-3 bg-muted/30">
+                            <p className="text-xs text-muted-foreground text-center mb-2">Schema del gomito (vista dall&apos;alto)</p>
+                            <ElbowPreview innerWidth={w} thickness={t} armA={a} armB={b} />
+                        </div>
+                    </PreviewPopup>
 
                     <div className="flex gap-2 pt-2">
                         <Button type="submit" className="flex-1 h-11 font-semibold">
