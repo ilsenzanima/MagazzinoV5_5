@@ -3,25 +3,30 @@
 import { useState, useCallback } from "react";
 import { DuctForm } from "@/components/cutting-simulator/DuctForm";
 import { ElbowForm } from "@/components/cutting-simulator/ElbowForm";
+import { ProjectForm } from "@/components/cutting-simulator/ProjectForm";
 import { CutPlanViewer } from "@/components/cutting-simulator/CutPlanViewer";
 import { SheetConfigForm } from "@/components/cutting-simulator/SheetConfigForm";
 import { PiecesList } from "@/components/cutting-simulator/PiecesList";
 import {
     calculateRectangularDuct,
     calculateElbow90,
+    calculateProject,
     explodePieces,
     type DuctInput,
     type ElbowInput,
     type CalculationResult,
 } from "@/lib/cutting-simulator/calculations";
+import type { DuctProject } from "@/lib/cutting-simulator/project-model";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
-import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight } from "lucide-react";
+import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+type ViewMode = "single" | "project";
 type PieceType = "straight" | "elbow90";
 
 export function CuttingSimulatorClient() {
+    const [viewMode, setViewMode] = useState<ViewMode>("single");
     const [pieceType, setPieceType] = useState<PieceType>("straight");
     const [calcResult, setCalcResult] = useState<CalculationResult | null>(null);
     const [nestingResult, setNestingResult] = useState<NestingResult | null>(null);
@@ -55,6 +60,15 @@ export function CuttingSimulatorClient() {
         [sheetConfig, runNesting]
     );
 
+    const handleCalculateProject = useCallback(
+        (project: DuctProject) => {
+            const result = calculateProject(project);
+            setCalcResult(result);
+            runNesting(result, sheetConfig);
+        },
+        [sheetConfig, runNesting]
+    );
+
     const handleSheetConfigChange = useCallback(
         (newConfig: SheetConfig) => {
             setSheetConfig(newConfig);
@@ -67,6 +81,12 @@ export function CuttingSimulatorClient() {
 
     const handleTypeChange = (type: PieceType) => {
         setPieceType(type);
+        setCalcResult(null);
+        setNestingResult(null);
+    };
+
+    const handleViewModeChange = (mode: ViewMode) => {
+        setViewMode(mode);
         setCalcResult(null);
         setNestingResult(null);
     };
@@ -88,31 +108,25 @@ export function CuttingSimulatorClient() {
                 </div>
             </div>
 
-            {/* Selettore tipo pezzo */}
+            {/* Selettore modalità: Pezzo Singolo / Progetto */}
             <div className="flex gap-2 p-1 bg-muted/50 rounded-lg w-fit">
                 <Button
-                    variant={pieceType === "straight" ? "default" : "ghost"}
+                    variant={viewMode === "single" ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => handleTypeChange("straight")}
-                    className={cn(
-                        "gap-2 transition-all",
-                        pieceType === "straight" && "shadow-md"
-                    )}
+                    onClick={() => handleViewModeChange("single")}
+                    className={cn("gap-2 transition-all", viewMode === "single" && "shadow-md")}
                 >
                     <RectangleHorizontal className="h-4 w-4" />
-                    Tratto Dritto
+                    Pezzo Singolo
                 </Button>
                 <Button
-                    variant={pieceType === "elbow90" ? "default" : "ghost"}
+                    variant={viewMode === "project" ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => handleTypeChange("elbow90")}
-                    className={cn(
-                        "gap-2 transition-all",
-                        pieceType === "elbow90" && "shadow-md"
-                    )}
+                    onClick={() => handleViewModeChange("project")}
+                    className={cn("gap-2 transition-all", viewMode === "project" && "shadow-md")}
                 >
-                    <CornerDownRight className="h-4 w-4" />
-                    Angolo 90°
+                    <Layers className="h-4 w-4" />
+                    Progetto
                 </Button>
             </div>
 
@@ -120,10 +134,44 @@ export function CuttingSimulatorClient() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Colonna sinistra: input */}
                 <div className="lg:col-span-4 space-y-4">
-                    {pieceType === "straight" ? (
-                        <DuctForm onCalculate={handleCalculateStraight} />
+                    {viewMode === "project" ? (
+                        <ProjectForm onCalculateProject={handleCalculateProject} />
                     ) : (
-                        <ElbowForm onCalculate={handleCalculateElbow} />
+                        <>
+                            {/* Sub-selettore tipo pezzo singolo */}
+                            <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
+                                <button type="button"
+                                    onClick={() => handleTypeChange("straight")}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                        pieceType === "straight"
+                                            ? "bg-background shadow-sm text-foreground"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <RectangleHorizontal className="h-3.5 w-3.5" />
+                                    Tratto Dritto
+                                </button>
+                                <button type="button"
+                                    onClick={() => handleTypeChange("elbow90")}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                        pieceType === "elbow90"
+                                            ? "bg-background shadow-sm text-foreground"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <CornerDownRight className="h-3.5 w-3.5" />
+                                    Angolo 90°
+                                </button>
+                            </div>
+
+                            {pieceType === "straight" ? (
+                                <DuctForm onCalculate={handleCalculateStraight} />
+                            ) : (
+                                <ElbowForm onCalculate={handleCalculateElbow} />
+                            )}
+                        </>
                     )}
 
                     <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
