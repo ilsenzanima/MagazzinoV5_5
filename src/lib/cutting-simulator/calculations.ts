@@ -379,17 +379,20 @@ function filterBySides(pieces: CutPiece[], sides: DuctSides): CutPiece[] {
             }
             return true;
         }
-        // Fianchi
         if (id.includes('fianco') || id.includes('side')) {
             if (id.includes('int')) {
                 // Fianchi interni → corrispondono ai lati left/right
                 if (id.includes('-a') && !sides.left) return false;
                 if (id.includes('-b') && !sides.right) return false;
+                return true;
             }
             if (id.includes('ext')) {
                 if (id.includes('-a') && !sides.left) return false;
                 if (id.includes('-b') && !sides.right) return false;
+                return true;
             }
+            // Pezzo dritto generico (fianco standard dx/sx)
+            if (!sides.left && !sides.right) return false;
             return true;
         }
         return true;
@@ -397,6 +400,11 @@ function filterBySides(pieces: CutPiece[], sides: DuctSides): CutPiece[] {
         const id = p.id.toLowerCase();
         if ((id.includes('base') || id.includes('coperchio')) && p.quantity === 2) {
             if (!sides.top || !sides.bottom) {
+                return { ...p, quantity: 1 };
+            }
+        }
+        if ((id.includes('fianco') || id.includes('side')) && !id.includes('int') && !id.includes('ext') && p.quantity === 2) {
+            if (!sides.left || !sides.right) {
                 return { ...p, quantity: 1 };
             }
         }
@@ -482,6 +490,32 @@ export function calculateProject(project: DuctProject): CalculationResult {
         });
     });
 
+    // Aggiunta tappo frontale se previsto
+    if (section.cap === 'inner') {
+        allPieces.unshift({
+            id: 'tappo-interno',
+            label: '[+] Tappo (Interno)',
+            width: section.innerWidth,
+            height: section.innerHeight,
+            quantity: 1,
+            color: '#94a3b8',
+            formula: `${section.innerWidth} × ${section.innerHeight}`,
+        });
+    } else if (section.cap === 'outer') {
+        const outW = section.innerWidth + 2 * section.thickness;
+        const outH = section.innerHeight + 2 * section.thickness;
+        allPieces.unshift({
+            id: 'tappo-esterno',
+            label: '[+] Tappo (Esterno)',
+            width: outW,
+            height: outH,
+            quantity: 1,
+            color: '#475569',
+            formula: `${outW} × ${outH}`,
+        });
+    }
+
+    // Riepilogo generale del progetto
     const totalArea = allPieces.reduce(
         (sum, p) => sum + p.width * p.height * p.quantity, 0
     );
