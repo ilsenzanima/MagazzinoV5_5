@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Scissors, AlertTriangle } from "lucide-react";
-import type { NestingSheet, SheetConfig } from "@/lib/cutting-simulator/nesting";
+import type { NestingSheet, SheetConfig, Remnant } from "@/lib/cutting-simulator/nesting";
 
 interface CutPlanViewerProps {
     sheets: NestingSheet[];
@@ -150,6 +150,39 @@ function SheetCanvas({
             }
         }
 
+        // Avanzi riutilizzabili (rettangoli verdi tratteggiati)
+        for (const rem of sheet.remnants) {
+            const rx = padding + rem.x * scale;
+            const ry = padding + rem.y * scale;
+            const rw = rem.width * scale;
+            const rh = rem.height * scale;
+
+            // Sfondo leggero verde
+            ctx.fillStyle = "rgba(34, 197, 94, 0.08)";
+            ctx.fillRect(rx, ry, rw, rh);
+
+            // Bordo tratteggiato verde
+            ctx.strokeStyle = "rgba(34, 197, 94, 0.5)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+            ctx.strokeRect(rx, ry, rw, rh);
+            ctx.setLineDash([]);
+
+            // Dimensioni dell'avanzo (solo se abbastanza grande da leggersi)
+            if (rw > 40 && rh > 20) {
+                const remFontSize = Math.max(8, Math.min(11, Math.min(rw, rh) * 0.15));
+                ctx.fillStyle = "rgba(34, 197, 94, 0.6)";
+                ctx.font = `${remFontSize}px monospace`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(
+                    `${rem.width.toFixed(0)}×${rem.height.toFixed(0)}`,
+                    rx + rw / 2,
+                    ry + rh / 2
+                );
+            }
+        }
+
         // Quota lastra in basso
         ctx.fillStyle = "#64748b";
         ctx.font = "11px Inter, sans-serif";
@@ -189,6 +222,17 @@ function SheetCanvas({
                 <CardDescription className="text-xs">
                     {sheet.placements.map((p) => p.piece.id.toUpperCase()).join(" · ")}
                 </CardDescription>
+                {sheet.remnants.length > 0 && (() => {
+                    const biggest = sheet.remnants.reduce((best, r) =>
+                        r.width * r.height > best.width * best.height ? r : best
+                        , sheet.remnants[0]);
+                    return (
+                        <p className="text-[10px] text-emerald-500/80 mt-0.5">
+                            🟩 Avanzo più grande: {biggest.width}×{biggest.height} mm
+                            {sheet.remnants.length > 1 && ` (+${sheet.remnants.length - 1} altri)`}
+                        </p>
+                    );
+                })()}
             </CardHeader>
             <CardContent className="p-2 flex justify-center bg-black/20 rounded-b-lg">
                 <canvas ref={canvasRef} className="max-w-full" />
