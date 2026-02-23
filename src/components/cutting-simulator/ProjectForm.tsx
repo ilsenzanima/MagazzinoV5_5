@@ -203,17 +203,34 @@ export function ProjectForm({ onCalculateProject }: ProjectFormProps) {
                         </div>
 
                         <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
-                            {project.segments.map((seg, idx) => (
-                                <SegmentRow
-                                    key={seg.id}
-                                    segment={seg}
-                                    index={idx}
-                                    total={project.segments.length}
-                                    onUpdate={(patch) => updateSegment(seg.id, patch)}
-                                    onRemove={() => removeSegment(seg.id)}
-                                    onMove={(dir) => moveSegment(seg.id, dir)}
-                                />
-                            ))}
+                            {project.segments.map((seg, idx) => {
+                                let deductionText = '';
+                                if (project.globalMeasurements && seg.type === 'straight') {
+                                    const prev = project.segments[idx - 1];
+                                    const next = project.segments[idx + 1];
+                                    let deduction = 0;
+                                    if (prev && prev.type === 'elbow90') deduction += prev.armB;
+                                    if (next && next.type === 'elbow90') deduction += next.armA;
+
+                                    if (deduction > 0) {
+                                        const actualLength = Math.max(0, seg.length - deduction);
+                                        deductionText = `Taglio: ${actualLength} (-${deduction})`;
+                                    }
+                                }
+
+                                return (
+                                    <SegmentRow
+                                        key={seg.id}
+                                        segment={seg}
+                                        index={idx}
+                                        total={project.segments.length}
+                                        deductionText={deductionText}
+                                        onUpdate={(patch) => updateSegment(seg.id, patch)}
+                                        onRemove={() => removeSegment(seg.id)}
+                                        onMove={(dir) => moveSegment(seg.id, dir)}
+                                    />
+                                );
+                            })}
                             {project.segments.length === 0 && (
                                 <p className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-lg">
                                     Nessun segmento. Aggiungi un tratto dritto o un angolo.
@@ -236,11 +253,12 @@ export function ProjectForm({ onCalculateProject }: ProjectFormProps) {
 // ==================== Riga segmento ====================
 
 function SegmentRow({
-    segment, index, total, onUpdate, onRemove, onMove,
+    segment, index, total, deductionText, onUpdate, onRemove, onMove,
 }: {
     segment: Segment;
     index: number;
     total: number;
+    deductionText?: string;
     onUpdate: (patch: Partial<StraightSegment> | Partial<Elbow90Segment>) => void;
     onRemove: () => void;
     onMove: (dir: 'up' | 'down') => void;
@@ -269,7 +287,7 @@ function SegmentRow({
             {/* Contenuto */}
             <div className="flex-1 min-w-0">
                 {isStraight ? (
-                    <StraightFields seg={segment as StraightSegment} onUpdate={onUpdate} />
+                    <StraightFields seg={segment as StraightSegment} deductionText={deductionText} onUpdate={onUpdate} />
                 ) : (
                     <ElbowFields seg={segment as Elbow90Segment} onUpdate={onUpdate} />
                 )}
@@ -286,39 +304,51 @@ function SegmentRow({
 
 // ==================== Tratto Dritto ====================
 
-function StraightFields({ seg, onUpdate }: {
+function StraightFields({ seg, deductionText, onUpdate }: {
     seg: StraightSegment;
+    deductionText?: string;
     onUpdate: (patch: Partial<StraightSegment>) => void;
 }) {
     return (
-        <div className="flex items-center gap-2">
-            <Ruler className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-            <span className="text-xs font-medium text-blue-400 shrink-0 w-12">Dritto</span>
+        <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+                <Ruler className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                <span className="text-xs font-medium text-blue-400 shrink-0 w-12">Dritto</span>
 
-            <div className="relative flex-1 max-w-[120px]">
-                <Input type="number" min="1" step="1"
-                    value={seg.length}
-                    onChange={e => onUpdate({ length: parseFloat(e.target.value) || 0 })}
-                    className="h-7 text-xs font-mono pr-8" />
-                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                <div className="relative flex-1 max-w-[120px]">
+                    <Input type="number" min="1" step="1"
+                        value={seg.length}
+                        onChange={e => onUpdate({ length: parseFloat(e.target.value) || 0 })}
+                        className="h-7 text-xs font-mono pr-8" />
+                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                </div>
+
+                {/* Orientamento */}
+                <div className="flex gap-0.5">
+                    {(['horizontal', 'vertical'] as const).map(o => (
+                        <button key={o} type="button"
+                            onClick={() => onUpdate({ orientation: o })}
+                            className={cn(
+                                "px-1.5 py-0.5 text-[9px] rounded transition-all",
+                                seg.orientation === o
+                                    ? "bg-blue-500/20 text-blue-300 font-medium"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {o === 'horizontal' ? 'Oriz.' : 'Vert.'}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {/* Orientamento */}
-            <div className="flex gap-0.5">
-                {(['horizontal', 'vertical'] as const).map(o => (
-                    <button key={o} type="button"
-                        onClick={() => onUpdate({ orientation: o })}
-                        className={cn(
-                            "px-1.5 py-0.5 text-[9px] rounded transition-all",
-                            seg.orientation === o
-                                ? "bg-blue-500/20 text-blue-300 font-medium"
-                                : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        {o === 'horizontal' ? 'Oriz.' : 'Vert.'}
-                    </button>
-                ))}
-            </div>
+            {deductionText && (
+                <div className="flex items-center gap-1 pl-[64px] animate-in slide-in-from-top-1 fade-in duration-300">
+                    <CornerDownRight className="h-2.5 w-2.5 text-muted-foreground/60" />
+                    <span className="text-[10px] text-muted-foreground/80 font-mono tracking-tight bg-muted/40 px-1 rounded">
+                        {deductionText}
+                    </span>
+                </div>
+            )}
         </div>
     );
 }
@@ -397,6 +427,6 @@ function ElbowFields({ seg, onUpdate }: {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
