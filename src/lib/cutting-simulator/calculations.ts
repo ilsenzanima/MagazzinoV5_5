@@ -410,7 +410,7 @@ function filterBySides(pieces: CutPiece[], sides: DuctSides): CutPiece[] {
  * e rinomina con prefisso progressivo per evitare conflitti.
  */
 export function calculateProject(project: DuctProject): CalculationResult {
-    const { section, segments } = project;
+    const { section, segments, globalMeasurements } = project;
     const allPieces: CutPiece[] = [];
 
     segments.forEach((seg, idx) => {
@@ -418,13 +418,46 @@ export function calculateProject(project: DuctProject): CalculationResult {
         let result: CalculationResult;
 
         if (seg.type === 'straight') {
+            let actualLength = seg.length;
+            let deductionText = '';
+
+            // Se abilitate le misure globali, sottraiamo l'ingombro degli angoli adiacenti
+            if (globalMeasurements) {
+                const prev = segments[idx - 1];
+                const next = segments[idx + 1];
+                let deduction = 0;
+
+                // Il segmento precedente si aggancia con il suo braccio B all'ingresso di questo
+                if (prev && prev.type === 'elbow90') {
+                    deduction += prev.armB;
+                }
+                // Il segmento successivo si aggancia con il suo braccio A all'uscita di questo
+                if (next && next.type === 'elbow90') {
+                    deduction += next.armA;
+                }
+
+                if (deduction > 0) {
+                    actualLength = Math.max(0, seg.length - deduction);
+                    deductionText = ` (Ingombro: ${seg.length} − ${deduction} = ${actualLength})`;
+                }
+            }
+
             result = calculateRectangularDuct({
                 innerWidth: section.innerWidth,
                 innerHeight: section.innerHeight,
-                length: seg.length,
+                length: actualLength, // Uso lunghezza effettiva
                 thickness: section.thickness,
                 extraMargin: section.extraMargin,
             });
+
+            // Aggiungiamo il deductionText al summary del dritto, o nella label
+            // (La filterBySides manterrà questi valori)
+            if (deductionText) {
+                result.pieces.forEach(p => {
+                    p.label += deductionText;
+                });
+            }
+
         } else {
             result = calculateElbow90({
                 innerWidth: section.innerWidth,

@@ -46,6 +46,8 @@ export interface DuctProject {
     name: string;
     section: SectionProfile;
     segments: Segment[];
+    /** Se true, le lunghezze dei tratti dritti sono considerate "fuori tutto" (ingombri) e vengono accorciate dalle curve adiacenti */
+    globalMeasurements: boolean;
 }
 
 /** Contatore per ID univoci */
@@ -87,6 +89,7 @@ export function defaultProject(): DuctProject {
         name: 'Nuovo Progetto',
         section: defaultSection(),
         segments: [createStraightSegment(2000)],
+        globalMeasurements: true,
     };
 }
 
