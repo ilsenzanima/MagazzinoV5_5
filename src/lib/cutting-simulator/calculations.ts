@@ -230,7 +230,7 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
 
     // Fianchi esterni: 2 pezzi separati (uno per braccio).
     const extSideAWidth = innerHeight + extraMargin;
-    const extSideAHeight = armA - thickness;
+    const extSideAHeight = armA + outerWidth - thickness; // faccia esterna A meno sormonto di B
 
     const extSideBWidth = innerHeight + extraMargin;
     const extSideBHeight = armB + outerWidth;
@@ -300,7 +300,7 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
             height: extSideAHeight,
             quantity: 1,
             color: PIECE_COLORS[1],
-            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} − ${thickness}) = ${extSideAWidth} × ${extSideAHeight}`,
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armA} + ${outerWidth} − ${thickness}) = ${extSideAWidth} × ${extSideAHeight}`,
         },
         {
             id: 'fianco-ext-b',
