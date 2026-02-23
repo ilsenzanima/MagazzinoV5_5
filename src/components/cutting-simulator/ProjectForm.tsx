@@ -154,6 +154,26 @@ export function ProjectForm({ onCalculateProject }: ProjectFormProps) {
                                     sides={sec.sides}
                                     onChange={sides => updateSection({ sides })}
                                 />
+
+                                {/* Tappo Frontale */}
+                                <div className="space-y-1.5 pt-3 border-t border-border/50">
+                                    <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">Tappo Frontale (Testa)</Label>
+                                    <div className="flex gap-1">
+                                        {(['none', 'inner', 'outer'] as const).map(c => (
+                                            <button key={c} type="button"
+                                                onClick={() => updateSection({ cap: c })}
+                                                className={cn(
+                                                    "px-2 py-1 text-xs rounded transition-all flex-1 border border-border/40",
+                                                    sec.cap === c
+                                                        ? "bg-primary text-primary-foreground font-medium border-primary"
+                                                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                                )}
+                                            >
+                                                {c === 'none' ? 'Nessuno' : c === 'inner' ? 'Interno' : 'Esterno'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -317,11 +337,11 @@ function StraightFields({ seg, deductionText, onUpdate }: {
                 <Ruler className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                 <span className="text-xs font-medium text-blue-400 shrink-0 w-12">Dritto</span>
 
-                <div className="relative flex-1 max-w-[120px]">
+                <div className="relative flex-1 min-w-[80px]">
                     <Input type="number" min="1" step="1"
                         value={seg.length}
                         onChange={e => onUpdate({ length: parseFloat(e.target.value) || 0 })}
-                        className="h-7 text-xs font-mono pr-8" />
+                        className="h-7 text-xs font-mono pr-8 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                     <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
                 </div>
 
@@ -407,25 +427,25 @@ function ElbowFields({ seg, onUpdate }: {
             </div>
 
             {/* Bracci */}
-            <div className="flex gap-2 pl-5">
-                <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-muted-foreground">A:</span>
+            <div className="flex gap-2 pl-5 mt-1">
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-muted-foreground">A:</span>
                     <div className="relative">
                         <Input type="number" min="1" step="1"
                             value={seg.armA}
                             onChange={e => onUpdate({ armA: parseFloat(e.target.value) || 0 })}
-                            className="h-6 text-[11px] font-mono w-[80px] pr-7" />
-                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-muted-foreground">mm</span>
+                            className="h-7 text-[11px] font-mono w-[84px] pr-7 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-muted-foreground">B:</span>
+                <div className="flex items-center gap-1.5 border-l border-border/50 pl-2">
+                    <span className="text-[10px] font-medium text-muted-foreground">B:</span>
                     <div className="relative">
                         <Input type="number" min="1" step="1"
                             value={seg.armB}
                             onChange={e => onUpdate({ armB: parseFloat(e.target.value) || 0 })}
-                            className="h-6 text-[11px] font-mono w-[80px] pr-7" />
-                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-muted-foreground">mm</span>
+                            className="h-7 text-[11px] font-mono w-[84px] pr-7 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
                     </div>
                 </div>
             </div>

@@ -10,12 +10,15 @@ export interface DuctSides {
     right: boolean;
 }
 
+export type CapType = 'none' | 'inner' | 'outer';
+
 export interface SectionProfile {
     innerWidth: number;
     innerHeight: number;
     thickness: number;
     sides: DuctSides;
     extraMargin: number;
+    cap: CapType;
 }
 
 export type SegmentDirection = 'left' | 'right' | 'up' | 'down';
@@ -80,6 +83,7 @@ export function defaultSection(): SectionProfile {
         thickness: 50,
         sides: { top: true, bottom: true, left: true, right: true },
         extraMargin: 0,
+        cap: 'none',
     };
 }
 
