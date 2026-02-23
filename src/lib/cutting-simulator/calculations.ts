@@ -240,27 +240,28 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
     const intSideAHeight = armA;
 
     const intSideBWidth = innerHeight + extraMargin;
-    const intSideBHeight = armB;
+    const intSideBHeight = armB + thickness; // sormonto allo spigolo interno
 
     const pieces: CutPiece[] = [];
 
     if (baseMode === 'single') {
-        // BASE UNICA: un solo pezzo a L per base e uno per coperchio.
-        // La L ha:
-        //   - Braccio verticale: outerWidth × (armA + outerWidth)
-        //   - Braccio orizzontale: armB × outerWidth (si estende dal lato)
-        // Come rettangolo di taglio, prendiamo il bounding box:
-        // Larghezza = outerWidth + armB, Altezza = armA + outerWidth
+        // BASE UNICA: un pezzo a L sagomato per base e uno per coperchio.
+        // Dal rettangolo di taglio (bounding box) si ricava la sagoma a L,
+        // scartando l'angolo vuoto (armA × armB).
+        // Bounding box: (outerWidth + armB) × (armA + outerWidth)
+        // Sagoma a L effettiva = bounding box - angolo vuoto
         const baseLWidth = outerWidth + armB + extraMargin;
         const baseLHeight = armA + outerWidth;
+        const wasteCorner = armA * armB; // angolo da scartare
+        const actualArea = baseLWidth * baseLHeight - wasteCorner;
         pieces.push({
             id: 'base-l',
-            label: 'Base/Coperchio a L (pezzo unico)',
+            label: 'Base/Coperchio a L (sagomata)',
             width: baseLWidth,
             height: baseLHeight,
             quantity: 2,
             color: PIECE_COLORS[0],
-            formula: `(${outerWidth} + ${armB}) × (${armA} + ${outerWidth}) = ${baseLWidth} × ${baseLHeight}`,
+            formula: `Sagoma a L: rettangolo ${baseLWidth}×${baseLHeight} − angolo ${armA}×${armB} = ${(actualArea / 1_000_000).toFixed(3)} m² cad.`,
         });
     } else {
         // BASE SEPARATA: 2 pezzi per braccio
@@ -326,7 +327,7 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
             height: intSideBHeight,
             quantity: 1,
             color: PIECE_COLORS[4],
-            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × ${armB}`,
+            formula: `${innerHeight}${extraMargin ? ` + ${extraMargin}` : ''} × (${armB} + ${thickness}) = ${intSideBWidth} × ${intSideBHeight}`,
         },
     );
 
