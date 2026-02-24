@@ -44,6 +44,32 @@ export interface Elbow90Segment {
 
 export type Segment = StraightSegment | Elbow90Segment;
 
+// ==================== ANNOTAZIONI & CONTESTO ====================
+
+export interface Annotation {
+    id: string;
+    /** Posizione nel canvas world-space (mm) */
+    x: number;
+    y: number;
+    text: string;
+    type: 'note' | 'dimension';
+}
+
+export type ContextElementType = 'wall' | 'floor' | 'opening';
+
+export interface ContextElement {
+    id: string;
+    type: ContextElementType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation?: number;
+    label?: string;
+}
+
+// ==================== PROGETTO ====================
+
 export interface DuctProject {
     id: string;
     name: string;
@@ -51,6 +77,10 @@ export interface DuctProject {
     segments: Segment[];
     /** Se true, le lunghezze dei tratti dritti sono considerate "fuori tutto" (ingombri) e vengono accorciate dalle curve adiacenti */
     globalMeasurements: boolean;
+    /** Annotazioni testuali sul disegno (fase B) */
+    annotations?: Annotation[];
+    /** Elementi contestuali: pareti, solai, varchi (fase D) */
+    contextElements?: ContextElement[];
 }
 
 /** Contatore per ID univoci */

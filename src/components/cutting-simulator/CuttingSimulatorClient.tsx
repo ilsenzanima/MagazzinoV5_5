@@ -5,6 +5,7 @@ import { DuctForm } from "@/components/cutting-simulator/DuctForm";
 import { ElbowForm } from "@/components/cutting-simulator/ElbowForm";
 import { ProjectForm } from "@/components/cutting-simulator/ProjectForm";
 import { FlatPiecesForm } from "@/components/cutting-simulator/FlatPiecesForm";
+import { ProjectEditor } from "@/components/cutting-simulator/ProjectEditor";
 import { CutPlanViewer } from "@/components/cutting-simulator/CutPlanViewer";
 import { SheetConfigForm } from "@/components/cutting-simulator/SheetConfigForm";
 import { PiecesList } from "@/components/cutting-simulator/PiecesList";
@@ -18,13 +19,15 @@ import {
     type CalculationResult,
 } from "@/lib/cutting-simulator/calculations";
 import type { DuctProject } from "@/lib/cutting-simulator/project-model";
+import { defaultProject } from "@/lib/cutting-simulator/project-model";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
-import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid } from "lucide-react";
+import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid, List, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "single" | "project";
 type PieceType = "straight" | "elbow90" | "flatPieces";
+type ProjectViewMode = "list" | "editor";
 
 export function CuttingSimulatorClient() {
     const [viewMode, setViewMode] = useState<ViewMode>("single");
@@ -36,6 +39,8 @@ export function CuttingSimulatorClient() {
         height: 1200,
         gap: 5,
     });
+    const [projectData, setProjectData] = useState<DuctProject>(defaultProject());
+    const [projectViewMode, setProjectViewMode] = useState<ProjectViewMode>('list');
 
     const runNesting = useCallback((result: CalculationResult, config: SheetConfig) => {
         const exploded = explodePieces(result.pieces);
@@ -136,7 +141,39 @@ export function CuttingSimulatorClient() {
                 {/* Colonna sinistra: input */}
                 <div className="lg:col-span-4 space-y-4">
                     {viewMode === "project" ? (
-                        <ProjectForm onCalculateProject={handleCalculateProject} />
+                        <>
+                            {/* Toggle Lista / Editor */}
+                            <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
+                                <button type="button"
+                                    onClick={() => setProjectViewMode('list')}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                        projectViewMode === 'list'
+                                            ? "bg-background shadow-sm text-foreground"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <List className="h-3.5 w-3.5" />
+                                    Lista
+                                </button>
+                                <button type="button"
+                                    onClick={() => setProjectViewMode('editor')}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                        projectViewMode === 'editor'
+                                            ? "bg-background shadow-sm text-foreground"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <PenTool className="h-3.5 w-3.5" />
+                                    Editor
+                                </button>
+                            </div>
+
+                            {projectViewMode === 'list' ? (
+                                <ProjectForm onCalculateProject={handleCalculateProject} />
+                            ) : null}
+                        </>
                     ) : (
                         <>
                             {/* Sub-selettore tipo pezzo singolo */}
@@ -208,28 +245,38 @@ export function CuttingSimulatorClient() {
 
                 {/* Colonna destra: visualizzazione */}
                 <div className="lg:col-span-8 space-y-4">
-                    {nestingResult && nestingResult.sheets.length > 0 && (
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
-                            <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
-                            <span>
-                                <strong>{nestingResult.totalSheets}</strong> lastr{nestingResult.totalSheets === 1 ? 'a' : 'e'} necessar{nestingResult.totalSheets === 1 ? 'ia' : 'ie'}.
-                                {' '}Utilizzo medio:{' '}
-                                <strong>
-                                    {(
-                                        nestingResult.sheets.reduce((s, sh) => s + sh.utilization, 0) /
-                                        nestingResult.sheets.length
-                                    ).toFixed(1)}
-                                    %
-                                </strong>
-                            </span>
-                        </div>
-                    )}
+                    {/* Editor visivo quando in modalità Progetto + Editor */}
+                    {viewMode === 'project' && projectViewMode === 'editor' ? (
+                        <ProjectEditor
+                            project={projectData}
+                            onProjectChange={setProjectData}
+                        />
+                    ) : (
+                        <>
+                            {nestingResult && nestingResult.sheets.length > 0 && (
+                                <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+                                    <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>
+                                        <strong>{nestingResult.totalSheets}</strong> lastr{nestingResult.totalSheets === 1 ? 'a' : 'e'} necessar{nestingResult.totalSheets === 1 ? 'ia' : 'ie'}.
+                                        {' '}Utilizzo medio:{' '}
+                                        <strong>
+                                            {(
+                                                nestingResult.sheets.reduce((s, sh) => s + sh.utilization, 0) /
+                                                nestingResult.sheets.length
+                                            ).toFixed(1)}
+                                            %
+                                        </strong>
+                                    </span>
+                                </div>
+                            )}
 
-                    <CutPlanViewer
-                        sheets={nestingResult?.sheets || []}
-                        sheetConfig={sheetConfig}
-                        unplacedCount={nestingResult?.unplaced.length || 0}
-                    />
+                            <CutPlanViewer
+                                sheets={nestingResult?.sheets || []}
+                                sheetConfig={sheetConfig}
+                                unplacedCount={nestingResult?.unplaced.length || 0}
+                            />
+                        </>
+                    )}
                 </div>
             </div>
         </div>
