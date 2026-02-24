@@ -78,9 +78,14 @@ interface FreeRect {
 
 /**
  * Trova il miglior rettangolo libero dove piazzare un pezzo di dimensioni (pw × ph).
- * Strategia: Notch-Priority + Best Area Fit.
- * I rettangoli "notch" (dentro l'angolo vuoto di una L) hanno PRIORITÀ ASSOLUTA
- * perché usare quello spazio è gratis (altrimenti sarebbe sprecato).
+ * Strategia: Notch-Priority + Best Short Side Fit (BSSF).
+ *
+ * BSSF = min(rect.w - piece.w, rect.h - piece.h)
+ * Preferisce il rettangolo dove il pezzo aderisce meglio su almeno un lato.
+ * - Pezzi alti → affiancati nel rettangolo alto (BSSF=0, fit perfetto sull'altezza)
+ * - Pezzi corti → ruotati nella fascia bassa (fit migliore sulla larghezza)
+ *
+ * I rettangoli "notch" (dentro l'angolo vuoto di una L) hanno PRIORITÀ ASSOLUTA.
  */
 function findBestFit(
     freeRects: FreeRect[],
@@ -89,7 +94,7 @@ function findBestFit(
 ): { index: number; rotated: boolean } | null {
     let bestIdx = -1;
     let bestRotated = false;
-    let bestWaste = Infinity;
+    let bestScore = Infinity;
     let bestIsNotch = false;
 
     for (let i = 0; i < freeRects.length; i++) {
@@ -98,15 +103,14 @@ function findBestFit(
 
         // Prova orientazione normale
         if (pw <= r.w && ph <= r.h) {
-            const waste = r.w * r.h - pw * ph;
-            // Notch ha priorità: se abbiamo un fit notch, non lo sovrascriviamo con un non-notch
+            const bssf = Math.min(r.w - pw, r.h - ph);
             if (rIsNotch && !bestIsNotch) {
-                bestWaste = waste;
+                bestScore = bssf;
                 bestIdx = i;
                 bestRotated = false;
                 bestIsNotch = true;
-            } else if (rIsNotch === bestIsNotch && waste < bestWaste) {
-                bestWaste = waste;
+            } else if (rIsNotch === bestIsNotch && bssf < bestScore) {
+                bestScore = bssf;
                 bestIdx = i;
                 bestRotated = false;
                 bestIsNotch = rIsNotch;
@@ -115,14 +119,14 @@ function findBestFit(
 
         // Prova orientazione ruotata
         if (pw !== ph && ph <= r.w && pw <= r.h) {
-            const waste = r.w * r.h - pw * ph;
+            const bssf = Math.min(r.w - ph, r.h - pw);
             if (rIsNotch && !bestIsNotch) {
-                bestWaste = waste;
+                bestScore = bssf;
                 bestIdx = i;
                 bestRotated = true;
                 bestIsNotch = true;
-            } else if (rIsNotch === bestIsNotch && waste < bestWaste) {
-                bestWaste = waste;
+            } else if (rIsNotch === bestIsNotch && bssf < bestScore) {
+                bestScore = bssf;
                 bestIdx = i;
                 bestRotated = true;
                 bestIsNotch = rIsNotch;
@@ -443,16 +447,16 @@ export function nestPieces(
                         for (let ri = 0; ri < sheet.freeRects.length; ri++) {
                             const r = sheet.freeRects[ri];
                             if (o.ow <= r.w && o.oh <= r.h) {
-                                const waste = r.w * r.h - o.ow * o.oh;
+                                const bssf = Math.min(r.w - o.ow, r.h - o.oh);
                                 const rIsNotch = !!r.isNotch;
                                 const curIsNotch = bestFit ? !!(openSheets[bestSheetIdx]?.freeRects[bestFit.index]?.isNotch) : false;
 
                                 let better = false;
                                 if (rIsNotch && !curIsNotch) better = true;
-                                else if (rIsNotch === curIsNotch && waste < bestWaste) better = true;
+                                else if (rIsNotch === curIsNotch && bssf < bestWaste) better = true;
 
                                 if (better || !bestFit) {
-                                    bestWaste = waste;
+                                    bestWaste = bssf;
                                     bestSheetIdx = s;
                                     bestFit = { index: ri, rotated: o.rot };
                                     bestLCorner = corner;
@@ -463,50 +467,28 @@ export function nestPieces(
                 }
             }
         } else {
-            // PEZZO RETTANGOLARE o COMPOUND
-            // Strategia: preserva il remnant più grande della lastra
+            // PEZZO RETTANGOLARE o COMPOUND — usa BSSF via findBestFit
             for (let s = 0; s < openSheets.length; s++) {
                 const sheet = openSheets[s];
+                const fit = findBestFit(sheet.freeRects, pw, ph);
+                if (fit) {
+                    const rect = sheet.freeRects[fit.index];
+                    const rIsNotch = !!rect.isNotch;
+                    const placedW = fit.rotated ? ph : pw;
+                    const placedH = fit.rotated ? pw : ph;
+                    const bssf = Math.min(rect.w - placedW, rect.h - placedH);
 
-                // Identifica il rettangolo più grande (remnant da preservare)
-                let maxRectArea = 0;
-                for (const fr of sheet.freeRects) {
-                    const area = fr.w * fr.h;
-                    if (area > maxRectArea) maxRectArea = area;
-                }
+                    const curIsNotch = bestFit ? !!(openSheets[bestSheetIdx]?.freeRects[bestFit.index]?.isNotch) : false;
 
-                // Prova tutte le orientazioni in tutti i rettangoli
-                for (let ri = 0; ri < sheet.freeRects.length; ri++) {
-                    const r = sheet.freeRects[ri];
-                    const rIsNotch = !!r.isNotch;
-                    const rArea = r.w * r.h;
-                    const isMainRect = !rIsNotch && rArea === maxRectArea && sheet.freeRects.length > 1;
+                    let better = false;
+                    if (rIsNotch && !curIsNotch) better = true;
+                    else if (rIsNotch === curIsNotch && bssf < bestWaste) better = true;
 
-                    // Prova orientazione normale
-                    const tryOrient = (ow: number, oh: number, rot: boolean) => {
-                        if (ow <= r.w && oh <= r.h) {
-                            const waste = rArea - ow * oh;
-                            // Penalità per usare il rettangolo più grande
-                            // → preferisce gli spazi piccoli per preservare il remnant grande
-                            const score = waste + (isMainRect ? 1_000_000 : 0);
-
-                            const curIsNotch = bestFit ? !!(openSheets[bestSheetIdx]?.freeRects[bestFit.index]?.isNotch) : false;
-                            const curScore = bestWaste;
-
-                            let better = false;
-                            if (rIsNotch && !curIsNotch) better = true;
-                            else if (rIsNotch === curIsNotch && score < curScore) better = true;
-
-                            if (better) {
-                                bestWaste = score;
-                                bestSheetIdx = s;
-                                bestFit = { index: ri, rotated: rot };
-                            }
-                        }
-                    };
-
-                    tryOrient(pw, ph, false);
-                    if (pw !== ph) tryOrient(ph, pw, true);
+                    if (better) {
+                        bestWaste = bssf;
+                        bestSheetIdx = s;
+                        bestFit = fit;
+                    }
                 }
             }
         }
