@@ -70,13 +70,17 @@ interface FreeRect {
     y: number;
     w: number;
     h: number;
+    /** Se true, questo spazio è dentro una nicchia L (angolo vuoto) — priorità alta */
+    isNotch?: boolean;
 }
 
 // ==================== ALGORITMO GUILLOTINE ====================
 
 /**
  * Trova il miglior rettangolo libero dove piazzare un pezzo di dimensioni (pw × ph).
- * Strategia: Best Area Fit — sceglie lo spazio con meno area sprecata.
+ * Strategia: Notch-Priority + Best Area Fit.
+ * I rettangoli "notch" (dentro l'angolo vuoto di una L) hanno PRIORITÀ ASSOLUTA
+ * perché usare quello spazio è gratis (altrimenti sarebbe sprecato).
  */
 function findBestFit(
     freeRects: FreeRect[],
@@ -86,27 +90,42 @@ function findBestFit(
     let bestIdx = -1;
     let bestRotated = false;
     let bestWaste = Infinity;
+    let bestIsNotch = false;
 
     for (let i = 0; i < freeRects.length; i++) {
         const r = freeRects[i];
+        const rIsNotch = !!r.isNotch;
 
         // Prova orientazione normale
         if (pw <= r.w && ph <= r.h) {
             const waste = r.w * r.h - pw * ph;
-            if (waste < bestWaste) {
+            // Notch ha priorità: se abbiamo un fit notch, non lo sovrascriviamo con un non-notch
+            if (rIsNotch && !bestIsNotch) {
                 bestWaste = waste;
                 bestIdx = i;
                 bestRotated = false;
+                bestIsNotch = true;
+            } else if (rIsNotch === bestIsNotch && waste < bestWaste) {
+                bestWaste = waste;
+                bestIdx = i;
+                bestRotated = false;
+                bestIsNotch = rIsNotch;
             }
         }
 
-        // Prova orientazione ruotata (solo se dimensioni diverse)
+        // Prova orientazione ruotata
         if (pw !== ph && ph <= r.w && pw <= r.h) {
             const waste = r.w * r.h - pw * ph;
-            if (waste < bestWaste) {
+            if (rIsNotch && !bestIsNotch) {
                 bestWaste = waste;
                 bestIdx = i;
                 bestRotated = true;
+                bestIsNotch = true;
+            } else if (rIsNotch === bestIsNotch && waste < bestWaste) {
+                bestWaste = waste;
+                bestIdx = i;
+                bestRotated = true;
+                bestIsNotch = rIsNotch;
             }
         }
     }
@@ -377,13 +396,14 @@ export function nestPieces(
                     notchY = rect.y + placedH - notchInfo.h;
                 }
 
-                // Aggiungi l'angolo vuoto come spazio libero utilizzabile
+                // Aggiungi l'angolo vuoto come spazio libero utilizzabile (priorità alta)
                 if (notchInfo.w > gap && notchInfo.h > gap) {
                     sheet.freeRects.push({
                         x: notchX,
                         y: notchY,
                         w: notchInfo.w,
                         h: notchInfo.h,
+                        isNotch: true,
                     });
                 }
             }
