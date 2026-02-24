@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { DuctForm } from "@/components/cutting-simulator/DuctForm";
 import { ElbowForm } from "@/components/cutting-simulator/ElbowForm";
 import { ProjectForm } from "@/components/cutting-simulator/ProjectForm";
+import { FlatPiecesForm } from "@/components/cutting-simulator/FlatPiecesForm";
 import { CutPlanViewer } from "@/components/cutting-simulator/CutPlanViewer";
 import { SheetConfigForm } from "@/components/cutting-simulator/SheetConfigForm";
 import { PiecesList } from "@/components/cutting-simulator/PiecesList";
@@ -18,12 +19,12 @@ import {
 } from "@/lib/cutting-simulator/calculations";
 import type { DuctProject } from "@/lib/cutting-simulator/project-model";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
-import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers } from "lucide-react";
+import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "single" | "project";
-type PieceType = "straight" | "elbow90";
+type PieceType = "straight" | "elbow90" | "flatPieces";
 
 export function CuttingSimulatorClient() {
     const [viewMode, setViewMode] = useState<ViewMode>("single");
@@ -164,12 +165,32 @@ export function CuttingSimulatorClient() {
                                     <CornerDownRight className="h-3.5 w-3.5" />
                                     Angolo 90°
                                 </button>
+                                <button type="button"
+                                    onClick={() => handleTypeChange("flatPieces")}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                        pieceType === "flatPieces"
+                                            ? "bg-background shadow-sm text-foreground"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <LayoutGrid className="h-3.5 w-3.5" />
+                                    Pezzi Piani
+                                </button>
                             </div>
 
                             {pieceType === "straight" ? (
                                 <DuctForm onCalculate={handleCalculateStraight} />
-                            ) : (
+                            ) : pieceType === "elbow90" ? (
                                 <ElbowForm onCalculate={handleCalculateElbow} />
+                            ) : (
+                                <FlatPiecesForm
+                                    sheetConfig={sheetConfig}
+                                    onCalculate={(result) => {
+                                        setCalcResult(result);
+                                        runNesting(result, sheetConfig);
+                                    }}
+                                />
                             )}
                         </>
                     )}
