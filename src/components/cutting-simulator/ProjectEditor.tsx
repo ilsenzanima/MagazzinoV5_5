@@ -409,21 +409,24 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     return (
                         <g key={node.segment.id} onClick={e => handleSegmentClick(i, e)} style={{ cursor: 'pointer' }}>
                             {/* Corpo segmento */}
-                            <rect
-                                x={node.x}
-                                y={node.y}
-                                width={node.width}
-                                height={node.height}
-                                fill={isSelected ? `${node.color}40` : `${node.color}20`}
-                                stroke={node.color}
-                                strokeWidth={isSelected ? 2.5 : 1.5}
-                                rx={node.segment.type === 'elbow90' ? 8 : 2}
-                            />
+                            {node.rects.map((r, rIdx) => (
+                                <rect
+                                    key={rIdx}
+                                    x={r.x}
+                                    y={r.y}
+                                    width={r.width}
+                                    height={r.height}
+                                    fill={isSelected ? `${node.color}40` : `${node.color}20`}
+                                    stroke={node.color}
+                                    strokeWidth={isSelected ? 2.5 : 1.5}
+                                    rx={r.rx || 0}
+                                />
+                            ))}
 
                             {/* Etichetta */}
                             <text
-                                x={node.x + node.width / 2}
-                                y={node.y + node.height / 2}
+                                x={node.labelX}
+                                y={node.labelY}
                                 textAnchor="middle"
                                 dominantBaseline="central"
                                 className="fill-foreground text-[11px] font-mono pointer-events-none"
@@ -433,11 +436,11 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
 
                             {/* Indice */}
                             <circle
-                                cx={node.x + 12} cy={node.y + 12} r={8}
+                                cx={node.labelX + 12} cy={node.labelY + 12} r={8}
                                 fill={node.color} opacity={0.8}
                             />
                             <text
-                                x={node.x + 12} y={node.y + 12}
+                                x={node.labelX + 12} y={node.labelY + 12}
                                 textAnchor="middle" dominantBaseline="central"
                                 className="fill-white text-[8px] font-bold pointer-events-none"
                             >
@@ -450,14 +453,16 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                 {/* Quote automatiche */}
                 {nodes2D.map((node, i) => {
                     if (node.segment.type !== 'straight') return null;
-                    const isHoriz = node.width > node.height;
+                    const r = node.rects[0];
+                    if (!r) return null;
+                    const isHoriz = r.width > r.height;
                     return (
                         <DimensionLine
                             key={`dim-${i}`}
-                            x1={isHoriz ? node.x : node.x + node.width / 2}
-                            y1={isHoriz ? node.y + node.height : node.y}
-                            x2={isHoriz ? node.x + node.width : node.x + node.width / 2}
-                            y2={isHoriz ? node.y + node.height : node.y + node.height}
+                            x1={isHoriz ? r.x : r.x + r.width / 2}
+                            y1={isHoriz ? r.y + r.height : r.y}
+                            x2={isHoriz ? r.x + r.width : r.x + r.width / 2}
+                            y2={isHoriz ? r.y + r.height : r.y + r.height}
                             label={`${(node.segment as StraightSegment).length}`}
                             offset={25}
                         />

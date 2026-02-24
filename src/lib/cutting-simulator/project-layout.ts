@@ -27,22 +27,34 @@ export interface SegmentNode3D {
     start: Vec3;
     /** Posizione finale del segmento */
     end: Vec3;
-    /** Direzione del segmento nel mondo */
+    /** Direzione del segmento nel mondo (in entrata) */
     direction: Direction3D;
     /** Dimensioni esterne del canale in quel punto */
     outerW: number;
     outerH: number;
+    /** (Solo per elbow90) Punto d'angolo */
+    corner?: Vec3;
+    /** (Solo per elbow90) Direzione in uscita */
+    dirOut?: Direction3D;
+}
+
+/** Rettangolo base per SVG */
+export interface Rect2D {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rx?: number;
 }
 
 /** Nodo 2D proiettato per il rendering nel canvas */
 export interface SegmentNode2D {
     segment: Segment;
     index: number;
-    /** Rettangolo in coordinate canvas (mm) */
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+    /** Sotto-rettangoli per disegnare questo pezzo (1 dritto, 3 angolo) */
+    rects: Rect2D[];
+    labelX: number;
+    labelY: number;
     /** Label da mostrare */
     label: string;
     /** Colore */
@@ -51,7 +63,7 @@ export interface SegmentNode2D {
 
 // ==================== COLORI SEGMENTI ====================
 
-const SEGMENT_COLORS = {
+const SEGMENT_COLORS: Record<string, string> = {
     straight: '#3b82f6',   // blue
     elbow90: '#f59e0b',    // amber
 };
@@ -136,28 +148,39 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
             });
             pos = end;
         } else if (seg.type === 'elbow90') {
-            // L'angolo occupa uno spazio cubico outerW × outerW
-            // (armA nella direzione corrente, armB nella nuova direzione)
-            const v = dirVec(dir);
-            const armLen = seg.armA + outerW; // lunghezza totale del braccio A
-            const end: Vec3 = {
-                x: pos.x + v.x * armLen,
-                y: pos.y + v.y * armLen,
-                z: pos.z + v.z * armLen,
+            const vIn = dirVec(dir);
+            const dirOut = turnDirection(dir, seg.direction);
+            const vOut = dirVec(dirOut);
+
+            // Consideriamo lo spazio dell'angolo come al centro dell'asse,
+            // armA arriva fino al vertice "spigolo", armB riparte
+            // Per il modello visivo, corner è il punto di rotazione al centro
+            const corner: Vec3 = {
+                x: pos.x + vIn.x * (seg.armA),
+                y: pos.y + vIn.y * (seg.armA),
+                z: pos.z + vIn.z * (seg.armA),
             };
+            const end: Vec3 = {
+                x: corner.x + vOut.x * (seg.armB),
+                y: corner.y + vOut.y * (seg.armB),
+                z: corner.z + vOut.z * (seg.armB),
+            };
+
             nodes.push({
                 segment: seg,
                 index: i,
                 start: { ...pos },
                 end,
+                corner,
                 direction: dir,
+                dirOut,
                 outerW,
                 outerH,
             });
 
             // Aggiorna posizione e direzione dopo la curva
             pos = end;
-            dir = turnDirection(dir, seg.direction);
+            dir = dirOut;
         }
     }
 
@@ -174,61 +197,98 @@ export function projectTo2D(
     view: ViewType
 ): SegmentNode2D[] {
     return nodes.map(node => {
-        let x1: number, y1: number, x2: number, y2: number;
-        let crossW: number; // larghezza perpendicolare al segmento
+        let u1: number, v1: number, u2: number, v2: number;
+        let cu: number | undefined, cv: number | undefined;
+        let crossW = node.outerW;
 
         switch (view) {
             case 'top': // Piano XY — vista dall'alto
-                x1 = node.start.x; y1 = node.start.y;
-                x2 = node.end.x; y2 = node.end.y;
+                u1 = node.start.x; v1 = node.start.y;
+                u2 = node.end.x; v2 = node.end.y;
+                if (node.corner) { cu = node.corner.x; cv = node.corner.y; }
                 crossW = node.outerW;
                 break;
             case 'front': // Piano XZ — vista frontale
-                x1 = node.start.x; y1 = -node.start.z;
-                x2 = node.end.x; y2 = -node.end.z;
+                u1 = node.start.x; v1 = -node.start.z;
+                u2 = node.end.x; v2 = -node.end.z;
+                if (node.corner) { cu = node.corner.x; cv = -node.corner.z; }
                 crossW = node.outerH;
                 break;
             case 'right': // Piano YZ — vista laterale
-                x1 = node.start.y; y1 = -node.start.z;
-                x2 = node.end.y; y2 = -node.end.z;
+                u1 = node.start.y; v1 = -node.start.z;
+                u2 = node.end.y; v2 = -node.end.z;
+                if (node.corner) { cu = node.corner.y; cv = -node.corner.z; }
                 crossW = node.outerW;
                 break;
         }
 
-        // Calcola il rettangolo orientato
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const segLen = Math.sqrt(dx * dx + dy * dy);
+        const createRect = (startU: number, startV: number, endU: number, endV: number): Rect2D => {
+            const du = endU - startU;
+            const dv = endV - startV;
+            const len = Math.sqrt(du * du + dv * dv);
 
-        // Per segmenti con lunghezza 0 (degeneri), usa un quadrato minimo
-        const rectW = Math.max(segLen, crossW);
-        const rectH = crossW;
+            if (len < 0.1) {
+                return {
+                    x: startU - crossW / 2,
+                    y: startV - crossW / 2,
+                    width: crossW,
+                    height: crossW,
+                    rx: node.segment.type === 'elbow90' ? 8 : 2
+                };
+            }
 
-        // Posizione: top-left del bounding box centrato sulla linea
-        const minX = Math.min(x1, x2);
-        const minY = Math.min(y1, y2);
+            const isHorizontal = Math.abs(du) >= Math.abs(dv);
+            const minU = Math.min(startU, endU);
+            const minV = Math.min(startV, endV);
 
-        // Offset perpendicolare per centrare la larghezza
-        const isHorizontal = Math.abs(dx) >= Math.abs(dy);
-        const rx = isHorizontal ? minX : minX - crossW / 2;
-        const ry = isHorizontal ? minY - crossW / 2 : minY;
-        const rw = isHorizontal ? rectW : crossW;
-        const rh = isHorizontal ? rectH : rectW > crossW ? rectW : crossW;
+            return {
+                x: isHorizontal ? minU : minU - crossW / 2,
+                y: isHorizontal ? minV - crossW / 2 : minV,
+                width: isHorizontal ? len : crossW,
+                height: isHorizontal ? crossW : len,
+                rx: node.segment.type === 'elbow90' ? 8 : 2
+            };
+        };
+
+        const rects: Rect2D[] = [];
+        let labelX = 0;
+        let labelY = 0;
+
+        if (node.segment.type === 'elbow90' && cu !== undefined && cv !== undefined) {
+            const r1 = createRect(u1, v1, cu, cv);
+            const r2 = createRect(cu, cv, u2, v2);
+            // Cubetto di giunzione per evitare buchi nella 'L'
+            const centerSq: Rect2D = {
+                x: cu - crossW / 2,
+                y: cv - crossW / 2,
+                width: crossW,
+                height: crossW,
+                rx: 0 // Il centro senza bordi arrotondati aiuta la congiunzione
+            };
+
+            rects.push(r1, centerSq, r2);
+            labelX = cu;
+            labelY = cv;
+        } else {
+            const r = createRect(u1, v1, u2, v2);
+            rects.push(r);
+            labelX = (u1 + u2) / 2;
+            labelY = (v1 + v2) / 2;
+        }
 
         const seg = node.segment;
-        const label = seg.label || (seg.type === 'straight'
+        const labelText = seg.label || (seg.type === 'straight'
             ? `${seg.length} mm`
             : `↱ ${seg.direction}`);
 
         return {
             segment: node.segment,
             index: node.index,
-            x: rx,
-            y: ry,
-            width: rw,
-            height: rh,
-            label,
-            color: SEGMENT_COLORS[seg.type],
+            rects,
+            labelX,
+            labelY,
+            label: labelText,
+            color: SEGMENT_COLORS[seg.type] || '#3b82f6',
         };
     });
 }
@@ -248,10 +308,12 @@ export function computeBBox(nodes: SegmentNode2D[]): BBox {
     }
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const n of nodes) {
-        if (n.x < minX) minX = n.x;
-        if (n.y < minY) minY = n.y;
-        if (n.x + n.width > maxX) maxX = n.x + n.width;
-        if (n.y + n.height > maxY) maxY = n.y + n.height;
+        for (const r of n.rects) {
+            if (r.x < minX) minX = r.x;
+            if (r.y < minY) minY = r.y;
+            if (r.x + r.width > maxX) maxX = r.x + r.width;
+            if (r.y + r.height > maxY) maxY = r.y + r.height;
+        }
     }
     return { minX, minY, maxX, maxY };
 }
