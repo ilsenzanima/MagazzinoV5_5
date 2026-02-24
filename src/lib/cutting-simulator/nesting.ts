@@ -318,9 +318,22 @@ function createLPairs(
         const notch = p.lNotch;
         const solidW = p.width - notch.w;
         const solidH = p.height - notch.h;
+
+        // CONDIZIONE CRITICA: il compound funziona SOLO quando i bracci
+        // delle due L non si sovrappongono. Questo accade quando il notch
+        // è almeno metà del pezzo: 2*notchH >= pieceH
+        // Se no, i bracci si accavallano e il compound è invalido.
+        const canInterlock = (2 * notch.h >= p.height) && (2 * notch.w >= p.width);
+
+        if (!canInterlock) {
+            result.push(p);
+            result.push(pieces[partner]);
+            continue;
+        }
+
         const compoundW = solidW + p.width;
         const compoundH = p.height;
-        const holeH = Math.max(0, 2 * notch.h - p.height);
+        const holeH = 2 * notch.h - p.height; // sempre >= 0 grazie al check sopra
 
         // Verifica che il composto entri nella lastra
         const fits = (compoundW <= sheetW && compoundH <= sheetH) ||
