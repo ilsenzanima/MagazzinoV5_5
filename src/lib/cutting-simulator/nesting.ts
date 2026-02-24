@@ -166,13 +166,75 @@ function guillotineSplit(
 const MIN_REMNANT_SIZE = 80;
 
 /**
+ * Spezza automaticamente i pezzi che non entrano nella lastra.
+ * Un pezzo con dimensioni maggiori della lastra viene diviso in più
+ * spezzoni lungo il lato eccedente, con etichetta progressiva.
+ *
+ * Esempio: Base 300×10000 su lastra 2500×1200 →
+ *   Il lato 10000 non entra in nessun modo → suddiviso in strisce da max 2500:
+ *   Base pt.1/4 (300×2500), Base pt.2/4 (300×2500), Base pt.3/4 (300×2500), Base pt.4/4 (300×1000)
+ */
+function splitOversizedPieces(pieces: CutPiece[], sheetW: number, sheetH: number): CutPiece[] {
+    const result: CutPiece[] = [];
+    const maxDim = Math.max(sheetW, sheetH);
+    const minDim = Math.min(sheetW, sheetH);
+
+    for (const piece of pieces) {
+        const pw = piece.width;
+        const ph = piece.height;
+
+        // Verifica se il pezzo entra nella lastra (anche ruotato)
+        const fitsNormal = pw <= sheetW && ph <= sheetH;
+        const fitsRotated = ph <= sheetW && pw <= sheetH;
+
+        if (fitsNormal || fitsRotated) {
+            result.push(piece);
+            continue;
+        }
+
+        // Il pezzo non entra → determiniamo quale dimensione eccede
+        // Il lato corto del pezzo deve entrare nel lato più piccolo della lastra
+        const shortSide = Math.min(pw, ph);
+        const longSide = Math.max(pw, ph);
+        const isWidthLong = pw >= ph;
+
+        // Il lato corto entra nella lastra?
+        if (shortSide > minDim) {
+            // Nemmeno il lato corto entra → pezzo impossibile per questa lastra
+            result.push(piece); // lascia che il nesting lo segni come unplaced
+            continue;
+        }
+
+        // Spezziamo il lato lungo in tratti che entrano
+        const maxCutLength = maxDim; // max lunghezza di un singolo taglio
+        const numParts = Math.ceil(longSide / maxCutLength);
+        const remainder = longSide % maxCutLength;
+
+        for (let i = 0; i < numParts; i++) {
+            const partLength = (i === numParts - 1 && remainder > 0) ? remainder : maxCutLength;
+            result.push({
+                ...piece,
+                id: `${piece.id}-pt${i + 1}`,
+                label: `${piece.label} pt.${i + 1}/${numParts}`,
+                width: isWidthLong ? partLength : pw,
+                height: isWidthLong ? ph : partLength,
+                quantity: 1,
+            });
+        }
+    }
+
+    return result;
+}
+
+/**
  * Esegue il nesting dei pezzi sulla configurazione della lastra data.
  * Algoritmo: Guillotine Best-Fit con rotazione e split intelligente.
+ * I pezzi troppo lunghi vengono automaticamente spezzati.
  */
 export function nestPieces(
     pieces: CutPiece[],
     sheetConfig: SheetConfig,
-    maxSheets: number = 10
+    maxSheets: number = 20
 ): NestingResult {
     const { width: sheetW, height: sheetH, gap } = sheetConfig;
 
@@ -188,8 +250,11 @@ export function nestPieces(
         }
     }
 
+    // Auto-split dei pezzi troppo lunghi per la lastra
+    const fittable = splitOversizedPieces(expanded, sheetW, sheetH);
+
     // Ordina per lato maggiore decrescente (pezzi grandi per primi)
-    expanded.sort((a, b) => {
+    fittable.sort((a, b) => {
         const maxA = Math.max(a.width, a.height);
         const maxB = Math.max(b.width, b.height);
         if (maxB !== maxA) return maxB - maxA;
@@ -230,7 +295,7 @@ export function nestPieces(
         currentPlacements = [];
     }
 
-    for (const piece of expanded) {
+    for (const piece of fittable) {
         const pw = piece.width;
         const ph = piece.height;
 
