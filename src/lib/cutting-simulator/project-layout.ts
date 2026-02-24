@@ -204,7 +204,8 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
  */
 export function projectTo2D(
     nodes: SegmentNode3D[],
-    view: ViewType
+    view: ViewType,
+    isoAngle: number = 0
 ): SegmentNode2D[] {
     return nodes.map(node => {
         const seg = node.segment;
@@ -214,12 +215,27 @@ export function projectTo2D(
             : `↱ ${seg.direction}`);
 
         if (view === 'iso') {
+            // Converte l'angolo da gradi a radianti
+            const rad = (isoAngle * Math.PI) / 180;
+            const cosA = Math.cos(rad);
+            const sinA = Math.sin(rad);
+
+            // Applica rotazione attorno all'asse Z prim'ancora della proiezione isometrica
+            const rotateZ = (p: Vec3): Vec3 => {
+                return {
+                    x: p.x * cosA - p.y * sinA,
+                    y: p.x * sinA + p.y * cosA,
+                    z: p.z
+                };
+            };
+
             const iso = (p: Vec3) => {
+                const rp = rotateZ(p);
                 const cos30 = 0.866;
                 const sin30 = 0.5;
                 return {
-                    x: (p.x - p.y) * cos30,
-                    y: (p.x + p.y) * sin30 - p.z,
+                    x: (rp.x - rp.y) * cos30,
+                    y: (rp.x + rp.y) * sin30 - rp.z,
                 };
             };
 
@@ -255,7 +271,12 @@ export function projectTo2D(
 
                 return faces.map(f => {
                     let sum = 0;
-                    f.indices.forEach(idx => sum += pts[idx].x + pts[idx].y + pts[idx].z);
+                    // Calcolo depth usando i punti ruotati per determinare correttamente 
+                    // cosa sta davanti (asse Y verso l'osservatore in iso standard)
+                    f.indices.forEach(idx => {
+                        const rp = rotateZ(pts[idx]);
+                        sum += rp.x + rp.y + rp.z;
+                    });
                     return {
                         points: f.indices.map(idx => ptsIso[idx]),
                         fill: f.fill,
