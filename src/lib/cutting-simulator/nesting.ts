@@ -245,11 +245,114 @@ function splitOversizedPieces(pieces: CutPiece[], sheetW: number, sheetH: number
     return result;
 }
 
+// ==================== COMPOUND L-PAIR ====================
+
+interface CompoundLInfo {
+    piece1: CutPiece;
+    piece2: CutPiece;
+    solidW: number;   // larghezza braccio solido (pieceW - notchW)
+    solidH: number;   // altezza braccio solido (pieceH - notchH)
+    holeW: number;    // larghezza buco interno (= notchW)
+    holeH: number;    // altezza buco interno (può essere 0)
+}
+
+/**
+ * Rileva coppie di pezzi L identici e li combina in un pezzo composto
+ * "incastrato" che occupa meno spazio sulla lastra.
+ *
+ * Esempio: 2 pezzi a L 800×800 con incavo 500×500 →
+ * Un unico rettangolo 1100×800 con buco interno 500×200.
+ * Risparmio: ~31% di occupazione lastra!
+ */
+function createLPairs(
+    pieces: CutPiece[],
+    sheetW: number,
+    sheetH: number,
+    compounds: Map<string, CompoundLInfo>
+): CutPiece[] {
+    const result: CutPiece[] = [];
+    const used = new Set<number>();
+
+    for (let i = 0; i < pieces.length; i++) {
+        if (used.has(i)) continue;
+        const p = pieces[i];
+
+        if (!p.lNotch) {
+            result.push(p);
+            continue;
+        }
+
+        // Cerca un partner L con stesse dimensioni
+        let partner = -1;
+        for (let j = i + 1; j < pieces.length; j++) {
+            if (used.has(j)) continue;
+            const q = pieces[j];
+            if (q.lNotch &&
+                q.width === p.width && q.height === p.height &&
+                q.lNotch.w === p.lNotch.w && q.lNotch.h === p.lNotch.h) {
+                partner = j;
+                break;
+            }
+        }
+
+        if (partner < 0) {
+            result.push(p);
+            continue;
+        }
+
+        used.add(i);
+        used.add(partner);
+
+        const notch = p.lNotch;
+        const solidW = p.width - notch.w;
+        const solidH = p.height - notch.h;
+        const compoundW = solidW + p.width;
+        const compoundH = p.height;
+        const holeH = Math.max(0, 2 * notch.h - p.height);
+
+        // Verifica che il composto entri nella lastra
+        const fits = (compoundW <= sheetW && compoundH <= sheetH) ||
+            (compoundH <= sheetW && compoundW <= sheetH);
+
+        if (!fits) {
+            result.push(p);
+            result.push(pieces[partner]);
+            continue;
+        }
+
+        const saving = p.width * 2 - compoundW;
+        const compId = `compound-${p.id}+${pieces[partner].id}`;
+        compounds.set(compId, {
+            piece1: p,
+            piece2: pieces[partner],
+            solidW,
+            solidH,
+            holeW: notch.w,
+            holeH,
+        });
+
+        result.push({
+            id: compId,
+            label: `Incastro: ${p.label}`,
+            width: compoundW,
+            height: compoundH,
+            quantity: 1,
+            color: p.color,
+            formula: `Incastro L: ${compoundW}×${compoundH} (−${saving} mm)`,
+        });
+    }
+
+    return result;
+}
+
 /**
  * Esegue il nesting dei pezzi sulla configurazione della lastra data.
- * Algoritmo: Guillotine Best-Fit con rotazione, split intelligente,
- * e MULTI-SHEET BACKTRACKING (prova tutte le lastre aperte prima di aprirne una nuova).
- * I pezzi troppo lunghi vengono automaticamente spezzati.
+ * Algoritmo: Guillotine Best-Fit con:
+ * - Auto-split pezzi troppo lunghi
+ * - Incastro automatico coppie L (compound L-pair)
+ * - Multi-sheet backtracking
+ * - Notch priority per riempire nicchie L
+ * - Rotazione intelligente con lookahead per L singole
  */
 export function nestPieces(
     pieces: CutPiece[],
@@ -258,7 +361,7 @@ export function nestPieces(
 ): NestingResult {
     const { width: sheetW, height: sheetH, gap } = sheetConfig;
 
-    // Espandi i pezzi con quantity > 1 in singoli elementi
+    // 1. Espandi quantity > 1
     const expanded: CutPiece[] = [];
     for (const p of pieces) {
         for (let q = 0; q < p.quantity; q++) {
@@ -270,18 +373,22 @@ export function nestPieces(
         }
     }
 
-    // Auto-split dei pezzi troppo lunghi per la lastra
+    // 2. Auto-split pezzi troppo lunghi
     const fittable = splitOversizedPieces(expanded, sheetW, sheetH);
 
-    // Ordina per lato maggiore decrescente (pezzi grandi per primi)
-    fittable.sort((a, b) => {
+    // 3. Compound L-pairs (incastro automatico)
+    const compounds = new Map<string, CompoundLInfo>();
+    const withCompounds = createLPairs(fittable, sheetW, sheetH, compounds);
+
+    // 4. Ordina per lato maggiore decrescente
+    withCompounds.sort((a, b) => {
         const maxA = Math.max(a.width, a.height);
         const maxB = Math.max(b.width, b.height);
         if (maxB !== maxA) return maxB - maxA;
         return (b.width * b.height) - (a.width * a.height);
     });
 
-    // Stato di TUTTE le lastre aperte contemporaneamente
+    // Stato di tutte le lastre aperte
     interface OpenSheet {
         placements: PlacedPiece[];
         freeRects: FreeRect[];
@@ -290,11 +397,14 @@ export function nestPieces(
     const openSheets: OpenSheet[] = [];
     const unplaced: CutPiece[] = [];
 
-    for (const piece of fittable) {
+    for (let pi = 0; pi < withCompounds.length; pi++) {
+        const piece = withCompounds[pi];
         const pw = piece.width;
         const ph = piece.height;
+        const isCompound = compounds.has(piece.id);
+        const hasNotch = !!piece.lNotch && !isCompound;
 
-        // Verifica che il pezzo entri fisicamente in una lastra
+        // Verifica che il pezzo entri fisicamente
         const fitsAtAll =
             (pw <= sheetW && ph <= sheetH) ||
             (ph <= sheetW && pw <= sheetH);
@@ -310,77 +420,33 @@ export function nestPieces(
         let bestWaste = Infinity;
         let bestLCorner: 'tr' | 'tl' | 'br' | 'bl' | null = null;
 
-        const hasNotch = !!piece.lNotch;
-
         if (hasNotch && piece.lNotch) {
-            // === PEZZO L-SHAPED: prova TUTTE le 4 orientazioni dell'incavo ===
+            // PEZZO L SINGOLO: prova tutte le 4 orientazioni dell'incavo
             const origNotch = piece.lNotch;
-            const allCorners: ('tr' | 'tl' | 'br' | 'bl')[] = ['tr', 'tl', 'br', 'bl'];
+            const corners: ('tr' | 'tl' | 'br' | 'bl')[] = ['tr', 'tl', 'br', 'bl'];
 
-            // Per ogni lastra aperta
             for (let s = 0; s < openSheets.length; s++) {
                 const sheet = openSheets[s];
+                for (const corner of corners) {
+                    const orientations = [{ ow: pw, oh: ph, rot: false }];
+                    if (pw !== ph) orientations.push({ ow: ph, oh: pw, rot: true });
 
-                // Per ogni corner dell'incavo, prova se il pezzo ci sta
-                for (const corner of allCorners) {
-                    // Determina se serve rotazione per questo corner
-                    // Normal (w×h): tr, tl → notch(w=origNotch.w, h=origNotch.h)
-                    // Rotated (h×w): br, bl con swap → notch diverso
-                    // In realtà, su un foglio piatto possiamo specchiare liberamente
-                    // quindi proviamo w×h e h×w con tutti i corner
-
-                    const orientations: { ow: number; oh: number; rotated: boolean }[] = [
-                        { ow: pw, oh: ph, rotated: false },
-                    ];
-                    if (pw !== ph) {
-                        orientations.push({ ow: ph, oh: pw, rotated: true });
-                    }
-
-                    for (const orient of orientations) {
-                        // Trova il miglior rect in questa lastra per queste dimensioni
+                    for (const o of orientations) {
                         for (let ri = 0; ri < sheet.freeRects.length; ri++) {
                             const r = sheet.freeRects[ri];
-                            if (orient.ow <= r.w && orient.oh <= r.h) {
-                                const waste = r.w * r.h - orient.ow * orient.oh;
-
-                                // Calcola il notch che risulterebbe
-                                const nw = orient.rotated ? origNotch.h : origNotch.w;
-                                const nh = orient.rotated ? origNotch.w : origNotch.h;
-                                let notchX = r.x;
-                                let notchY = r.y;
-                                if (corner === 'tr') { notchX = r.x + orient.ow - nw; }
-                                else if (corner === 'br') { notchX = r.x + orient.ow - nw; notchY = r.y + orient.oh - nh; }
-                                else if (corner === 'bl') { notchY = r.y + orient.oh - nh; }
-
-                                // LOOKAHEAD: quanti pezzi rimanenti entrerebbero in questo notch?
-                                let lookaheadScore = 0;
-                                const remainingPieces = fittable.slice(fittable.indexOf(piece) + 1);
-                                for (const rp of remainingPieces) {
-                                    if ((rp.width <= nw && rp.height <= nh) ||
-                                        (rp.height <= nw && rp.width <= nh)) {
-                                        lookaheadScore += rp.width * rp.height; // area recuperata
-                                    }
-                                }
-
-                                // Confronta: priorità notch > lookaheadScore > waste
+                            if (o.ow <= r.w && o.oh <= r.h) {
+                                const waste = r.w * r.h - o.ow * o.oh;
                                 const rIsNotch = !!r.isNotch;
-                                const currentIsNotch = bestFit ? !!(openSheets[bestSheetIdx]?.freeRects[bestFit.index]?.isNotch) : false;
+                                const curIsNotch = bestFit ? !!(openSheets[bestSheetIdx]?.freeRects[bestFit.index]?.isNotch) : false;
 
-                                let isBetter = false;
-                                if (rIsNotch && !currentIsNotch) {
-                                    isBetter = true;
-                                } else if (rIsNotch === currentIsNotch) {
-                                    if (lookaheadScore > (bestLCorner ? (bestWaste < 0 ? -bestWaste : 0) : 0)) {
-                                        isBetter = true;
-                                    } else if (waste < bestWaste) {
-                                        isBetter = true;
-                                    }
-                                }
+                                let better = false;
+                                if (rIsNotch && !curIsNotch) better = true;
+                                else if (rIsNotch === curIsNotch && waste < bestWaste) better = true;
 
-                                if (isBetter || bestFit === null) {
+                                if (better || !bestFit) {
                                     bestWaste = waste;
                                     bestSheetIdx = s;
-                                    bestFit = { index: ri, rotated: orient.rotated };
+                                    bestFit = { index: ri, rotated: o.rot };
                                     bestLCorner = corner;
                                 }
                             }
@@ -389,7 +455,7 @@ export function nestPieces(
                 }
             }
         } else {
-            // === PEZZO RETTANGOLARE NORMALE ===
+            // PEZZO RETTANGOLARE o COMPOUND
             for (let s = 0; s < openSheets.length; s++) {
                 const sheet = openSheets[s];
                 const fit = findBestFit(sheet.freeRects, pw, ph);
@@ -397,13 +463,13 @@ export function nestPieces(
                     const rect = sheet.freeRects[fit.index];
                     const waste = rect.w * rect.h - pw * ph;
                     const rIsNotch = !!rect.isNotch;
-                    const currentIsNotch = bestFit ? !!(openSheets[bestSheetIdx]?.freeRects[bestFit.index]?.isNotch) : false;
+                    const curIsNotch = bestFit ? !!(openSheets[bestSheetIdx]?.freeRects[bestFit.index]?.isNotch) : false;
 
-                    let isBetter = false;
-                    if (rIsNotch && !currentIsNotch) isBetter = true;
-                    else if (rIsNotch === currentIsNotch && waste < bestWaste) isBetter = true;
+                    let better = false;
+                    if (rIsNotch && !curIsNotch) better = true;
+                    else if (rIsNotch === curIsNotch && waste < bestWaste) better = true;
 
-                    if (isBetter) {
+                    if (better) {
                         bestWaste = waste;
                         bestSheetIdx = s;
                         bestFit = fit;
@@ -412,7 +478,7 @@ export function nestPieces(
             }
         }
 
-        // Se nessuna lastra esistente ha spazio, apriamo una nuova
+        // Nessuna lastra ha spazio → apri una nuova
         if (bestSheetIdx < 0) {
             if (openSheets.length >= maxSheets) {
                 unplaced.push(piece);
@@ -425,125 +491,142 @@ export function nestPieces(
             };
             openSheets.push(newSheet);
             bestSheetIdx = openSheets.length - 1;
+            bestFit = findBestFit(newSheet.freeRects, pw, ph);
 
+            // Per L singole su nuova lastra, scegli corner con lookahead
             if (hasNotch && piece.lNotch) {
-                // Per una nuova lastra, scegli l'orientazione con migliore lookahead
-                bestFit = findBestFit(newSheet.freeRects, pw, ph);
-                // Lookahead per scegliere il corner migliore
-                const origNotch = piece.lNotch;
-                const remainingPieces = fittable.slice(fittable.indexOf(piece) + 1);
+                const remaining = withCompounds.slice(pi + 1);
                 let bestScore = -1;
-                for (const corner of ['tr', 'tl', 'br', 'bl'] as const) {
+                for (const c of ['tr', 'tl', 'br', 'bl'] as const) {
                     let score = 0;
-                    const nw = origNotch.w;
-                    const nh = origNotch.h;
-                    for (const rp of remainingPieces) {
+                    const nw = piece.lNotch.w, nh = piece.lNotch.h;
+                    for (const rp of remaining) {
                         if ((rp.width <= nw && rp.height <= nh) ||
                             (rp.height <= nw && rp.width <= nh)) {
                             score += rp.width * rp.height;
                         }
                     }
-                    // Bonus se il corner facilita specchiamento della prossima L
-                    const nextL = remainingPieces.find(rp => !!rp.lNotch);
-                    if (nextL) {
-                        // Preferisci TR per la prima L (così la seconda va TL → specchio)
-                        if (corner === 'tr') score += 100000;
-                    }
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestLCorner = corner;
-                    }
+                    if (remaining.find(rp => !!rp.lNotch) && c === 'tr') score += 100000;
+                    if (score > bestScore) { bestScore = score; bestLCorner = c; }
                 }
-            } else {
-                bestFit = findBestFit(newSheet.freeRects, pw, ph);
             }
         }
 
-        if (bestFit && bestSheetIdx >= 0) {
-            const sheet = openSheets[bestSheetIdx];
-            const rect = sheet.freeRects[bestFit.index];
-            const placedW = bestFit.rotated ? ph : pw;
-            const placedH = bestFit.rotated ? pw : ph;
+        if (!bestFit || bestSheetIdx < 0) {
+            unplaced.push(piece);
+            continue;
+        }
 
-            // Determina il notch finale
-            let notchInfo = piece.lNotch ? { ...piece.lNotch } : undefined;
+        const sheet = openSheets[bestSheetIdx];
+        const rect = sheet.freeRects[bestFit.index];
+        const placedW = bestFit.rotated ? ph : pw;
+        const placedH = bestFit.rotated ? pw : ph;
 
-            if (hasNotch && notchInfo) {
-                // Usa il corner scelto dall'ottimizzazione
-                if (bestLCorner) {
-                    if (bestFit.rotated) {
-                        notchInfo = {
-                            w: notchInfo.h,
-                            h: notchInfo.w,
-                            corner: bestLCorner,
-                        };
-                    } else {
-                        notchInfo = { ...notchInfo, corner: bestLCorner };
-                    }
-                } else if (bestFit.rotated) {
-                    const cornerMap: Record<string, 'tr' | 'tl' | 'br' | 'bl'> = {
-                        'tr': 'br', 'br': 'bl', 'bl': 'tl', 'tl': 'tr',
-                    };
-                    notchInfo = {
-                        w: notchInfo.h,
-                        h: notchInfo.w,
-                        corner: cornerMap[notchInfo.corner],
-                    };
-                }
+        // Guillotine split del bounding box
+        const newFree = guillotineSplit(rect, placedW, placedH, gap);
+        sheet.freeRects.splice(bestFit.index, 1, ...newFree);
+
+        if (isCompound) {
+            // === COMPOUND L-PAIR: espandi in 2 piazzamenti L incastrati ===
+            const info = compounds.get(piece.id)!;
+
+            if (!bestFit.rotated) {
+                // L₁ con incavo TR (materiale: braccio sinistro + base in basso)
+                sheet.placements.push({
+                    piece: info.piece1,
+                    x: rect.x, y: rect.y,
+                    width: info.piece1.width, height: info.piece1.height,
+                    rotated: false, isLShaped: true,
+                    lNotch: { w: info.piece1.lNotch!.w, h: info.piece1.lNotch!.h, corner: 'tr' },
+                });
+                // L₂ con incavo BL (materiale: braccio destro + top)
+                sheet.placements.push({
+                    piece: info.piece2,
+                    x: rect.x + info.solidW, y: rect.y,
+                    width: info.piece2.width, height: info.piece2.height,
+                    rotated: false, isLShaped: true,
+                    lNotch: { w: info.piece2.lNotch!.w, h: info.piece2.lNotch!.h, corner: 'bl' },
+                });
+            } else {
+                // Rotated compound: swap axes
+                sheet.placements.push({
+                    piece: info.piece1,
+                    x: rect.x, y: rect.y,
+                    width: info.piece1.height, height: info.piece1.width,
+                    rotated: true, isLShaped: true,
+                    lNotch: { w: info.piece1.lNotch!.h, h: info.piece1.lNotch!.w, corner: 'br' },
+                });
+                sheet.placements.push({
+                    piece: info.piece2,
+                    x: rect.x, y: rect.y + info.solidW,
+                    width: info.piece2.height, height: info.piece2.width,
+                    rotated: true, isLShaped: true,
+                    lNotch: { w: info.piece2.lNotch!.h, h: info.piece2.lNotch!.w, corner: 'tl' },
+                });
             }
 
-            sheet.placements.push({
-                piece,
-                x: rect.x,
-                y: rect.y,
-                width: placedW,
-                height: placedH,
-                rotated: bestFit.rotated,
-                isLShaped: hasNotch,
-                lNotch: notchInfo,
-            });
-
-            // Guillotine split del rettangolo occupato
-            const newFree = guillotineSplit(rect, placedW, placedH, gap);
-            sheet.freeRects.splice(bestFit.index, 1, ...newFree);
-
-            // Se il pezzo è a L, aggiungere l'angolo vuoto come spazio libero
-            if (hasNotch && notchInfo) {
-                let notchX = rect.x;
-                let notchY = rect.y;
-
-                if (notchInfo.corner === 'tr') {
-                    notchX = rect.x + placedW - notchInfo.w;
-                    notchY = rect.y;
-                } else if (notchInfo.corner === 'tl') {
-                    notchX = rect.x;
-                    notchY = rect.y;
-                } else if (notchInfo.corner === 'br') {
-                    notchX = rect.x + placedW - notchInfo.w;
-                    notchY = rect.y + placedH - notchInfo.h;
-                } else if (notchInfo.corner === 'bl') {
-                    notchX = rect.x;
-                    notchY = rect.y + placedH - notchInfo.h;
-                }
-
-                if (notchInfo.w > gap && notchInfo.h > gap) {
+            // Aggiungi il buco interno come spazio libero
+            if (info.holeH > 0) {
+                if (!bestFit.rotated) {
                     sheet.freeRects.push({
-                        x: notchX,
-                        y: notchY,
-                        w: notchInfo.w,
-                        h: notchInfo.h,
+                        x: rect.x + info.solidW,
+                        y: rect.y + info.solidH,
+                        w: info.holeW,
+                        h: info.holeH,
+                        isNotch: true,
+                    });
+                } else {
+                    sheet.freeRects.push({
+                        x: rect.x + info.solidH,
+                        y: rect.y + info.solidW,
+                        w: info.holeH,
+                        h: info.holeW,
                         isNotch: true,
                     });
                 }
             }
+        } else if (hasNotch && piece.lNotch) {
+            // === L SINGOLA ===
+            let notchInfo = { ...piece.lNotch };
+            if (bestLCorner) {
+                notchInfo = bestFit.rotated
+                    ? { w: notchInfo.h, h: notchInfo.w, corner: bestLCorner }
+                    : { ...notchInfo, corner: bestLCorner };
+            } else if (bestFit.rotated) {
+                const cm: Record<string, 'tr' | 'tl' | 'br' | 'bl'> = {
+                    'tr': 'br', 'br': 'bl', 'bl': 'tl', 'tl': 'tr',
+                };
+                notchInfo = { w: notchInfo.h, h: notchInfo.w, corner: cm[notchInfo.corner] };
+            }
 
-            sheet.freeRects = sheet.freeRects.filter(r => r.w > gap && r.h > gap);
+            sheet.placements.push({
+                piece, x: rect.x, y: rect.y,
+                width: placedW, height: placedH,
+                rotated: bestFit.rotated, isLShaped: true, lNotch: notchInfo,
+            });
+
+            // Notch come FreeRect
+            let nx = rect.x, ny = rect.y;
+            if (notchInfo.corner === 'tr') nx = rect.x + placedW - notchInfo.w;
+            else if (notchInfo.corner === 'br') { nx = rect.x + placedW - notchInfo.w; ny = rect.y + placedH - notchInfo.h; }
+            else if (notchInfo.corner === 'bl') ny = rect.y + placedH - notchInfo.h;
+
+            if (notchInfo.w > gap && notchInfo.h > gap) {
+                sheet.freeRects.push({ x: nx, y: ny, w: notchInfo.w, h: notchInfo.h, isNotch: true });
+            }
         } else {
-            unplaced.push(piece);
+            // === PEZZO RETTANGOLARE NORMALE ===
+            sheet.placements.push({
+                piece, x: rect.x, y: rect.y,
+                width: placedW, height: placedH,
+                rotated: bestFit.rotated,
+            });
         }
+
+        sheet.freeRects = sheet.freeRects.filter(r => r.w > gap && r.h > gap);
     }
 
-    // Costruisci il risultato finale da tutte le lastre aperte
+    // Costruisci risultato finale
     const sheets: NestingSheet[] = openSheets
         .filter(s => s.placements.length > 0)
         .map((s, idx) => {
@@ -564,10 +647,5 @@ export function nestPieces(
             };
         });
 
-    return {
-        sheets,
-        unplaced,
-        totalSheets: sheets.length,
-    };
+    return { sheets, unplaced, totalSheets: sheets.length };
 }
-
