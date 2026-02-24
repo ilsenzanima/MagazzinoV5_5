@@ -34,9 +34,9 @@ export interface CutPiece {
     id: string;
     /** Etichetta leggibile */
     label: string;
-    /** Larghezza del pezzo in mm */
+    /** Larghezza del pezzo in mm (bounding box) */
     width: number;
-    /** Altezza del pezzo in mm */
+    /** Altezza del pezzo in mm (bounding box) */
     height: number;
     /** Quantità necessaria */
     quantity: number;
@@ -44,6 +44,15 @@ export interface CutPiece {
     color: string;
     /** Descrizione del calcolo per trasparenza */
     formula: string;
+    /** Se presente, il pezzo è a forma di L con un angolo vuoto */
+    lNotch?: {
+        /** Larghezza dell'incavo (angolo tagliato) */
+        w: number;
+        /** Altezza dell'incavo */
+        h: number;
+        /** Posizione dell'incavo: top-right, top-left, bottom-right, bottom-left */
+        corner: 'tr' | 'tl' | 'br' | 'bl';
+    };
 }
 
 export interface CalculationResult {
@@ -262,6 +271,11 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
             quantity: 2,
             color: PIECE_COLORS[0],
             formula: `Sagoma a L: rettangolo ${baseLWidth}×${baseLHeight} − angolo ${armA}×${armB} = ${(actualArea / 1_000_000).toFixed(3)} m² cad.`,
+            lNotch: {
+                w: armB,
+                h: armA,
+                corner: 'tr',
+            },
         });
     } else {
         // BASE SEPARATA: 2 pezzi per braccio

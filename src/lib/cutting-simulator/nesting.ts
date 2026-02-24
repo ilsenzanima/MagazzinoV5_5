@@ -327,6 +327,22 @@ export function nestPieces(
             const placedW = bestFit.rotated ? ph : pw;
             const placedH = bestFit.rotated ? pw : ph;
 
+            // Propaga metadati L-shape
+            const hasNotch = !!piece.lNotch;
+            let notchInfo = piece.lNotch;
+
+            // Se il pezzo è ruotato, ruotiamo anche l'incavo
+            if (hasNotch && notchInfo && bestFit.rotated) {
+                const cornerMap: Record<string, 'tr' | 'tl' | 'br' | 'bl'> = {
+                    'tr': 'br', 'br': 'bl', 'bl': 'tl', 'tl': 'tr',
+                };
+                notchInfo = {
+                    w: notchInfo.h,
+                    h: notchInfo.w,
+                    corner: cornerMap[notchInfo.corner],
+                };
+            }
+
             sheet.placements.push({
                 piece,
                 x: rect.x,
@@ -334,11 +350,44 @@ export function nestPieces(
                 width: placedW,
                 height: placedH,
                 rotated: bestFit.rotated,
+                isLShaped: hasNotch,
+                lNotch: notchInfo ? { ...notchInfo } : undefined,
             });
 
-            // Guillotine split
+            // Guillotine split del rettangolo occupato
             const newFree = guillotineSplit(rect, placedW, placedH, gap);
             sheet.freeRects.splice(bestFit.index, 1, ...newFree);
+
+            // Se il pezzo è a L, aggiungere l'angolo vuoto come spazio libero
+            if (hasNotch && notchInfo) {
+                let notchX = rect.x;
+                let notchY = rect.y;
+
+                if (notchInfo.corner === 'tr') {
+                    notchX = rect.x + placedW - notchInfo.w;
+                    notchY = rect.y;
+                } else if (notchInfo.corner === 'tl') {
+                    notchX = rect.x;
+                    notchY = rect.y;
+                } else if (notchInfo.corner === 'br') {
+                    notchX = rect.x + placedW - notchInfo.w;
+                    notchY = rect.y + placedH - notchInfo.h;
+                } else if (notchInfo.corner === 'bl') {
+                    notchX = rect.x;
+                    notchY = rect.y + placedH - notchInfo.h;
+                }
+
+                // Aggiungi l'angolo vuoto come spazio libero utilizzabile
+                if (notchInfo.w > gap && notchInfo.h > gap) {
+                    sheet.freeRects.push({
+                        x: notchX,
+                        y: notchY,
+                        w: notchInfo.w,
+                        h: notchInfo.h,
+                    });
+                }
+            }
+
             sheet.freeRects = sheet.freeRects.filter(r => r.w > gap && r.h > gap);
         } else {
             unplaced.push(piece);
