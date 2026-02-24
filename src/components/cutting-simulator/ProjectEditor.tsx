@@ -253,12 +253,13 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     const [isPanning, setIsPanning] = useState(false);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
+    const [isoAngle, setIsoAngle] = useState(0);
     const svgRef = useRef<SVGSVGElement>(null);
     const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
     // Layout 3D → Proiezione 2D
     const nodes3D = useMemo(() => computeLayout(project), [project]);
-    const nodes2D = useMemo(() => projectTo2D(nodes3D, view), [nodes3D, view]);
+    const nodes2D = useMemo(() => projectTo2D(nodes3D, view, isoAngle), [nodes3D, view, isoAngle]);
     const bbox = useMemo(() => {
         const b = computeBBox(nodes2D);
         const pad = 200;
@@ -292,12 +293,21 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     }, [panOffset]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
-        if (isPanning && panStart.current) {
+        if (isPanning && panStart.current && svgRef.current) {
             const dx = e.clientX - panStart.current.x;
             const dy = e.clientY - panStart.current.y;
-            setPanOffset({ x: panStart.current.ox + dx, y: panStart.current.oy + dy });
+
+            // Calcolo proporzione per movimento coerente
+            const rect = svgRef.current.getBoundingClientRect();
+            const scaleX = vbW / rect.width;
+            const scaleY = vbH / rect.height;
+
+            setPanOffset({
+                x: panStart.current.ox + dx * scaleX,
+                y: panStart.current.oy + dy * scaleY
+            });
         }
-    }, [isPanning]);
+    }, [isPanning, vbW, vbH]);
 
     const handleMouseUp = useCallback(() => {
         setIsPanning(false);
@@ -364,7 +374,19 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
 
                 <div className="flex-1" />
 
-                {/* Zoom controls */}
+                {/* Zoom controls e Slider Rotazione */}
+                {view === 'iso' && (
+                    <div className="flex items-center gap-2 mr-2">
+                        <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Rotazione Z: {isoAngle}°</Label>
+                        <input
+                            type="range"
+                            min="0" max="360" step="15"
+                            value={isoAngle}
+                            onChange={e => setIsoAngle(Number(e.target.value))}
+                            className="w-24 accent-primary"
+                        />
+                    </div>
+                )}
                 <span className="text-xs text-muted-foreground font-mono">{(zoom * 100).toFixed(0)}%</span>
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.min(5, z * 1.2))}>+</Button>
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.max(0.2, z / 1.2))}>−</Button>
