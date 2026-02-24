@@ -29,12 +29,14 @@ const VIEW_LABELS: Record<ViewType, string> = {
     top: 'Dall\'Alto',
     front: 'Frontale',
     right: 'Laterale',
+    iso: '3D',
 };
 
 const VIEW_ICONS: Record<ViewType, typeof Eye> = {
     top: Eye,
     front: Eye,
     right: Eye,
+    iso: Eye,
 };
 
 // ==================== GRIGLIA CAD ====================
@@ -344,7 +346,7 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
             <div className="flex items-center gap-2 p-2 border-b border-border/50 bg-muted/30">
                 {/* Selettore vista */}
                 <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md">
-                    {(['top', 'front', 'right'] as ViewType[]).map(v => (
+                    {(['top', 'front', 'right', 'iso'] as ViewType[]).map(v => (
                         <button
                             key={v}
                             onClick={() => setView(v)}
@@ -409,19 +411,33 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     return (
                         <g key={node.segment.id} onClick={e => handleSegmentClick(i, e)} style={{ cursor: 'pointer' }}>
                             {/* Corpo segmento */}
-                            {node.rects.map((r, rIdx) => (
-                                <rect
-                                    key={rIdx}
-                                    x={r.x}
-                                    y={r.y}
-                                    width={r.width}
-                                    height={r.height}
-                                    fill={isSelected ? `${node.color}40` : `${node.color}20`}
-                                    stroke={node.color}
-                                    strokeWidth={isSelected ? 2.5 : 1.5}
-                                    rx={r.rx || 0}
-                                />
-                            ))}
+                            {node.polygons && node.polygons.length > 0 ? (
+                                node.polygons.map((poly, pIdx) => (
+                                    <polygon
+                                        key={`poly-${i}-${pIdx}`}
+                                        points={poly.points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+                                        fill={isSelected ? `${node.color}60` : poly.fill}
+                                        stroke={poly.stroke}
+                                        strokeWidth={isSelected ? 2.5 : poly.strokeWidth}
+                                        strokeLinejoin="round"
+                                        strokeDasharray={poly.strokeDasharray}
+                                    />
+                                ))
+                            ) : (
+                                node.rects.map((r, rIdx) => (
+                                    <rect
+                                        key={rIdx}
+                                        x={r.x}
+                                        y={r.y}
+                                        width={r.width}
+                                        height={r.height}
+                                        fill={isSelected ? `${node.color}40` : `${node.color}20`}
+                                        stroke={node.color}
+                                        strokeWidth={isSelected ? 2.5 : 1.5}
+                                        rx={r.rx || 0}
+                                    />
+                                ))
+                            )}
 
                             {/* Etichetta */}
                             <text
