@@ -228,7 +228,8 @@ function splitOversizedPieces(pieces: CutPiece[], sheetW: number, sheetH: number
 
 /**
  * Esegue il nesting dei pezzi sulla configurazione della lastra data.
- * Algoritmo: Guillotine Best-Fit con rotazione e split intelligente.
+ * Algoritmo: Guillotine Best-Fit con rotazione, split intelligente,
+ * e MULTI-SHEET BACKTRACKING (prova tutte le lastre aperte prima di aprirne una nuova).
  * I pezzi troppo lunghi vengono automaticamente spezzati.
  */
 export function nestPieces(
@@ -258,48 +259,23 @@ export function nestPieces(
         const maxA = Math.max(a.width, a.height);
         const maxB = Math.max(b.width, b.height);
         if (maxB !== maxA) return maxB - maxA;
-        // Parità: ordina per area
         return (b.width * b.height) - (a.width * a.height);
     });
 
-    const sheets: NestingSheet[] = [];
+    // Stato di TUTTE le lastre aperte contemporaneamente
+    interface OpenSheet {
+        placements: PlacedPiece[];
+        freeRects: FreeRect[];
+    }
+
+    const openSheets: OpenSheet[] = [];
     const unplaced: CutPiece[] = [];
-
-    let freeRects: FreeRect[] = [{ x: 0, y: 0, w: sheetW, h: sheetH }];
-    let currentPlacements: PlacedPiece[] = [];
-
-    function finalizeSheet() {
-        if (currentPlacements.length === 0) return;
-
-        const usedArea = currentPlacements.reduce(
-            (sum, p) => sum + p.width * p.height, 0
-        );
-
-        // Calcola avanzi riutilizzabili
-        const remnants: Remnant[] = freeRects
-            .filter(r => r.w >= MIN_REMNANT_SIZE && r.h >= MIN_REMNANT_SIZE)
-            .map(r => ({ x: r.x, y: r.y, width: r.w, height: r.h }));
-
-        sheets.push({
-            index: sheets.length,
-            placements: currentPlacements,
-            utilization: parseFloat(
-                ((usedArea / (sheetW * sheetH)) * 100).toFixed(1)
-            ),
-            remnants,
-        });
-    }
-
-    function newSheet() {
-        freeRects = [{ x: 0, y: 0, w: sheetW, h: sheetH }];
-        currentPlacements = [];
-    }
 
     for (const piece of fittable) {
         const pw = piece.width;
         const ph = piece.height;
 
-        // Verifica che il pezzo possa fisicamente entrare nella lastra
+        // Verifica che il pezzo entri fisicamente in una lastra
         const fitsAtAll =
             (pw <= sheetW && ph <= sheetH) ||
             (ph <= sheetW && pw <= sheetH);
@@ -309,49 +285,86 @@ export function nestPieces(
             continue;
         }
 
-        // Cerca il miglior spazio libero
-        let best = findBestFit(freeRects, pw, ph);
+        // Cerca il MIGLIOR posizionamento tra TUTTE le lastre aperte
+        let bestSheetIdx = -1;
+        let bestFit: { index: number; rotated: boolean } | null = null;
+        let bestWaste = Infinity;
 
-        if (!best) {
-            // Lastra piena → chiudi e apri una nuova
-            finalizeSheet();
+        for (let s = 0; s < openSheets.length; s++) {
+            const sheet = openSheets[s];
+            const fit = findBestFit(sheet.freeRects, pw, ph);
+            if (fit) {
+                const rect = sheet.freeRects[fit.index];
+                const waste = rect.w * rect.h - pw * ph;
+                if (waste < bestWaste) {
+                    bestWaste = waste;
+                    bestSheetIdx = s;
+                    bestFit = fit;
+                }
+            }
+        }
 
-            if (sheets.length >= maxSheets) {
+        // Se nessuna lastra esistente ha spazio, apriamo una nuova
+        if (bestSheetIdx < 0) {
+            if (openSheets.length >= maxSheets) {
                 unplaced.push(piece);
                 continue;
             }
 
-            newSheet();
-            best = findBestFit(freeRects, pw, ph);
+            // Apri nuova lastra
+            const newSheet: OpenSheet = {
+                placements: [],
+                freeRects: [{ x: 0, y: 0, w: sheetW, h: sheetH }],
+            };
+            openSheets.push(newSheet);
+            bestSheetIdx = openSheets.length - 1;
+            bestFit = findBestFit(newSheet.freeRects, pw, ph);
         }
 
-        if (best) {
-            const rect = freeRects[best.index];
-            const placedW = best.rotated ? ph : pw;
-            const placedH = best.rotated ? pw : ph;
+        if (bestFit && bestSheetIdx >= 0) {
+            const sheet = openSheets[bestSheetIdx];
+            const rect = sheet.freeRects[bestFit.index];
+            const placedW = bestFit.rotated ? ph : pw;
+            const placedH = bestFit.rotated ? pw : ph;
 
-            currentPlacements.push({
+            sheet.placements.push({
                 piece,
                 x: rect.x,
                 y: rect.y,
                 width: placedW,
                 height: placedH,
-                rotated: best.rotated,
+                rotated: bestFit.rotated,
             });
 
-            // Rimuovi il rettangolo usato e aggiungi i 2 risultanti dal taglio
+            // Guillotine split
             const newFree = guillotineSplit(rect, placedW, placedH, gap);
-            freeRects.splice(best.index, 1, ...newFree);
-
-            // Rimuovi rettangoli troppo piccoli per ospitare qualsiasi pezzo rimasto
-            freeRects = freeRects.filter(r => r.w > gap && r.h > gap);
+            sheet.freeRects.splice(bestFit.index, 1, ...newFree);
+            sheet.freeRects = sheet.freeRects.filter(r => r.w > gap && r.h > gap);
         } else {
             unplaced.push(piece);
         }
     }
 
-    // Chiudi l'ultima lastra
-    finalizeSheet();
+    // Costruisci il risultato finale da tutte le lastre aperte
+    const sheets: NestingSheet[] = openSheets
+        .filter(s => s.placements.length > 0)
+        .map((s, idx) => {
+            const usedArea = s.placements.reduce(
+                (sum, p) => sum + p.width * p.height, 0
+            );
+            const remnants: Remnant[] = s.freeRects
+                .filter(r => r.w >= MIN_REMNANT_SIZE && r.h >= MIN_REMNANT_SIZE)
+                .map(r => ({ x: r.x, y: r.y, width: r.w, height: r.h }));
+
+            return {
+                index: idx,
+                placements: s.placements,
+                utilization: parseFloat(
+                    ((usedArea / (sheetW * sheetH)) * 100).toFixed(1)
+                ),
+                remnants,
+            };
+        });
 
     return {
         sheets,
@@ -359,3 +372,4 @@ export function nestPieces(
         totalSheets: sheets.length,
     };
 }
+
