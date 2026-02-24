@@ -137,8 +137,10 @@ function findBestFit(
  * Dopo aver piazzato un pezzo in un rettangolo libero,
  * divide lo spazio rimanente in 2 rettangoli (taglio a ghigliottina).
  *
- * Strategia: "Shorter Leftover Axis" — divide in modo che l'avanzo
- * più grande sia il più "quadrato" possibile (utilizzabile).
+ * Strategia: "Max-Min Balanced" — sceglie lo split che produce i due
+ * rettangoli più bilanciati (il più piccolo dei due sia il più grande
+ * possibile). Questo crea spazi utilizzabili su entrambi i lati,
+ * favorendo la rotazione orizzontale dei pezzi nella fascia inferiore.
  */
 function guillotineSplit(
     rect: FreeRect,
@@ -151,14 +153,20 @@ function guillotineSplit(
     const rightW = rect.w - pw - gap;
     const bottomH = rect.h - ph - gap;
 
-    // Split orizzontale: pezzo di destra ha tutta l'altezza, pezzo sotto solo la larghezza del pezzo
-    // Split verticale: pezzo sotto ha tutta la larghezza, pezzo a destra solo l'altezza del pezzo
-    // Scegliamo la variante che produce l'avanzo più grande
+    // Split orizzontale: destra prende tutta l'altezza, sotto solo la larghezza del pezzo
+    // Split verticale: sotto prende tutta la larghezza, destra solo l'altezza del pezzo
 
-    const horizArea = (rightW > 0 ? rightW * rect.h : 0) + (bottomH > 0 ? pw * bottomH : 0);
-    const vertArea = (rightW > 0 ? rightW * ph : 0) + (bottomH > 0 ? rect.w * bottomH : 0);
+    const horizRight = rightW > 0 ? rightW * rect.h : 0;
+    const horizBottom = bottomH > 0 ? pw * bottomH : 0;
+    const horizMinArea = Math.min(horizRight || Infinity, horizBottom || Infinity);
 
-    if (horizArea >= vertArea) {
+    const vertRight = rightW > 0 ? rightW * ph : 0;
+    const vertBottom = bottomH > 0 ? rect.w * bottomH : 0;
+    const vertMinArea = Math.min(vertRight || Infinity, vertBottom || Infinity);
+
+    // Sceglie lo split che MASSIMIZZA il rettangolo più piccolo.
+    // Così entrambi i rettangoli risultanti sono utili, non uno enorme + uno minuscolo.
+    if (horizMinArea >= vertMinArea) {
         // Split orizzontale
         if (rightW > 0) {
             result.push({ x: rect.x + pw + gap, y: rect.y, w: rightW, h: rect.h });
@@ -167,7 +175,7 @@ function guillotineSplit(
             result.push({ x: rect.x, y: rect.y + ph + gap, w: pw, h: bottomH });
         }
     } else {
-        // Split verticale
+        // Split verticale: sotto prende tutta la larghezza → fascia ampia per pezzi ruotati
         if (rightW > 0) {
             result.push({ x: rect.x + pw + gap, y: rect.y, w: rightW, h: ph });
         }
