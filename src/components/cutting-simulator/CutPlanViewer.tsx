@@ -117,16 +117,76 @@ function SheetCanvas({
             const pw = placement.width * scale;
             const ph = placement.height * scale;
 
+            // Costruisci il percorso del pezzo (rettangolo o L)
+            ctx.beginPath();
+            if (placement.isLShaped && placement.lNotch) {
+                const nw = placement.lNotch.w * scale;
+                const nh = placement.lNotch.h * scale;
+                const c = placement.lNotch.corner;
+
+                // Disegna la sagoma a L (percorso orario)
+                if (c === 'tr') {
+                    // Incavo in alto a destra
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px + pw - nw, py);
+                    ctx.lineTo(px + pw - nw, py + nh);
+                    ctx.lineTo(px + pw, py + nh);
+                    ctx.lineTo(px + pw, py + ph);
+                    ctx.lineTo(px, py + ph);
+                } else if (c === 'tl') {
+                    // Incavo in alto a sinistra
+                    ctx.moveTo(px + nw, py);
+                    ctx.lineTo(px + pw, py);
+                    ctx.lineTo(px + pw, py + ph);
+                    ctx.lineTo(px, py + ph);
+                    ctx.lineTo(px, py + nh);
+                    ctx.lineTo(px + nw, py + nh);
+                } else if (c === 'br') {
+                    // Incavo in basso a destra
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px + pw, py);
+                    ctx.lineTo(px + pw, py + ph - nh);
+                    ctx.lineTo(px + pw - nw, py + ph - nh);
+                    ctx.lineTo(px + pw - nw, py + ph);
+                    ctx.lineTo(px, py + ph);
+                } else {
+                    // Incavo in basso a sinistra (bl)
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px + pw, py);
+                    ctx.lineTo(px + pw, py + ph);
+                    ctx.lineTo(px + nw, py + ph);
+                    ctx.lineTo(px + nw, py + ph - nh);
+                    ctx.lineTo(px, py + ph - nh);
+                }
+                ctx.closePath();
+            } else {
+                ctx.rect(px, py, pw, ph);
+            }
+
             // Sfondo pezzo
-            ctx.fillStyle = placement.piece.color + "40"; // alpha
-            ctx.fillRect(px, py, pw, ph);
+            ctx.fillStyle = placement.piece.color + "40";
+            ctx.fill();
 
             // Bordo pezzo
             ctx.strokeStyle = placement.piece.color;
             ctx.lineWidth = 2;
-            ctx.strokeRect(px, py, pw, ph);
+            ctx.stroke();
 
             // Etichetta
+            // Per pezzi a L, centrare leggermente nella parte con più materiale
+            let labelCX = px + pw / 2;
+            let labelCY = py + ph / 2;
+            if (placement.isLShaped && placement.lNotch) {
+                const c = placement.lNotch.corner;
+                const nw = placement.lNotch.w * scale;
+                const nh = placement.lNotch.h * scale;
+                // Sposta il centro verso la zona con materiale
+                if (c === 'tr') { labelCX -= nw * 0.2; labelCY += nh * 0.15; }
+                else if (c === 'tl') { labelCX += nw * 0.2; labelCY += nh * 0.15; }
+                else if (c === 'br') { labelCX -= nw * 0.2; labelCY -= nh * 0.15; }
+                else { labelCX += nw * 0.2; labelCY -= nh * 0.15; }
+            }
+
             const fontSize = Math.max(9, Math.min(14, Math.min(pw, ph) * 0.12));
             ctx.fillStyle = "#e2e8f0";
             ctx.font = `bold ${fontSize}px Inter, sans-serif`;
@@ -134,19 +194,26 @@ function SheetCanvas({
             ctx.textBaseline = "middle";
 
             const labelText = placement.piece.id.toUpperCase();
-            ctx.fillText(labelText, px + pw / 2, py + ph / 2 - fontSize * 0.6);
+            ctx.fillText(labelText, labelCX, labelCY - fontSize * 0.6);
 
             // Dimensioni
             ctx.font = `${fontSize * 0.85}px monospace`;
             ctx.fillStyle = "#94a3b8";
             const dimText = `${placement.width.toFixed(0)}×${placement.height.toFixed(0)}`;
-            ctx.fillText(dimText, px + pw / 2, py + ph / 2 + fontSize * 0.5);
+            ctx.fillText(dimText, labelCX, labelCY + fontSize * 0.5);
 
             // Indicatore rotazione
             if (placement.rotated) {
                 ctx.font = `${fontSize * 0.7}px sans-serif`;
                 ctx.fillStyle = "#f59e0b";
-                ctx.fillText("↻", px + pw / 2, py + ph / 2 + fontSize * 1.4);
+                ctx.fillText("↻", labelCX, labelCY + fontSize * 1.4);
+            }
+
+            // Indicatore forma L
+            if (placement.isLShaped) {
+                ctx.font = `${fontSize * 0.7}px sans-serif`;
+                ctx.fillStyle = "#a78bfa";
+                ctx.fillText("⌐ L", labelCX, labelCY + fontSize * (placement.rotated ? 2.2 : 1.4));
             }
         }
 
