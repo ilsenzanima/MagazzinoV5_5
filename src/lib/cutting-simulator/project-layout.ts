@@ -8,7 +8,7 @@ import type { DuctProject, Segment } from './project-model';
 
 // ==================== TIPI ====================
 
-export type ViewType = 'top' | 'front' | 'right';
+export type ViewType = 'top' | 'front' | 'right' | 'iso';
 
 export interface Vec3 {
     x: number;
@@ -47,12 +47,22 @@ export interface Rect2D {
     rx?: number;
 }
 
+/** Poligono per SVG (vista ISO) */
+export interface Polygon2D {
+    points: { x: number; y: number }[];
+    fill: string;
+    stroke: string;
+    strokeWidth: number;
+    strokeDasharray?: string;
+}
+
 /** Nodo 2D proiettato per il rendering nel canvas */
 export interface SegmentNode2D {
     segment: Segment;
     index: number;
     /** Sotto-rettangoli per disegnare questo pezzo (1 dritto, 3 angolo) */
     rects: Rect2D[];
+    polygons?: Polygon2D[];
     labelX: number;
     labelY: number;
     /** Label da mostrare */
@@ -197,6 +207,97 @@ export function projectTo2D(
     view: ViewType
 ): SegmentNode2D[] {
     return nodes.map(node => {
+        const seg = node.segment;
+        const baseColor = SEGMENT_COLORS[seg.type] || '#3b82f6';
+        const labelText = seg.label || (seg.type === 'straight'
+            ? `${seg.length} mm`
+            : `↱ ${seg.direction}`);
+
+        if (view === 'iso') {
+            const iso = (p: Vec3) => {
+                const cos30 = 0.866;
+                const sin30 = 0.5;
+                return {
+                    x: (p.x - p.y) * cos30,
+                    y: (p.x + p.y) * sin30 - p.z,
+                };
+            };
+
+            const generateBoxPolygons = (p1: Vec3, p2: Vec3, w: number, h: number): (Polygon2D & { depth: number })[] => {
+                const minX = Math.min(p1.x, p2.x) - (p1.x === p2.x ? w / 2 : 0);
+                const maxX = Math.max(p1.x, p2.x) + (p1.x === p2.x ? w / 2 : 0);
+                const minY = Math.min(p1.y, p2.y) - (p1.y === p2.y ? w / 2 : 0);
+                const maxY = Math.max(p1.y, p2.y) + (p1.y === p2.y ? w / 2 : 0);
+                const minZ = Math.min(p1.z, p2.z) - (p1.z === p2.z ? h / 2 : 0);
+                const maxZ = Math.max(p1.z, p2.z) + (p1.z === p2.z ? h / 2 : 0);
+
+                const pts = [
+                    { x: minX, y: minY, z: minZ }, // 0
+                    { x: maxX, y: minY, z: minZ }, // 1
+                    { x: maxX, y: maxY, z: minZ }, // 2
+                    { x: minX, y: maxY, z: minZ }, // 3
+                    { x: minX, y: minY, z: maxZ }, // 4
+                    { x: maxX, y: minY, z: maxZ }, // 5
+                    { x: maxX, y: maxY, z: maxZ }, // 6
+                    { x: minX, y: maxY, z: maxZ }  // 7
+                ];
+
+                const ptsIso = pts.map(iso);
+
+                const faces = [
+                    { indices: [0, 1, 2, 3], fill: `${baseColor}10` }, // bottom
+                    { indices: [4, 5, 6, 7], fill: `${baseColor}40` }, // top
+                    { indices: [0, 1, 5, 4], fill: `${baseColor}30` }, // front-right 
+                    { indices: [3, 2, 6, 7], fill: `${baseColor}05` }, // back-left 
+                    { indices: [0, 3, 7, 4], fill: `${baseColor}20` }, // front-left 
+                    { indices: [1, 2, 6, 5], fill: `${baseColor}05` }, // back-right 
+                ];
+
+                return faces.map(f => {
+                    let sum = 0;
+                    f.indices.forEach(idx => sum += pts[idx].x + pts[idx].y + pts[idx].z);
+                    return {
+                        points: f.indices.map(idx => ptsIso[idx]),
+                        fill: f.fill,
+                        stroke: baseColor,
+                        strokeWidth: 1,
+                        depth: sum
+                    };
+                });
+            };
+
+            let polygons: Polygon2D[] = [];
+            let labelPos = { x: 0, y: 0 };
+
+            if (seg.type === 'elbow90' && node.corner) {
+                const p1 = generateBoxPolygons(node.start, node.corner, node.outerW, node.outerH);
+                const p2 = generateBoxPolygons(node.corner, node.end, node.outerW, node.outerH);
+                const pc = generateBoxPolygons(node.corner, node.corner, node.outerW, node.outerH);
+                polygons = [...p1, ...pc, ...p2];
+                polygons.sort((a: any, b: any) => a.depth - b.depth);
+                labelPos = iso(node.corner);
+            } else {
+                polygons = generateBoxPolygons(node.start, node.end, node.outerW, node.outerH);
+                polygons.sort((a: any, b: any) => a.depth - b.depth);
+                labelPos = iso({
+                    x: (node.start.x + node.end.x) / 2,
+                    y: (node.start.y + node.end.y) / 2,
+                    z: (node.start.z + node.end.z) / 2
+                });
+            }
+
+            return {
+                segment: node.segment,
+                index: node.index,
+                rects: [],
+                polygons,
+                labelX: labelPos.x,
+                labelY: labelPos.y,
+                label: labelText,
+                color: baseColor,
+            };
+        }
+
         let u1: number, v1: number, u2: number, v2: number;
         let cu: number | undefined, cv: number | undefined;
         let crossW = node.outerW;
@@ -276,11 +377,6 @@ export function projectTo2D(
             labelY = (v1 + v2) / 2;
         }
 
-        const seg = node.segment;
-        const labelText = seg.label || (seg.type === 'straight'
-            ? `${seg.length} mm`
-            : `↱ ${seg.direction}`);
-
         return {
             segment: node.segment,
             index: node.index,
@@ -288,7 +384,7 @@ export function projectTo2D(
             labelX,
             labelY,
             label: labelText,
-            color: SEGMENT_COLORS[seg.type] || '#3b82f6',
+            color: baseColor,
         };
     });
 }
@@ -308,11 +404,22 @@ export function computeBBox(nodes: SegmentNode2D[]): BBox {
     }
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const n of nodes) {
-        for (const r of n.rects) {
-            if (r.x < minX) minX = r.x;
-            if (r.y < minY) minY = r.y;
-            if (r.x + r.width > maxX) maxX = r.x + r.width;
-            if (r.y + r.height > maxY) maxY = r.y + r.height;
+        if (n.polygons && n.polygons.length > 0) {
+            for (const poly of n.polygons) {
+                for (const pt of poly.points) {
+                    if (pt.x < minX) minX = pt.x;
+                    if (pt.y < minY) minY = pt.y;
+                    if (pt.x > maxX) maxX = pt.x;
+                    if (pt.y > maxY) maxY = pt.y;
+                }
+            }
+        } else {
+            for (const r of n.rects) {
+                if (r.x < minX) minX = r.x;
+                if (r.y < minY) minY = r.y;
+                if (r.x + r.width > maxX) maxX = r.x + r.width;
+                if (r.y + r.height > maxY) maxY = r.y + r.height;
+            }
         }
     }
     return { minX, minY, maxX, maxY };
