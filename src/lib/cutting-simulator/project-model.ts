@@ -61,8 +61,13 @@ export interface Annotation {
     /** Posizione nel canvas world-space (mm) */
     x: number;
     y: number;
+    /** Posizione finale per le quote (mm) */
+    x2?: number;
+    y2?: number;
     text: string;
     type: 'note' | 'dimension';
+    /** Vista a cui appartiene l'annotazione (es. 'top', 'front'). Se vuoto, visibile ovunque. */
+    viewId?: string;
 }
 
 export type ContextElementType = 'wall' | 'floor' | 'opening';

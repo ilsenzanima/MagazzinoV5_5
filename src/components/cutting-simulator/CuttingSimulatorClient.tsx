@@ -8,6 +8,7 @@ import { FlatPiecesForm } from "@/components/cutting-simulator/FlatPiecesForm";
 import { ProjectEditor } from "@/components/cutting-simulator/ProjectEditor";
 import { CutPlanViewer } from "@/components/cutting-simulator/CutPlanViewer";
 import { SheetConfigForm } from "@/components/cutting-simulator/SheetConfigForm";
+import { TracksAnalysisPanel } from "@/components/cutting-simulator/TracksAnalysisPanel";
 import { PiecesList } from "@/components/cutting-simulator/PiecesList";
 import {
     calculateRectangularDuct,
@@ -21,7 +22,7 @@ import {
 import type { DuctProject } from "@/lib/cutting-simulator/project-model";
 import { defaultProject } from "@/lib/cutting-simulator/project-model";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
-import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid, List, PenTool } from "lucide-react";
+import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid, List, PenTool, MousePointer2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -238,6 +239,8 @@ export function CuttingSimulatorClient() {
 
                     <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
 
+                    {viewMode === 'project' && <TracksAnalysisPanel project={projectData} />}
+
                     {calcResult && (
                         <PiecesList
                             pieces={calcResult.pieces}
@@ -251,10 +254,16 @@ export function CuttingSimulatorClient() {
                 <div className="lg:col-span-8 space-y-4">
                     {/* Editor visivo quando in modalità Progetto + Editor */}
                     {viewMode === 'project' && projectViewMode === 'editor' ? (
-                        <ProjectEditor
-                            project={projectData}
-                            onProjectChange={setProjectData}
-                        />
+                        <>
+                            <div className="md:hidden flex items-center gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 text-sm shadow-sm">
+                                <MousePointer2 className="h-4 w-4 flex-shrink-0" />
+                                <span>L'editor 3D non supporta le modifiche touch. Usa un computer per la progettazione.</span>
+                            </div>
+                            <ProjectEditor
+                                project={projectData}
+                                onProjectChange={setProjectData}
+                            />
+                        </>
                     ) : (
                         <>
                             {nestingResult && nestingResult.sheets.length > 0 && (
