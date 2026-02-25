@@ -209,7 +209,10 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
 
                     {/* === SEGMENTI === */}
                     <div className="space-y-4">
-                        <TrackGenerator onGenerate={(segs) => onProjectChange(p => ({ ...p, segments: [...p.segments, ...segs] }))} />
+                        <TrackGenerator
+                            existingTracksCount={project.segments.filter(s => s.type === 'trackSeparator').length}
+                            onGenerate={(segs) => onProjectChange(p => ({ ...p, segments: [...p.segments, ...segs] }))}
+                        />
 
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium">Segmenti nell'Editor ({project.segments.filter(s => s.type !== 'trackSeparator').length})</p>
@@ -505,7 +508,7 @@ function ElbowFields({ seg, onUpdate }: {
 
 // ==================== Generatore Tratti ====================
 
-function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[]) => void }) {
+function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTracksCount?: number, onGenerate: (segments: Segment[]) => void }) {
     const [isOpen, setIsOpen] = useState(false);
     const [trackLength, setTrackLength] = useState(10000);
     const [standardLength, setStandardLength] = useState(2500);
@@ -518,8 +521,11 @@ function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[]) => v
         let remainingLength = trackLength;
         const newSegments: Segment[] = [];
 
+        // Generazione del nome progressivo (A, B, C...)
+        const trackLetter = String.fromCharCode(65 + existingTracksCount);
+
         // Aggiungi subito l'header separatore
-        newSegments.push(createTrackSeparator(trackLength, 'Tratto da ' + trackLength + 'mm'));
+        newSegments.push(createTrackSeparator(trackLength, `TRATTO ${trackLetter}`));
 
         // Sottrarre l'ingombro del gomito dalla lunghezza totale dei dritti
         if (hasElbow) {
