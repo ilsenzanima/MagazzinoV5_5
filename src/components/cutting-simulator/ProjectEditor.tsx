@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     Eye, Move, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-    X, Trash2, Plus, CornerDownRight, RectangleHorizontal, Type, Ruler, MousePointer2
+    X, Trash2, Plus, CornerDownRight, RectangleHorizontal, Type, Ruler, MousePointer2, Hand
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -77,8 +77,8 @@ function CadGrid({ bbox, gridSize }: { bbox: { minX: number; minY: number; maxX:
 
 // ==================== QUOTA (DIMENSION) ====================
 
-function DimensionLine({ x1, y1, x2, y2, label, offset = 30, isSelected = false }: {
-    x1: number; y1: number; x2: number; y2: number; label: string; offset?: number; isSelected?: boolean;
+function DimensionLine({ x1, y1, x2, y2, label, offset = 30, isSelected = false, fScale = 1 }: {
+    x1: number; y1: number; x2: number; y2: number; label: string; offset?: number; isSelected?: boolean; fScale?: number;
 }) {
     const dx = x2 - x1;
     const dy = y2 - y1;
@@ -86,8 +86,8 @@ function DimensionLine({ x1, y1, x2, y2, label, offset = 30, isSelected = false 
     if (len < 10) return null;
 
     // Perpendicular offset
-    const nx = -dy / len * offset;
-    const ny = dx / len * offset;
+    const nx = -dy / len * offset * fScale;
+    const ny = dx / len * offset * fScale;
 
     const ax = x1 + nx, ay = y1 + ny;
     const bx = x2 + nx, by = y2 + ny;
@@ -99,15 +99,16 @@ function DimensionLine({ x1, y1, x2, y2, label, offset = 30, isSelected = false 
     return (
         <g className="dimension-line">
             {/* Extension lines */}
-            <line x1={x1} y1={y1} x2={ax} y2={ay} stroke={extColor} strokeWidth={0.5} />
-            <line x1={x2} y1={y2} x2={bx} y2={by} stroke={extColor} strokeWidth={0.5} />
+            <line x1={x1} y1={y1} x2={ax} y2={ay} stroke={extColor} strokeWidth={0.5 * fScale} />
+            <line x1={x2} y1={y2} x2={bx} y2={by} stroke={extColor} strokeWidth={0.5 * fScale} />
             {/* Dimension line */}
-            <line x1={ax} y1={ay} x2={bx} y2={by} stroke={color} strokeWidth={isSelected ? 1.5 : 0.8} markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
+            <line x1={ax} y1={ay} x2={bx} y2={by} stroke={color} strokeWidth={(isSelected ? 1.5 : 0.8) * fScale} markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
             {/* Label */}
             <text
-                x={mx} y={my - 4}
+                x={mx} y={my - 4 * fScale}
                 textAnchor="middle"
-                className="fill-primary text-[10px] font-mono"
+                className="fill-primary font-mono"
+                style={{ fontSize: `${10 * fScale}px` }}
             >
                 {label}
             </text>
@@ -303,7 +304,7 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
 
     const view: ViewType = viewFamily === 'side' ? sideFace : viewFamily;
 
-    const [activeTool, setActiveTool] = useState<'select' | 'add_note' | 'add_dim'>('select');
+    const [activeTool, setActiveTool] = useState<'select' | 'pan' | 'add_note' | 'add_dim'>('select');
     const [selectedAnnId, setSelectedAnnId] = useState<string | null>(null);
     const [drawingDim, setDrawingDim] = useState<{ x: number; y: number } | null>(null);
     const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -334,9 +335,12 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     // ViewBox con pan e zoom
     const vbW = (bbox.maxX - bbox.minX) / zoom;
     const vbH = (bbox.maxY - bbox.minY) / zoom;
-    const vbX = bbox.minX + (bbox.maxX - bbox.minX - vbW) / 2 - panOffset.x / zoom;
-    const vbY = bbox.minY + (bbox.maxY - bbox.minY - vbH) / 2 - panOffset.y / zoom;
+    const vbX = bbox.minX + (bbox.maxX - bbox.minX - vbW) / 2 - panOffset.x;
+    const vbY = bbox.minY + (bbox.maxY - bbox.minY - vbH) / 2 - panOffset.y;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    // Fattore di scala dinamico per rendering font/spessori uniformi rispetto allo zoom
+    const fScale = Math.max(1, vbW / 800);
 
     // ==================== Handlers ====================
 
@@ -364,11 +368,11 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     }, []);
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        if (e.button === 1 || (e.button === 0 && e.altKey)) {
+        if (activeTool === 'pan' || e.button === 1 || (e.button === 0 && e.altKey)) {
             setIsPanning(true);
             panStart.current = { x: e.clientX, y: e.clientY, ox: panOffset.x, oy: panOffset.y };
         }
-    }, [panOffset]);
+    }, [panOffset, activeTool]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         const pt = getSvgPoint(e);
@@ -418,7 +422,7 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
         setSelectedIdx(null);
         setSelectedAnnId(null);
 
-        if (view === 'iso') return;
+        if (view === 'iso' || activeTool === 'pan') return;
 
         const pt = getSvgPoint(e);
 
@@ -486,9 +490,9 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     return (
         <div className="relative border border-border rounded-lg overflow-hidden bg-background">
             {/* Toolbar */}
-            <div className="flex items-center gap-2 p-2 border-b border-border/50 bg-muted/30">
+            <div className="flex flex-wrap items-center gap-2 p-2 border-b border-border/50 bg-muted/30">
                 {/* Selettore vista */}
-                <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md">
+                <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md shrink-0">
                     {(['top', 'side', 'iso'] as const).map(v => (
                         <button
                             key={v}
@@ -511,15 +515,22 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     ))}
                 </div>
 
-                <div className="w-px h-6 bg-border mx-1" />
+                <div className="w-px h-6 bg-border mx-1 shrink-0" />
 
-                <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md">
+                <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md shrink-0">
                     <button
                         title="Seleziona"
                         onClick={() => { setActiveTool('select'); setDrawingDim(null); }}
                         className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'select' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
                     >
                         <MousePointer2 className="h-4 w-4" />
+                    </button>
+                    <button
+                        title="Sposta (Pan)"
+                        onClick={() => { setActiveTool('pan'); setDrawingDim(null); }}
+                        className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'pan' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                    >
+                        <Hand className="h-4 w-4" />
                     </button>
                     {(view === 'top' || viewFamily === 'side') && (
                         <>
@@ -542,7 +553,7 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                 </div>
 
                 {viewFamily === 'side' && (
-                    <div className="flex items-center gap-1 ml-2 mr-2">
+                    <div className="flex items-center gap-1 ml-2 mr-2 shrink-0">
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => {
                             const idx = SIDE_FACES.indexOf(sideFace);
                             setSideFace(SIDE_FACES[(idx - 1 + 4) % 4]);
@@ -561,11 +572,11 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     </div>
                 )}
 
-                <div className="flex-1" />
+                <div className="flex-1 min-w-[20px]" />
 
                 {/* Zoom controls e Slider Rotazione */}
                 {view === 'iso' && (
-                    <div className="flex items-center gap-2 mr-2">
+                    <div className="flex items-center gap-2 mr-2 shrink-0">
                         <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Rotazione Z: {isoAngle}°</Label>
                         <input
                             type="range"
@@ -576,12 +587,14 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                         />
                     </div>
                 )}
-                <span className="text-xs text-muted-foreground font-mono">{(zoom * 100).toFixed(0)}%</span>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.min(5, z * 1.2))}>+</Button>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.max(0.2, z / 1.2))}>−</Button>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={handleResetView}>
-                    <Move className="h-3 w-3" /> Reset
-                </Button>
+                <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs text-muted-foreground font-mono w-10 text-right">{(zoom * 100).toFixed(0)}%</span>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.min(5, z * 1.2))}>+</Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.max(0.2, z / 1.2))}>−</Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={handleResetView}>
+                        <Move className="h-3 w-3" /> Reset
+                    </Button>
+                </div>
             </div>
 
             {/* Canvas SVG */}
@@ -656,21 +669,22 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                                 y={node.labelY}
                                 textAnchor="middle"
                                 dominantBaseline="central"
-                                className="fill-foreground text-[11px] font-mono pointer-events-none"
-                                style={{ paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4, strokeLinejoin: 'round' }}
+                                className="fill-foreground font-mono pointer-events-none"
+                                style={{ fontSize: `${11 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
                             >
                                 {node.label}
                             </text>
 
                             {/* Indice */}
                             <circle
-                                cx={node.labelX + 12} cy={node.labelY + 12} r={8}
+                                cx={node.labelX + 16 * fScale} cy={node.labelY + 16 * fScale} r={9 * fScale}
                                 fill={node.color} opacity={0.8}
                             />
                             <text
-                                x={node.labelX + 12} y={node.labelY + 12}
+                                x={node.labelX + 16 * fScale} y={node.labelY + 16 * fScale}
                                 textAnchor="middle" dominantBaseline="central"
-                                className="fill-white text-[8px] font-bold pointer-events-none"
+                                className="fill-white font-bold pointer-events-none"
+                                style={{ fontSize: `${9 * fScale}px` }}
                             >
                                 {i + 1}
                             </text>
@@ -693,6 +707,7 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                             y2={isHoriz ? r.y + r.height : r.y + r.height}
                             label={`${(node.segment as StraightSegment).length}`}
                             offset={25}
+                            fScale={fScale}
                         />
                     );
                 })}
@@ -714,14 +729,15 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                                 style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
                             >
                                 <rect
-                                    x={ann.x - 5} y={ann.y - 12}
-                                    width={(ann.text.length * 7) + 10} height={18}
-                                    fill={isSelected ? 'hsl(var(--primary)/0.15)' : 'hsl(var(--background)/0.8)'}
-                                    stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
-                                    strokeDasharray={isSelected ? "none" : "2 2"}
-                                    rx={4}
+                                    x={ann.x - 5 * fScale} y={ann.y - 14 * fScale}
+                                    width={(ann.text.length * 7 * fScale) + 10 * fScale} height={20 * fScale}
+                                    fill={isSelected ? 'hsl(var(--primary)/0.15)' : 'hsl(var(--background)/0.9)'}
+                                    stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground)/0.4)'}
+                                    strokeDasharray={isSelected ? "none" : `${2 * fScale} ${2 * fScale}`}
+                                    strokeWidth={1 * fScale}
+                                    rx={4 * fScale}
                                 />
-                                <text x={ann.x} y={ann.y} className="fill-foreground text-[11px] font-sans pointer-events-none">{ann.text}</text>
+                                <text x={ann.x} y={ann.y} className="fill-foreground font-sans pointer-events-none" style={{ fontSize: `${12 * fScale}px` }}>{ann.text}</text>
                             </g>
                         );
                     } else if (ann.type === 'dimension' && ann.x2 !== undefined && ann.y2 !== undefined) {
@@ -732,9 +748,9 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                                 onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
                                 style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
                             >
-                                <DimensionLine x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} label={label} offset={0} isSelected={isSelected} />
+                                <DimensionLine x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} label={label} offset={0} isSelected={isSelected} fScale={fScale} />
                                 {/* Hitbox invisibile per cliccarla più facilmente */}
-                                <line x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} stroke="transparent" strokeWidth={20} />
+                                <line x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} stroke="transparent" strokeWidth={20 * fScale} />
                             </g>
                         );
                     }
@@ -743,7 +759,11 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
 
                 {/* Quota in fase di disegno */}
                 {activeTool === 'add_dim' && drawingDim && (
-                    <DimensionLine x1={drawingDim.x} y1={drawingDim.y} x2={mousePos.x} y2={mousePos.y} label="Disegnando..." offset={0} />
+                    <g>
+                        {/* Linea guida tratteggiata rossa */}
+                        <line x1={drawingDim.x} y1={drawingDim.y} x2={mousePos.x} y2={mousePos.y} stroke="hsl(var(--primary))" strokeWidth={1.5 * fScale} strokeDasharray={`${6 * fScale},${4 * fScale}`} opacity={0.6} />
+                        <DimensionLine x1={drawingDim.x} y1={drawingDim.y} x2={mousePos.x} y2={mousePos.y} label="Click per confermare" offset={0} fScale={fScale} />
+                    </g>
                 )}
 
                 {/* Label vista */}
