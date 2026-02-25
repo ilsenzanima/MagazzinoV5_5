@@ -457,9 +457,9 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
 
                 {/* Segmenti */}
                 {nodes2D.map((node, i) => {
-                    const isSelected = selectedIdx === i;
+                    const isSelected = selectedIdx === node.index;
                     return (
-                        <g key={node.segment.id} onClick={e => handleSegmentClick(i, e)} style={{ cursor: 'pointer' }}>
+                        <g key={node.segment.id} onClick={e => handleSegmentClick(node.index, e)} style={{ cursor: 'pointer' }}>
                             {/* Corpo segmento */}
                             {node.polygons && node.polygons.length > 0 ? (
                                 node.polygons.map((poly, pIdx) => (
