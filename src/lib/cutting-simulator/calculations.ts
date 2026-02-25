@@ -436,8 +436,10 @@ export function calculateProject(project: DuctProject): CalculationResult {
     const allPieces: CutPiece[] = [];
 
     segments.forEach((seg, idx) => {
+        if (seg.type === 'trackSeparator') return; // I separatori non producono lamiere
+
         const prefix = `S${idx + 1}`;
-        let result: CalculationResult;
+        let result: CalculationResult | null = null;
 
         if (seg.type === 'straight') {
             let actualLength = seg.length;
@@ -445,8 +447,11 @@ export function calculateProject(project: DuctProject): CalculationResult {
 
             // Se abilitate le misure globali, sottraiamo l'ingombro degli angoli adiacenti
             if (globalMeasurements) {
-                const prev = segments[idx - 1];
-                const next = segments[idx + 1];
+                // Find previous non-separator segment
+                const prevArray = segments.slice(0, idx).filter(s => s.type !== 'trackSeparator');
+                const prev = prevArray[prevArray.length - 1];
+                // Find next non-separator segment
+                const next = segments.slice(idx + 1).find(s => s.type !== 'trackSeparator');
                 let deduction = 0;
                 const outerWidth = section.innerWidth + 2 * section.thickness;
 
@@ -481,7 +486,7 @@ export function calculateProject(project: DuctProject): CalculationResult {
                 });
             }
 
-        } else {
+        } else if (seg.type === 'elbow90') {
             result = calculateElbow90({
                 innerWidth: section.innerWidth,
                 innerHeight: section.innerHeight,
@@ -492,6 +497,8 @@ export function calculateProject(project: DuctProject): CalculationResult {
                 baseMode: seg.baseMode,
             });
         }
+
+        if (!result) return;
 
         // Filtra per lati attivi e rinomina
         const filtered = filterBySides(result.pieces, section.sides);

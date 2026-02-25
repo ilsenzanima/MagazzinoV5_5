@@ -11,12 +11,15 @@ import {
     CornerDownRight, Ruler, GripVertical, Layers, ChevronDown, ChevronUp, FastForward,
 } from "lucide-react";
 import { SectionSidesSelector } from "@/components/cutting-simulator/SectionSidesSelector";
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type {
-    DuctProject, Segment, StraightSegment, Elbow90Segment,
+    DuctProject, Segment, StraightSegment, Elbow90Segment, TrackSeparatorSegment,
     SectionProfile, SegmentDirection, SegmentOrientation,
 } from "@/lib/cutting-simulator/project-model";
 import {
-    defaultProject, createStraightSegment, createElbow90Segment,
+    defaultProject, createStraightSegment, createElbow90Segment, createTrackSeparator,
     sidesLabel,
 } from "@/lib/cutting-simulator/project-model";
 
@@ -208,29 +211,54 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                         <TrackGenerator onGenerate={(segs) => onProjectChange(p => ({ ...p, segments: [...p.segments, ...segs] }))} />
 
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">Segmenti nell'Editor ({project.segments.length})</p>
+                            <p className="text-sm font-medium">Segmenti nell'Editor ({project.segments.filter(s => s.type !== 'trackSeparator').length})</p>
                             <div className="flex gap-1">
-                                <Button type="button" variant="outline" size="sm"
-                                    onClick={() => addSegment(createStraightSegment())}
-                                    className="h-7 text-xs gap-1"
-                                >
-                                    <Plus className="h-3 w-3" /> Dritto
-                                </Button>
-                                <Button type="button" variant="outline" size="sm"
-                                    onClick={() => addSegment(createElbow90Segment())}
-                                    className="h-7 text-xs gap-1"
-                                >
-                                    <Plus className="h-3 w-3" /> Angolo 90°
-                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1 bg-muted/50 border-primary/20 hover:border-primary/50">
+                                            <Plus className="h-3 w-3" /> Aggiungi Elemento
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48 border-border/40">
+                                        <DropdownMenuItem onClick={() => addSegment(createStraightSegment())} className="text-xs cursor-pointer">
+                                            Dritto
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => addSegment(createElbow90Segment())} className="text-xs cursor-pointer">
+                                            Angolo 90°
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                                            Tappo (Prossimamente)
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                                            Raccordo (Prossimamente)
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                         </div>
 
                         <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
                             {project.segments.map((seg, idx) => {
+                                if (seg.type === 'trackSeparator') {
+                                    return (
+                                        <div key={seg.id} className="flex items-center gap-2 py-2 px-1 relative my-1">
+                                            <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent rounded pointer-events-none" />
+                                            <div className="h-4 w-1 bg-primary rounded-full relative z-10" />
+                                            <span className="text-[11px] font-bold text-primary relative z-10 uppercase tracking-wider">{seg.name}</span>
+                                            <div className="flex-1 border-t border-dashed border-primary/30 ml-2 relative z-10" />
+                                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive relative z-10"
+                                                onClick={() => removeSegment(seg.id)}>
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    );
+                                }
+
                                 let deductionText = '';
                                 if (project.globalMeasurements && seg.type === 'straight') {
-                                    const prev = project.segments[idx - 1];
-                                    const next = project.segments[idx + 1];
+                                    // Trova i veri segmenti adiacenti ignorando i trackSeparator
+                                    const prev = project.segments.slice(0, idx).reverse().find(s => s.type !== 'trackSeparator');
+                                    const next = project.segments.slice(idx + 1).find(s => s.type !== 'trackSeparator');
                                     let deduction = 0;
                                     const outerWidth = project.section.innerWidth + (2 * project.section.thickness);
 
@@ -246,7 +274,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                 return (
                                     <SegmentRow
                                         key={seg.id}
-                                        segment={seg}
+                                        segment={seg as StraightSegment | Elbow90Segment}
                                         index={idx}
                                         total={project.segments.length}
                                         deductionText={deductionText}
@@ -470,6 +498,9 @@ function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[]) => v
     const handleGenerate = () => {
         let remainingLength = trackLength;
         const newSegments: Segment[] = [];
+
+        // Aggiungi subito l'header separatore
+        newSegments.push(createTrackSeparator(trackLength, 'Tratto da ' + trackLength + 'mm'));
 
         // Sottrarre l'ingombro del gomito dalla lunghezza totale dei dritti
         if (hasElbow) {

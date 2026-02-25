@@ -172,7 +172,7 @@ function PropertiesPanel({
                             <Input
                                 type="number"
                                 min={0}
-                                value={segment.armA}
+                                value={(segment as Elbow90Segment).armA}
                                 onChange={e => onUpdate(index, { armA: Number(e.target.value) })}
                                 className="h-8 text-sm"
                             />
@@ -182,7 +182,7 @@ function PropertiesPanel({
                             <Input
                                 type="number"
                                 min={0}
-                                value={segment.armB}
+                                value={(segment as Elbow90Segment).armB}
                                 onChange={e => onUpdate(index, { armB: Number(e.target.value) })}
                                 className="h-8 text-sm"
                             />
@@ -199,7 +199,7 @@ function PropertiesPanel({
                                         onClick={() => onUpdate(index, { direction: d })}
                                         className={cn(
                                             "p-1.5 rounded text-xs flex items-center justify-center",
-                                            segment.direction === d
+                                            (segment as Elbow90Segment).direction === d
                                                 ? "bg-primary text-primary-foreground"
                                                 : "bg-muted/50 hover:bg-muted"
                                         )}
@@ -276,6 +276,34 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     const vbH = (bbox.maxY - bbox.minY) / zoom;
     const vbX = bbox.minX + (bbox.maxX - bbox.minX - vbW) / 2 - panOffset.x / zoom;
     const vbY = bbox.minY + (bbox.maxY - bbox.minY - vbH) / 2 - panOffset.y / zoom;
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    // ==================== Info Tratti (Controllo Quote) ====================
+    const tracksInfo = useMemo(() => {
+        const tracks: { id: string, name: string, expected: number, actual: number, isMismatch: boolean }[] = [];
+        let currentTrack: { id: string, name: string, expected: number } | null = null;
+        let currentActual = 0;
+
+        for (const seg of project.segments) {
+            if (seg.type === 'trackSeparator') {
+                if (currentTrack) {
+                    tracks.push({ ...currentTrack, actual: currentActual, isMismatch: currentActual !== currentTrack.expected });
+                }
+                currentTrack = { id: seg.id, name: seg.name, expected: seg.expectedLength };
+                currentActual = 0;
+            } else if (currentTrack) {
+                if (seg.type === 'straight') {
+                    currentActual += seg.length;
+                } else if (seg.type === 'elbow90') {
+                    currentActual += seg.armA; // L'ingombro del gomito che "ruba" quota al tratto è il braccio A
+                }
+            }
+        }
+        if (currentTrack) {
+            tracks.push({ ...currentTrack, actual: currentActual, isMismatch: currentActual !== currentTrack.expected });
+        }
+        return tracks;
+    }, [project.segments]);
 
     // ==================== Handlers ====================
 
@@ -299,12 +327,12 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
 
             // Calcolo proporzione per movimento coerente
             const rect = svgRef.current.getBoundingClientRect();
-            const scaleX = vbW / rect.width;
-            const scaleY = vbH / rect.height;
+            // Il reale fattore di scala è dominato dalla dimensione che fitta il viewBox!
+            const realScale = Math.max(vbW / rect.width, vbH / rect.height);
 
             setPanOffset({
-                x: panStart.current.ox + dx * scaleX,
-                y: panStart.current.oy + dy * scaleY
+                x: panStart.current.ox + dx * realScale,
+                y: panStart.current.oy + dy * realScale
             });
         }
     }, [isPanning, vbW, vbH]);
@@ -468,6 +496,7 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                                 textAnchor="middle"
                                 dominantBaseline="central"
                                 className="fill-foreground text-[11px] font-mono pointer-events-none"
+                                style={{ paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4, strokeLinejoin: 'round' }}
                             >
                                 {node.label}
                             </text>
@@ -509,12 +538,36 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
 
                 {/* Label vista */}
                 <text
-                    x={vbX + 10} y={vbY + 18}
+                    x={vbX + 10} y={vbY + 20}
                     className="fill-muted-foreground text-[12px] font-semibold pointer-events-none"
+                    style={{ paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 3, strokeLinejoin: 'round' }}
                 >
                     Vista: {VIEW_LABELS[view]}
                 </text>
             </svg>
+
+            {/* Overlay Tratti (Tracks Info) */}
+            {tracksInfo.length > 0 && (
+                <div className="absolute bottom-4 right-4 bg-background/95 backdrop-blur-md p-3 rounded border border-border/50 shadow-sm min-w-[200px] z-10 pointer-events-none">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2 px-1">Verifica Tratti Rapidi</p>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pointer-events-auto">
+                        {tracksInfo.map(t => (
+                            <div key={t.id} className="flex flex-col gap-0.5 text-[11px] bg-muted/40 p-2 rounded border border-border/30">
+                                <span className="font-semibold text-foreground">{t.name}</span>
+                                <div className="flex justify-between items-center mt-1">
+                                    <span className="text-muted-foreground">Teorica: {t.expected} mm</span>
+                                    <span className={cn(
+                                        "font-mono font-black",
+                                        t.isMismatch ? "text-destructive" : "text-emerald-500"
+                                    )}>
+                                        Attuale: {t.actual} mm
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Pannello proprietà */}
             {selectedSegment && selectedIdx !== null && (
