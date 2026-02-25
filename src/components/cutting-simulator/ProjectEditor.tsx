@@ -25,17 +25,18 @@ import {
 
 // ==================== VISTA LABELS ====================
 
-const VIEW_LABELS: Record<ViewType, string> = {
+const VIEW_LABELS: Record<string, string> = {
     top: 'Dall\'Alto',
-    front: 'Frontale',
-    right: 'Laterale',
+    side: 'Laterale',
     iso: '3D',
 };
 
-const VIEW_ICONS: Record<ViewType, typeof Eye> = {
+const SIDE_FACES = ['front', 'right', 'back', 'left'] as const;
+type SideFaceType = typeof SIDE_FACES[number];
+
+const VIEW_ICONS: Record<string, typeof Eye> = {
     top: Eye,
-    front: Eye,
-    right: Eye,
+    side: Eye,
     iso: Eye,
 };
 
@@ -248,7 +249,11 @@ interface ProjectEditorProps {
 }
 
 export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) {
-    const [view, setView] = useState<ViewType>('top');
+    const [viewFamily, setViewFamily] = useState<'top' | 'side' | 'iso'>('iso');
+    const [sideFace, setSideFace] = useState<SideFaceType>('front');
+
+    const view: ViewType = viewFamily === 'side' ? sideFace : viewFamily;
+
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
     const [isPanning, setIsPanning] = useState(false);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -384,13 +389,13 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
             <div className="flex items-center gap-2 p-2 border-b border-border/50 bg-muted/30">
                 {/* Selettore vista */}
                 <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md">
-                    {(['top', 'front', 'right', 'iso'] as ViewType[]).map(v => (
+                    {(['top', 'side', 'iso'] as const).map(v => (
                         <button
                             key={v}
-                            onClick={() => setView(v)}
+                            onClick={() => setViewFamily(v)}
                             className={cn(
                                 "px-2.5 py-1 text-xs font-medium rounded transition-all",
-                                view === v
+                                viewFamily === v
                                     ? "bg-background shadow-sm text-foreground"
                                     : "text-muted-foreground hover:text-foreground"
                             )}
@@ -399,6 +404,26 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                         </button>
                     ))}
                 </div>
+
+                {viewFamily === 'side' && (
+                    <div className="flex items-center gap-1 ml-2 mr-2">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => {
+                            const idx = SIDE_FACES.indexOf(sideFace);
+                            setSideFace(SIDE_FACES[(idx - 1 + 4) % 4]);
+                        }}>
+                            <ArrowLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="text-[10px] uppercase font-semibold text-primary w-16 text-center">
+                            {sideFace === 'front' ? 'Fronte' : sideFace === 'right' ? 'Destra' : sideFace === 'back' ? 'Retro' : 'Sinistra'}
+                        </span>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => {
+                            const idx = SIDE_FACES.indexOf(sideFace);
+                            setSideFace(SIDE_FACES[(idx + 1) % 4]);
+                        }}>
+                            <ArrowRight className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                )}
 
                 <div className="flex-1" />
 
