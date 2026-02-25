@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef } from "react";
-import type { DuctProject, Segment, StraightSegment, Elbow90Segment } from "@/lib/cutting-simulator/project-model";
+import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation } from "@/lib/cutting-simulator/project-model";
 import {
     computeLayout,
     projectTo2D,
@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     Eye, Move, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-    X, Trash2, Plus, CornerDownRight, RectangleHorizontal,
+    X, Trash2, Plus, CornerDownRight, RectangleHorizontal, Type, Ruler, MousePointer2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -77,8 +77,8 @@ function CadGrid({ bbox, gridSize }: { bbox: { minX: number; minY: number; maxX:
 
 // ==================== QUOTA (DIMENSION) ====================
 
-function DimensionLine({ x1, y1, x2, y2, label, offset = 30 }: {
-    x1: number; y1: number; x2: number; y2: number; label: string; offset?: number;
+function DimensionLine({ x1, y1, x2, y2, label, offset = 30, isSelected = false }: {
+    x1: number; y1: number; x2: number; y2: number; label: string; offset?: number; isSelected?: boolean;
 }) {
     const dx = x2 - x1;
     const dy = y2 - y1;
@@ -93,13 +93,16 @@ function DimensionLine({ x1, y1, x2, y2, label, offset = 30 }: {
     const bx = x2 + nx, by = y2 + ny;
     const mx = (ax + bx) / 2, my = (ay + by) / 2;
 
+    const color = isSelected ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.6)";
+    const extColor = isSelected ? "hsl(var(--primary) / 0.6)" : "hsl(var(--primary) / 0.4)";
+
     return (
         <g className="dimension-line">
             {/* Extension lines */}
-            <line x1={x1} y1={y1} x2={ax} y2={ay} stroke="hsl(var(--primary) / 0.4)" strokeWidth={0.5} />
-            <line x1={x2} y1={y2} x2={bx} y2={by} stroke="hsl(var(--primary) / 0.4)" strokeWidth={0.5} />
+            <line x1={x1} y1={y1} x2={ax} y2={ay} stroke={extColor} strokeWidth={0.5} />
+            <line x1={x2} y1={y2} x2={bx} y2={by} stroke={extColor} strokeWidth={0.5} />
             {/* Dimension line */}
-            <line x1={ax} y1={ay} x2={bx} y2={by} stroke="hsl(var(--primary) / 0.6)" strokeWidth={0.8} markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
+            <line x1={ax} y1={ay} x2={bx} y2={by} stroke={color} strokeWidth={isSelected ? 1.5 : 0.8} markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
             {/* Label */}
             <text
                 x={mx} y={my - 4}
@@ -112,7 +115,53 @@ function DimensionLine({ x1, y1, x2, y2, label, offset = 30 }: {
     );
 }
 
-// ==================== PANNELLO PROPRIETÀ ====================
+// ==================== PANNELLO PROPRIETÀ ANNOTAZIONI ====================
+
+function AnnotationPanel({
+    annotation,
+    onUpdate,
+    onRemove,
+    onClose,
+}: {
+    annotation: Annotation;
+    onUpdate: (patch: Partial<Annotation>) => void;
+    onRemove: () => void;
+    onClose: () => void;
+}) {
+    return (
+        <div className="absolute right-2 top-2 w-64 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg p-3 z-10 space-y-3">
+            <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold">
+                    {annotation.type === 'note' ? '📝 Nota Testuale' : '📏 Quota Manuale'}
+                </h4>
+                <button onClick={onClose} className="p-1 hover:bg-muted rounded">
+                    <X className="h-3.5 w-3.5" />
+                </button>
+            </div>
+            <div className="space-y-2">
+                <div>
+                    <Label className="text-[10px] uppercase text-muted-foreground">Testo (opzionale)</Label>
+                    <Input
+                        value={annotation.text}
+                        onChange={e => onUpdate({ text: e.target.value })}
+                        placeholder={annotation.type === 'dimension' ? 'Auto...' : 'Scrivi qualcosa'}
+                        className="h-8 text-sm"
+                    />
+                </div>
+            </div>
+            <div className="flex pt-2 border-t border-border/50">
+                <Button
+                    variant="ghost" size="sm" className="text-destructive hover:text-destructive text-xs w-full"
+                    onClick={() => { onRemove(); onClose(); }}
+                >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Elimina
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+// ==================== PANNELLO PROPRIETÀ SEGMENTI ====================
 
 function PropertiesPanel({
     segment,
@@ -254,6 +303,12 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
 
     const view: ViewType = viewFamily === 'side' ? sideFace : viewFamily;
 
+    const [activeTool, setActiveTool] = useState<'select' | 'add_note' | 'add_dim'>('select');
+    const [selectedAnnId, setSelectedAnnId] = useState<string | null>(null);
+    const [drawingDim, setDrawingDim] = useState<{ x: number; y: number } | null>(null);
+    const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [draggingAnnId, setDraggingAnnId] = useState<string | null>(null);
+
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
     const [isPanning, setIsPanning] = useState(false);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -283,34 +338,24 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     const vbY = bbox.minY + (bbox.maxY - bbox.minY - vbH) / 2 - panOffset.y / zoom;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-    // ==================== Info Tratti (Controllo Quote) ====================
-    const tracksInfo = useMemo(() => {
-        const tracks: { id: string, name: string, expected: number, actual: number, isMismatch: boolean }[] = [];
-        let currentTrack: { id: string, name: string, expected: number } | null = null;
-        let currentActual = 0;
-
-        for (const seg of project.segments) {
-            if (seg.type === 'trackSeparator') {
-                if (currentTrack) {
-                    tracks.push({ ...currentTrack, actual: currentActual, isMismatch: currentActual !== currentTrack.expected });
-                }
-                currentTrack = { id: seg.id, name: seg.name, expected: seg.expectedLength };
-                currentActual = 0;
-            } else if (currentTrack) {
-                if (seg.type === 'straight') {
-                    currentActual += seg.length;
-                } else if (seg.type === 'elbow90') {
-                    currentActual += seg.armA; // L'ingombro del gomito che "ruba" quota al tratto è il braccio A
-                }
-            }
-        }
-        if (currentTrack) {
-            tracks.push({ ...currentTrack, actual: currentActual, isMismatch: currentActual !== currentTrack.expected });
-        }
-        return tracks;
-    }, [project.segments]);
+    // ==================== Handlers ====================
 
     // ==================== Handlers ====================
+
+    const getSvgPoint = useCallback((e: React.MouseEvent | React.TouchEvent | any) => {
+        if (!svgRef.current) return { x: 0, y: 0 };
+        const pt = svgRef.current.createSVGPoint();
+        if (e.clientX !== undefined) {
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+        } else if (e.touches && e.touches.length > 0) {
+            pt.x = e.touches[0].clientX;
+            pt.y = e.touches[0].clientY;
+        }
+        const ctm = svgRef.current.getScreenCTM();
+        if (!ctm) return { x: 0, y: 0 };
+        return pt.matrixTransform(ctm.inverse());
+    }, []);
 
     const handleWheel = useCallback((e: React.WheelEvent) => {
         e.preventDefault();
@@ -326,35 +371,90 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     }, [panOffset]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
+        const pt = getSvgPoint(e);
+        setMousePos(pt);
+
         if (isPanning && panStart.current && svgRef.current) {
             const dx = e.clientX - panStart.current.x;
             const dy = e.clientY - panStart.current.y;
 
-            // Calcolo proporzione per movimento coerente
             const rect = svgRef.current.getBoundingClientRect();
-            // Il reale fattore di scala è dominato dalla dimensione che fitta il viewBox!
             const realScale = Math.max(vbW / rect.width, vbH / rect.height);
 
             setPanOffset({
                 x: panStart.current.ox + dx * realScale,
                 y: panStart.current.oy + dy * realScale
             });
+        } else if (draggingAnnId) {
+            const anns = project.annotations || [];
+            const idx = anns.findIndex(a => a.id === draggingAnnId);
+            if (idx >= 0) {
+                const ann = anns[idx];
+                const newAnns = [...anns];
+                if (ann.type === 'note') {
+                    newAnns[idx] = { ...ann, x: pt.x, y: pt.y };
+                    onProjectChange({ ...project, annotations: newAnns });
+                }
+            }
         }
-    }, [isPanning, vbW, vbH]);
+    }, [isPanning, vbW, vbH, getSvgPoint, draggingAnnId, project, onProjectChange]);
 
     const handleMouseUp = useCallback(() => {
         setIsPanning(false);
+        setDraggingAnnId(null);
         panStart.current = null;
     }, []);
 
     const handleSegmentClick = useCallback((idx: number, e: React.MouseEvent) => {
         e.stopPropagation();
-        setSelectedIdx(prev => prev === idx ? null : idx);
-    }, []);
+        if (activeTool === 'select') {
+            setSelectedIdx(prev => prev === idx ? null : idx);
+            setSelectedAnnId(null);
+        }
+    }, [activeTool]);
 
-    const handleCanvasClick = useCallback(() => {
+    const handleCanvasClick = useCallback((e: React.MouseEvent) => {
+        if (isPanning) return;
         setSelectedIdx(null);
-    }, []);
+        setSelectedAnnId(null);
+
+        if (view === 'iso') return;
+
+        const pt = getSvgPoint(e);
+
+        if (activeTool === 'add_note') {
+            const newAnn: Annotation = {
+                id: `ann-${Date.now()}`,
+                type: 'note',
+                text: 'Nuova Nota',
+                x: Math.round(pt.x),
+                y: Math.round(pt.y),
+                viewId: viewFamily === 'side' ? sideFace : viewFamily
+            };
+            onProjectChange({ ...project, annotations: [...(project.annotations || []), newAnn] });
+            setSelectedAnnId(newAnn.id);
+            setActiveTool('select');
+        } else if (activeTool === 'add_dim') {
+            if (!drawingDim) {
+                setDrawingDim({ x: Math.round(pt.x), y: Math.round(pt.y) });
+            } else {
+                const newAnn: Annotation = {
+                    id: `ann-${Date.now()}`,
+                    type: 'dimension',
+                    text: '',
+                    x: drawingDim.x,
+                    y: drawingDim.y,
+                    x2: Math.round(pt.x),
+                    y2: Math.round(pt.y),
+                    viewId: viewFamily === 'side' ? sideFace : viewFamily
+                };
+                onProjectChange({ ...project, annotations: [...(project.annotations || []), newAnn] });
+                setDrawingDim(null);
+                setSelectedAnnId(newAnn.id);
+                setActiveTool('select');
+            }
+        }
+    }, [isPanning, activeTool, drawingDim, getSvgPoint, onProjectChange, project, view, viewFamily, sideFace]);
 
     const handleUpdate = useCallback((idx: number, patch: Partial<StraightSegment> | Partial<Elbow90Segment>) => {
         const newSegments = [...project.segments];
@@ -392,7 +492,13 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     {(['top', 'side', 'iso'] as const).map(v => (
                         <button
                             key={v}
-                            onClick={() => setViewFamily(v)}
+                            onClick={() => {
+                                setViewFamily(v);
+                                if (v === 'iso') {
+                                    setActiveTool('select');
+                                    setDrawingDim(null);
+                                }
+                            }}
                             className={cn(
                                 "px-2.5 py-1 text-xs font-medium rounded transition-all",
                                 viewFamily === v
@@ -403,6 +509,36 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                             {VIEW_LABELS[v]}
                         </button>
                     ))}
+                </div>
+
+                <div className="w-px h-6 bg-border mx-1" />
+
+                <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md">
+                    <button
+                        title="Seleziona"
+                        onClick={() => { setActiveTool('select'); setDrawingDim(null); }}
+                        className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'select' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                    >
+                        <MousePointer2 className="h-4 w-4" />
+                    </button>
+                    {(view === 'top' || viewFamily === 'side') && (
+                        <>
+                            <button
+                                title="Aggiungi Nota Testuale"
+                                onClick={() => { setActiveTool('add_note'); setDrawingDim(null); setSelectedAnnId(null); setSelectedIdx(null); }}
+                                className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'add_note' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                            >
+                                <Type className="h-4 w-4" />
+                            </button>
+                            <button
+                                title="Aggiungi Quota"
+                                onClick={() => { setActiveTool('add_dim'); setDrawingDim(null); setSelectedAnnId(null); setSelectedIdx(null); }}
+                                className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'add_dim' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                            >
+                                <Ruler className="h-4 w-4" />
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {viewFamily === 'side' && (
@@ -561,6 +697,55 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     );
                 })}
 
+                {/* Annotazioni Utente */}
+                {project.annotations?.filter(a => !a.viewId || a.viewId === viewFamily || (viewFamily === 'side' && a.viewId === sideFace)).map((ann) => {
+                    const isSelected = selectedAnnId === ann.id;
+                    if (ann.type === 'note') {
+                        return (
+                            <g key={ann.id}
+                                className="annotation-draggable"
+                                onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
+                                onMouseDown={e => {
+                                    if (activeTool === 'select') {
+                                        e.stopPropagation();
+                                        setDraggingAnnId(ann.id);
+                                    }
+                                }}
+                                style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
+                            >
+                                <rect
+                                    x={ann.x - 5} y={ann.y - 12}
+                                    width={(ann.text.length * 7) + 10} height={18}
+                                    fill={isSelected ? 'hsl(var(--primary)/0.15)' : 'hsl(var(--background)/0.8)'}
+                                    stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
+                                    strokeDasharray={isSelected ? "none" : "2 2"}
+                                    rx={4}
+                                />
+                                <text x={ann.x} y={ann.y} className="fill-foreground text-[11px] font-sans pointer-events-none">{ann.text}</text>
+                            </g>
+                        );
+                    } else if (ann.type === 'dimension' && ann.x2 !== undefined && ann.y2 !== undefined) {
+                        const dist = Math.round(Math.sqrt(Math.pow(ann.x2 - ann.x, 2) + Math.pow(ann.y2 - ann.y, 2)));
+                        const label = ann.text || `${dist}`; // Rimosso 'mm' per renderla più flessibile a testo utente
+                        return (
+                            <g key={ann.id}
+                                onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
+                                style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
+                            >
+                                <DimensionLine x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} label={label} offset={0} isSelected={isSelected} />
+                                {/* Hitbox invisibile per cliccarla più facilmente */}
+                                <line x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} stroke="transparent" strokeWidth={20} />
+                            </g>
+                        );
+                    }
+                    return null;
+                })}
+
+                {/* Quota in fase di disegno */}
+                {activeTool === 'add_dim' && drawingDim && (
+                    <DimensionLine x1={drawingDim.x} y1={drawingDim.y} x2={mousePos.x} y2={mousePos.y} label="Disegnando..." offset={0} />
+                )}
+
                 {/* Label vista */}
                 <text
                     x={vbX + 10} y={vbY + 20}
@@ -571,31 +756,10 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                 </text>
             </svg>
 
-            {/* Overlay Tratti (Tracks Info) */}
-            {tracksInfo.length > 0 && (
-                <div className="absolute bottom-4 right-4 bg-background/95 backdrop-blur-md p-3 rounded border border-border/50 shadow-sm min-w-[200px] z-10 pointer-events-none">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2 px-1">Verifica Tratti Rapidi</p>
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto pointer-events-auto">
-                        {tracksInfo.map(t => (
-                            <div key={t.id} className="flex flex-col gap-0.5 text-[11px] bg-muted/40 p-2 rounded border border-border/30">
-                                <span className="font-semibold text-foreground">{t.name}</span>
-                                <div className="flex justify-between items-center mt-1">
-                                    <span className="text-muted-foreground">Teorica: {t.expected} mm</span>
-                                    <span className={cn(
-                                        "font-mono font-black",
-                                        t.isMismatch ? "text-destructive" : "text-emerald-500"
-                                    )}>
-                                        Attuale: {t.actual} mm
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
 
-            {/* Pannello proprietà */}
-            {selectedSegment && selectedIdx !== null && (
+
+            {/* Pannello proprietà segmenti */}
+            {selectedSegment && selectedIdx !== null && activeTool === 'select' && (
                 <PropertiesPanel
                     segment={selectedSegment}
                     index={selectedIdx}
@@ -604,6 +768,23 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     onRemove={handleRemove}
                     onInsertAfter={handleInsertAfter}
                     onClose={() => setSelectedIdx(null)}
+                />
+            )}
+
+            {/* Pannello annotazioni */}
+            {selectedAnnId && activeTool === 'select' && (
+                <AnnotationPanel
+                    annotation={project.annotations!.find(a => a.id === selectedAnnId)!}
+                    onUpdate={(patch) => {
+                        const newAnns = project.annotations!.map(a => a.id === selectedAnnId ? { ...a, ...patch } : a);
+                        onProjectChange({ ...project, annotations: newAnns });
+                    }}
+                    onRemove={() => {
+                        const newAnns = project.annotations!.filter(a => a.id !== selectedAnnId);
+                        onProjectChange({ ...project, annotations: newAnns });
+                        setSelectedAnnId(null);
+                    }}
+                    onClose={() => setSelectedAnnId(null)}
                 />
             )}
 
