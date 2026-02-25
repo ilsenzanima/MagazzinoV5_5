@@ -8,7 +8,7 @@ import type { DuctProject, Segment } from './project-model';
 
 // ==================== TIPI ====================
 
-export type ViewType = 'top' | 'front' | 'right' | 'iso';
+export type ViewType = 'top' | 'front' | 'right' | 'back' | 'left' | 'iso';
 
 export interface Vec3 {
     x: number;
@@ -207,7 +207,7 @@ export function projectTo2D(
     view: ViewType,
     isoAngle: number = 0
 ): SegmentNode2D[] {
-    return nodes.map(node => {
+    return nodes.map((node) => {
         const seg = node.segment;
         const baseColor = SEGMENT_COLORS[seg.type] || '#3b82f6';
         let labelText = seg.label || '';
@@ -217,12 +217,10 @@ export function projectTo2D(
         }
 
         if (view === 'iso') {
-            // Converte l'angolo da gradi a radianti
             const rad = (isoAngle * Math.PI) / 180;
             const cosA = Math.cos(rad);
             const sinA = Math.sin(rad);
 
-            // Applica rotazione attorno all'asse Z prim'ancora della proiezione isometrica
             const rotateZ = (p: Vec3): Vec3 => {
                 return {
                     x: p.x * cosA - p.y * sinA,
@@ -250,31 +248,29 @@ export function projectTo2D(
                 const maxZ = Math.max(p1.z, p2.z) + (p1.z === p2.z ? h / 2 : 0);
 
                 const pts = [
-                    { x: minX, y: minY, z: minZ }, // 0
-                    { x: maxX, y: minY, z: minZ }, // 1
-                    { x: maxX, y: maxY, z: minZ }, // 2
-                    { x: minX, y: maxY, z: minZ }, // 3
-                    { x: minX, y: minY, z: maxZ }, // 4
-                    { x: maxX, y: minY, z: maxZ }, // 5
-                    { x: maxX, y: maxY, z: maxZ }, // 6
-                    { x: minX, y: maxY, z: maxZ }  // 7
+                    { x: minX, y: minY, z: minZ },
+                    { x: maxX, y: minY, z: minZ },
+                    { x: maxX, y: maxY, z: minZ },
+                    { x: minX, y: maxY, z: minZ },
+                    { x: minX, y: minY, z: maxZ },
+                    { x: maxX, y: minY, z: maxZ },
+                    { x: maxX, y: maxY, z: maxZ },
+                    { x: minX, y: maxY, z: maxZ }
                 ];
 
                 const ptsIso = pts.map(iso);
 
                 const faces = [
-                    { indices: [0, 1, 2, 3], fill: `${baseColor}10` }, // bottom
-                    { indices: [4, 5, 6, 7], fill: `${baseColor}40` }, // top
-                    { indices: [0, 1, 5, 4], fill: `${baseColor}30` }, // front-right 
-                    { indices: [3, 2, 6, 7], fill: `${baseColor}05` }, // back-left 
-                    { indices: [0, 3, 7, 4], fill: `${baseColor}20` }, // front-left 
-                    { indices: [1, 2, 6, 5], fill: `${baseColor}05` }, // back-right 
+                    { indices: [0, 1, 2, 3], fill: `${baseColor}10` },
+                    { indices: [4, 5, 6, 7], fill: `${baseColor}40` },
+                    { indices: [0, 1, 5, 4], fill: `${baseColor}30` },
+                    { indices: [3, 2, 6, 7], fill: `${baseColor}05` },
+                    { indices: [0, 3, 7, 4], fill: `${baseColor}20` },
+                    { indices: [1, 2, 6, 5], fill: `${baseColor}05` },
                 ];
 
                 return faces.map(f => {
                     let sum = 0;
-                    // Calcolo depth usando i punti ruotati per determinare correttamente 
-                    // cosa sta davanti (asse Y verso l'osservatore in iso standard)
                     f.indices.forEach(idx => {
                         const rp = rotateZ(pts[idx]);
                         sum += rp.x + rp.y + rp.z;
@@ -293,102 +289,81 @@ export function projectTo2D(
             let labelPos = { x: 0, y: 0 };
 
             if (seg.type === 'elbow90' && node.corner && node.dirOut) {
-                // Generazione di un unico volume a L per evitare facce interne sovrapposte
                 const w = node.outerW;
                 const h = node.outerH;
                 const dirIn = node.direction;
                 const dirOut = node.dirOut;
 
-                // Calcoliamo i limiti lungo gli assi coinvolti
-                const minX = Math.min(node.start.x, node.end.x, node.corner.x) - w / 2;
-                const maxX = Math.max(node.start.x, node.end.x, node.corner.x) + w / 2;
-                const minY = Math.min(node.start.y, node.end.y, node.corner.y) - w / 2;
-                const maxY = Math.max(node.start.y, node.end.y, node.corner.y) + w / 2;
+                const sx = node.start.x, sy = node.start.y;
+                const cx = node.corner.x, cy = node.corner.y;
+                const ex = node.end.x, ey = node.end.y;
+                let basePts: { x: number, y: number }[] = [];
+
+                if (dirIn === '+x' && dirOut === '+y') {
+                    basePts = [{ x: sx, y: sy - w / 2 }, { x: cx + w / 2, y: cy - w / 2 }, { x: cx + w / 2, y: ey }, { x: cx - w / 2, y: ey }, { x: cx - w / 2, y: cy + w / 2 }, { x: sx, y: sy + w / 2 }];
+                } else if (dirIn === '+x' && dirOut === '-y') {
+                    basePts = [{ x: sx, y: sy + w / 2 }, { x: cx + w / 2, y: cy + w / 2 }, { x: cx + w / 2, y: ey }, { x: cx - w / 2, y: ey }, { x: cx - w / 2, y: cy - w / 2 }, { x: sx, y: sy - w / 2 }];
+                } else if (dirIn === '-x' && dirOut === '+y') {
+                    basePts = [{ x: sx, y: sy - w / 2 }, { x: cx - w / 2, y: cy - w / 2 }, { x: cx - w / 2, y: ey }, { x: cx + w / 2, y: ey }, { x: cx + w / 2, y: cy + w / 2 }, { x: sx, y: sy + w / 2 }];
+                } else if (dirIn === '-x' && dirOut === '-y') {
+                    basePts = [{ x: sx, y: sy + w / 2 }, { x: cx - w / 2, y: cy + w / 2 }, { x: cx - w / 2, y: ey }, { x: cx + w / 2, y: ey }, { x: cx + w / 2, y: cy - w / 2 }, { x: sx, y: sy - w / 2 }];
+                } else if (dirIn === '+y' && dirOut === '+x') {
+                    basePts = [{ x: sx - w / 2, y: sy }, { x: cx - w / 2, y: cy + w / 2 }, { x: ex, y: cy + w / 2 }, { x: ex, y: cy - w / 2 }, { x: cx + w / 2, y: cy - w / 2 }, { x: sx + w / 2, y: sy }];
+                } else if (dirIn === '+y' && dirOut === '-x') {
+                    basePts = [{ x: sx + w / 2, y: sy }, { x: cx + w / 2, y: cy + w / 2 }, { x: ex, y: cy + w / 2 }, { x: ex, y: cy - w / 2 }, { x: cx - w / 2, y: cy - w / 2 }, { x: sx - w / 2, y: sy }];
+                } else if (dirIn === '-y' && dirOut === '+x') {
+                    basePts = [{ x: sx - w / 2, y: sy }, { x: cx - w / 2, y: cy - w / 2 }, { x: ex, y: cy - w / 2 }, { x: ex, y: cy + w / 2 }, { x: cx + w / 2, y: cy + w / 2 }, { x: sx + w / 2, y: sy }];
+                } else if (dirIn === '-y' && dirOut === '-x') {
+                    basePts = [{ x: sx + w / 2, y: sy }, { x: cx + w / 2, y: cy - w / 2 }, { x: ex, y: cy - w / 2 }, { x: ex, y: cy + w / 2 }, { x: cx - w / 2, y: cy + w / 2 }, { x: sx - w / 2, y: sy }];
+                } else {
+                    const minX = Math.min(node.start.x, node.end.x, node.corner.x) - w / 2;
+                    const maxX = Math.max(node.start.x, node.end.x, node.corner.x) + w / 2;
+                    const minY = Math.min(node.start.y, node.end.y, node.corner.y) - w / 2;
+                    const maxY = Math.max(node.start.y, node.end.y, node.corner.y) + w / 2;
+                    basePts = [
+                        { x: minX, y: minY }, { x: maxX, y: minY },
+                        { x: maxX, y: maxY }, { x: minX, y: maxY }
+                    ];
+                }
+
                 const minZ = Math.min(node.start.z, node.end.z, node.corner.z) - h / 2;
                 const maxZ = Math.max(node.start.z, node.end.z, node.corner.z) + h / 2;
 
-                // Trova il bounding box interno della 'L' da sottrarre
-                let innerMinX = minX; let innerMaxX = maxX;
-                let innerMinY = minY; let innerMaxY = maxY;
+                const topPts = basePts.map(p => ({ x: p.x, y: p.y, z: maxZ }));
+                const botPts = basePts.map(p => ({ x: p.x, y: p.y, z: minZ }));
 
-                if (dirIn === '+x' && dirOut === '+y') { innerMinX = minX + w; innerMinY = minY + w; }
-                else if (dirIn === '+x' && dirOut === '-y') { innerMinX = minX + w; innerMaxY = maxY - w; }
-                else if (dirIn === '-x' && dirOut === '+y') { innerMaxX = maxX - w; innerMinY = minY + w; }
-                else if (dirIn === '-x' && dirOut === '-y') { innerMaxX = maxX - w; innerMaxY = maxY - w; }
-                else if (dirIn === '+y' && dirOut === '+x') { innerMinX = minX + w; innerMinY = minY + w; }
-                else if (dirIn === '+y' && dirOut === '-x') { innerMaxX = maxX - w; innerMinY = minY + w; }
-                else if (dirIn === '-y' && dirOut === '+x') { innerMinX = minX + w; innerMaxY = maxY - w; }
-                else if (dirIn === '-y' && dirOut === '-x') { innerMaxX = maxX - w; innerMaxY = maxY - w; }
-
-                // Se è un cambio asse Z, per semplicità usiamo i 3 blocchi ma togliamo le facce interne se possibile
-                // o manteniamo boxes. Poiché solitamente il piano è l'XY e ci muoviamo ortogonalmente.
-                // Per coprire tutti in modo robusto, generiamo le facce della L sul piano XY se possibile.
-                const isVerticalTurn = dirIn.includes('z') || dirOut.includes('z');
-
-                if (isVerticalTurn) {
-                    // Fallback to 3 blocks for Z turns, but hide internal overlapping faces by tweaking opacity?
-                    // Or let's just use the 3 blocks, since in HVAC most turns are on XY.
-                    const p1 = generateBoxPolygons(node.start, node.corner, w, h);
-                    const p2 = generateBoxPolygons(node.corner, node.end, w, h);
-                    const pc = generateBoxPolygons(node.corner, node.corner, w, h);
-                    polygons = [...p1, ...pc, ...p2];
-                } else {
-                    // Genera i 6 vertici poligonali superiori/inferiori della forma ad L (piano XY)
-                    let basePts = [
-                        { x: minX, y: minY },
-                        { x: maxX, y: minY },
-                        { x: maxX, y: maxY },
-                        { x: minX, y: maxY }
-                    ];
-
-                    // Troviamo il vertice interno (angolo concavo)
-                    if (dirIn === '+x' && dirOut === '+y' || dirIn === '+y' && dirOut === '+x') {
-                        basePts = [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: innerMinX, y: maxY }, { x: innerMinX, y: innerMinY }, { x: minX, y: innerMinY }];
-                    } else if (dirIn === '+x' && dirOut === '-y' || dirIn === '-y' && dirOut === '+x') {
-                        basePts = [{ x: minX, y: innerMaxY }, { x: innerMinX, y: innerMaxY }, { x: innerMinX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
-                    } else if (dirIn === '-x' && dirOut === '+y' || dirIn === '+y' && dirOut === '-x') {
-                        basePts = [{ x: minX, y: minY }, { x: innerMaxX, y: minY }, { x: innerMaxX, y: innerMinY }, { x: maxX, y: innerMinY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
-                    } else if (dirIn === '-x' && dirOut === '-y' || dirIn === '-y' && dirOut === '-x') {
-                        basePts = [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: innerMaxY }, { x: innerMaxX, y: innerMaxY }, { x: innerMaxX, y: maxY }, { x: minX, y: maxY }];
-                    }
-
-                    const topPts = basePts.map(p => ({ x: p.x, y: p.y, z: maxZ }));
-                    const botPts = basePts.map(p => ({ x: p.x, y: p.y, z: minZ }));
-
-                    const sideFaces: any[] = [];
-                    for (let i = 0; i < basePts.length; i++) {
-                        const next = (i + 1) % basePts.length;
-                        sideFaces.push({
-                            indices: [i, next, next + basePts.length, i + basePts.length],
-                            fill: `${baseColor}20` // Opacità controllata per i lati
-                        });
-                    }
-
-                    const ptsList = [...botPts, ...topPts];
-                    const ptsIso = ptsList.map(iso);
-
-                    const faces = [
-                        { indices: basePts.map((_, i) => i), fill: `${baseColor}10` }, // bottom
-                        { indices: basePts.map((_, i) => i + basePts.length), fill: `${baseColor}40` }, // top
-                        ...sideFaces
-                    ];
-
-                    polygons = faces.map(f => {
-                        let sum = 0;
-                        f.indices.forEach((idx: number) => {
-                            const rp = rotateZ(ptsList[idx]);
-                            sum += rp.x + rp.y + rp.z;
-                        });
-                        return {
-                            points: f.indices.map((idx: number) => ptsIso[idx]),
-                            fill: f.fill,
-                            stroke: baseColor,
-                            strokeWidth: 1,
-                            depth: sum
-                        };
+                const sideFaces: any[] = [];
+                for (let i = 0; i < basePts.length; i++) {
+                    const next = (i + 1) % basePts.length;
+                    sideFaces.push({
+                        indices: [i, next, next + basePts.length, i + basePts.length],
+                        fill: `${baseColor}20`
                     });
                 }
 
+                const ptsList = [...botPts, ...topPts];
+                const ptsIso = ptsList.map(iso);
+
+                const faces = [
+                    { indices: basePts.map((_, i) => i), fill: `${baseColor}10` },
+                    { indices: basePts.map((_, i) => i + basePts.length), fill: `${baseColor}40` },
+                    ...sideFaces
+                ];
+
+                polygons = faces.map(f => {
+                    let sum = 0;
+                    f.indices.forEach((idx: number) => {
+                        const rp = rotateZ(ptsList[idx]);
+                        sum += rp.x + rp.y + rp.z;
+                    });
+                    return {
+                        points: f.indices.map((idx: number) => ptsIso[idx]),
+                        fill: f.fill,
+                        stroke: baseColor,
+                        strokeWidth: 1,
+                        depth: sum
+                    };
+                });
                 polygons.sort((a: any, b: any) => a.depth - b.depth);
                 labelPos = iso(node.corner);
             } else {
@@ -413,27 +388,39 @@ export function projectTo2D(
             };
         }
 
-        let u1: number, v1: number, u2: number, v2: number;
+        let u1 = 0, v1 = 0, u2 = 0, v2 = 0;
         let cu: number | undefined, cv: number | undefined;
         let crossW = node.outerW;
 
         switch (view) {
-            case 'top': // Piano XY — vista dall'alto
+            case 'top':
                 u1 = node.start.x; v1 = node.start.y;
                 u2 = node.end.x; v2 = node.end.y;
                 if (node.corner) { cu = node.corner.x; cv = node.corner.y; }
                 crossW = node.outerW;
                 break;
-            case 'front': // Piano XZ — vista frontale
+            case 'front': // Fronte = y up (+x, -z)
                 u1 = node.start.x; v1 = -node.start.z;
                 u2 = node.end.x; v2 = -node.end.z;
                 if (node.corner) { cu = node.corner.x; cv = -node.corner.z; }
                 crossW = node.outerH;
                 break;
-            case 'right': // Piano YZ — vista laterale
+            case 'right': // Destra = x up (+y, -z)
                 u1 = node.start.y; v1 = -node.start.z;
                 u2 = node.end.y; v2 = -node.end.z;
                 if (node.corner) { cu = node.corner.y; cv = -node.corner.z; }
+                crossW = node.outerW;
+                break;
+            case 'back': // Retro = vista +y (-x, -z)
+                u1 = -node.start.x; v1 = -node.start.z;
+                u2 = -node.end.x; v2 = -node.end.z;
+                if (node.corner) { cu = -node.corner.x; cv = -node.corner.z; }
+                crossW = node.outerH;
+                break;
+            case 'left': // Sinistra = vista +x (-y, -z)
+                u1 = -node.start.y; v1 = -node.start.z;
+                u2 = -node.end.y; v2 = -node.end.z;
+                if (node.corner) { cu = -node.corner.y; cv = -node.corner.z; }
                 crossW = node.outerW;
                 break;
         }
@@ -473,13 +460,12 @@ export function projectTo2D(
         if (node.segment.type === 'elbow90' && cu !== undefined && cv !== undefined) {
             const r1 = createRect(u1, v1, cu, cv);
             const r2 = createRect(cu, cv, u2, v2);
-            // Cubetto di giunzione per evitare buchi nella 'L'
             const centerSq: Rect2D = {
                 x: cu - crossW / 2,
                 y: cv - crossW / 2,
                 width: crossW,
                 height: crossW,
-                rx: 0 // Il centro senza bordi arrotondati aiuta la congiunzione
+                rx: 0
             };
 
             rects.push(r1, centerSq, r2);
