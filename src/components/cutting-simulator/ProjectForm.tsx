@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { cn } from "@/lib/utils";
 import {
     Plus, Trash2, ArrowDown, ArrowUp, ArrowLeft, ArrowRight,
-    CornerDownRight, Ruler, GripVertical, Layers, ChevronDown, ChevronUp, FastForward,
+    CornerDownRight, Ruler, GripVertical, Layers, ChevronDown, ChevronUp, FastForward, ChevronRight
 } from "lucide-react";
 import { SectionSidesSelector } from "@/components/cutting-simulator/SectionSidesSelector";
 import {
@@ -43,6 +43,7 @@ const ORIENTATION_LABELS: Record<SegmentOrientation, string> = {
 };
 
 export function ProjectForm({ project, onProjectChange, onCalculateProject }: ProjectFormProps) {
+    const [collapsedTracks, setCollapsedTracks] = useState<Record<string, boolean>>({});
     const [sectionOpen, setSectionOpen] = useState(true);
 
     // --- Sezione ---
@@ -238,52 +239,70 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                         </div>
 
                         <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
-                            {project.segments.map((seg, idx) => {
-                                if (seg.type === 'trackSeparator') {
-                                    return (
-                                        <div key={seg.id} className="flex items-center gap-2 py-2 px-1 relative my-1">
-                                            <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent rounded pointer-events-none" />
-                                            <div className="h-4 w-1 bg-primary rounded-full relative z-10" />
-                                            <span className="text-[11px] font-bold text-primary relative z-10 uppercase tracking-wider">{seg.name}</span>
-                                            <div className="flex-1 border-t border-dashed border-primary/30 ml-2 relative z-10" />
-                                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive relative z-10"
-                                                onClick={() => removeSegment(seg.id)}>
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    );
-                                }
-
-                                let deductionText = '';
-                                if (project.globalMeasurements && seg.type === 'straight') {
-                                    // Trova i veri segmenti adiacenti ignorando i trackSeparator
-                                    const prev = project.segments.slice(0, idx).reverse().find(s => s.type !== 'trackSeparator');
-                                    const next = project.segments.slice(idx + 1).find(s => s.type !== 'trackSeparator');
-                                    let deduction = 0;
-                                    const outerWidth = project.section.innerWidth + (2 * project.section.thickness);
-
-                                    if (prev && prev.type === 'elbow90') deduction += prev.armB + outerWidth;
-                                    if (next && next.type === 'elbow90') deduction += next.armA + outerWidth;
-
-                                    if (deduction > 0) {
-                                        const actualLength = Math.max(0, seg.length - deduction);
-                                        deductionText = `Taglio: ${actualLength} (-${deduction})`;
+                            {(() => {
+                                let currentTrackId: string | null = null;
+                                return project.segments.map((seg, idx) => {
+                                    if (seg.type === 'trackSeparator') {
+                                        currentTrackId = seg.id;
+                                        const isCollapsed = collapsedTracks[seg.id];
+                                        return (
+                                            <div key={seg.id} className="flex items-center gap-2 py-2 px-1 relative my-1 group">
+                                                <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent rounded pointer-events-none" />
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 w-6 p-0 text-primary relative z-10 -ml-1"
+                                                    onClick={() => setCollapsedTracks(prev => ({ ...prev, [seg.id]: !prev[seg.id] }))}
+                                                >
+                                                    {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                </Button>
+                                                <div className="h-4 w-1 bg-primary rounded-full relative z-10" />
+                                                <span className="text-[11px] font-bold text-primary relative z-10 uppercase tracking-wider">{seg.name}</span>
+                                                <div className="flex-1 border-t border-dashed border-primary/30 ml-2 relative z-10" />
+                                                <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive relative z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={() => removeSegment(seg.id)}>
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        );
                                     }
-                                }
 
-                                return (
-                                    <SegmentRow
-                                        key={seg.id}
-                                        segment={seg as StraightSegment | Elbow90Segment}
-                                        index={idx}
-                                        total={project.segments.length}
-                                        deductionText={deductionText}
-                                        onUpdate={(patch) => updateSegment(seg.id, patch)}
-                                        onRemove={() => removeSegment(seg.id)}
-                                        onMove={(dir) => moveSegment(seg.id, dir)}
-                                    />
-                                );
-                            })}
+                                    if (currentTrackId && collapsedTracks[currentTrackId]) {
+                                        return null;
+                                    }
+
+                                    let deductionText = '';
+                                    if (project.globalMeasurements && seg.type === 'straight') {
+                                        // Trova i veri segmenti adiacenti ignorando i trackSeparator
+                                        const prev = project.segments.slice(0, idx).reverse().find(s => s.type !== 'trackSeparator');
+                                        const next = project.segments.slice(idx + 1).find(s => s.type !== 'trackSeparator');
+                                        let deduction = 0;
+                                        const outerWidth = project.section.innerWidth + (2 * project.section.thickness);
+
+                                        if (prev && prev.type === 'elbow90') deduction += prev.armB + outerWidth;
+                                        if (next && next.type === 'elbow90') deduction += next.armA + outerWidth;
+
+                                        if (deduction > 0) {
+                                            const actualLength = Math.max(0, seg.length - deduction);
+                                            deductionText = `Taglio: ${actualLength} (-${deduction})`;
+                                        }
+                                    }
+
+                                    return (
+                                        <SegmentRow
+                                            key={seg.id}
+                                            segment={seg as StraightSegment | Elbow90Segment}
+                                            index={idx}
+                                            total={project.segments.length}
+                                            deductionText={deductionText}
+                                            onUpdate={(patch) => updateSegment(seg.id, patch)}
+                                            onRemove={() => removeSegment(seg.id)}
+                                            onMove={(dir) => moveSegment(seg.id, dir)}
+                                        />
+                                    );
+                                });
+                            })()}
                             {project.segments.length === 0 && (
                                 <p className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-lg">
                                     Nessun segmento. Aggiungi un tratto dritto o un angolo.
