@@ -259,14 +259,14 @@ export function CuttingSimulatorClient() {
                 )}
 
                 {/* Colonna destra: visualizzazione */}
-                <div className={cn("overflow-hidden flex flex-col", isEditorFullscreen ? "h-full w-full" : "lg:col-span-8 space-y-4")}>
+                <div className={cn("overflow-hidden flex flex-col", isEditorFullscreen ? "fixed inset-0 z-[100] bg-background p-0 md:p-2" : "lg:col-span-8 space-y-4")}>
                     {isEditorFullscreen ? (
                         <>
-                            <div className="md:hidden flex items-center gap-2 p-2 mb-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 text-[10px] sm:text-xs shadow-sm shrink-0">
+                            <div className="md:hidden flex items-center gap-2 p-2 mx-2 mt-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 text-[10px] sm:text-xs shadow-sm shrink-0">
                                 <MousePointer2 className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span>L'editor non supporta bene touch limitato. Usa PC per progettare comodamente.</span>
                             </div>
-                            <div className="flex-1 w-full relative min-h-0 border border-border shadow-sm rounded-xl overflow-hidden">
+                            <div className="flex-1 w-full relative min-h-0 md:border border-border md:shadow-sm md:rounded-xl overflow-hidden">
                                 <ProjectEditor
                                     project={projectData}
                                     onProjectChange={setProjectData}
@@ -276,7 +276,7 @@ export function CuttingSimulatorClient() {
                                                 <p className="text-xs font-semibold text-primary uppercase">Navigazione</p>
                                                 <Button variant="outline" size="sm" onClick={() => setProjectViewMode('list')} className="w-full justify-start text-xs h-9">
                                                     <List className="h-4 w-4 mr-2" />
-                                                    Torna alla Lista Pezzi
+                                                    Chiudi Editor 3D
                                                 </Button>
                                             </div>
                                             <div className="w-full h-px bg-border my-2" />
