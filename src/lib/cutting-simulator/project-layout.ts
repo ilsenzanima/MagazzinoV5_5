@@ -125,16 +125,16 @@ function turnDirection(current: Direction3D, turn: 'left' | 'right' | 'up' | 'do
 
 /**
  * Calcola il layout 3D di tutti i segmenti del progetto.
- * Parte dall'origine (0,0,0) e procede nella direzione +x.
+ * Parte dall'origine (0,0,0) e procede nella direzione specificata.
  */
 export function computeLayout(project: DuctProject): SegmentNode3D[] {
-    const { section, segments } = project;
+    const { section, segments, initialDirection } = project;
     const outerW = section.innerWidth + 2 * section.thickness;
     const outerH = section.innerHeight + 2 * section.thickness;
 
     const nodes: SegmentNode3D[] = [];
     let pos: Vec3 = { x: 0, y: 0, z: 0 };
-    let dir: Direction3D = '+x';
+    let dir: Direction3D = initialDirection || '+x';
 
     for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
