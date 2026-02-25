@@ -495,7 +495,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     const selectedSegment = selectedIdx !== null ? project.segments[selectedIdx] : null;
 
     return (
-        <div className="relative w-full overflow-hidden shrink-0 border border-border rounded-xl bg-muted/20" tabIndex={0} onKeyDown={e => {
+        <div className="relative w-full h-full flex flex-col overflow-hidden shrink-0 border border-border rounded-xl bg-muted/20" tabIndex={0} onKeyDown={e => {
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 if (selectedIdx !== null) handleRemove(selectedIdx);
                 else if (selectedAnnId !== null) {
@@ -629,8 +629,8 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
             <svg
                 ref={svgRef}
                 viewBox={`${vbX.toFixed(0)} ${vbY.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}`}
-                className="w-full bg-background"
-                style={{ height: 500, cursor: isPanning ? 'grabbing' : 'crosshair' }}
+                className="w-full h-full flex-1 bg-background touch-none"
+                style={{ cursor: isPanning ? 'grabbing' : 'crosshair', minHeight: 500 }}
                 onWheel={handleWheel}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
