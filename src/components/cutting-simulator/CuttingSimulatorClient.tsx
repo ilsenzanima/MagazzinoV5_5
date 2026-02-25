@@ -171,7 +171,11 @@ export function CuttingSimulatorClient() {
                             </div>
 
                             {projectViewMode === 'list' ? (
-                                <ProjectForm onCalculateProject={handleCalculateProject} />
+                                <ProjectForm
+                                    project={projectData}
+                                    onProjectChange={setProjectData}
+                                    onCalculateProject={handleCalculateProject}
+                                />
                             ) : null}
                         </>
                     ) : (

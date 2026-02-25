@@ -290,11 +290,103 @@ export function projectTo2D(
             let polygons: Polygon2D[] = [];
             let labelPos = { x: 0, y: 0 };
 
-            if (seg.type === 'elbow90' && node.corner) {
-                const p1 = generateBoxPolygons(node.start, node.corner, node.outerW, node.outerH);
-                const p2 = generateBoxPolygons(node.corner, node.end, node.outerW, node.outerH);
-                const pc = generateBoxPolygons(node.corner, node.corner, node.outerW, node.outerH);
-                polygons = [...p1, ...pc, ...p2];
+            if (seg.type === 'elbow90' && node.corner && node.dirOut) {
+                // Generazione di un unico volume a L per evitare facce interne sovrapposte
+                const w = node.outerW;
+                const h = node.outerH;
+                const dirIn = node.direction;
+                const dirOut = node.dirOut;
+
+                // Calcoliamo i limiti lungo gli assi coinvolti
+                const minX = Math.min(node.start.x, node.end.x, node.corner.x) - w / 2;
+                const maxX = Math.max(node.start.x, node.end.x, node.corner.x) + w / 2;
+                const minY = Math.min(node.start.y, node.end.y, node.corner.y) - w / 2;
+                const maxY = Math.max(node.start.y, node.end.y, node.corner.y) + w / 2;
+                const minZ = Math.min(node.start.z, node.end.z, node.corner.z) - h / 2;
+                const maxZ = Math.max(node.start.z, node.end.z, node.corner.z) + h / 2;
+
+                // Trova il bounding box interno della 'L' da sottrarre
+                let innerMinX = minX; let innerMaxX = maxX;
+                let innerMinY = minY; let innerMaxY = maxY;
+
+                if (dirIn === '+x' && dirOut === '+y') { innerMinX = minX + w; innerMinY = minY + w; }
+                else if (dirIn === '+x' && dirOut === '-y') { innerMinX = minX + w; innerMaxY = maxY - w; }
+                else if (dirIn === '-x' && dirOut === '+y') { innerMaxX = maxX - w; innerMinY = minY + w; }
+                else if (dirIn === '-x' && dirOut === '-y') { innerMaxX = maxX - w; innerMaxY = maxY - w; }
+                else if (dirIn === '+y' && dirOut === '+x') { innerMinX = minX + w; innerMinY = minY + w; }
+                else if (dirIn === '+y' && dirOut === '-x') { innerMaxX = maxX - w; innerMinY = minY + w; }
+                else if (dirIn === '-y' && dirOut === '+x') { innerMinX = minX + w; innerMaxY = maxY - w; }
+                else if (dirIn === '-y' && dirOut === '-x') { innerMaxX = maxX - w; innerMaxY = maxY - w; }
+
+                // Se è un cambio asse Z, per semplicità usiamo i 3 blocchi ma togliamo le facce interne se possibile
+                // o manteniamo boxes. Poiché solitamente il piano è l'XY e ci muoviamo ortogonalmente.
+                // Per coprire tutti in modo robusto, generiamo le facce della L sul piano XY se possibile.
+                const isVerticalTurn = dirIn.includes('z') || dirOut.includes('z');
+
+                if (isVerticalTurn) {
+                    // Fallback to 3 blocks for Z turns, but hide internal overlapping faces by tweaking opacity?
+                    // Or let's just use the 3 blocks, since in HVAC most turns are on XY.
+                    const p1 = generateBoxPolygons(node.start, node.corner, w, h);
+                    const p2 = generateBoxPolygons(node.corner, node.end, w, h);
+                    const pc = generateBoxPolygons(node.corner, node.corner, w, h);
+                    polygons = [...p1, ...pc, ...p2];
+                } else {
+                    // Genera i 6 vertici poligonali superiori/inferiori della forma ad L (piano XY)
+                    let basePts = [
+                        { x: minX, y: minY },
+                        { x: maxX, y: minY },
+                        { x: maxX, y: maxY },
+                        { x: minX, y: maxY }
+                    ];
+
+                    // Troviamo il vertice interno (angolo concavo)
+                    if (dirIn === '+x' && dirOut === '+y' || dirIn === '+y' && dirOut === '+x') {
+                        basePts = [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: innerMinX, y: maxY }, { x: innerMinX, y: innerMinY }, { x: minX, y: innerMinY }];
+                    } else if (dirIn === '+x' && dirOut === '-y' || dirIn === '-y' && dirOut === '+x') {
+                        basePts = [{ x: minX, y: innerMaxY }, { x: innerMinX, y: innerMaxY }, { x: innerMinX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
+                    } else if (dirIn === '-x' && dirOut === '+y' || dirIn === '+y' && dirOut === '-x') {
+                        basePts = [{ x: minX, y: minY }, { x: innerMaxX, y: minY }, { x: innerMaxX, y: innerMinY }, { x: maxX, y: innerMinY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
+                    } else if (dirIn === '-x' && dirOut === '-y' || dirIn === '-y' && dirOut === '-x') {
+                        basePts = [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: innerMaxY }, { x: innerMaxX, y: innerMaxY }, { x: innerMaxX, y: maxY }, { x: minX, y: maxY }];
+                    }
+
+                    const topPts = basePts.map(p => ({ x: p.x, y: p.y, z: maxZ }));
+                    const botPts = basePts.map(p => ({ x: p.x, y: p.y, z: minZ }));
+
+                    const sideFaces: any[] = [];
+                    for (let i = 0; i < basePts.length; i++) {
+                        const next = (i + 1) % basePts.length;
+                        sideFaces.push({
+                            indices: [i, next, next + basePts.length, i + basePts.length],
+                            fill: `${baseColor}20` // Opacità controllata per i lati
+                        });
+                    }
+
+                    const ptsList = [...botPts, ...topPts];
+                    const ptsIso = ptsList.map(iso);
+
+                    const faces = [
+                        { indices: basePts.map((_, i) => i), fill: `${baseColor}10` }, // bottom
+                        { indices: basePts.map((_, i) => i + basePts.length), fill: `${baseColor}40` }, // top
+                        ...sideFaces
+                    ];
+
+                    polygons = faces.map(f => {
+                        let sum = 0;
+                        f.indices.forEach((idx: number) => {
+                            const rp = rotateZ(ptsList[idx]);
+                            sum += rp.x + rp.y + rp.z;
+                        });
+                        return {
+                            points: f.indices.map((idx: number) => ptsIso[idx]),
+                            fill: f.fill,
+                            stroke: baseColor,
+                            strokeWidth: 1,
+                            depth: sum
+                        };
+                    });
+                }
+
                 polygons.sort((a: any, b: any) => a.depth - b.depth);
                 labelPos = iso(node.corner);
             } else {
