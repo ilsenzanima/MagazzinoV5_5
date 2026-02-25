@@ -210,9 +210,11 @@ export function projectTo2D(
     return nodes.map(node => {
         const seg = node.segment;
         const baseColor = SEGMENT_COLORS[seg.type] || '#3b82f6';
-        const labelText = seg.label || (seg.type === 'straight'
-            ? `${seg.length} mm`
-            : `↱ ${seg.direction}`);
+        let labelText = seg.label || '';
+        if (!labelText) {
+            if (seg.type === 'straight') labelText = `${seg.length} mm`;
+            else if (seg.type === 'elbow90') labelText = `↱ ${seg.direction}`;
+        }
 
         if (view === 'iso') {
             // Converte l'angolo da gradi a radianti

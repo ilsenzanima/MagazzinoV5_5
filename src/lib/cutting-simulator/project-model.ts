@@ -24,25 +24,35 @@ export interface SectionProfile {
 export type SegmentDirection = 'left' | 'right' | 'up' | 'down';
 export type SegmentOrientation = 'horizontal' | 'vertical';
 
-export interface StraightSegment {
-    type: 'straight';
+export type SegmentType = 'straight' | 'elbow90' | 'trackSeparator';
+
+export interface BaseSegment {
     id: string;
+    type: SegmentType;
+    label?: string; // Etichetta personalizzata
+}
+
+export interface StraightSegment extends BaseSegment {
+    type: 'straight';
     length: number;
     orientation: SegmentOrientation;
-    label?: string;
 }
 
-export interface Elbow90Segment {
+export interface Elbow90Segment extends BaseSegment {
     type: 'elbow90';
-    id: string;
     direction: SegmentDirection;
-    armA: number;
-    armB: number;
+    armA: number; // Lunghezza braccio di ingresso
+    armB: number; // Lunghezza braccio di uscita
     baseMode: 'split' | 'single';
-    label?: string;
 }
 
-export type Segment = StraightSegment | Elbow90Segment;
+export interface TrackSeparatorSegment extends BaseSegment {
+    type: 'trackSeparator';
+    expectedLength: number;
+    name: string;
+}
+
+export type Segment = StraightSegment | Elbow90Segment | TrackSeparatorSegment;
 
 // ==================== ANNOTAZIONI & CONTESTO ====================
 
@@ -106,6 +116,15 @@ export function createElbow90Segment(direction: SegmentDirection = 'right'): Elb
     };
 }
 
+export function createTrackSeparator(expectedLength: number, name: string = 'Tratto'): TrackSeparatorSegment {
+    return {
+        id: `track-${++_segCounter}-${Date.now()}`,
+        type: 'trackSeparator',
+        expectedLength,
+        name
+    };
+}
+
 export function defaultSection(): SectionProfile {
     return {
         innerWidth: 200,
@@ -122,7 +141,7 @@ export function defaultProject(): DuctProject {
         id: `proj-${Date.now()}`,
         name: 'Nuovo Progetto',
         section: defaultSection(),
-        segments: [createStraightSegment(2000)],
+        segments: [],
         globalMeasurements: true,
     };
 }
