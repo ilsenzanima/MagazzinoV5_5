@@ -98,176 +98,206 @@ export function CuttingSimulatorClient() {
         setNestingResult(null);
     };
 
+    const isEditorFullscreen = viewMode === "project" && projectViewMode === "editor";
+
     return (
-        <div className="space-y-6">
+        <div className={cn("w-full transition-all flex flex-col", isEditorFullscreen ? "h-[calc(100vh-6rem)]" : "space-y-6")}>
             {/* Header */}
-            <div className="flex items-start gap-3">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
-                    <Scissors className="h-7 w-7 text-primary" />
+            {!isEditorFullscreen && (
+                <div className="flex items-start gap-3 shrink-0">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
+                        <Scissors className="h-7 w-7 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                            Disegno e Taglio
+                        </h1>
+                        <p className="text-muted-foreground text-sm mt-1">
+                            Calcola i pezzi, simula il piano di taglio e ottimizza l&apos;uso del materiale
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                        Disegno e Taglio
-                    </h1>
-                    <p className="text-muted-foreground text-sm mt-1">
-                        Calcola i pezzi, simula il piano di taglio e ottimizza l&apos;uso del materiale
-                    </p>
-                </div>
-            </div>
+            )}
 
             {/* Selettore modalità: Pezzo Singolo / Progetto */}
-            <div className="flex gap-2 p-1 bg-muted/50 rounded-lg w-fit">
-                <Button
-                    variant={viewMode === "single" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => handleViewModeChange("single")}
-                    className={cn("gap-2 transition-all", viewMode === "single" && "shadow-md")}
-                >
-                    <RectangleHorizontal className="h-4 w-4" />
-                    Pezzo Singolo
-                </Button>
-                <Button
-                    variant={viewMode === "project" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => handleViewModeChange("project")}
-                    className={cn("gap-2 transition-all", viewMode === "project" && "shadow-md")}
-                >
-                    <Layers className="h-4 w-4" />
-                    Progetto
-                </Button>
-            </div>
+            {!isEditorFullscreen && (
+                <div className="flex gap-2 p-1 bg-muted/50 rounded-lg w-fit shrink-0">
+                    <Button
+                        variant={viewMode === "single" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => handleViewModeChange("single")}
+                        className={cn("gap-2 transition-all", viewMode === "single" && "shadow-md")}
+                    >
+                        <RectangleHorizontal className="h-4 w-4" />
+                        Pezzo Singolo
+                    </Button>
+                    <Button
+                        variant={viewMode === "project" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => handleViewModeChange("project")}
+                        className={cn("gap-2 transition-all", viewMode === "project" && "shadow-md")}
+                    >
+                        <Layers className="h-4 w-4" />
+                        Progetto
+                    </Button>
+                </div>
+            )}
 
             {/* Contenuto principale: layout responsive */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Colonna sinistra: input */}
-                <div className="lg:col-span-4 space-y-4">
-                    {viewMode === "project" ? (
-                        <>
-                            {/* Toggle Lista / Editor */}
-                            <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
-                                <button type="button"
-                                    onClick={() => setProjectViewMode('list')}
-                                    className={cn(
-                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                        projectViewMode === 'list'
-                                            ? "bg-background shadow-sm text-foreground"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <List className="h-3.5 w-3.5" />
-                                    Lista
-                                </button>
-                                <button type="button"
-                                    onClick={() => setProjectViewMode('editor')}
-                                    className={cn(
-                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                        projectViewMode === 'editor'
-                                            ? "bg-background shadow-sm text-foreground"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <PenTool className="h-3.5 w-3.5" />
-                                    Editor
-                                </button>
-                            </div>
+            <div className={cn("w-full flex-1", isEditorFullscreen ? "flex flex-col min-h-0" : "grid grid-cols-1 lg:grid-cols-12 gap-6")}>
+                {/* Colonna sinistra: input (nascosta se fullscreen) */}
+                {!isEditorFullscreen && (
+                    <div className="lg:col-span-4 space-y-4 shrink-0 overflow-y-auto pr-2 pb-4">
+                        {viewMode === "project" ? (
+                            <>
+                                {/* Toggle Lista / Editor */}
+                                <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
+                                    <button type="button"
+                                        onClick={() => setProjectViewMode('list')}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                            projectViewMode === 'list'
+                                                ? "bg-background shadow-sm text-foreground"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <List className="h-3.5 w-3.5" />
+                                        Lista
+                                    </button>
+                                    <button type="button"
+                                        onClick={() => setProjectViewMode('editor')}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                            projectViewMode === 'editor'
+                                                ? "bg-background shadow-sm text-foreground"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <PenTool className="h-3.5 w-3.5" />
+                                        Editor
+                                    </button>
+                                </div>
 
-                            {projectViewMode === 'list' ? (
-                                <ProjectForm
-                                    project={projectData}
-                                    onProjectChange={setProjectData}
-                                    onCalculateProject={handleCalculateProject}
-                                />
-                            ) : null}
-                        </>
-                    ) : (
-                        <>
-                            {/* Sub-selettore tipo pezzo singolo */}
-                            <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
-                                <button type="button"
-                                    onClick={() => handleTypeChange("straight")}
-                                    className={cn(
-                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                        pieceType === "straight"
-                                            ? "bg-background shadow-sm text-foreground"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <RectangleHorizontal className="h-3.5 w-3.5" />
-                                    Tratto Dritto
-                                </button>
-                                <button type="button"
-                                    onClick={() => handleTypeChange("elbow90")}
-                                    className={cn(
-                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                        pieceType === "elbow90"
-                                            ? "bg-background shadow-sm text-foreground"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <CornerDownRight className="h-3.5 w-3.5" />
-                                    Angolo 90°
-                                </button>
-                                <button type="button"
-                                    onClick={() => handleTypeChange("flatPieces")}
-                                    className={cn(
-                                        "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                        pieceType === "flatPieces"
-                                            ? "bg-background shadow-sm text-foreground"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <LayoutGrid className="h-3.5 w-3.5" />
-                                    Pezzi Piani
-                                </button>
-                            </div>
+                                {projectViewMode === 'list' ? (
+                                    <ProjectForm
+                                        project={projectData}
+                                        onProjectChange={setProjectData}
+                                        onCalculateProject={handleCalculateProject}
+                                    />
+                                ) : null}
+                            </>
+                        ) : (
+                            <>
+                                {/* Sub-selettore tipo pezzo singolo */}
+                                <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
+                                    <button type="button"
+                                        onClick={() => handleTypeChange("straight")}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                            pieceType === "straight"
+                                                ? "bg-background shadow-sm text-foreground"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <RectangleHorizontal className="h-3.5 w-3.5" />
+                                        Tratto Dritto
+                                    </button>
+                                    <button type="button"
+                                        onClick={() => handleTypeChange("elbow90")}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                            pieceType === "elbow90"
+                                                ? "bg-background shadow-sm text-foreground"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <CornerDownRight className="h-3.5 w-3.5" />
+                                        Angolo 90°
+                                    </button>
+                                    <button type="button"
+                                        onClick={() => handleTypeChange("flatPieces")}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                            pieceType === "flatPieces"
+                                                ? "bg-background shadow-sm text-foreground"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <LayoutGrid className="h-3.5 w-3.5" />
+                                        Pezzi Piani
+                                    </button>
+                                </div>
 
-                            {pieceType === "straight" ? (
-                                <DuctForm onCalculate={handleCalculateStraight} />
-                            ) : pieceType === "elbow90" ? (
-                                <ElbowForm onCalculate={handleCalculateElbow} />
-                            ) : (
-                                <FlatPiecesForm
-                                    sheetConfig={sheetConfig}
-                                    onCalculate={(result) => {
-                                        setCalcResult(result);
-                                        runNesting(result, sheetConfig);
-                                    }}
-                                />
-                            )}
-                        </>
-                    )}
+                                {pieceType === "straight" ? (
+                                    <DuctForm onCalculate={handleCalculateStraight} />
+                                ) : pieceType === "elbow90" ? (
+                                    <ElbowForm onCalculate={handleCalculateElbow} />
+                                ) : (
+                                    <FlatPiecesForm
+                                        sheetConfig={sheetConfig}
+                                        onCalculate={(result) => {
+                                            setCalcResult(result);
+                                            runNesting(result, sheetConfig);
+                                        }}
+                                    />
+                                )}
+                            </>
+                        )}
 
-                    <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
+                        <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
 
-                    {viewMode === 'project' && <TracksAnalysisPanel project={projectData} />}
+                        {viewMode === 'project' && <TracksAnalysisPanel project={projectData} />}
 
-                    {calcResult && (
-                        <PiecesList
-                            pieces={calcResult.pieces}
-                            totalArea={calcResult.totalArea}
-                            summary={calcResult.summary}
-                        />
-                    )}
-                </div>
+                        {calcResult && (
+                            <PiecesList
+                                pieces={calcResult.pieces}
+                                totalArea={calcResult.totalArea}
+                                summary={calcResult.summary}
+                            />
+                        )}
+                    </div>
+                )}
 
                 {/* Colonna destra: visualizzazione */}
-                <div className="lg:col-span-8 space-y-4">
-                    {/* Editor visivo quando in modalità Progetto + Editor */}
-                    {viewMode === 'project' && projectViewMode === 'editor' ? (
+                <div className={cn("overflow-hidden flex flex-col", isEditorFullscreen ? "h-full w-full" : "lg:col-span-8 space-y-4")}>
+                    {isEditorFullscreen ? (
                         <>
-                            <div className="md:hidden flex items-center gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 text-sm shadow-sm">
-                                <MousePointer2 className="h-4 w-4 flex-shrink-0" />
-                                <span>L'editor 3D non supporta le modifiche touch. Usa un computer per la progettazione.</span>
+                            <div className="md:hidden flex items-center gap-2 p-2 mb-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 text-[10px] sm:text-xs shadow-sm shrink-0">
+                                <MousePointer2 className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>L'editor non supporta bene touch limitato. Usa PC per progettare comodamente.</span>
                             </div>
-                            <ProjectEditor
-                                project={projectData}
-                                onProjectChange={setProjectData}
-                            />
+                            <div className="flex-1 w-full relative min-h-0 border border-border shadow-sm rounded-xl overflow-hidden">
+                                <ProjectEditor
+                                    project={projectData}
+                                    onProjectChange={setProjectData}
+                                    sidebarContent={
+                                        <div className="space-y-5 px-3 pb-6">
+                                            <div className="space-y-2 mt-4">
+                                                <p className="text-xs font-semibold text-primary uppercase">Navigazione</p>
+                                                <Button variant="outline" size="sm" onClick={() => setProjectViewMode('list')} className="w-full justify-start text-xs h-9">
+                                                    <List className="h-4 w-4 mr-2" />
+                                                    Torna alla Lista Pezzi
+                                                </Button>
+                                            </div>
+                                            <div className="w-full h-px bg-border my-2" />
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-primary uppercase">Ottimizzazione</p>
+                                                <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
+                                            </div>
+                                            <div className="w-full h-px bg-border my-2" />
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-primary uppercase">Verifica Inviluppo</p>
+                                                <TracksAnalysisPanel project={projectData} />
+                                            </div>
+                                        </div>
+                                    }
+                                />
+                            </div>
                         </>
                     ) : (
                         <>
                             {nestingResult && nestingResult.sheets.length > 0 && (
-                                <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+                                <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm shrink-0">
                                     <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
                                     <span>
                                         <strong>{nestingResult.totalSheets}</strong> lastr{nestingResult.totalSheets === 1 ? 'a' : 'e'} necessar{nestingResult.totalSheets === 1 ? 'ia' : 'ie'}.
@@ -283,11 +313,13 @@ export function CuttingSimulatorClient() {
                                 </div>
                             )}
 
-                            <CutPlanViewer
-                                sheets={nestingResult?.sheets || []}
-                                sheetConfig={sheetConfig}
-                                unplacedCount={nestingResult?.unplaced.length || 0}
-                            />
+                            <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+                                <CutPlanViewer
+                                    sheets={nestingResult?.sheets || []}
+                                    sheetConfig={sheetConfig}
+                                    unplacedCount={nestingResult?.unplaced.length || 0}
+                                />
+                            </div>
                         </>
                     )}
                 </div>

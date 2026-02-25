@@ -92,6 +92,8 @@ export interface DuctProject {
     segments: Segment[];
     /** Se true, le lunghezze dei tratti dritti sono considerate "fuori tutto" (ingombri) e vengono accorciate dalle curve adiacenti */
     globalMeasurements: boolean;
+    /** Direzione 3D di partenza per il primo segmento (es: +x dest, -y fronte) */
+    initialDirection?: '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
     /** Annotazioni testuali sul disegno (fase B) */
     annotations?: Annotation[];
     /** Elementi contestuali: pareti, solai, varchi (fase D) */

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     Eye, Move, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-    X, Trash2, Plus, CornerDownRight, RectangleHorizontal, Type, Ruler, MousePointer2, Hand
+    X, Trash2, Plus, CornerDownRight, RectangleHorizontal, Type, Ruler, MousePointer2, Hand, Menu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -93,21 +93,21 @@ function DimensionLine({ x1, y1, x2, y2, label, offset = 30, isSelected = false,
     const bx = x2 + nx, by = y2 + ny;
     const mx = (ax + bx) / 2, my = (ay + by) / 2;
 
-    const color = isSelected ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.6)";
-    const extColor = isSelected ? "hsl(var(--primary) / 0.6)" : "hsl(var(--primary) / 0.4)";
+    const lineClass = isSelected ? "stroke-primary" : "stroke-foreground opacity-80";
+    const extClass = isSelected ? "stroke-primary opacity-60" : "stroke-foreground opacity-40";
 
     return (
         <g className="dimension-line">
             {/* Extension lines */}
-            <line x1={x1} y1={y1} x2={ax} y2={ay} stroke={extColor} strokeWidth={0.5 * fScale} />
-            <line x1={x2} y1={y2} x2={bx} y2={by} stroke={extColor} strokeWidth={0.5 * fScale} />
-            {/* Dimension line */}
-            <line x1={ax} y1={ay} x2={bx} y2={by} stroke={color} strokeWidth={(isSelected ? 2 : 1.2) * fScale} markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
+            <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
+            <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
+            {/* Dimension line with dasharray per le quote manuali e fisso */}
+            <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
             {/* Label - font ingrandito per visibilità */}
             <text
                 x={mx} y={my - 6 * fScale}
                 textAnchor="middle"
-                className="fill-primary font-mono font-bold font-sans"
+                className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
                 style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
             >
                 {label}
@@ -296,9 +296,10 @@ function PropertiesPanel({
 interface ProjectEditorProps {
     project: DuctProject;
     onProjectChange: (project: DuctProject) => void;
+    sidebarContent?: React.ReactNode;
 }
 
-export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) {
+export function ProjectEditor({ project, onProjectChange, sidebarContent }: ProjectEditorProps) {
     const [viewFamily, setViewFamily] = useState<'top' | 'side' | 'iso'>('iso');
     const [sideFace, setSideFace] = useState<SideFaceType>('front');
 
@@ -317,6 +318,9 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     const [isoAngle, setIsoAngle] = useState(0);
     const svgRef = useRef<SVGSVGElement>(null);
     const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+    // Gestione sidebar
+    const [showSidebar, setShowSidebar] = useState(false);
 
     // Layout 3D → Proiezione 2D
     const nodes3D = useMemo(() => computeLayout(project), [project]);
@@ -337,12 +341,9 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     const vbH = (bbox.maxY - bbox.minY) / zoom;
     const vbX = bbox.minX + (bbox.maxX - bbox.minX - vbW) / 2 - panOffset.x;
     const vbY = bbox.minY + (bbox.maxY - bbox.minY - vbH) / 2 - panOffset.y;
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     // Fattore di scala dinamico per rendering font/spessori uniformi rispetto allo zoom
     const fScale = Math.max(1, vbW / 800);
-
-    // ==================== Handlers ====================
 
     // ==================== Handlers ====================
 
@@ -494,112 +495,133 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
     const selectedSegment = selectedIdx !== null ? project.segments[selectedIdx] : null;
 
     return (
-        <div className="relative border border-border rounded-lg overflow-hidden bg-background">
-            {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-2 p-2 border-b border-border/50 bg-muted/30">
-                {/* Selettore vista */}
-                <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md shrink-0">
-                    {(['top', 'side', 'iso'] as const).map(v => (
+        <div className="relative w-full overflow-hidden shrink-0 border border-border rounded-xl bg-muted/20" tabIndex={0} onKeyDown={e => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedIdx !== null) handleRemove(selectedIdx);
+                else if (selectedAnnId !== null) {
+                    onProjectChange({ ...project, annotations: project.annotations?.filter(a => a.id !== selectedAnnId) });
+                    setSelectedAnnId(null);
+                }
+            }
+        }}>
+            {/* Toolbar superiore fissa */}
+            <div className="absolute top-2 left-2 right-2 flex items-center gap-2 z-10 flex-wrap shrink-0">
+                {sidebarContent && (
+                    <div className="flex bg-muted/50 p-0.5 rounded-md backdrop-blur-sm mr-2 shadow-sm">
                         <button
-                            key={v}
-                            onClick={() => {
-                                setViewFamily(v);
-                                if (v === 'iso') {
-                                    setActiveTool('select');
-                                    setDrawingDim(null);
-                                }
-                            }}
-                            className={cn(
-                                "px-2.5 py-1 text-xs font-medium rounded transition-all",
-                                viewFamily === v
-                                    ? "bg-background shadow-sm text-foreground"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
+                            title="Opzioni Progetto"
+                            onClick={() => setShowSidebar(!showSidebar)}
+                            className={cn("p-1.5 rounded transition-all flex items-center justify-center", showSidebar ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}
                         >
-                            {VIEW_LABELS[v]}
+                            <Menu className="h-4 w-4" />
                         </button>
-                    ))}
-                </div>
-
-                <div className="w-px h-6 bg-border mx-1 shrink-0" />
-
-                <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md shrink-0">
-                    <button
-                        title="Seleziona"
-                        onClick={() => { setActiveTool('select'); setDrawingDim(null); }}
-                        className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'select' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        <MousePointer2 className="h-4 w-4" />
-                    </button>
-                    <button
-                        title="Sposta (Pan)"
-                        onClick={() => { setActiveTool('pan'); setDrawingDim(null); }}
-                        className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'pan' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        <Hand className="h-4 w-4" />
-                    </button>
-                    {(view === 'top' || viewFamily === 'side') && (
-                        <>
+                    </div>
+                )}
+                <div className="flex bg-muted/50 p-0.5 rounded-md backdrop-blur-sm shadow-sm">
+                    {/* Selettore vista */}
+                    <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md shrink-0">
+                        {(['top', 'side', 'iso'] as const).map(v => (
                             <button
-                                title="Aggiungi Nota Testuale"
-                                onClick={() => { setActiveTool('add_note'); setDrawingDim(null); setSelectedAnnId(null); setSelectedIdx(null); }}
-                                className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'add_note' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                                key={v}
+                                onClick={() => {
+                                    setViewFamily(v);
+                                    if (v === 'iso') {
+                                        setActiveTool('select');
+                                        setDrawingDim(null);
+                                    }
+                                }}
+                                className={cn(
+                                    "px-2.5 py-1 text-xs font-medium rounded transition-all",
+                                    viewFamily === v
+                                        ? "bg-background shadow-sm text-foreground"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
                             >
-                                <Type className="h-4 w-4" />
+                                {VIEW_LABELS[v]}
                             </button>
-                            <button
-                                title="Aggiungi Quota"
-                                onClick={() => { setActiveTool('add_dim'); setDrawingDim(null); setSelectedAnnId(null); setSelectedIdx(null); }}
-                                className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'add_dim' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
-                            >
-                                <Ruler className="h-4 w-4" />
-                            </button>
-                        </>
+                        ))}
+                    </div>
+
+                    <div className="w-px h-6 bg-border mx-1 shrink-0" />
+
+                    <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md shrink-0">
+                        <button
+                            title="Seleziona"
+                            onClick={() => { setActiveTool('select'); setDrawingDim(null); }}
+                            className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'select' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                        >
+                            <MousePointer2 className="h-4 w-4" />
+                        </button>
+                        <button
+                            title="Sposta (Pan)"
+                            onClick={() => { setActiveTool('pan'); setDrawingDim(null); }}
+                            className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'pan' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                        >
+                            <Hand className="h-4 w-4" />
+                        </button>
+                        {(view === 'top' || viewFamily === 'side') && (
+                            <>
+                                <button
+                                    title="Aggiungi Nota Testuale"
+                                    onClick={() => { setActiveTool('add_note'); setDrawingDim(null); setSelectedAnnId(null); setSelectedIdx(null); }}
+                                    className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'add_note' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                                >
+                                    <Type className="h-4 w-4" />
+                                </button>
+                                <button
+                                    title="Aggiungi Quota"
+                                    onClick={() => { setActiveTool('add_dim'); setDrawingDim(null); setSelectedAnnId(null); setSelectedIdx(null); }}
+                                    className={cn("p-1.5 rounded transition-all flex items-center justify-center", activeTool === 'add_dim' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                                >
+                                    <Ruler className="h-4 w-4" />
+                                </button>
+                            </>
+                        )}
+                    </div>
+
+                    {viewFamily === 'side' && (
+                        <div className="flex items-center gap-1 ml-2 mr-2 shrink-0">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => {
+                                const idx = SIDE_FACES.indexOf(sideFace);
+                                setSideFace(SIDE_FACES[(idx - 1 + 4) % 4]);
+                            }}>
+                                <ArrowLeft className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="text-[10px] uppercase font-semibold text-primary w-16 text-center">
+                                {sideFace === 'front' ? 'Fronte' : sideFace === 'right' ? 'Destra' : sideFace === 'back' ? 'Retro' : 'Sinistra'}
+                            </span>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => {
+                                const idx = SIDE_FACES.indexOf(sideFace);
+                                setSideFace(SIDE_FACES[(idx + 1) % 4]);
+                            }}>
+                                <ArrowRight className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
                     )}
-                </div>
 
-                {viewFamily === 'side' && (
-                    <div className="flex items-center gap-1 ml-2 mr-2 shrink-0">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => {
-                            const idx = SIDE_FACES.indexOf(sideFace);
-                            setSideFace(SIDE_FACES[(idx - 1 + 4) % 4]);
-                        }}>
-                            <ArrowLeft className="h-3.5 w-3.5" />
-                        </Button>
-                        <span className="text-[10px] uppercase font-semibold text-primary w-16 text-center">
-                            {sideFace === 'front' ? 'Fronte' : sideFace === 'right' ? 'Destra' : sideFace === 'back' ? 'Retro' : 'Sinistra'}
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => {
-                            const idx = SIDE_FACES.indexOf(sideFace);
-                            setSideFace(SIDE_FACES[(idx + 1) % 4]);
-                        }}>
-                            <ArrowRight className="h-3.5 w-3.5" />
+                    <div className="flex-1 min-w-[20px]" />
+
+                    {/* Zoom controls e Slider Rotazione */}
+                    {view === 'iso' && (
+                        <div className="flex items-center gap-2 mr-2 shrink-0">
+                            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Rotazione Z: {isoAngle}°</Label>
+                            <input
+                                type="range"
+                                min="0" max="360" step="15"
+                                value={isoAngle}
+                                onChange={e => setIsoAngle(Number(e.target.value))}
+                                className="w-24 accent-primary"
+                            />
+                        </div>
+                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-xs text-muted-foreground font-mono w-10 text-right">{(zoom * 100).toFixed(0)}%</span>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.min(5, z * 1.2))}>+</Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.max(0.2, z / 1.2))}>−</Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={handleResetView}>
+                            <Move className="h-3 w-3" /> Reset
                         </Button>
                     </div>
-                )}
-
-                <div className="flex-1 min-w-[20px]" />
-
-                {/* Zoom controls e Slider Rotazione */}
-                {view === 'iso' && (
-                    <div className="flex items-center gap-2 mr-2 shrink-0">
-                        <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Rotazione Z: {isoAngle}°</Label>
-                        <input
-                            type="range"
-                            min="0" max="360" step="15"
-                            value={isoAngle}
-                            onChange={e => setIsoAngle(Number(e.target.value))}
-                            className="w-24 accent-primary"
-                        />
-                    </div>
-                )}
-                <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs text-muted-foreground font-mono w-10 text-right">{(zoom * 100).toFixed(0)}%</span>
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.min(5, z * 1.2))}>+</Button>
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setZoom(z => Math.max(0.2, z / 1.2))}>−</Button>
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={handleResetView}>
-                        <Move className="h-3 w-3" /> Reset
-                    </Button>
                 </div>
             </div>
 
@@ -619,10 +641,16 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                 {/* Markers per frecce quote */}
                 <defs>
                     <marker id="arrow-start" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
-                        <path d="M6,0 L0,2 L6,4" fill="hsl(var(--primary) / 0.6)" />
+                        <path d="M6,0 L0,2 L6,4" fill="currentColor" className="text-foreground opacity-80" />
                     </marker>
                     <marker id="arrow-end" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
-                        <path d="M0,0 L6,2 L0,4" fill="hsl(var(--primary) / 0.6)" />
+                        <path d="M0,0 L6,2 L0,4" fill="currentColor" className="text-foreground opacity-80" />
+                    </marker>
+                    <marker id="arrow-start-sel" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
+                        <path d="M6,0 L0,2 L6,4" fill="currentColor" className="text-primary" />
+                    </marker>
+                    <marker id="arrow-end-sel" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+                        <path d="M0,0 L6,2 L0,4" fill="currentColor" className="text-primary" />
                     </marker>
                 </defs>
 
@@ -704,17 +732,48 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     const r = node.rects[0];
                     if (!r) return null;
                     const isHoriz = r.width > r.height;
+
+                    const x1 = isHoriz ? r.x : r.x + r.width / 2;
+                    const y1 = isHoriz ? r.y + r.height : r.y;
+                    const x2 = isHoriz ? r.x + r.width : r.x + r.width / 2;
+                    const y2 = isHoriz ? r.y + r.height : r.y + r.height;
+                    const label = `${(node.segment as StraightSegment).length}`;
+                    const offset = 25; // Fixed offset for auto dimensions
+                    const isSelected = false; // Auto dimensions are not selectable
+
+                    // Calculate dimension line points
+                    const angle = Math.atan2(y2 - y1, x2 - x1);
+                    const perpAngle = angle + Math.PI / 2;
+
+                    const ax = x1 + Math.cos(perpAngle) * offset;
+                    const ay = y1 + Math.sin(perpAngle) * offset;
+                    const bx = x2 + Math.cos(perpAngle) * offset;
+                    const by = y2 + Math.sin(perpAngle) * offset;
+
+                    // Calculate label position
+                    const mx = (ax + bx) / 2;
+                    const my = (ay + by) / 2;
+
+                    const lineClass = isSelected ? "stroke-primary" : "stroke-foreground opacity-80";
+                    const extClass = isSelected ? "stroke-primary opacity-60" : "stroke-foreground opacity-40";
+
                     return (
-                        <DimensionLine
-                            key={`dim-${i}`}
-                            x1={isHoriz ? r.x : r.x + r.width / 2}
-                            y1={isHoriz ? r.y + r.height : r.y}
-                            x2={isHoriz ? r.x + r.width : r.x + r.width / 2}
-                            y2={isHoriz ? r.y + r.height : r.y + r.height}
-                            label={`${(node.segment as StraightSegment).length}`}
-                            offset={25}
-                            fScale={fScale}
-                        />
+                        <g key={`dim-${i}`} className="dimension-line">
+                            {/* Extension lines */}
+                            <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
+                            <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
+                            {/* Dimension line with dasharray per le quote manuali e fisso */}
+                            <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
+                            {/* Label - font ingrandito per visibilità */}
+                            <text
+                                x={mx} y={my - 6 * fScale}
+                                textAnchor="middle"
+                                className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
+                                style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
+                            >
+                                {label}
+                            </text>
+                        </g>
                     );
                 })}
 
@@ -748,12 +807,47 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                         );
                     } else if (ann.type === 'dimension' && ann.x2 !== undefined && ann.y2 !== undefined) {
                         const label = ann.text || `Quota ?`; // Se custom è vuota, richiede all'utente
+                        const x1 = ann.x;
+                        const y1 = ann.y;
+                        const x2 = ann.x2;
+                        const y2 = ann.y2;
+                        const offset = 0; // Manual dimensions don't have an auto offset
+
+                        // Calculate dimension line points
+                        const angle = Math.atan2(y2 - y1, x2 - x1);
+                        const perpAngle = angle + Math.PI / 2;
+
+                        const ax = x1 + Math.cos(perpAngle) * offset;
+                        const ay = y1 + Math.sin(perpAngle) * offset;
+                        const bx = x2 + Math.cos(perpAngle) * offset;
+                        const by = y2 + Math.sin(perpAngle) * offset;
+
+                        // Calculate label position
+                        const mx = (ax + bx) / 2;
+                        const my = (ay + by) / 2;
+
+                        const lineClass = isSelected ? "stroke-primary" : "stroke-foreground opacity-80";
+                        const extClass = isSelected ? "stroke-primary opacity-60" : "stroke-foreground opacity-40";
+
                         return (
                             <g key={ann.id}
                                 onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
                                 style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
                             >
-                                <DimensionLine x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} label={label} offset={0} isSelected={isSelected} fScale={fScale} />
+                                {/* Extension lines */}
+                                <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
+                                <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
+                                {/* Dimension line with dasharray per le quote manuali e fisso */}
+                                <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
+                                {/* Label - font ingrandito per visibilità */}
+                                <text
+                                    x={mx} y={my - 6 * fScale}
+                                    textAnchor="middle"
+                                    className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
+                                    style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
+                                >
+                                    {label}
+                                </text>
                                 {/* Hitbox invisibile per cliccarla più facilmente */}
                                 <line x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} stroke="transparent" strokeWidth={30 * fScale} />
                             </g>
@@ -771,8 +865,51 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                             const dy = Math.abs(mousePos.y - drawingDim.y);
                             const snapX = dx > dy ? mousePos.x : drawingDim.x;
                             const snapY = dx > dy ? drawingDim.y : mousePos.y;
+
+                            const x1 = drawingDim.x;
+                            const y1 = drawingDim.y;
+                            const x2 = snapX;
+                            const y2 = snapY;
+                            const label = ""; // No label during drawing
+                            const offset = 0;
+                            const isSelected = true;
+
+                            // Calculate dimension line points
+                            const angle = Math.atan2(y2 - y1, x2 - x1);
+                            const perpAngle = angle + Math.PI / 2;
+
+                            const ax = x1 + Math.cos(perpAngle) * offset;
+                            const ay = y1 + Math.sin(perpAngle) * offset;
+                            const bx = x2 + Math.cos(perpAngle) * offset;
+                            const by = y2 + Math.sin(perpAngle) * offset;
+
+                            // Calculate label position
+                            const mx = (ax + bx) / 2;
+                            const my = (ay + by) / 2;
+
+                            const lineClass = isSelected ? "stroke-primary" : "stroke-foreground opacity-80";
+                            const extClass = isSelected ? "stroke-primary opacity-60" : "stroke-foreground opacity-40";
+
                             return (
-                                <DimensionLine x1={drawingDim.x} y1={drawingDim.y} x2={snapX} y2={snapY} label="" offset={0} fScale={fScale} />
+                                <>
+                                    <line x1={drawingDim.x} y1={drawingDim.y} x2={snapX} y2={snapY} stroke="hsl(var(--primary))" strokeWidth={1.5 * fScale} strokeDasharray={`${6 * fScale},${4 * fScale}`} opacity={0.6} />
+                                    <g className="dimension-line">
+                                        {/* Extension lines */}
+                                        <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
+                                        <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
+                                        {/* Dimension line with dasharray per le quote manuali e fisso */}
+                                        <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
+                                        {/* Label - font ingrandito per visibilità */}
+                                        <text
+                                            x={mx} y={my - 6 * fScale}
+                                            textAnchor="middle"
+                                            className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
+                                            style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
+                                        >
+                                            {label}
+                                        </text>
+                                    </g>
+                                </>
                             )
                         })()}
                     </g>
@@ -818,6 +955,45 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                     }}
                     onClose={() => setSelectedAnnId(null)}
                 />
+            )}
+
+            {/* Pannello globale (nessuna selezione) e Settings Form Sidebar */}
+            {sidebarContent && showSidebar && (
+                <div className="absolute top-14 left-2 bottom-6 w-80 bg-background/95 backdrop-blur-md border border-border rounded-lg shadow-xl z-20 overflow-y-auto flex flex-col">
+                    <div className="p-3 border-b flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur-md z-10">
+                        <h3 className="font-semibold text-sm">Opzioni Progetto</h3>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowSidebar(false)}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    {/* Impostazioni Globali dell'editor */}
+                    <div className="p-4 space-y-4 border-b">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-primary">Direzione Iniziale Canale</Label>
+                            <select
+                                className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                                value={project.initialDirection || '+x'}
+                                onChange={e => onProjectChange({ ...project, initialDirection: e.target.value as any })}
+                            >
+                                <option value="+x">Verso Destra (→)</option>
+                                <option value="-x">Verso Sinistra (←)</option>
+                                <option value="-y">Verso il Fronte (↓)</option>
+                                <option value="+y">Verso il Retro (↑)</option>
+                                <option value="+z">Verso l'Alto</option>
+                                <option value="-z">Verso il Basso</option>
+                            </select>
+                        </div>
+                    </div>
+                    {/* Contenuto iniettato (SheetConfig e TracksAnalysis) */}
+                    <div className="p-2 space-y-4">
+                        {sidebarContent}
+                    </div>
+                </div>
+            )}
+            {!selectedSegment && selectedIdx === null && selectedAnnId === null && activeTool === 'select' && !showSidebar && (
+                <div className="absolute right-2 top-2 p-2 bg-background/50 backdrop-blur border rounded-md text-xs text-muted-foreground opacity-60 pointer-events-none">
+                    Nessuna selezione
+                </div>
             )}
 
             {/* Istruzioni */}
