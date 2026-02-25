@@ -102,13 +102,13 @@ function DimensionLine({ x1, y1, x2, y2, label, offset = 30, isSelected = false,
             <line x1={x1} y1={y1} x2={ax} y2={ay} stroke={extColor} strokeWidth={0.5 * fScale} />
             <line x1={x2} y1={y2} x2={bx} y2={by} stroke={extColor} strokeWidth={0.5 * fScale} />
             {/* Dimension line */}
-            <line x1={ax} y1={ay} x2={bx} y2={by} stroke={color} strokeWidth={(isSelected ? 1.5 : 0.8) * fScale} markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
-            {/* Label */}
+            <line x1={ax} y1={ay} x2={bx} y2={by} stroke={color} strokeWidth={(isSelected ? 2 : 1.2) * fScale} markerStart="url(#arrow-start)" markerEnd="url(#arrow-end)" />
+            {/* Label - font ingrandito per visibilità */}
             <text
-                x={mx} y={my - 4 * fScale}
+                x={mx} y={my - 6 * fScale}
                 textAnchor="middle"
-                className="fill-primary font-mono"
-                style={{ fontSize: `${10 * fScale}px` }}
+                className="fill-primary font-mono font-bold font-sans"
+                style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
             >
                 {label}
             </text>
@@ -442,14 +442,20 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
             if (!drawingDim) {
                 setDrawingDim({ x: Math.round(pt.x), y: Math.round(pt.y) });
             } else {
+                // Snap ortogonale
+                const dx = Math.abs(pt.x - drawingDim.x);
+                const dy = Math.abs(pt.y - drawingDim.y);
+                const x2 = dx > dy ? Math.round(pt.x) : drawingDim.x;
+                const y2 = dx > dy ? drawingDim.y : Math.round(pt.y);
+
                 const newAnn: Annotation = {
                     id: `ann-${Date.now()}`,
                     type: 'dimension',
-                    text: '',
+                    text: '', // Lasciamo in bianco che significa "inserisci testo"
                     x: drawingDim.x,
                     y: drawingDim.y,
-                    x2: Math.round(pt.x),
-                    y2: Math.round(pt.y),
+                    x2: x2,
+                    y2: y2,
                     viewId: viewFamily === 'side' ? sideFace : viewFamily
                 };
                 onProjectChange({ ...project, annotations: [...(project.annotations || []), newAnn] });
@@ -729,20 +735,19 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                                 style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
                             >
                                 <rect
-                                    x={ann.x - 5 * fScale} y={ann.y - 14 * fScale}
-                                    width={(ann.text.length * 7 * fScale) + 10 * fScale} height={20 * fScale}
+                                    x={ann.x - 5 * fScale} y={ann.y - 18 * fScale}
+                                    width={(ann.text.length * 9 * fScale) + 14 * fScale} height={26 * fScale}
                                     fill={isSelected ? 'hsl(var(--primary)/0.15)' : 'hsl(var(--background)/0.9)'}
                                     stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground)/0.4)'}
                                     strokeDasharray={isSelected ? "none" : `${2 * fScale} ${2 * fScale}`}
-                                    strokeWidth={1 * fScale}
-                                    rx={4 * fScale}
+                                    strokeWidth={1.5 * fScale}
+                                    rx={6 * fScale}
                                 />
-                                <text x={ann.x} y={ann.y} className="fill-foreground font-sans pointer-events-none" style={{ fontSize: `${12 * fScale}px` }}>{ann.text}</text>
+                                <text x={ann.x} y={ann.y} className="fill-foreground font-sans font-medium pointer-events-none" style={{ fontSize: `${16 * fScale}px` }}>{ann.text}</text>
                             </g>
                         );
                     } else if (ann.type === 'dimension' && ann.x2 !== undefined && ann.y2 !== undefined) {
-                        const dist = Math.round(Math.sqrt(Math.pow(ann.x2 - ann.x, 2) + Math.pow(ann.y2 - ann.y, 2)));
-                        const label = ann.text || `${dist}`; // Rimosso 'mm' per renderla più flessibile a testo utente
+                        const label = ann.text || `Quota ?`; // Se custom è vuota, richiede all'utente
                         return (
                             <g key={ann.id}
                                 onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
@@ -750,7 +755,7 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                             >
                                 <DimensionLine x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} label={label} offset={0} isSelected={isSelected} fScale={fScale} />
                                 {/* Hitbox invisibile per cliccarla più facilmente */}
-                                <line x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} stroke="transparent" strokeWidth={20 * fScale} />
+                                <line x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} stroke="transparent" strokeWidth={30 * fScale} />
                             </g>
                         );
                     }
@@ -760,9 +765,16 @@ export function ProjectEditor({ project, onProjectChange }: ProjectEditorProps) 
                 {/* Quota in fase di disegno */}
                 {activeTool === 'add_dim' && drawingDim && (
                     <g>
-                        {/* Linea guida tratteggiata rossa */}
-                        <line x1={drawingDim.x} y1={drawingDim.y} x2={mousePos.x} y2={mousePos.y} stroke="hsl(var(--primary))" strokeWidth={1.5 * fScale} strokeDasharray={`${6 * fScale},${4 * fScale}`} opacity={0.6} />
-                        <DimensionLine x1={drawingDim.x} y1={drawingDim.y} x2={mousePos.x} y2={mousePos.y} label="Click per confermare" offset={0} fScale={fScale} />
+                        {/* Linea guida tratteggiata */}
+                        {(() => {
+                            const dx = Math.abs(mousePos.x - drawingDim.x);
+                            const dy = Math.abs(mousePos.y - drawingDim.y);
+                            const snapX = dx > dy ? mousePos.x : drawingDim.x;
+                            const snapY = dx > dy ? drawingDim.y : mousePos.y;
+                            return (
+                                <DimensionLine x1={drawingDim.x} y1={drawingDim.y} x2={snapX} y2={snapY} label="" offset={0} fScale={fScale} />
+                            )
+                        })()}
                     </g>
                 )}
 
