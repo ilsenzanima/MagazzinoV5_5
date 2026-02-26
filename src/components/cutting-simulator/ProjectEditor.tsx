@@ -311,15 +311,18 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [draggingAnnId, setDraggingAnnId] = useState<string | null>(null);
     const [draggingTrackId, setDraggingTrackId] = useState<string | null>(null);
+    const [snapTarget, setSnapTarget] = useState<{ x: number, y: number, z: number } | null>(null);
     const [trackDragOffset, setTrackDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
     const [isPanning, setIsPanning] = useState(false);
+    const [isRotatingIso, setIsRotatingIso] = useState(false);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [isoAngle, setIsoAngle] = useState(0);
     const svgRef = useRef<SVGSVGElement>(null);
     const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+    const rotStart = useRef<{ x: number; angle: number } | null>(null);
 
     // Gestione sidebar
     const [showSidebar, setShowSidebar] = useState(false);
@@ -377,11 +380,19 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     }, []);
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        if (activeTool === 'pan' || e.button === 1 || (e.button === 0 && e.altKey)) {
+        if (activeTool === 'pan' || (e.button === 0 && e.altKey)) {
             setIsPanning(true);
             panStart.current = { x: e.clientX, y: e.clientY, ox: panOffset.x, oy: panOffset.y };
+        } else if (e.button === 1) { // Click Rotellina Centrale
+            if (viewFamily === 'iso') {
+                setIsRotatingIso(true);
+                rotStart.current = { x: e.clientX, angle: isoAngle };
+            } else {
+                setIsPanning(true);
+                panStart.current = { x: e.clientX, y: e.clientY, ox: panOffset.x, oy: panOffset.y };
+            }
         }
-    }, [panOffset, activeTool]);
+    }, [panOffset, activeTool, viewFamily, isoAngle]);
 
     const handleSegmentMouseDown = useCallback((trackId: string | undefined, e: React.MouseEvent) => {
         if (activeTool === 'select' && trackId) {
@@ -397,7 +408,10 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         const pt = getSvgPoint(e);
         setMousePos(pt);
 
-        if (isPanning && panStart.current && svgRef.current) {
+        if (isRotatingIso && rotStart.current) {
+            const dx = e.clientX - rotStart.current.x;
+            setIsoAngle(rotStart.current.angle + dx * 0.5); // 0.5 è la sensibilità della rotazione
+        } else if (isPanning && panStart.current && svgRef.current) {
             const dx = e.clientX - panStart.current.x;
             const dy = e.clientY - panStart.current.y;
 
@@ -411,7 +425,86 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         } else if (draggingTrackId && panStart.current) {
             const dx = pt.x - panStart.current.x;
             const dy = pt.y - panStart.current.y;
-            setTrackDragOffset({ x: dx, y: dy });
+
+            // Approssimiamo lo spostamento 3D "on the fly"
+            let worldDx = dx; let worldDy = dy; let worldDz = 0;
+            if (viewFamily === 'top') {
+                worldDy = -dy;
+            } else if (viewFamily === 'side') {
+                if (sideFace === 'front') { worldDx = dx; worldDz = -dy; }
+                else if (sideFace === 'back') { worldDx = -dx; worldDz = -dy; }
+                else if (sideFace === 'right') { worldDy = dx; worldDz = -dy; }
+                else if (sideFace === 'left') { worldDy = -dx; worldDz = -dy; }
+            } else if (viewFamily === 'iso') {
+                const rad = (isoAngle * Math.PI) / 180;
+                const cos30 = 0.866;
+                const sin30 = 0.5;
+                const baseDx = (dx / (2 * cos30)) + (dy / (2 * sin30));
+                const baseDy = -(dx / (2 * cos30)) + (dy / (2 * sin30));
+                const cosA = Math.cos(-rad);
+                const sinA = Math.sin(-rad);
+                worldDx = baseDx * cosA - baseDy * sinA;
+                worldDy = baseDx * sinA + baseDy * cosA;
+            }
+
+            // Troviamo la posizione di origine
+            const trackIdx = project.segments.findIndex(s => s.id === draggingTrackId);
+            const ts = project.segments[trackIdx] as any;
+            let worldPos = { x: ts.startX ?? 0, y: ts.startY ?? 0, z: ts.startZ ?? 0 };
+            if (ts.startX === undefined) {
+                const firstNode = nodes3D.find(n => n.index === trackIdx + 1);
+                if (firstNode) worldPos = { ...firstNode.start };
+            }
+
+            const newPos = { x: worldPos.x + worldDx, y: worldPos.y + worldDy, z: worldPos.z + worldDz };
+
+            // Cerchiamo target di snap
+            let foundSnap: { x: number, y: number, z: number } | null = null;
+            let minSqDist = 150 * 150; // SNAP_DISTANCE = 150mm
+
+            for (const node of nodes3D) {
+                if (node.trackId === draggingTrackId) continue;
+                const endpoints = [node.end];
+                if (node.segment.type === 'trackSeparator') endpoints.push(node.start); // Opzionale aggancio a inizi liberi
+
+                for (const ep of endpoints) {
+                    const distSq = Math.pow(ep.x - newPos.x, 2) + Math.pow(ep.y - newPos.y, 2) + Math.pow(ep.z - newPos.z, 2);
+                    if (distSq < minSqDist) {
+                        minSqDist = distSq;
+                        foundSnap = { ...ep };
+                    }
+                }
+            }
+
+            setSnapTarget(foundSnap);
+
+            let screenDx = dx; let screenDy = dy;
+            if (foundSnap) {
+                const snapWorldDx = foundSnap.x - worldPos.x;
+                const snapWorldDy = foundSnap.y - worldPos.y;
+                const snapWorldDz = foundSnap.z - worldPos.z;
+
+                if (viewFamily === 'top') {
+                    screenDx = snapWorldDx; screenDy = -snapWorldDy;
+                } else if (viewFamily === 'side') {
+                    if (sideFace === 'front') { screenDx = snapWorldDx; screenDy = -snapWorldDz; }
+                    else if (sideFace === 'back') { screenDx = -snapWorldDx; screenDy = -snapWorldDz; }
+                    else if (sideFace === 'right') { screenDx = snapWorldDy; screenDy = -snapWorldDz; }
+                    else if (sideFace === 'left') { screenDx = -snapWorldDy; screenDy = -snapWorldDz; }
+                } else if (viewFamily === 'iso') {
+                    const rad = (isoAngle * Math.PI) / 180;
+                    const cosA = Math.cos(rad);
+                    const sinA = Math.sin(rad);
+                    const rx = snapWorldDx * cosA - snapWorldDy * sinA;
+                    const ry = snapWorldDx * sinA + snapWorldDy * cosA;
+                    const cos30 = 0.866;
+                    const sin30 = 0.5;
+                    screenDx = (rx - ry) * cos30;
+                    screenDy = (rx + ry) * sin30 - snapWorldDz;
+                }
+            }
+
+            setTrackDragOffset({ x: screenDx, y: screenDy });
         } else if (draggingAnnId) {
             const anns = project.annotations || [];
             const idx = anns.findIndex(a => a.id === draggingAnnId);
@@ -428,6 +521,8 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
 
     const handleMouseUp = useCallback((e: React.MouseEvent) => {
         setIsPanning(false);
+        setIsRotatingIso(false);
+        rotStart.current = null;
         setDraggingAnnId(null);
 
         if (draggingTrackId && panStart.current) {
@@ -453,39 +548,44 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                     }
 
                     let worldDx = dx; let worldDy = dy; let worldDz = 0;
-                    if (viewFamily === 'top') {
-                        worldDy = -dy;
-                    } else if (viewFamily === 'side') {
-                        if (sideFace === 'front') { worldDx = dx; worldDz = -dy; }
-                        else if (sideFace === 'back') { worldDx = -dx; worldDz = -dy; }
-                        else if (sideFace === 'right') { worldDy = dx; worldDz = -dy; }
-                        else if (sideFace === 'left') { worldDy = -dx; worldDz = -dy; }
-                    } else if (viewFamily === 'iso') {
-                        const rad = (isoAngle * Math.PI) / 180;
-                        const cos30 = 0.866;
-                        const sin30 = 0.5;
+                    if (snapTarget) {
+                        ts.startX = snapTarget.x;
+                        ts.startY = snapTarget.y;
+                        ts.startZ = snapTarget.z;
+                    } else {
+                        if (viewFamily === 'top') {
+                            worldDy = -dy;
+                        } else if (viewFamily === 'side') {
+                            if (sideFace === 'front') { worldDx = dx; worldDz = -dy; }
+                            else if (sideFace === 'back') { worldDx = -dx; worldDz = -dy; }
+                            else if (sideFace === 'right') { worldDy = dx; worldDz = -dy; }
+                            else if (sideFace === 'left') { worldDy = -dx; worldDz = -dy; }
+                        } else if (viewFamily === 'iso') {
+                            const rad = (isoAngle * Math.PI) / 180;
+                            const cos30 = 0.866;
+                            const sin30 = 0.5;
 
-                        // Pseudo inverse iso projection assuming dz=0
-                        const baseDx = (dx / (2 * cos30)) + (dy / (2 * sin30));
-                        const baseDy = -(dx / (2 * cos30)) + (dy / (2 * sin30));
+                            const baseDx = (dx / (2 * cos30)) + (dy / (2 * sin30));
+                            const baseDy = -(dx / (2 * cos30)) + (dy / (2 * sin30));
 
-                        // un-rotate
-                        const cosA = Math.cos(-rad);
-                        const sinA = Math.sin(-rad);
-                        worldDx = baseDx * cosA - baseDy * sinA;
-                        worldDy = baseDx * sinA + baseDy * cosA;
-                        worldDz = 0;
+                            const cosA = Math.cos(-rad);
+                            const sinA = Math.sin(-rad);
+                            worldDx = baseDx * cosA - baseDy * sinA;
+                            worldDy = baseDx * sinA + baseDy * cosA;
+                            worldDz = 0;
+                        }
+
+                        ts.startX = Math.round(worldPos.x + worldDx);
+                        ts.startY = Math.round(worldPos.y + worldDy);
+                        ts.startZ = Math.round(worldPos.z + worldDz);
                     }
-
-                    ts.startX = Math.round(worldPos.x + worldDx);
-                    ts.startY = Math.round(worldPos.y + worldDy);
-                    ts.startZ = Math.round(worldPos.z + worldDz);
 
                     newSegments[trackIdx] = ts;
                     onProjectChange({ ...project, segments: newSegments });
                 }
             }
             setDraggingTrackId(null);
+            setSnapTarget(null);
             setTrackDragOffset({ x: 0, y: 0 });
         }
 
@@ -816,6 +916,38 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                         </g>
                     );
                 })}
+
+                {/* Indicatore visivo Snap */}
+                {snapTarget && draggingTrackId && (() => {
+                    // Proiettiamo in 2D la posizione world dello snap
+                    let sx = 0, sy = 0;
+                    // Mock rapido di proiezione 2D
+                    if (viewFamily === 'top') {
+                        sx = snapTarget.x; sy = -snapTarget.y;
+                    } else if (viewFamily === 'side') {
+                        if (sideFace === 'front') { sx = snapTarget.x; sy = -snapTarget.z; }
+                        else if (sideFace === 'back') { sx = -snapTarget.x; sy = -snapTarget.z; }
+                        else if (sideFace === 'right') { sx = snapTarget.y; sy = -snapTarget.z; }
+                        else if (sideFace === 'left') { sx = -snapTarget.y; sy = -snapTarget.z; }
+                    } else if (viewFamily === 'iso') {
+                        const rad = (isoAngle * Math.PI) / 180;
+                        const cosA = Math.cos(rad); const sinA = Math.sin(rad);
+                        const rx = snapTarget.x * cosA - snapTarget.y * sinA;
+                        const ry = snapTarget.x * sinA + snapTarget.y * cosA;
+                        const cos30 = 0.866; const sin30 = 0.5;
+                        sx = (rx - ry) * cos30;
+                        sy = (rx + ry) * sin30 - snapTarget.z;
+                    }
+
+                    return (
+                        <g>
+                            <circle cx={sx} cy={sy} r={25 * fScale} fill="hsl(var(--primary)/0.2)" stroke="hsl(var(--primary))" strokeWidth={2 * fScale} />
+                            <circle cx={sx} cy={sy} r={8 * fScale} fill="hsl(var(--primary))" />
+                            <line x1={sx - 40 * fScale} y1={sy} x2={sx + 40 * fScale} y2={sy} stroke="hsl(var(--primary))" strokeWidth={1 * fScale} pointerEvents="none" strokeDasharray="4 4" />
+                            <line x1={sx} y1={sy - 40 * fScale} x2={sx} y2={sy + 40 * fScale} stroke="hsl(var(--primary))" strokeWidth={1 * fScale} pointerEvents="none" strokeDasharray="4 4" />
+                        </g>
+                    );
+                })()}
 
                 {/* TODO: Quote automatiche rimosse per evitare sovrapposizioni con l'etichetta base */}
 
