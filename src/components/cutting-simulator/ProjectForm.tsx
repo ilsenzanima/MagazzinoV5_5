@@ -240,11 +240,6 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                             </Button>
                         </div>
 
-                        <TrackGenerator
-                            existingTracksCount={project.segments.filter(s => s.type === 'trackSeparator').length}
-                            onGenerate={(segs) => onProjectChange(p => ({ ...p, segments: [...p.segments, ...segs] }))}
-                        />
-
                         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                             {(() => {
                                 const groupedSegments: {
@@ -348,15 +343,36 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                     )}
 
                                                     {/* Toolbar di aggiunta per QUESTO gruppo */}
-                                                    <div className="mt-2 ml-6 flex gap-1.5">
-                                                        <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] w-full border-dashed"
-                                                            onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment())}>
-                                                            <Plus className="h-3 w-3 mr-1" /> Dritto
-                                                        </Button>
-                                                        <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] w-full border-dashed"
-                                                            onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createElbow90Segment())}>
-                                                            <Plus className="h-3 w-3 mr-1" /> Angolo
-                                                        </Button>
+                                                    <div className="mt-2 ml-6 space-y-2">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] w-full border-dashed bg-background hover:bg-muted/50">
+                                                                    <Plus className="h-3 w-3 mr-1" /> Aggiungi Tratto Singolo
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="start" className="w-48 border-border/40">
+                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment())} className="text-xs cursor-pointer">
+                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Dritto
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createElbow90Segment())} className="text-xs cursor-pointer">
+                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Angolo 90°
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Tappo (Prossimamente)
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Raccordo (Prossimamente)
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                        <TrackGenerator
+                                                            onGenerate={(segs) => {
+                                                                // Usa timeout per evitare React render loop issue se si fan troppi update insieme
+                                                                segs.forEach((s, idx) => {
+                                                                    addSegmentToGroup(group.separatorIndex, group.items.length + idx, s);
+                                                                });
+                                                            }}
+                                                        />
                                                     </div>
                                                 </div>
                                             )}
@@ -565,9 +581,9 @@ function ElbowFields({ seg, onUpdate }: {
     );
 }
 
-// ==================== Generatore Segmenti ====================
+// ==================== Generatore Tratti Concatenati ====================
 
-function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTracksCount?: number, onGenerate: (segments: Segment[]) => void }) {
+function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[]) => void }) {
     const [isOpen, setIsOpen] = useState(false);
     const [trackLength, setTrackLength] = useState(10000);
     const [standardLength, setStandardLength] = useState(2500);
@@ -579,12 +595,6 @@ function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTrack
     const handleGenerate = () => {
         let remainingLength = trackLength;
         const newSegments: Segment[] = [];
-
-        // Generazione del nome progressivo (A, B, C...)
-        const trackLetter = String.fromCharCode(65 + existingTracksCount);
-
-        // Aggiungi subito l'header separatore
-        newSegments.push(createTrackSeparator(trackLength, `SEGMENTO ${trackLetter}`));
 
         // Sottrarre l'ingombro del gomito dalla lunghezza totale dei dritti
         if (hasElbow) {
@@ -627,11 +637,11 @@ function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTrack
         <div className="border border-primary/30 rounded-lg overflow-hidden bg-primary/5">
             <button type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center gap-2 px-3 py-2 bg-primary/10 hover:bg-primary/20 transition-colors text-left"
+                className="w-full flex items-center gap-2 px-2 py-1.5 bg-primary/10 hover:bg-primary/20 transition-colors text-left"
             >
-                <FastForward className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium flex-1 text-primary">Aggiungi Segmento Rapido</span>
-                {isOpen ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-primary" />}
+                <FastForward className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[11px] font-medium flex-1 text-primary">Genera successione di Tratti da Misura</span>
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-primary" />}
             </button>
 
             {isOpen && (
@@ -735,7 +745,7 @@ function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTrack
                     </div>
 
                     <Button type="button" onClick={handleGenerate} className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground">
-                        Aggiungi struttura al progetto
+                        Inserisci sequenza nel Segmento
                     </Button>
                 </div>
             )}
