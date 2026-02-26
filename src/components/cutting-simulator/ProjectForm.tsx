@@ -62,7 +62,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
         onProjectChange(p => ({ ...p, segments: p.segments.filter(s => s.id !== id) }));
     }, [onProjectChange]);
 
-    const updateSegment = useCallback((id: string, patch: Partial<StraightSegment> | Partial<Elbow90Segment>) => {
+    const updateSegment = useCallback((id: string, patch: Partial<StraightSegment> | Partial<Elbow90Segment> | Partial<TrackSeparatorSegment>) => {
         onProjectChange(p => ({
             ...p,
             segments: p.segments.map(s => s.id === id ? { ...s, ...patch } as Segment : s),
@@ -289,10 +289,22 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                             {group.items.length} tratti
                                                         </span>
                                                     </div>
-                                                    <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
-                                                        onClick={() => removeSegment(sepId)}>
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Label className="text-[10px] text-muted-foreground uppercase">Teorica:</Label>
+                                                            <div className="relative">
+                                                                <Input type="number" min="0" step="1"
+                                                                    value={group.separator?.expectedLength || 0}
+                                                                    onChange={e => updateSegment(sepId, { expectedLength: parseFloat(e.target.value) || 0 })}
+                                                                    className="h-6 w-20 text-[10px] pr-6 py-0 border-border/40" />
+                                                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                                                            </div>
+                                                        </div>
+                                                        <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
+                                                            onClick={() => removeSegment(sepId)}>
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -366,7 +378,10 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                         <TrackGenerator
-                                                            onGenerate={(segs) => {
+                                                            onGenerate={(segs, requestedLength) => {
+                                                                if (group.separator) {
+                                                                    updateSegment(group.separator.id, { expectedLength: requestedLength });
+                                                                }
                                                                 // Usa timeout per evitare React render loop issue se si fan troppi update insieme
                                                                 segs.forEach((s, idx) => {
                                                                     addSegmentToGroup(group.separatorIndex, group.items.length + idx, s);
@@ -583,7 +598,7 @@ function ElbowFields({ seg, onUpdate }: {
 
 // ==================== Generatore Tratti Concatenati ====================
 
-function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[]) => void }) {
+function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[], totalLength: number) => void }) {
     const [isOpen, setIsOpen] = useState(false);
     const [trackLength, setTrackLength] = useState(10000);
     const [standardLength, setStandardLength] = useState(2500);
@@ -628,7 +643,7 @@ function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[]) => v
         }
 
         if (newSegments.length > 0) {
-            onGenerate(newSegments);
+            onGenerate(newSegments, trackLength);
             setIsOpen(false);
         }
     };
