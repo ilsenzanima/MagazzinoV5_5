@@ -75,8 +75,32 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
             if (idx < 0) return p;
             const newIdx = dir === 'up' ? idx - 1 : idx + 1;
             if (newIdx < 0 || newIdx >= p.segments.length) return p;
+            // Prevent moving a regular segment outside its TrackSeparator group or before it
+            if (p.segments[idx].type !== 'trackSeparator' && p.segments[newIdx].type === 'trackSeparator') return p;
+            if (p.segments[idx].type === 'trackSeparator' && p.segments[newIdx].type !== 'trackSeparator') return p;
+
             const segs = [...p.segments];
             [segs[idx], segs[newIdx]] = [segs[newIdx], segs[idx]];
+            return { ...p, segments: segs };
+        });
+    }, [onProjectChange]);
+
+    const addEmptySegment = useCallback(() => {
+        const existingTracksCount = project.segments.filter(s => s.type === 'trackSeparator').length;
+        const trackLetter = String.fromCharCode(65 + existingTracksCount);
+        addSegment(createTrackSeparator(1000, `SEGMENTO ${trackLetter}`));
+    }, [project.segments, addSegment]);
+
+    const addSegmentToGroup = useCallback((separatorIndex: number | null, itemsCount: number, newSeg: Segment) => {
+        onProjectChange(p => {
+            const segs = [...p.segments];
+            const insertIndex = separatorIndex === null ? itemsCount : separatorIndex + 1 + itemsCount;
+            segs.splice(insertIndex, 0, newSeg);
+            // Assicurati che se aggiungiamo a un gruppo, non sia collassato
+            if (separatorIndex !== null) {
+                const sepId = segs[separatorIndex].id;
+                setCollapsedTracks(prev => ({ ...prev, [sepId]: false }));
+            }
             return { ...p, segments: segs };
         });
     }, [onProjectChange]);
@@ -209,106 +233,141 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
 
                     {/* === STRUTTURA === */}
                     <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium">Isole nel Progetto ({project.segments.filter(s => s.type === 'trackSeparator').length})</p>
+                            <Button type="button" onClick={addEmptySegment} size="sm" className="h-7 text-xs gap-1">
+                                <Plus className="h-3 w-3" /> Crea Nuovo Segmento (Isola)
+                            </Button>
+                        </div>
+
                         <TrackGenerator
                             existingTracksCount={project.segments.filter(s => s.type === 'trackSeparator').length}
                             onGenerate={(segs) => onProjectChange(p => ({ ...p, segments: [...p.segments, ...segs] }))}
                         />
 
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">Tratti nell'Editor ({project.segments.filter(s => s.type !== 'trackSeparator').length})</p>
-                            <div className="flex gap-1">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1 bg-muted/50 border-primary/20 hover:border-primary/50">
-                                            <Plus className="h-3 w-3" /> Aggiungi Elemento
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48 border-border/40">
-                                        <DropdownMenuItem onClick={() => addSegment(createStraightSegment())} className="text-xs cursor-pointer">
-                                            Dritto
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => addSegment(createElbow90Segment())} className="text-xs cursor-pointer">
-                                            Angolo 90°
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                                            Tappo (Prossimamente)
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                                            Raccordo (Prossimamente)
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        </div>
-
-                        <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
+                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                             {(() => {
-                                let currentTrackId: string | null = null;
-                                return project.segments.map((seg, idx) => {
+                                const groupedSegments: {
+                                    separator: TrackSeparatorSegment | null;
+                                    separatorIndex: number | null;
+                                    items: { seg: Segment; index: number }[];
+                                }[] = [];
+
+                                let currentGroup: {
+                                    separator: TrackSeparatorSegment | null;
+                                    separatorIndex: number | null;
+                                    items: { seg: Segment; index: number }[];
+                                } | null = null;
+
+                                project.segments.forEach((seg, idx) => {
                                     if (seg.type === 'trackSeparator') {
-                                        currentTrackId = seg.id;
-                                        const isCollapsed = collapsedTracks[seg.id];
-                                        return (
-                                            <div key={seg.id} className="flex items-center gap-2 py-2 px-1 relative my-1 group">
-                                                <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent rounded pointer-events-none" />
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-6 w-6 p-0 text-primary relative z-10 -ml-1"
-                                                    onClick={() => setCollapsedTracks(prev => ({ ...prev, [seg.id]: !prev[seg.id] }))}
-                                                >
-                                                    {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                                </Button>
-                                                <div className="h-4 w-1 bg-primary rounded-full relative z-10" />
-                                                <span className="text-[11px] font-bold text-primary relative z-10 uppercase tracking-wider">{seg.name}</span>
-                                                <div className="flex-1 border-t border-dashed border-primary/30 ml-2 relative z-10" />
-                                                <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive relative z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={() => removeSegment(seg.id)}>
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
-                                        );
-                                    }
-
-                                    if (currentTrackId && collapsedTracks[currentTrackId]) {
-                                        return null;
-                                    }
-
-                                    let deductionText = '';
-                                    if (project.globalMeasurements && seg.type === 'straight') {
-                                        // Trova i veri segmenti adiacenti ignorando i trackSeparator
-                                        const prev = project.segments.slice(0, idx).reverse().find(s => s.type !== 'trackSeparator');
-                                        const next = project.segments.slice(idx + 1).find(s => s.type !== 'trackSeparator');
-                                        let deduction = 0;
-                                        const outerWidth = project.section.innerWidth + (2 * project.section.thickness);
-
-                                        if (prev && prev.type === 'elbow90') deduction += prev.armB + outerWidth;
-                                        if (next && next.type === 'elbow90') deduction += next.armA + outerWidth;
-
-                                        if (deduction > 0) {
-                                            const actualLength = Math.max(0, seg.length - deduction);
-                                            deductionText = `Taglio: ${actualLength} (-${deduction})`;
+                                        if (currentGroup) groupedSegments.push(currentGroup);
+                                        currentGroup = { separator: seg as TrackSeparatorSegment, separatorIndex: idx, items: [] };
+                                    } else {
+                                        if (!currentGroup) {
+                                            currentGroup = { separator: null, separatorIndex: null, items: [] };
                                         }
+                                        currentGroup.items.push({ seg, index: idx });
                                     }
+                                });
+                                if (currentGroup) groupedSegments.push(currentGroup);
+
+                                return groupedSegments.map((group, groupIdx) => {
+                                    const sepId = group.separator?.id || `no-sep-${groupIdx}`;
+                                    const isCollapsed = collapsedTracks[sepId] || false;
 
                                     return (
-                                        <SegmentRow
-                                            key={seg.id}
-                                            segment={seg as StraightSegment | Elbow90Segment}
-                                            index={idx}
-                                            total={project.segments.length}
-                                            deductionText={deductionText}
-                                            onUpdate={(patch) => updateSegment(seg.id, patch)}
-                                            onRemove={() => removeSegment(seg.id)}
-                                            onMove={(dir) => moveSegment(seg.id, dir)}
-                                        />
+                                        <div key={sepId} className="border border-border/60 rounded-lg overflow-hidden bg-card/50 shadow-sm relative">
+                                            {/* Header del Gruppo (Segmento/Isola) */}
+                                            {group.separator && (
+                                                <div className="bg-muted/40 px-3 py-2 flex items-center justify-between border-b border-border/40">
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground"
+                                                            onClick={() => setCollapsedTracks(prev => ({ ...prev, [sepId]: !isCollapsed }))}
+                                                        >
+                                                            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                        </Button>
+                                                        <div className="h-3 w-3 bg-primary/80 rounded block shadow-sm" />
+                                                        <span className="text-xs font-bold uppercase tracking-wider">{group.separator.name}</span>
+                                                        <span className="text-[10px] text-muted-foreground ml-2 px-1.5 py-0.5 bg-background rounded-md border border-border/50">
+                                                            {group.items.length} tratti
+                                                        </span>
+                                                    </div>
+                                                    <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
+                                                        onClick={() => removeSegment(sepId)}>
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {!isCollapsed && (
+                                                <div className="p-2 space-y-2">
+                                                    {/* Lista dei Tratti concatenati */}
+                                                    {group.items.length > 0 ? (
+                                                        <div className="space-y-1.5 relative">
+                                                            {/* Barra visiva di concatenazione */}
+                                                            <div className="absolute top-4 bottom-4 left-3 w-0.5 bg-primary/20 pointer-events-none" />
+
+                                                            {group.items.map(({ seg, index }) => {
+                                                                let deductionText = '';
+                                                                if (project.globalMeasurements && seg.type === 'straight') {
+                                                                    const prev = project.segments.slice(0, index).reverse().find(s => s.type !== 'trackSeparator');
+                                                                    const next = project.segments.slice(index + 1).find(s => s.type !== 'trackSeparator');
+                                                                    let deduction = 0;
+                                                                    const outerWidth = project.section.innerWidth + (2 * project.section.thickness);
+                                                                    if (prev && prev.type === 'elbow90') deduction += prev.armB + outerWidth;
+                                                                    if (next && next.type === 'elbow90') deduction += next.armA + outerWidth;
+                                                                    if (deduction > 0) {
+                                                                        const actualLength = Math.max(0, seg.length - deduction);
+                                                                        deductionText = `Taglio: ${actualLength} (-${deduction})`;
+                                                                    }
+                                                                }
+
+                                                                return (
+                                                                    <div key={seg.id} className="relative z-10 pl-6">
+                                                                        {/* Pallino di congiunzione */}
+                                                                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rounded-full border-[1.5px] border-primary/50 bg-background" />
+                                                                        <SegmentRow
+                                                                            segment={seg as StraightSegment | Elbow90Segment}
+                                                                            index={index}
+                                                                            total={project.segments.length}
+                                                                            deductionText={deductionText}
+                                                                            onUpdate={(patch) => updateSegment(seg.id, patch)}
+                                                                            onRemove={() => removeSegment(seg.id)}
+                                                                            onMove={(dir) => moveSegment(seg.id, dir)}
+                                                                        />
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[11px] text-muted-foreground text-center py-4 italic">
+                                                            Nessun tratto in questo segmento.
+                                                        </p>
+                                                    )}
+
+                                                    {/* Toolbar di aggiunta per QUESTO gruppo */}
+                                                    <div className="mt-2 ml-6 flex gap-1.5">
+                                                        <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] w-full border-dashed"
+                                                            onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment())}>
+                                                            <Plus className="h-3 w-3 mr-1" /> Dritto
+                                                        </Button>
+                                                        <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] w-full border-dashed"
+                                                            onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createElbow90Segment())}>
+                                                            <Plus className="h-3 w-3 mr-1" /> Angolo
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     );
                                 });
                             })()}
+
                             {project.segments.length === 0 && (
                                 <p className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-lg">
-                                    Nessun tratto. Aggiungi un Segmento Rapido o crea tratti singoli.
+                                    Nessun elemento. Clicca su "Crea Nuovo Segmento (Isola)".
                                 </p>
                             )}
                         </div>
