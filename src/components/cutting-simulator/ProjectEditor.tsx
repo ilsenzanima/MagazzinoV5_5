@@ -162,7 +162,7 @@ function AnnotationPanel({
     );
 }
 
-// ==================== PANNELLO PROPRIETÀ SEGMENTI ====================
+// ==================== PANNELLO PROPRIETÀ TRATTO ====================
 
 function PropertiesPanel({
     segment,

@@ -97,7 +97,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                     </div>
                     <div className="flex-1">
                         <CardTitle className="text-lg">Progetto Canalizzazione</CardTitle>
-                        <CardDescription>Definisci sezione e segmenti, poi genera il piano di taglio</CardDescription>
+                        <CardDescription>Definisci sezione e struttura, poi genera il piano di taglio</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -207,7 +207,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                         </button>
                     </div>
 
-                    {/* === SEGMENTI === */}
+                    {/* === STRUTTURA === */}
                     <div className="space-y-4">
                         <TrackGenerator
                             existingTracksCount={project.segments.filter(s => s.type === 'trackSeparator').length}
@@ -215,7 +215,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                         />
 
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">Segmenti nell'Editor ({project.segments.filter(s => s.type !== 'trackSeparator').length})</p>
+                            <p className="text-sm font-medium">Tratti nell'Editor ({project.segments.filter(s => s.type !== 'trackSeparator').length})</p>
                             <div className="flex gap-1">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -308,7 +308,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                             })()}
                             {project.segments.length === 0 && (
                                 <p className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-lg">
-                                    Nessun segmento. Aggiungi un tratto dritto o un angolo.
+                                    Nessun tratto. Aggiungi un Segmento Rapido o crea tratti singoli.
                                 </p>
                             )}
                         </div>
@@ -317,7 +317,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                     {/* === AZIONI === */}
                     <Button type="submit" className="w-full h-11 font-semibold" disabled={project.segments.length === 0}>
                         <Layers className="mr-2 h-4 w-4" />
-                        Genera Piano di Taglio ({project.segments.length} segmenti)
+                        Genera Piano di Taglio ({project.segments.length} elementi)
                     </Button>
                 </form>
             </CardContent>
@@ -325,7 +325,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
     );
 }
 
-// ==================== Riga segmento ====================
+// ==================== Riga tratto ====================
 
 function SegmentRow({
     segment, index, total, deductionText, onUpdate, onRemove, onMove,
@@ -506,7 +506,7 @@ function ElbowFields({ seg, onUpdate }: {
     );
 }
 
-// ==================== Generatore Tratti ====================
+// ==================== Generatore Segmenti ====================
 
 function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTracksCount?: number, onGenerate: (segments: Segment[]) => void }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -525,7 +525,7 @@ function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTrack
         const trackLetter = String.fromCharCode(65 + existingTracksCount);
 
         // Aggiungi subito l'header separatore
-        newSegments.push(createTrackSeparator(trackLength, `TRATTO ${trackLetter}`));
+        newSegments.push(createTrackSeparator(trackLength, `SEGMENTO ${trackLetter}`));
 
         // Sottrarre l'ingombro del gomito dalla lunghezza totale dei dritti
         if (hasElbow) {
@@ -571,7 +571,7 @@ function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTrack
                 className="w-full flex items-center gap-2 px-3 py-2 bg-primary/10 hover:bg-primary/20 transition-colors text-left"
             >
                 <FastForward className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium flex-1 text-primary">Aggiungi Tratto Rapido</span>
+                <span className="text-sm font-medium flex-1 text-primary">Aggiungi Segmento Rapido</span>
                 {isOpen ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-primary" />}
             </button>
 
@@ -676,7 +676,7 @@ function TrackGenerator({ existingTracksCount = 0, onGenerate }: { existingTrack
                     </div>
 
                     <Button type="button" onClick={handleGenerate} className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground">
-                        Genera Segmenti nel Progetto
+                        Aggiungi struttura al progetto
                     </Button>
                 </div>
             )}
