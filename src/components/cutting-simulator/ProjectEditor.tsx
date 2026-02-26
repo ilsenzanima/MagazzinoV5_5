@@ -310,6 +310,8 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     const [drawingDim, setDrawingDim] = useState<{ x: number; y: number } | null>(null);
     const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [draggingAnnId, setDraggingAnnId] = useState<string | null>(null);
+    const [draggingTrackId, setDraggingTrackId] = useState<string | null>(null);
+    const [trackDragOffset, setTrackDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
     const [isPanning, setIsPanning] = useState(false);
@@ -375,6 +377,16 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         }
     }, [panOffset, activeTool]);
 
+    const handleSegmentMouseDown = useCallback((trackId: string | undefined, e: React.MouseEvent) => {
+        if (activeTool === 'select' && trackId && viewFamily !== 'iso') {
+            e.stopPropagation();
+            setDraggingTrackId(trackId);
+            setTrackDragOffset({ x: 0, y: 0 });
+            const pt = getSvgPoint(e);
+            panStart.current = { x: pt.x, y: pt.y, ox: 0, oy: 0 };
+        }
+    }, [activeTool, viewFamily, getSvgPoint]);
+
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         const pt = getSvgPoint(e);
         setMousePos(pt);
@@ -390,6 +402,10 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                 x: panStart.current.ox + dx * realScale,
                 y: panStart.current.oy + dy * realScale
             });
+        } else if (draggingTrackId && panStart.current) {
+            const dx = pt.x - panStart.current.x;
+            const dy = pt.y - panStart.current.y;
+            setTrackDragOffset({ x: dx, y: dy });
         } else if (draggingAnnId) {
             const anns = project.annotations || [];
             const idx = anns.findIndex(a => a.id === draggingAnnId);
@@ -402,13 +418,58 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                 }
             }
         }
-    }, [isPanning, vbW, vbH, getSvgPoint, draggingAnnId, project, onProjectChange]);
+    }, [isPanning, vbW, vbH, getSvgPoint, draggingAnnId, draggingTrackId, project, onProjectChange]);
 
-    const handleMouseUp = useCallback(() => {
+    const handleMouseUp = useCallback((e: React.MouseEvent) => {
         setIsPanning(false);
         setDraggingAnnId(null);
+
+        if (draggingTrackId && panStart.current) {
+            const pt = getSvgPoint(e);
+            const dx = pt.x - panStart.current.x;
+            const dy = pt.y - panStart.current.y;
+
+            if (dx !== 0 || dy !== 0) {
+                const newSegments = [...project.segments];
+                const trackIdx = newSegments.findIndex(s => s.id === draggingTrackId);
+
+                if (trackIdx >= 0 && newSegments[trackIdx].type === 'trackSeparator') {
+                    const ts = { ...newSegments[trackIdx] } as any;
+
+                    // Retrieve original world absolute position from node3D if ts lacks startX/Y
+                    let worldPos = { x: ts.startX ?? 0, y: ts.startY ?? 0, z: ts.startZ ?? 0 };
+                    if (ts.startX === undefined) {
+                        const firstSegIdx = trackIdx + 1;
+                        const firstNode = nodes3D.find(n => n.index === firstSegIdx);
+                        if (firstNode) {
+                            worldPos = { ...firstNode.start };
+                        }
+                    }
+
+                    let worldDx = dx; let worldDy = dy; let worldDz = 0;
+                    if (viewFamily === 'top') {
+                        worldDy = -dy;
+                    } else if (viewFamily === 'side') {
+                        if (sideFace === 'front') { worldDx = dx; worldDz = -dy; }
+                        else if (sideFace === 'back') { worldDx = -dx; worldDz = -dy; }
+                        else if (sideFace === 'right') { worldDy = dx; worldDz = -dy; }
+                        else if (sideFace === 'left') { worldDy = -dx; worldDz = -dy; }
+                    }
+
+                    ts.startX = Math.round(worldPos.x + worldDx);
+                    ts.startY = Math.round(worldPos.y + worldDy);
+                    ts.startZ = Math.round(worldPos.z + worldDz);
+
+                    newSegments[trackIdx] = ts;
+                    onProjectChange({ ...project, segments: newSegments });
+                }
+            }
+            setDraggingTrackId(null);
+            setTrackDragOffset({ x: 0, y: 0 });
+        }
+
         panStart.current = null;
-    }, []);
+    }, [draggingTrackId, viewFamily, sideFace, getSvgPoint, project, onProjectChange, nodes3D]);
 
     const handleSegmentClick = useCallback((idx: number, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -666,8 +727,18 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                 {/* Segmenti */}
                 {nodes2D.map((node, i) => {
                     const isSelected = selectedIdx === node.index;
+                    const isDraggingThisTrack = node.trackId === draggingTrackId && draggingTrackId !== null;
                     return (
-                        <g key={node.segment.id} onClick={e => handleSegmentClick(node.index, e)} style={{ cursor: 'pointer' }}>
+                        <g
+                            key={node.segment.id}
+                            onClick={e => handleSegmentClick(node.index, e)}
+                            onMouseDown={e => handleSegmentMouseDown(node.trackId, e)}
+                            style={{
+                                cursor: isDraggingThisTrack ? 'grabbing' : (activeTool === 'select' ? (node.trackId ? 'grab' : 'pointer') : 'default'),
+                                transform: isDraggingThisTrack ? `translate(${trackDragOffset.x}px, ${trackDragOffset.y}px)` : undefined,
+                                transition: isDraggingThisTrack ? 'none' : 'transform 0.1s ease-out'
+                            }}
+                        >
                             {/* Corpo segmento */}
                             {node.polygons && node.polygons.length > 0 ? (
                                 node.polygons.map((poly, pIdx) => (
@@ -726,56 +797,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                     );
                 })}
 
-                {/* Quote automatiche */}
-                {nodes2D.map((node, i) => {
-                    if (node.segment.type !== 'straight') return null;
-                    const r = node.rects[0];
-                    if (!r) return null;
-                    const isHoriz = r.width > r.height;
-
-                    const x1 = isHoriz ? r.x : r.x + r.width / 2;
-                    const y1 = isHoriz ? r.y + r.height : r.y;
-                    const x2 = isHoriz ? r.x + r.width : r.x + r.width / 2;
-                    const y2 = isHoriz ? r.y + r.height : r.y + r.height;
-                    const label = `${(node.segment as StraightSegment).length}`;
-                    const offset = 25; // Fixed offset for auto dimensions
-                    const isSelected = false; // Auto dimensions are not selectable
-
-                    // Calculate dimension line points
-                    const angle = Math.atan2(y2 - y1, x2 - x1);
-                    const perpAngle = angle + Math.PI / 2;
-
-                    const ax = x1 + Math.cos(perpAngle) * offset;
-                    const ay = y1 + Math.sin(perpAngle) * offset;
-                    const bx = x2 + Math.cos(perpAngle) * offset;
-                    const by = y2 + Math.sin(perpAngle) * offset;
-
-                    // Calculate label position
-                    const mx = (ax + bx) / 2;
-                    const my = (ay + by) / 2;
-
-                    const lineClass = isSelected ? "stroke-primary" : "stroke-foreground opacity-80";
-                    const extClass = isSelected ? "stroke-primary opacity-60" : "stroke-foreground opacity-40";
-
-                    return (
-                        <g key={`dim-${i}`} className="dimension-line">
-                            {/* Extension lines */}
-                            <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
-                            <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
-                            {/* Dimension line with dasharray per le quote manuali e fisso */}
-                            <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
-                            {/* Label - font ingrandito per visibilità */}
-                            <text
-                                x={mx} y={my - 6 * fScale}
-                                textAnchor="middle"
-                                className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
-                                style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
-                            >
-                                {label}
-                            </text>
-                        </g>
-                    );
-                })}
+                {/* TODO: Quote automatiche rimosse per evitare sovrapposizioni con l'etichetta base */}
 
                 {/* Annotazioni Utente */}
                 {project.annotations?.filter(a => !a.viewId || a.viewId === viewFamily || (viewFamily === 'side' && a.viewId === sideFace)).map((ann) => {

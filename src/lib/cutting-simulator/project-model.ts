@@ -50,6 +50,10 @@ export interface TrackSeparatorSegment extends BaseSegment {
     type: 'trackSeparator';
     expectedLength: number;
     name: string;
+    /** Coordinate 3D assolute di partenza per slegare il tratto (Fase C: Drag&Drop) */
+    startX?: number;
+    startY?: number;
+    startZ?: number;
 }
 
 export type Segment = StraightSegment | Elbow90Segment | TrackSeparatorSegment;
