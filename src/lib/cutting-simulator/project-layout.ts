@@ -34,8 +34,10 @@ export interface SegmentNode3D {
     outerH: number;
     /** (Solo per elbow90) Punto d'angolo */
     corner?: Vec3;
-    /** (Solo per elbow90) Direzione in uscita */
+    /** Direzione in uscita */
     dirOut?: Direction3D;
+    /** (Nuovo) ID del TrackSeparator di appartenenza per Drag&Drop */
+    trackId?: string;
 }
 
 /** Rettangolo base per SVG */
@@ -69,6 +71,8 @@ export interface SegmentNode2D {
     label: string;
     /** Colore */
     color: string;
+    /** (Nuovo) ID del TrackSeparator di appartenenza per Drag&Drop */
+    trackId?: string;
 }
 
 // ==================== COLORI SEGMENTI ====================
@@ -135,9 +139,25 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
     const nodes: SegmentNode3D[] = [];
     let pos: Vec3 = { x: 0, y: 0, z: 0 };
     let dir: Direction3D = initialDirection || '+x';
+    let trackIndex = 0;
+    let currentTrackId: string | undefined = undefined;
 
     for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
+
+        if (seg.type === 'trackSeparator') {
+            trackIndex++;
+            currentTrackId = seg.id;
+            if (seg.startX !== undefined && seg.startY !== undefined) {
+                pos = { x: seg.startX, y: seg.startY, z: seg.startZ || 0 };
+                dir = initialDirection || '+x';
+            } else if (trackIndex > 1) {
+                // Modello di default per i nuovi tratti non ancora posizionati: li mette sotto di 2000mm
+                pos = { x: 0, y: pos.y + 2000, z: 0 };
+                dir = initialDirection || '+x';
+            }
+            continue;
+        }
 
         if (seg.type === 'straight') {
             const v = dirVec(dir);
@@ -155,6 +175,7 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 direction: dir,
                 outerW,
                 outerH,
+                trackId: currentTrackId,
             });
             pos = end;
         } else if (seg.type === 'elbow90') {
@@ -186,6 +207,7 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 dirOut,
                 outerW,
                 outerH,
+                trackId: currentTrackId,
             });
 
             // Aggiorna posizione e direzione dopo la curva
@@ -215,6 +237,14 @@ export function projectTo2D(
             if (seg.type === 'straight') labelText = `${seg.length} mm`;
             else if (seg.type === 'elbow90') labelText = `↱ ${seg.direction}`;
         }
+
+        const baseResult = {
+            segment: seg,
+            index: node.index,
+            label: labelText,
+            color: baseColor,
+            trackId: node.trackId,
+        };
 
         if (view === 'iso') {
             const rad = (isoAngle * Math.PI) / 180;
@@ -385,6 +415,7 @@ export function projectTo2D(
                 labelY: labelPos.y,
                 label: labelText,
                 color: baseColor,
+                trackId: node.trackId,
             };
         }
 
@@ -486,6 +517,7 @@ export function projectTo2D(
             labelY,
             label: labelText,
             color: baseColor,
+            trackId: node.trackId,
         };
     });
 }
