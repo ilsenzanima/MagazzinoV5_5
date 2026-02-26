@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation } from "@/lib/cutting-simulator/project-model";
 import {
     computeLayout,
@@ -364,10 +364,16 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         return pt.matrixTransform(ctm.inverse());
     }, []);
 
-    const handleWheel = useCallback((e: React.WheelEvent) => {
-        e.preventDefault();
-        const factor = e.deltaY > 0 ? 0.9 : 1.1;
-        setZoom(z => Math.max(0.2, Math.min(5, z * factor)));
+    useEffect(() => {
+        const container = svgRef.current?.parentElement;
+        if (!container) return;
+        const onWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            const factor = e.deltaY > 0 ? 0.9 : 1.1;
+            setZoom(z => Math.max(0.2, Math.min(5, z * factor)));
+        };
+        container.addEventListener('wheel', onWheel, { passive: false });
+        return () => container.removeEventListener('wheel', onWheel);
     }, []);
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -378,14 +384,14 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     }, [panOffset, activeTool]);
 
     const handleSegmentMouseDown = useCallback((trackId: string | undefined, e: React.MouseEvent) => {
-        if (activeTool === 'select' && trackId && viewFamily !== 'iso') {
+        if (activeTool === 'select' && trackId) {
             e.stopPropagation();
             setDraggingTrackId(trackId);
             setTrackDragOffset({ x: 0, y: 0 });
             const pt = getSvgPoint(e);
             panStart.current = { x: pt.x, y: pt.y, ox: 0, oy: 0 };
         }
-    }, [activeTool, viewFamily, getSvgPoint]);
+    }, [activeTool, getSvgPoint]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         const pt = getSvgPoint(e);
@@ -454,6 +460,21 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                         else if (sideFace === 'back') { worldDx = -dx; worldDz = -dy; }
                         else if (sideFace === 'right') { worldDy = dx; worldDz = -dy; }
                         else if (sideFace === 'left') { worldDy = -dx; worldDz = -dy; }
+                    } else if (viewFamily === 'iso') {
+                        const rad = (isoAngle * Math.PI) / 180;
+                        const cos30 = 0.866;
+                        const sin30 = 0.5;
+
+                        // Pseudo inverse iso projection assuming dz=0
+                        const baseDx = (dx / (2 * cos30)) + (dy / (2 * sin30));
+                        const baseDy = -(dx / (2 * cos30)) + (dy / (2 * sin30));
+
+                        // un-rotate
+                        const cosA = Math.cos(-rad);
+                        const sinA = Math.sin(-rad);
+                        worldDx = baseDx * cosA - baseDy * sinA;
+                        worldDy = baseDx * sinA + baseDy * cosA;
+                        worldDz = 0;
                     }
 
                     ts.startX = Math.round(worldPos.x + worldDx);
@@ -692,7 +713,6 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                 viewBox={`${vbX.toFixed(0)} ${vbY.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}`}
                 className="w-full h-full flex-1 bg-background touch-none"
                 style={{ cursor: isPanning ? 'grabbing' : 'crosshair', minHeight: 500 }}
-                onWheel={handleWheel}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
