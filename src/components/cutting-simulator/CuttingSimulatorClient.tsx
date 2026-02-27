@@ -144,122 +144,128 @@ export function CuttingSimulatorClient() {
             )}
 
             {/* Contenuto principale: layout responsive */}
-            <div className={cn("w-full flex-1", isEditorFullscreen ? "flex flex-col min-h-0" : "grid grid-cols-1 lg:grid-cols-12 gap-6")}>
-                {/* Colonna sinistra: input (nascosta se fullscreen) */}
+            <div className={cn("w-full flex-1", isEditorFullscreen ? "flex flex-col min-h-0" : "flex flex-col gap-8")}>
+                {/* Sezione superiore Impostazioni (nascosta se fullscreen) */}
                 {!isEditorFullscreen && (
-                    <div className="lg:col-span-4 space-y-4 shrink-0 overflow-y-auto pr-2 pb-4">
-                        {viewMode === "project" ? (
-                            <>
-                                {/* Toggle Lista / Editor */}
-                                <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
-                                    <button type="button"
-                                        onClick={() => setProjectViewMode('list')}
-                                        className={cn(
-                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                            projectViewMode === 'list'
-                                                ? "bg-background shadow-sm text-foreground"
-                                                : "text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <List className="h-3.5 w-3.5" />
-                                        Lista
-                                    </button>
-                                    <button type="button"
-                                        onClick={() => setProjectViewMode('editor')}
-                                        className={cn(
-                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                            projectViewMode === 'editor'
-                                                ? "bg-background shadow-sm text-foreground"
-                                                : "text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <PenTool className="h-3.5 w-3.5" />
-                                        Editor
-                                    </button>
-                                </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+                        {/* Colonna 1: Form di Input e Configurazione Lastra */}
+                        <div className="space-y-4">
+                            {viewMode === "project" ? (
+                                <>
+                                    {/* Toggle Lista / Editor */}
+                                    <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
+                                        <button type="button"
+                                            onClick={() => setProjectViewMode('list')}
+                                            className={cn(
+                                                "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                                projectViewMode === 'list'
+                                                    ? "bg-background shadow-sm text-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            <List className="h-3.5 w-3.5" />
+                                            Lista
+                                        </button>
+                                        <button type="button"
+                                            onClick={() => setProjectViewMode('editor')}
+                                            className={cn(
+                                                "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                                projectViewMode === 'editor'
+                                                    ? "bg-background shadow-sm text-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            <PenTool className="h-3.5 w-3.5" />
+                                            Editor
+                                        </button>
+                                    </div>
 
-                                {projectViewMode === 'list' ? (
-                                    <ProjectForm
-                                        project={projectData}
-                                        onProjectChange={setProjectData}
-                                        onCalculateProject={handleCalculateProject}
-                                    />
-                                ) : null}
-                            </>
-                        ) : (
-                            <>
-                                {/* Sub-selettore tipo pezzo singolo */}
-                                <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
-                                    <button type="button"
-                                        onClick={() => handleTypeChange("straight")}
-                                        className={cn(
-                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                            pieceType === "straight"
-                                                ? "bg-background shadow-sm text-foreground"
-                                                : "text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <RectangleHorizontal className="h-3.5 w-3.5" />
-                                        Tratto Dritto
-                                    </button>
-                                    <button type="button"
-                                        onClick={() => handleTypeChange("elbow90")}
-                                        className={cn(
-                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                            pieceType === "elbow90"
-                                                ? "bg-background shadow-sm text-foreground"
-                                                : "text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <CornerDownRight className="h-3.5 w-3.5" />
-                                        Angolo 90°
-                                    </button>
-                                    <button type="button"
-                                        onClick={() => handleTypeChange("flatPieces")}
-                                        className={cn(
-                                            "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
-                                            pieceType === "flatPieces"
-                                                ? "bg-background shadow-sm text-foreground"
-                                                : "text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <LayoutGrid className="h-3.5 w-3.5" />
-                                        Pezzi Piani
-                                    </button>
-                                </div>
+                                    {projectViewMode === 'list' ? (
+                                        <ProjectForm
+                                            project={projectData}
+                                            onProjectChange={setProjectData}
+                                            onCalculateProject={handleCalculateProject}
+                                        />
+                                    ) : null}
+                                </>
+                            ) : (
+                                <>
+                                    {/* Sub-selettore tipo pezzo singolo */}
+                                    <div className="flex gap-1.5 p-1 bg-muted/30 rounded-lg">
+                                        <button type="button"
+                                            onClick={() => handleTypeChange("straight")}
+                                            className={cn(
+                                                "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                                pieceType === "straight"
+                                                    ? "bg-background shadow-sm text-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            <RectangleHorizontal className="h-3.5 w-3.5" />
+                                            Tratto Dritto
+                                        </button>
+                                        <button type="button"
+                                            onClick={() => handleTypeChange("elbow90")}
+                                            className={cn(
+                                                "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                                pieceType === "elbow90"
+                                                    ? "bg-background shadow-sm text-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            <CornerDownRight className="h-3.5 w-3.5" />
+                                            Angolo 90°
+                                        </button>
+                                        <button type="button"
+                                            onClick={() => handleTypeChange("flatPieces")}
+                                            className={cn(
+                                                "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-all",
+                                                pieceType === "flatPieces"
+                                                    ? "bg-background shadow-sm text-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            <LayoutGrid className="h-3.5 w-3.5" />
+                                            Pezzi Piani
+                                        </button>
+                                    </div>
 
-                                {pieceType === "straight" ? (
-                                    <DuctForm onCalculate={handleCalculateStraight} />
-                                ) : pieceType === "elbow90" ? (
-                                    <ElbowForm onCalculate={handleCalculateElbow} />
-                                ) : (
-                                    <FlatPiecesForm
-                                        sheetConfig={sheetConfig}
-                                        onCalculate={(result) => {
-                                            setCalcResult(result);
-                                            runNesting(result, sheetConfig);
-                                        }}
-                                    />
-                                )}
-                            </>
-                        )}
+                                    {pieceType === "straight" ? (
+                                        <DuctForm onCalculate={handleCalculateStraight} />
+                                    ) : pieceType === "elbow90" ? (
+                                        <ElbowForm onCalculate={handleCalculateElbow} />
+                                    ) : (
+                                        <FlatPiecesForm
+                                            sheetConfig={sheetConfig}
+                                            onCalculate={(result) => {
+                                                setCalcResult(result);
+                                                runNesting(result, sheetConfig);
+                                            }}
+                                        />
+                                    )}
+                                </>
+                            )}
 
-                        <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
+                            <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
+                        </div>
 
-                        {viewMode === 'project' && <TracksAnalysisPanel project={projectData} />}
+                        {/* Colonna 2: Analisi e Lista Pezzi */}
+                        <div className="space-y-4">
+                            {viewMode === 'project' && <TracksAnalysisPanel project={projectData} />}
 
-                        {calcResult && (
-                            <PiecesList
-                                pieces={calcResult.pieces}
-                                totalArea={calcResult.totalArea}
-                                summary={calcResult.summary}
-                            />
-                        )}
+                            {calcResult && (
+                                <PiecesList
+                                    pieces={calcResult.pieces}
+                                    totalArea={calcResult.totalArea}
+                                    summary={calcResult.summary}
+                                />
+                            )}
+                        </div>
                     </div>
                 )}
 
-                {/* Colonna destra: visualizzazione */}
-                <div className={cn("overflow-hidden flex flex-col", isEditorFullscreen ? "fixed inset-0 z-[100] bg-background p-0 md:p-2" : "lg:col-span-8 space-y-4")}>
+                {/* Sezione inferiore: visualizzazione del piano (o Editor fullscreen) */}
+                <div className={cn("overflow-hidden flex flex-col", isEditorFullscreen ? "fixed inset-0 z-[100] bg-background p-0 md:p-2" : "space-y-4 w-full min-h-[500px]")}>
                     {isEditorFullscreen ? (
                         <>
                             <div className="md:hidden flex items-center gap-2 p-2 mx-2 mt-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 text-[10px] sm:text-xs shadow-sm shrink-0">
