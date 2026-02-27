@@ -425,6 +425,8 @@ export function projectTo2D(
         let u1 = 0, v1 = 0, u2 = 0, v2 = 0;
         let cu: number | undefined, cv: number | undefined;
         let crossW = node.outerW;
+        let pW = node.outerW;
+        let pH = node.outerH;
 
         switch (view) {
             case 'top':
@@ -432,30 +434,40 @@ export function projectTo2D(
                 u2 = node.end.x; v2 = node.end.y;
                 if (node.corner) { cu = node.corner.x; cv = node.corner.y; }
                 crossW = node.outerW;
+                pW = node.outerW; // Top view uses Width
+                pH = node.outerW;
                 break;
             case 'front': // Fronte = y up (+x, -z)
                 u1 = node.start.x; v1 = -node.start.z;
                 u2 = node.end.x; v2 = -node.end.z;
                 if (node.corner) { cu = node.corner.x; cv = -node.corner.z; }
                 crossW = node.outerH;
+                pW = node.outerW;
+                pH = node.outerH;
                 break;
             case 'right': // Destra = x up (+y, -z)
                 u1 = node.start.y; v1 = -node.start.z;
                 u2 = node.end.y; v2 = -node.end.z;
                 if (node.corner) { cu = node.corner.y; cv = -node.corner.z; }
                 crossW = node.outerW;
+                pW = node.outerW;
+                pH = node.outerH;
                 break;
             case 'back': // Retro = vista +y (-x, -z)
                 u1 = -node.start.x; v1 = -node.start.z;
                 u2 = -node.end.x; v2 = -node.end.z;
                 if (node.corner) { cu = -node.corner.x; cv = -node.corner.z; }
                 crossW = node.outerH;
+                pW = node.outerW;
+                pH = node.outerH;
                 break;
             case 'left': // Sinistra = vista +x (-y, -z)
                 u1 = -node.start.y; v1 = -node.start.z;
                 u2 = -node.end.y; v2 = -node.end.z;
                 if (node.corner) { cu = -node.corner.y; cv = -node.corner.z; }
                 crossW = node.outerW;
+                pW = node.outerW;
+                pH = node.outerH;
                 break;
         }
 
@@ -464,12 +476,28 @@ export function projectTo2D(
             const dv = endV - startV;
             const len = Math.sqrt(du * du + dv * dv);
 
+            // Determiniamo la larghezza "cross" da usare in questa specifica direzione e vista
+            let effectiveCrossW = crossW;
+            if (node.segment.type === 'obstacle') {
+                // Per gli ostacoli, la larghezza proiettata dipende se il tratto si sta espandendo su U o V.
+                // Se è orizzontale (du != 0 => si sposta lungo U), la grandezza ortogonale su V è dettata dalla vista
+                // (es. Top -> larghezza W, Front -> altezza H). Usiamo pW o pH in base al piano.
+                const isHorizontalMov = Math.abs(du) >= Math.abs(dv);
+                if (view === 'top') {
+                    effectiveCrossW = pW;
+                } else if (view === 'front' || view === 'back') {
+                    effectiveCrossW = isHorizontalMov ? pH : pW;
+                } else if (view === 'left' || view === 'right') {
+                    effectiveCrossW = isHorizontalMov ? pH : pW;
+                }
+            }
+
             if (len < 0.1) {
                 return {
-                    x: startU - crossW / 2,
-                    y: startV - crossW / 2,
-                    width: crossW,
-                    height: crossW,
+                    x: startU - effectiveCrossW / 2,
+                    y: startV - effectiveCrossW / 2,
+                    width: effectiveCrossW,
+                    height: effectiveCrossW,
                     rx: node.segment.type === 'elbow90' ? 8 : 2
                 };
             }
@@ -479,10 +507,10 @@ export function projectTo2D(
             const minV = Math.min(startV, endV);
 
             return {
-                x: isHorizontal ? minU : minU - crossW / 2,
-                y: isHorizontal ? minV - crossW / 2 : minV,
-                width: isHorizontal ? len : crossW,
-                height: isHorizontal ? crossW : len,
+                x: isHorizontal ? minU : minU - effectiveCrossW / 2,
+                y: isHorizontal ? minV - effectiveCrossW / 2 : minV,
+                width: isHorizontal ? len : effectiveCrossW,
+                height: isHorizontal ? effectiveCrossW : len,
                 rx: node.segment.type === 'elbow90' ? 8 : 2
             };
         };
@@ -495,7 +523,7 @@ export function projectTo2D(
             const r1 = createRect(u1, v1, cu, cv);
             const r2 = createRect(cu, cv, u2, v2);
             const centerSq: Rect2D = {
-                x: cu - crossW / 2,
+                x: cu - crossW / 2, // L'angolo usa standard crossW
                 y: cv - crossW / 2,
                 width: crossW,
                 height: crossW,

@@ -916,8 +916,9 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
 
                             {/* Quote ostacolo in testo */}
                             {node.segment.type === 'obstacle' && (node.segment as ContextualElementSegment).showQuotas && (
-                                <g transform={`translate(${node.labelX}, ${node.labelY + 28 * fScale})`}>
-                                    <text textAnchor="middle" className="fill-purple-500 font-mono font-bold pointer-events-none" style={{ fontSize: `${9 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 3 * fScale, strokeLinejoin: 'round' }}>
+                                <g transform={`translate(${node.labelX}, ${node.labelY + 36 * fScale})`}>
+                                    <rect x={-30 * fScale} y={-10 * fScale} width={60 * fScale} height={16 * fScale} fill="hsl(var(--background)/0.8)" rx={4 * fScale} />
+                                    <text textAnchor="middle" className="fill-purple-500 font-mono font-bold pointer-events-none" style={{ fontSize: `${10 * fScale}px` }}>
                                         {(() => {
                                             const o = node.segment as ContextualElementSegment;
                                             const q = [];
