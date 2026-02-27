@@ -24,7 +24,8 @@ export interface SectionProfile {
 export type SegmentDirection = 'left' | 'right' | 'up' | 'down';
 export type SegmentOrientation = 'horizontal' | 'vertical';
 
-export type SegmentType = 'straight' | 'elbow90' | 'trackSeparator';
+export type SegmentType = 'straight' | 'elbow90' | 'trackSeparator' | 'obstacle';
+export type ObstacleType = 'wall' | 'floor' | 'column';
 
 export interface BaseSegment {
     id: string;
@@ -56,7 +57,20 @@ export interface TrackSeparatorSegment extends BaseSegment {
     startZ?: number;
 }
 
-export type Segment = StraightSegment | Elbow90Segment | TrackSeparatorSegment;
+export interface ContextualElementSegment extends BaseSegment {
+    type: 'obstacle';
+    obstacleType: ObstacleType;
+    thickness: number;   // Lunghezza spesa lungo la canala (es. 300mm)
+    width: number;       // Trasversale (se muro, molto largo)
+    height: number;      // Verticale
+    showQuotas: boolean;
+    quotaLeft?: number;
+    quotaRight?: number;
+    quotaTop?: number;
+    quotaBottom?: number;
+}
+
+export type Segment = StraightSegment | Elbow90Segment | TrackSeparatorSegment | ContextualElementSegment;
 
 // ==================== ANNOTAZIONI & CONTESTO ====================
 
@@ -133,6 +147,18 @@ export function createTrackSeparator(expectedLength: number, name: string = 'Tra
         type: 'trackSeparator',
         expectedLength,
         name
+    };
+}
+
+export function createObstacleSegment(obstacleType: ObstacleType = 'wall', innerWidth: number = 200, innerHeight: number = 200): ContextualElementSegment {
+    return {
+        id: `obs-${++_segCounter}-${Date.now()}`,
+        type: 'obstacle',
+        obstacleType,
+        thickness: 300,
+        width: innerWidth + 500, // Margine default
+        height: innerHeight + 500,
+        showQuotas: false
     };
 }
 

@@ -80,6 +80,7 @@ export interface SegmentNode2D {
 const SEGMENT_COLORS: Record<string, string> = {
     straight: '#3b82f6',   // blue
     elbow90: '#f59e0b',    // amber
+    obstacle: '#a855f7',   // purple
 };
 
 // ==================== LAYOUT ENGINE ====================
@@ -159,9 +160,10 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
             continue;
         }
 
-        if (seg.type === 'straight') {
+        if (seg.type === 'straight' || seg.type === 'obstacle') {
             const v = dirVec(dir);
-            const len = seg.length;
+            const isObs = seg.type === 'obstacle';
+            const len = isObs ? seg.thickness : seg.length;
             const end: Vec3 = {
                 x: pos.x + v.x * len,
                 y: pos.y + v.y * len,
@@ -173,8 +175,8 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 start: { ...pos },
                 end,
                 direction: dir,
-                outerW,
-                outerH,
+                outerW: isObs ? seg.width : outerW,
+                outerH: isObs ? seg.height : outerH,
                 trackId: currentTrackId,
             });
             pos = end;
@@ -236,6 +238,7 @@ export function projectTo2D(
         if (!labelText) {
             if (seg.type === 'straight') labelText = `${seg.length} mm`;
             else if (seg.type === 'elbow90') labelText = `↱ ${seg.direction}`;
+            else if (seg.type === 'obstacle') labelText = `${seg.obstacleType === 'wall' ? 'Muro' : seg.obstacleType === 'floor' ? 'Solaio' : 'Ost.'} ${seg.thickness}mm`;
         }
 
         const baseResult = {

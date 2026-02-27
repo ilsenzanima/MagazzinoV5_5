@@ -17,10 +17,11 @@ import {
 import type {
     DuctProject, Segment, StraightSegment, Elbow90Segment, TrackSeparatorSegment,
     SectionProfile, SegmentDirection, SegmentOrientation,
+    ContextualElementSegment, ObstacleType
 } from "@/lib/cutting-simulator/project-model";
 import {
     defaultProject, createStraightSegment, createElbow90Segment, createTrackSeparator,
-    sidesLabel,
+    createObstacleSegment, sidesLabel,
 } from "@/lib/cutting-simulator/project-model";
 
 interface ProjectFormProps {
@@ -62,7 +63,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
         onProjectChange(p => ({ ...p, segments: p.segments.filter(s => s.id !== id) }));
     }, [onProjectChange]);
 
-    const updateSegment = useCallback((id: string, patch: Partial<StraightSegment> | Partial<Elbow90Segment> | Partial<TrackSeparatorSegment>) => {
+    const updateSegment = useCallback((id: string, patch: Partial<StraightSegment> | Partial<Elbow90Segment> | Partial<TrackSeparatorSegment> | Partial<ContextualElementSegment>) => {
         onProjectChange(p => ({
             ...p,
             segments: p.segments.map(s => s.id === id ? { ...s, ...patch } as Segment : s),
@@ -369,6 +370,15 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                 <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createElbow90Segment())} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Angolo 90°
                                                                 </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight))} className="text-xs cursor-pointer">
+                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Muro
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight))} className="text-xs cursor-pointer">
+                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Solaio
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight))} className="text-xs cursor-pointer">
+                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Pilastro/Ostacolo
+                                                                </DropdownMenuItem>
                                                                 <DropdownMenuItem disabled className="text-xs text-muted-foreground">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Tappo (Prossimamente)
                                                                 </DropdownMenuItem>
@@ -424,12 +434,13 @@ function SegmentRow({
     index: number;
     total: number;
     deductionText?: string;
-    onUpdate: (patch: Partial<StraightSegment> | Partial<Elbow90Segment>) => void;
+    onUpdate: (patch: Partial<StraightSegment> | Partial<Elbow90Segment> | Partial<ContextualElementSegment>) => void;
     onRemove: () => void;
     onMove: (dir: 'up' | 'down') => void;
 }) {
     const isStraight = segment.type === 'straight';
-    const accent = isStraight ? 'border-l-blue-500' : 'border-l-amber-500';
+    const isObstacle = segment.type === 'obstacle';
+    const accent = isStraight ? 'border-l-blue-500' : isObstacle ? 'border-l-purple-500' : 'border-l-amber-500';
 
     return (
         <div className={cn(
@@ -452,9 +463,11 @@ function SegmentRow({
             {/* Contenuto */}
             <div className="flex-1 min-w-0">
                 {isStraight ? (
-                    <StraightFields seg={segment as StraightSegment} deductionText={deductionText} onUpdate={onUpdate} />
+                    <StraightFields seg={segment as StraightSegment} deductionText={deductionText} onUpdate={onUpdate as any} />
+                ) : isObstacle ? (
+                    <ObstacleFields seg={segment as ContextualElementSegment} onUpdate={onUpdate as any} />
                 ) : (
-                    <ElbowFields seg={segment as Elbow90Segment} onUpdate={onUpdate} />
+                    <ElbowFields seg={segment as Elbow90Segment} onUpdate={onUpdate as any} />
                 )}
             </div>
 
@@ -593,6 +606,76 @@ function ElbowFields({ seg, onUpdate }: {
                 </div>
             </div>
         </div >
+    );
+}
+
+// ==================== Ostacolo/Muro/Solaio ====================
+
+function ObstacleFields({ seg, onUpdate }: {
+    seg: ContextualElementSegment;
+    onUpdate: (patch: Partial<ContextualElementSegment>) => void;
+}) {
+    const typeLabel = seg.obstacleType === 'wall' ? 'Muro' : seg.obstacleType === 'floor' ? 'Solaio' : 'Ostacolo';
+
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+                <div className="p-1 rounded bg-purple-500/20 text-purple-400">
+                    <Layers className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-xs font-semibold text-purple-400 w-16">{typeLabel}</span>
+
+                <div className="flex items-center gap-1.5 flex-1 max-w-[120px]">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Spessore:</span>
+                    <div className="relative flex-1">
+                        <Input type="number" min="1" step="1"
+                            value={seg.thickness}
+                            onChange={e => onUpdate({ thickness: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-1 ml-auto">
+                    <Label className="text-[10px] text-muted-foreground mr-1 cursor-pointer" onClick={() => onUpdate({ showQuotas: !seg.showQuotas })}>
+                        Quote
+                    </Label>
+                    <button type="button"
+                        onClick={() => onUpdate({ showQuotas: !seg.showQuotas })}
+                        className={cn(
+                            "relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors",
+                            seg.showQuotas ? "bg-purple-500" : "bg-input"
+                        )}
+                    >
+                        <span className={cn(
+                            "pointer-events-none block h-3 w-3 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                            seg.showQuotas ? "translate-x-3.5" : "translate-x-0"
+                        )} />
+                    </button>
+                </div>
+            </div>
+
+            {seg.showQuotas && (
+                <div className="grid grid-cols-2 gap-2 pl-8 pt-1 border-t border-border/40 animate-in fade-in slide-in-from-top-1">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground w-10">Sinistra:</span>
+                        <Input type="number" placeholder="-" value={seg.quotaLeft || ''} onChange={e => onUpdate({ quotaLeft: parseFloat(e.target.value) || undefined })} className="h-6 text-[10px] pr-0 w-16" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground w-10">Destra:</span>
+                        <Input type="number" placeholder="-" value={seg.quotaRight || ''} onChange={e => onUpdate({ quotaRight: parseFloat(e.target.value) || undefined })} className="h-6 text-[10px] pr-0 w-16" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground w-10">Alto:</span>
+                        <Input type="number" placeholder="-" value={seg.quotaTop || ''} onChange={e => onUpdate({ quotaTop: parseFloat(e.target.value) || undefined })} className="h-6 text-[10px] pr-0 w-16" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground w-10">Basso:</span>
+                        <Input type="number" placeholder="-" value={seg.quotaBottom || ''} onChange={e => onUpdate({ quotaBottom: parseFloat(e.target.value) || undefined })} className="h-6 text-[10px] pr-0 w-16" />
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 

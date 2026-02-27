@@ -440,10 +440,11 @@ export function calculateProject(project: DuctProject): CalculationResult {
 
         const prefix = `S${idx + 1}`;
         let result: CalculationResult | null = null;
+        let actualLength = 0;
+        let deductionText = '';
 
-        if (seg.type === 'straight') {
-            let actualLength = seg.length;
-            let deductionText = '';
+        if (seg.type === 'straight' || seg.type === 'obstacle') {
+            actualLength = seg.type === 'straight' ? seg.length : seg.thickness;
 
             // Se abilitate le misure globali, sottraiamo l'ingombro degli angoli adiacenti
             if (globalMeasurements) {
@@ -465,8 +466,9 @@ export function calculateProject(project: DuctProject): CalculationResult {
                 }
 
                 if (deduction > 0) {
-                    actualLength = Math.max(0, seg.length - deduction);
-                    deductionText = ` (Ingombro: ${seg.length} − ${deduction} = ${actualLength})`;
+                    const originalLength = seg.type === 'straight' ? seg.length : seg.thickness;
+                    actualLength = Math.max(0, originalLength - deduction);
+                    deductionText = ` (Ingombro: ${originalLength} − ${deduction} = ${actualLength})`;
                 }
             }
 
@@ -477,6 +479,14 @@ export function calculateProject(project: DuctProject): CalculationResult {
                 thickness: section.thickness,
                 extraMargin: section.extraMargin,
             });
+
+            if (seg.type === 'obstacle') {
+                // Override label per chiarezza nel piano di taglio
+                const typeLabel = seg.obstacleType === 'wall' ? 'Muro' : seg.obstacleType === 'floor' ? 'Solaio' : 'Ostacolo';
+                result.pieces.forEach(p => {
+                    p.label = p.label.replace('Dritto', `Passaggio ${typeLabel}`);
+                });
+            }
 
             // Aggiungiamo il deductionText al summary del dritto, o nella label
             // (La filterBySides manterrà questi valori)
