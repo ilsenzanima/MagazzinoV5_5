@@ -147,8 +147,8 @@ export function CuttingSimulatorClient() {
             <div className={cn("w-full flex-1", isEditorFullscreen ? "flex flex-col min-h-0" : "flex flex-col gap-8")}>
                 {/* Sezione superiore Impostazioni (nascosta se fullscreen) */}
                 {!isEditorFullscreen && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-                        {/* Colonna 1: Form di Input e Configurazione Lastra */}
+                    <div className="flex flex-col gap-6 w-full">
+                        {/* Form di Input e Configurazione Lastra */}
                         <div className="space-y-4">
                             {viewMode === "project" ? (
                                 <>
@@ -248,19 +248,6 @@ export function CuttingSimulatorClient() {
 
                             <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
                         </div>
-
-                        {/* Colonna 2: Analisi e Lista Pezzi */}
-                        <div className="space-y-4">
-                            {viewMode === 'project' && <TracksAnalysisPanel project={projectData} />}
-
-                            {calcResult && (
-                                <PiecesList
-                                    pieces={calcResult.pieces}
-                                    totalArea={calcResult.totalArea}
-                                    summary={calcResult.summary}
-                                />
-                            )}
-                        </div>
                     </div>
                 )}
 
@@ -302,6 +289,16 @@ export function CuttingSimulatorClient() {
                         </>
                     ) : (
                         <>
+                            {viewMode === 'project' && <TracksAnalysisPanel project={projectData} />}
+
+                            {calcResult && (
+                                <PiecesList
+                                    pieces={calcResult.pieces}
+                                    totalArea={calcResult.totalArea}
+                                    summary={calcResult.summary}
+                                />
+                            )}
+
                             {nestingResult && nestingResult.sheets.length > 0 && (
                                 <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm shrink-0">
                                     <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />

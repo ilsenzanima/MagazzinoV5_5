@@ -636,6 +636,28 @@ function ObstacleFields({ seg, onUpdate }: {
                     </div>
                 </div>
 
+                <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Base:</span>
+                    <div className="relative flex-1">
+                        <Input type="number" min="1" step="1"
+                            value={seg.width}
+                            onChange={e => onUpdate({ width: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Altezza:</span>
+                    <div className="relative flex-1">
+                        <Input type="number" min="1" step="1"
+                            value={seg.height}
+                            onChange={e => onUpdate({ height: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-1 ml-auto">
                     <Label className="text-[10px] text-muted-foreground mr-1 cursor-pointer" onClick={() => onUpdate({ showQuotas: !seg.showQuotas })}>
                         Quote
