@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation } from "@/lib/cutting-simulator/project-model";
+import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment } from "@/lib/cutting-simulator/project-model";
 import {
     computeLayout,
     projectTo2D,
@@ -913,6 +913,23 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                             >
                                 {i + 1}
                             </text>
+
+                            {/* Quote ostacolo in testo */}
+                            {node.segment.type === 'obstacle' && (node.segment as ContextualElementSegment).showQuotas && (
+                                <g transform={`translate(${node.labelX}, ${node.labelY + 28 * fScale})`}>
+                                    <text textAnchor="middle" className="fill-purple-500 font-mono font-bold pointer-events-none" style={{ fontSize: `${9 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 3 * fScale, strokeLinejoin: 'round' }}>
+                                        {(() => {
+                                            const o = node.segment as ContextualElementSegment;
+                                            const q = [];
+                                            if (o.quotaLeft) q.push(`←${o.quotaLeft}`);
+                                            if (o.quotaRight) q.push(`${o.quotaRight}→`);
+                                            if (o.quotaTop) q.push(`↑${o.quotaTop}`);
+                                            if (o.quotaBottom) q.push(`↓${o.quotaBottom}`);
+                                            return q.join(' ');
+                                        })()}
+                                    </text>
+                                </g>
+                            )}
                         </g>
                     );
                 })}
