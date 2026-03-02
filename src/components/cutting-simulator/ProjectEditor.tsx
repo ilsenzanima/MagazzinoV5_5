@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment } from "@/lib/cutting-simulator/project-model";
+import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment, PendinoSegment } from "@/lib/cutting-simulator/project-model";
+import { createStraightSegment, createElbow90Segment, createObstacleSegment, createPendinoSegment } from "@/lib/cutting-simulator/project-model";
 import {
     computeLayout,
     projectTo2D,
@@ -17,11 +18,7 @@ import {
     X, Trash2, Plus, CornerDownRight, RectangleHorizontal, Type, Ruler, MousePointer2, Hand, Menu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-    createStraightSegment,
-    createElbow90Segment,
-    type SegmentDirection,
-} from "@/lib/cutting-simulator/project-model";
+import type { SegmentDirection } from "@/lib/cutting-simulator/project-model";
 
 // ==================== VISTA LABELS ====================
 
@@ -315,6 +312,9 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     const [trackDragOffset, setTrackDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; segIdx: number } | null>(null);
+    const [splitDialog, setSplitDialog] = useState<{ mode: 'atDistance' | 'half' | 'equalParts'; segIdx: number } | null>(null);
+    const [splitValue, setSplitValue] = useState<number>(0);
     const [isPanning, setIsPanning] = useState(false);
     const [isRotatingIso, setIsRotatingIso] = useState(false);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -600,6 +600,61 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         }
     }, [activeTool]);
 
+    // ==================== Context Menu Handler ====================
+    const handleContextMenu = useCallback((segIdx: number, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({ x: e.clientX, y: e.clientY, segIdx });
+    }, []);
+
+    // Chiudi context menu al click ovunque
+    useEffect(() => {
+        if (!contextMenu) return;
+        const close = () => setContextMenu(null);
+        window.addEventListener('click', close);
+        return () => window.removeEventListener('click', close);
+    }, [contextMenu]);
+
+    // ==================== Funzioni Context Menu ====================
+    const splitSegment = useCallback((segIdx: number, mode: 'half' | 'atDistance' | 'equalParts', value?: number) => {
+        const seg = project.segments[segIdx];
+        if (seg.type !== 'straight') return;
+        const len = (seg as StraightSegment).length;
+        const newSegments = [...project.segments];
+
+        if (mode === 'half') {
+            const half = Math.round(len / 2);
+            const s1 = createStraightSegment(half);
+            const s2 = createStraightSegment(len - half);
+            newSegments.splice(segIdx, 1, s1, s2);
+        } else if (mode === 'atDistance' && value && value > 0 && value < len) {
+            const s1 = createStraightSegment(value);
+            const s2 = createStraightSegment(len - value);
+            newSegments.splice(segIdx, 1, s1, s2);
+        } else if (mode === 'equalParts' && value && value >= 2) {
+            const partLen = Math.round(len / value);
+            const parts: Segment[] = [];
+            let remaining = len;
+            for (let i = 0; i < value; i++) {
+                const pLen = i === value - 1 ? remaining : partLen;
+                parts.push(createStraightSegment(pLen));
+                remaining -= partLen;
+            }
+            newSegments.splice(segIdx, 1, ...parts);
+        }
+
+        onProjectChange({ ...project, segments: newSegments });
+        setContextMenu(null);
+        setSplitDialog(null);
+    }, [project, onProjectChange]);
+
+    const insertSegmentAfter = useCallback((segIdx: number, newSeg: Segment) => {
+        const newSegments = [...project.segments];
+        newSegments.splice(segIdx + 1, 0, newSeg);
+        onProjectChange({ ...project, segments: newSegments });
+        setContextMenu(null);
+    }, [project, onProjectChange]);
+
     const handleCanvasClick = useCallback((e: React.MouseEvent) => {
         if (isPanning) return;
         setSelectedIdx(null);
@@ -852,6 +907,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                         <g
                             key={node.segment.id}
                             onClick={e => handleSegmentClick(node.index, e)}
+                            onContextMenu={e => handleContextMenu(node.index, e)}
                             onMouseDown={e => handleSegmentMouseDown(node.trackId, e)}
                             style={{
                                 cursor: isDraggingThisTrack ? 'grabbing' : (activeTool === 'select' ? (node.trackId ? 'grab' : 'pointer') : 'default'),
@@ -1193,8 +1249,131 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
 
             {/* Istruzioni */}
             <div className="absolute bottom-2 left-2 text-[10px] text-muted-foreground/60 pointer-events-none">
-                Click pezzo = seleziona · Scroll = zoom · Alt+Drag = pan
+                Click pezzo = seleziona · Tasto destro = opzioni · Scroll = zoom · Alt+Drag = pan
             </div>
+
+            {/* ==================== CONTEXT MENU ==================== */}
+            {contextMenu && (() => {
+                const seg = project.segments[contextMenu.segIdx];
+                const isStraight = seg?.type === 'straight';
+                const isFirst = contextMenu.segIdx === 0;
+                const isLast = contextMenu.segIdx === project.segments.length - 1;
+                return (
+                    <div
+                        className="fixed z-[9999] min-w-[200px] bg-popover border border-border rounded-lg shadow-xl py-1 animate-in fade-in zoom-in-95"
+                        style={{ left: contextMenu.x, top: contextMenu.y }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Titolo */}
+                        <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wide border-b border-border/50">
+                            {seg?.type === 'straight' ? `Dritto ${(seg as StraightSegment).length}mm` :
+                                seg?.type === 'elbow90' ? 'Curva 90°' :
+                                    seg?.type === 'obstacle' ? `Ostacolo (${(seg as ContextualElementSegment).obstacleType})` :
+                                        seg?.type === 'pendino' ? 'Pendino' : 'Segmento'}
+                        </div>
+
+                        {/* Opzioni Divisione (solo per dritti) */}
+                        {isStraight && (
+                            <>
+                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                    onClick={() => { splitSegment(contextMenu.segIdx, 'half'); }}>
+                                    ✂️ Dividi a metà
+                                </button>
+                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                    onClick={() => { setSplitDialog({ mode: 'atDistance', segIdx: contextMenu.segIdx }); setSplitValue(Math.round((seg as StraightSegment).length / 2)); setContextMenu(null); }}>
+                                    📏 Dividi a X mm dall&apos;inizio
+                                </button>
+                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                    onClick={() => { setSplitDialog({ mode: 'equalParts', segIdx: contextMenu.segIdx }); setSplitValue(2); setContextMenu(null); }}>
+                                    📐 Dividi in N parti uguali
+                                </button>
+                                <div className="border-t border-border/50 my-1" />
+                            </>
+                        )}
+
+                        {/* Inserisci dopo */}
+                        <div className="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">Inserisci dopo</div>
+                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createStraightSegment(1000))}>
+                            ➕ Dritto (1000mm)
+                        </button>
+                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createElbow90Segment('right'))}>
+                            🔄 Curva 90°
+                        </button>
+                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight))}>
+                            🧱 Muro
+                        </button>
+                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight))}>
+                            🏗️ Solaio
+                        </button>
+                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createPendinoSegment())}>
+                            📌 Pendino
+                        </button>
+
+                        <div className="border-t border-border/50 my-1" />
+
+                        {/* Elimina */}
+                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-destructive/10 text-destructive flex items-center gap-2"
+                            onClick={() => { handleRemove(contextMenu.segIdx); setContextMenu(null); }}>
+                            🗑️ Elimina segmento
+                        </button>
+                    </div>
+                );
+            })()}
+
+            {/* ==================== SPLIT DIALOG ==================== */}
+            {splitDialog && (() => {
+                const seg = project.segments[splitDialog.segIdx] as StraightSegment;
+                if (!seg || seg.type !== 'straight') return null;
+                return (
+                    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setSplitDialog(null)}>
+                        <div className="bg-popover border border-border rounded-xl shadow-2xl p-4 min-w-[280px] space-y-3 animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                            <h3 className="text-sm font-semibold">
+                                {splitDialog.mode === 'atDistance' ? '📏 Dividi a distanza' : '📐 Dividi in parti uguali'}
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                                Segmento dritto: <strong>{seg.length}mm</strong>
+                            </p>
+                            <div className="space-y-1">
+                                <label className="text-xs text-muted-foreground">
+                                    {splitDialog.mode === 'atDistance' ? 'Distanza dall\'inizio (mm)' : 'Numero di parti'}
+                                </label>
+                                <input
+                                    type="number"
+                                    min={splitDialog.mode === 'atDistance' ? 1 : 2}
+                                    max={splitDialog.mode === 'atDistance' ? seg.length - 1 : 20}
+                                    step={1}
+                                    value={splitValue}
+                                    onChange={e => setSplitValue(parseInt(e.target.value) || 0)}
+                                    className="w-full h-9 px-3 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    autoFocus
+                                />
+                                {splitDialog.mode === 'equalParts' && splitValue >= 2 && (
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Ogni parte: ~{Math.round(seg.length / splitValue)}mm
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                                <button
+                                    className="flex-1 h-8 text-xs bg-muted hover:bg-muted/80 rounded-md transition-colors"
+                                    onClick={() => setSplitDialog(null)}>
+                                    Annulla
+                                </button>
+                                <button
+                                    className="flex-1 h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors font-medium"
+                                    onClick={() => splitSegment(splitDialog.segIdx, splitDialog.mode, splitValue)}>
+                                    Dividi
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
