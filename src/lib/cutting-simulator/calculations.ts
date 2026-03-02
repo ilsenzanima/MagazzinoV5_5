@@ -374,7 +374,7 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
 
 // ==================== CALCOLO PROGETTO COMPLETO ====================
 
-import type { DuctProject, DuctSides, Segment } from '@/lib/cutting-simulator/project-model';
+import type { DuctProject, DuctSides, Segment, TrackSeparatorSegment } from '@/lib/cutting-simulator/project-model';
 
 /**
  * Filtra i pezzi in base a quali lati sono attivi.
@@ -435,8 +435,18 @@ export function calculateProject(project: DuctProject): CalculationResult {
     const { section, segments, globalMeasurements } = project;
     const allPieces: CutPiece[] = [];
 
+    // Traccia il TrackSeparator corrente per determinare spessore override
+    let currentSeparator: TrackSeparatorSegment | null = null;
+
     segments.forEach((seg, idx) => {
-        if (seg.type === 'trackSeparator') return; // I separatori non producono lamiere
+        if (seg.type === 'trackSeparator') {
+            currentSeparator = seg as TrackSeparatorSegment;
+            return; // I separatori non producono lamiere
+        }
+        if (seg.type === 'pendino') return; // Solo rappresentativo, nessun pezzo
+
+        // Spessore effettivo: override dell'isola oppure globale
+        const effectiveThickness = currentSeparator?.thicknessOverride ?? section.thickness;
 
         const prefix = `S${idx + 1}`;
         let result: CalculationResult | null = null;
@@ -454,7 +464,7 @@ export function calculateProject(project: DuctProject): CalculationResult {
                 // Find next non-separator segment
                 const next = segments.slice(idx + 1).find(s => s.type !== 'trackSeparator');
                 let deduction = 0;
-                const outerWidth = section.innerWidth + 2 * section.thickness;
+                const outerWidth = section.innerWidth + 2 * effectiveThickness;
 
                 // Il segmento precedente si aggancia con il suo braccio B all'ingresso di questo
                 if (prev && prev.type === 'elbow90') {
@@ -476,7 +486,7 @@ export function calculateProject(project: DuctProject): CalculationResult {
                 innerWidth: section.innerWidth,
                 innerHeight: section.innerHeight,
                 length: actualLength, // Uso lunghezza effettiva
-                thickness: section.thickness,
+                thickness: effectiveThickness,
                 extraMargin: section.extraMargin,
             });
 
@@ -500,7 +510,7 @@ export function calculateProject(project: DuctProject): CalculationResult {
             result = calculateElbow90({
                 innerWidth: section.innerWidth,
                 innerHeight: section.innerHeight,
-                thickness: section.thickness,
+                thickness: effectiveThickness,
                 armA: seg.armA,
                 armB: seg.armB,
                 extraMargin: section.extraMargin,
@@ -520,6 +530,54 @@ export function calculateProject(project: DuctProject): CalculationResult {
             });
         });
     });
+
+    // Fasce Giunti: 4 fasce per ogni giunto tra due segmenti non-separator consecutivi
+    if (project.jointBands) {
+        const bandW = project.jointBandWidth || 100; // larghezza fascia in mm
+        const outerW = section.innerWidth + 2 * section.thickness;
+        const outerH = section.innerHeight + 2 * section.thickness;
+        // Fasce corte = dimensione esterne, fasce lunghe = esterne + 2×spessore per chiudere l'angolo
+        const shortSideW = outerW;   // es. 300mm
+        const shortSideH = outerH;   // es. 300mm
+        const longSideW = outerW + 2 * section.thickness;  // es. 400mm
+        const longSideH = outerH + 2 * section.thickness;  // es. 400mm
+
+        let jointCount = 0;
+        const nonSepSegs = segments.filter(s => s.type !== 'trackSeparator');
+        for (let i = 0; i < nonSepSegs.length - 1; i++) {
+            const curr = nonSepSegs[i];
+            const next = nonSepSegs[i + 1];
+            // Un giunto tra due tratti dritti (o dritto↔curva, o dritto↔ostacolo)
+            if (curr.type === 'straight' || curr.type === 'obstacle') {
+                if (next.type === 'straight' || next.type === 'obstacle' || next.type === 'elbow90') {
+                    jointCount++;
+                }
+            }
+        }
+
+        if (jointCount > 0) {
+            // 2 fasce orizzontali (base/coperchio) = larghezza esterna × bandW
+            allPieces.push({
+                id: `fascia-oriz`,
+                label: `[F] Fascia Giunto Orizz. (${shortSideW}×${bandW})`,
+                width: shortSideW,
+                height: bandW,
+                quantity: jointCount * 2,
+                color: '#14b8a6', // teal
+                formula: `${shortSideW} × ${bandW} — ${jointCount} giunti × 2`,
+            });
+            // 2 fasce verticali (fianchi) = (altezza esterna + 2×spessore) × bandW
+            allPieces.push({
+                id: `fascia-vert`,
+                label: `[F] Fascia Giunto Vert. (${longSideH}×${bandW})`,
+                width: longSideH,
+                height: bandW,
+                quantity: jointCount * 2,
+                color: '#0d9488', // darker teal
+                formula: `${longSideH} × ${bandW} — ${jointCount} giunti × 2`,
+            });
+        }
+    }
 
     // Aggiunta tappo frontale se previsto
     if (section.cap === 'inner') {
@@ -554,11 +612,14 @@ export function calculateProject(project: DuctProject): CalculationResult {
     const outerWidth = section.innerWidth + 2 * section.thickness;
     const outerHeight = section.innerHeight + 2 * section.thickness;
 
+    const pendiniCount = segments.filter(s => s.type === 'pendino').length;
+
     const summaryLines = [
         `Progetto: ${project.name}`,
         `Sezione: ${section.innerWidth}×${section.innerHeight} mm (esterna ${outerWidth}×${outerHeight})`,
         `Segmenti: ${segments.length} — Pezzi totali: ${allPieces.reduce((s, p) => s + p.quantity, 0)}`,
         `Superficie totale: ${(totalArea / 1_000_000).toFixed(3)} m²`,
+        ...(pendiniCount > 0 ? [`Pendini: ${pendiniCount}`] : []),
     ];
 
     return {
