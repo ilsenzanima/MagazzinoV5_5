@@ -36,6 +36,11 @@ export interface SegmentNode3D {
     corner?: Vec3;
     /** Direzione in uscita */
     dirOut?: Direction3D;
+    /** (Solo per obstacle) Offset dal centro per rispettare le quote */
+    obstacleOffset?: Vec3;
+    /** (Solo per obstacle) Dimensioni del canale interno al muro */
+    ductW?: number;
+    ductH?: number;
     /** (Nuovo) ID del TrackSeparator di appartenenza per Drag&Drop */
     trackId?: string;
 }
@@ -47,6 +52,7 @@ export interface Rect2D {
     width: number;
     height: number;
     rx?: number;
+    color?: string;
 }
 
 /** Poligono per SVG (vista ISO) */
@@ -169,6 +175,38 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 y: pos.y + v.y * len,
                 z: pos.z + v.z * len,
             };
+
+            let obstacleOffset: Vec3 | undefined;
+            if (isObs) {
+                const obs = seg as import('./project-model').ContextualElementSegment;
+                let dx = 0, dy = 0, dz = 0;
+
+                if (obs.quotaTop !== undefined) {
+                    dz = (outerH / 2) + obs.quotaTop - (obs.height / 2);
+                } else if (obs.quotaBottom !== undefined) {
+                    dz = -((outerH / 2) + obs.quotaBottom - (obs.height / 2));
+                }
+
+                let leftDir: Vec3;
+                if (dir === '+x') leftDir = { x: 0, y: -1, z: 0 };
+                else if (dir === '-x') leftDir = { x: 0, y: 1, z: 0 };
+                else if (dir === '+y') leftDir = { x: 1, y: 0, z: 0 };
+                else if (dir === '-y') leftDir = { x: -1, y: 0, z: 0 };
+                else leftDir = { x: 1, y: 0, z: 0 };
+
+                if (obs.quotaLeft !== undefined) {
+                    const d_lat = (outerW / 2) + obs.quotaLeft - (obs.width / 2);
+                    dx += leftDir.x * d_lat;
+                    dy += leftDir.y * d_lat;
+                } else if (obs.quotaRight !== undefined) {
+                    const d_lat = (outerW / 2) + obs.quotaRight - (obs.width / 2);
+                    dx -= leftDir.x * d_lat;
+                    dy -= leftDir.y * d_lat;
+                }
+
+                obstacleOffset = { x: dx, y: dy, z: dz };
+            }
+
             nodes.push({
                 segment: seg,
                 index: i,
@@ -177,6 +215,9 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 direction: dir,
                 outerW: isObs ? seg.width : outerW,
                 outerH: isObs ? seg.height : outerH,
+                ductW: isObs ? outerW : undefined,
+                ductH: isObs ? outerH : undefined,
+                obstacleOffset,
                 trackId: currentTrackId,
             });
             pos = end;
@@ -272,7 +313,7 @@ export function projectTo2D(
                 };
             };
 
-            const generateBoxPolygons = (p1: Vec3, p2: Vec3, w: number, h: number): (Polygon2D & { depth: number })[] => {
+            const generateBoxPolygons = (p1: Vec3, p2: Vec3, w: number, h: number, customColor = baseColor): (Polygon2D & { depth: number })[] => {
                 const minX = Math.min(p1.x, p2.x) - (p1.x === p2.x ? w / 2 : 0);
                 const maxX = Math.max(p1.x, p2.x) + (p1.x === p2.x ? w / 2 : 0);
                 const minY = Math.min(p1.y, p2.y) - (p1.y === p2.y ? w / 2 : 0);
@@ -294,12 +335,12 @@ export function projectTo2D(
                 const ptsIso = pts.map(iso);
 
                 const faces = [
-                    { indices: [0, 1, 2, 3], fill: `${baseColor}10` },
-                    { indices: [4, 5, 6, 7], fill: `${baseColor}40` },
-                    { indices: [0, 1, 5, 4], fill: `${baseColor}30` },
-                    { indices: [3, 2, 6, 7], fill: `${baseColor}05` },
-                    { indices: [0, 3, 7, 4], fill: `${baseColor}20` },
-                    { indices: [1, 2, 6, 5], fill: `${baseColor}05` },
+                    { indices: [0, 1, 2, 3], fill: `${customColor}10` },
+                    { indices: [4, 5, 6, 7], fill: `${customColor}40` },
+                    { indices: [0, 1, 5, 4], fill: `${customColor}30` },
+                    { indices: [3, 2, 6, 7], fill: `${customColor}05` },
+                    { indices: [0, 3, 7, 4], fill: `${customColor}20` },
+                    { indices: [1, 2, 6, 5], fill: `${customColor}05` },
                 ];
 
                 return faces.map(f => {
@@ -311,7 +352,7 @@ export function projectTo2D(
                     return {
                         points: f.indices.map(idx => ptsIso[idx]),
                         fill: f.fill,
-                        stroke: baseColor,
+                        stroke: customColor,
                         strokeWidth: 1,
                         depth: sum
                     };
@@ -399,8 +440,27 @@ export function projectTo2D(
                 });
                 polygons.sort((a: any, b: any) => a.depth - b.depth);
                 labelPos = iso(node.corner);
+            } else if (seg.type === 'obstacle') {
+                const off = node.obstacleOffset || { x: 0, y: 0, z: 0 };
+                const p1Obs = { x: node.start.x + off.x, y: node.start.y + off.y, z: node.start.z + off.z };
+                const p2Obs = { x: node.end.x + off.x, y: node.end.y + off.y, z: node.end.z + off.z };
+                const obsPolys = generateBoxPolygons(p1Obs, p2Obs, node.outerW, node.outerH, baseColor);
+
+                // Canna passante
+                const ductW = node.ductW || node.outerW;
+                const ductH = node.ductH || node.outerH;
+                const ductColor = SEGMENT_COLORS['straight'] || '#3b82f6';
+                const ductPolys = generateBoxPolygons(node.start, node.end, ductW, ductH, ductColor);
+
+                polygons = [...ductPolys, ...obsPolys];
+                polygons.sort((a: any, b: any) => a.depth - b.depth);
+                labelPos = iso({
+                    x: (node.start.x + node.end.x) / 2 + off.x,
+                    y: (node.start.y + node.end.y) / 2 + off.y,
+                    z: (node.start.z + node.end.z) / 2 + off.z
+                });
             } else {
-                polygons = generateBoxPolygons(node.start, node.end, node.outerW, node.outerH);
+                polygons = generateBoxPolygons(node.start, node.end, node.outerW, node.outerH, baseColor);
                 polygons.sort((a: any, b: any) => a.depth - b.depth);
                 labelPos = iso({
                     x: (node.start.x + node.end.x) / 2,
@@ -427,6 +487,8 @@ export function projectTo2D(
         let crossW = node.outerW;
         let pW = node.outerW;
         let pH = node.outerH;
+        let offU = 0, offV = 0;
+        const off = node.obstacleOffset || { x: 0, y: 0, z: 0 };
 
         switch (view) {
             case 'top':
@@ -436,6 +498,7 @@ export function projectTo2D(
                 crossW = node.outerW;
                 pW = node.outerW; // Top view uses Width
                 pH = node.outerW;
+                offU = off.x; offV = off.y;
                 break;
             case 'front': // Fronte = y up (+x, -z)
                 u1 = node.start.x; v1 = -node.start.z;
@@ -444,6 +507,7 @@ export function projectTo2D(
                 crossW = node.outerH;
                 pW = node.outerW;
                 pH = node.outerH;
+                offU = off.x; offV = -off.z;
                 break;
             case 'right': // Destra = x up (+y, -z)
                 u1 = node.start.y; v1 = -node.start.z;
@@ -452,6 +516,7 @@ export function projectTo2D(
                 crossW = node.outerW;
                 pW = node.outerW;
                 pH = node.outerH;
+                offU = off.y; offV = -off.z;
                 break;
             case 'back': // Retro = vista +y (-x, -z)
                 u1 = -node.start.x; v1 = -node.start.z;
@@ -460,6 +525,7 @@ export function projectTo2D(
                 crossW = node.outerH;
                 pW = node.outerW;
                 pH = node.outerH;
+                offU = -off.x; offV = -off.z;
                 break;
             case 'left': // Sinistra = vista +x (-y, -z)
                 u1 = -node.start.y; v1 = -node.start.z;
@@ -468,17 +534,18 @@ export function projectTo2D(
                 crossW = node.outerW;
                 pW = node.outerW;
                 pH = node.outerH;
+                offU = -off.y; offV = -off.z;
                 break;
         }
 
-        const createRect = (startU: number, startV: number, endU: number, endV: number): Rect2D => {
+        const createRect = (startU: number, startV: number, endU: number, endV: number, isDuct = false): Rect2D => {
             const du = endU - startU;
             const dv = endV - startV;
             const len = Math.sqrt(du * du + dv * dv);
 
             // Determiniamo la larghezza "cross" da usare in questa specifica direzione e vista
             let effectiveCrossW = crossW;
-            if (node.segment.type === 'obstacle') {
+            if (node.segment.type === 'obstacle' && !isDuct) {
                 // Per gli ostacoli, la larghezza proiettata dipende se il tratto si sta espandendo su U o V.
                 // Se è orizzontale (du != 0 => si sposta lungo U), la grandezza ortogonale su V è dettata dalla vista
                 // (es. Top -> larghezza W, Front -> altezza H). Usiamo pW o pH in base al piano.
@@ -533,6 +600,17 @@ export function projectTo2D(
             rects.push(r1, centerSq, r2);
             labelX = cu;
             labelY = cv;
+        } else if (node.segment.type === 'obstacle') {
+            const rObs = createRect(u1 + offU, v1 + offV, u2 + offU, v2 + offV);
+            rects.push(rObs);
+
+            // Canna passante
+            const rDuct = createRect(u1, v1, u2, v2, true);
+            rDuct.color = SEGMENT_COLORS['straight'] || '#3b82f6';
+            rects.push(rDuct);
+
+            labelX = ((u1 + u2) / 2) + offU;
+            labelY = ((v1 + v2) / 2) + offV;
         } else {
             const r = createRect(u1, v1, u2, v2);
             rects.push(r);

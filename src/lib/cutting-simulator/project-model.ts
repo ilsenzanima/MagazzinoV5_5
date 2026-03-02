@@ -22,9 +22,8 @@ export interface SectionProfile {
 }
 
 export type SegmentDirection = 'left' | 'right' | 'up' | 'down';
-export type SegmentOrientation = 'horizontal' | 'vertical';
 
-export type SegmentType = 'straight' | 'elbow90' | 'trackSeparator' | 'obstacle';
+export type SegmentType = 'straight' | 'elbow90' | 'trackSeparator' | 'obstacle' | 'pendino';
 export type ObstacleType = 'wall' | 'floor' | 'column';
 
 export interface BaseSegment {
@@ -36,7 +35,6 @@ export interface BaseSegment {
 export interface StraightSegment extends BaseSegment {
     type: 'straight';
     length: number;
-    orientation: SegmentOrientation;
 }
 
 export interface Elbow90Segment extends BaseSegment {
@@ -45,12 +43,16 @@ export interface Elbow90Segment extends BaseSegment {
     armA: number; // Lunghezza braccio di ingresso
     armB: number; // Lunghezza braccio di uscita
     baseMode: 'split' | 'single';
+    /** Lunghezza attesa del sotto-tratto che inizia DOPO questa curva (mm) */
+    expectedLengthAfter?: number;
 }
 
 export interface TrackSeparatorSegment extends BaseSegment {
     type: 'trackSeparator';
     expectedLength: number;
     name: string;
+    /** Spessore lastra override per questa isola (mm). Se non definito, si usa quello globale. */
+    thicknessOverride?: number;
     /** Coordinate 3D assolute di partenza per slegare il tratto (Fase C: Drag&Drop) */
     startX?: number;
     startY?: number;
@@ -70,7 +72,15 @@ export interface ContextualElementSegment extends BaseSegment {
     quotaBottom?: number;
 }
 
-export type Segment = StraightSegment | Elbow90Segment | TrackSeparatorSegment | ContextualElementSegment;
+export interface PendinoSegment extends BaseSegment {
+    type: 'pendino';
+    /** Posizione lungo il tratto (mm dalla partenza del segmento precedente) */
+    position?: number;
+    /** Nota testuale opzionale */
+    note?: string;
+}
+
+export type Segment = StraightSegment | Elbow90Segment | TrackSeparatorSegment | ContextualElementSegment | PendinoSegment;
 
 // ==================== ANNOTAZIONI & CONTESTO ====================
 
@@ -116,6 +126,10 @@ export interface DuctProject {
     annotations?: Annotation[];
     /** Elementi contestuali: pareti, solai, varchi (fase D) */
     contextElements?: ContextElement[];
+    /** Abilita il calcolo delle fasce giunti tra i tratti */
+    jointBands?: boolean;
+    /** Larghezza della fascia giunto in mm (default 100-150) */
+    jointBandWidth?: number;
 }
 
 /** Contatore per ID univoci */
@@ -126,7 +140,6 @@ export function createStraightSegment(length = 1000): StraightSegment {
         type: 'straight',
         id: `seg-${++_segCounter}-${Date.now()}`,
         length,
-        orientation: 'horizontal',
     };
 }
 
@@ -159,6 +172,13 @@ export function createObstacleSegment(obstacleType: ObstacleType = 'wall', inner
         width: innerWidth + 500, // Margine default
         height: innerHeight + 500,
         showQuotas: false
+    };
+}
+
+export function createPendinoSegment(): PendinoSegment {
+    return {
+        id: `pen-${++_segCounter}-${Date.now()}`,
+        type: 'pendino',
     };
 }
 

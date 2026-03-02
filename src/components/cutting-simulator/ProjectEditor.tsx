@@ -873,19 +873,22 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                                     />
                                 ))
                             ) : (
-                                node.rects.map((r, rIdx) => (
-                                    <rect
-                                        key={rIdx}
-                                        x={r.x}
-                                        y={r.y}
-                                        width={r.width}
-                                        height={r.height}
-                                        fill={isSelected ? `${node.color}40` : `${node.color}20`}
-                                        stroke={node.color}
-                                        strokeWidth={isSelected ? 2.5 : 1.5}
-                                        rx={r.rx || 0}
-                                    />
-                                ))
+                                node.rects.map((r, rIdx) => {
+                                    const rectColor = r.color || node.color;
+                                    return (
+                                        <rect
+                                            key={rIdx}
+                                            x={r.x}
+                                            y={r.y}
+                                            width={r.width}
+                                            height={r.height}
+                                            fill={isSelected ? `${rectColor}50` : `${rectColor}25`}
+                                            stroke={rectColor}
+                                            strokeWidth={isSelected ? 3 : 1.5}
+                                            rx={r.rx || 0}
+                                        />
+                                    );
+                                })
                             )}
 
                             {/* Etichetta */}

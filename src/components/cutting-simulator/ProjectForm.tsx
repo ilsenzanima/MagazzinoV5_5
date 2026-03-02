@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { cn } from "@/lib/utils";
 import {
     Plus, Trash2, ArrowDown, ArrowUp, ArrowLeft, ArrowRight,
-    CornerDownRight, Ruler, GripVertical, Layers, ChevronDown, ChevronUp, FastForward, ChevronRight
+    CornerDownRight, Ruler, GripVertical, Layers, ChevronDown, ChevronUp, FastForward, ChevronRight,
+    AlertTriangle, CheckCircle2, Pin
 } from "lucide-react";
 import { SectionSidesSelector } from "@/components/cutting-simulator/SectionSidesSelector";
 import {
@@ -16,12 +17,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type {
     DuctProject, Segment, StraightSegment, Elbow90Segment, TrackSeparatorSegment,
-    SectionProfile, SegmentDirection, SegmentOrientation,
-    ContextualElementSegment, ObstacleType
+    SectionProfile, SegmentDirection,
+    ContextualElementSegment, ObstacleType, PendinoSegment
 } from "@/lib/cutting-simulator/project-model";
 import {
     defaultProject, createStraightSegment, createElbow90Segment, createTrackSeparator,
-    createObstacleSegment, sidesLabel,
+    createObstacleSegment, createPendinoSegment, sidesLabel,
 } from "@/lib/cutting-simulator/project-model";
 
 interface ProjectFormProps {
@@ -39,9 +40,7 @@ const DIRECTION_ICONS: Record<SegmentDirection, typeof ArrowRight> = {
 const DIRECTION_LABELS: Record<SegmentDirection, string> = {
     right: 'Destra', left: 'Sinistra', up: 'Sopra', down: 'Sotto',
 };
-const ORIENTATION_LABELS: Record<SegmentOrientation, string> = {
-    horizontal: 'Orizzontale', vertical: 'Verticale',
-};
+
 
 export function ProjectForm({ project, onProjectChange, onCalculateProject }: ProjectFormProps) {
     const [collapsedTracks, setCollapsedTracks] = useState<Record<string, boolean>>({});
@@ -110,6 +109,16 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
         e.preventDefault();
         onCalculateProject(project);
     };
+
+    // Calcola la lunghezza reale dai segmenti in un gruppo
+    const computeTrackLength = useCallback((items: { seg: Segment }[]): number => {
+        return items.reduce((sum, { seg }) => {
+            if (seg.type === 'straight') return sum + seg.length;
+            if (seg.type === 'obstacle') return sum + seg.thickness;
+            if (seg.type === 'elbow90') return sum + seg.armA + seg.armB;
+            return sum;
+        }, 0);
+    }, []);
 
     const sec = project.section;
 
@@ -232,6 +241,41 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                         </button>
                     </div>
 
+                    {/* === FASCE GIUNTI === */}
+                    <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
+                        <div className="space-y-0.5 pr-4">
+                            <Label className="text-xs font-medium cursor-pointer" onClick={() => onProjectChange(p => ({ ...p, jointBands: !p.jointBands }))}>
+                                Fasce Giunti
+                            </Label>
+                            <p className="text-[10px] text-muted-foreground leading-tight">
+                                Aggiunge 4 fasce per ogni giunto tra pezzi dritti (avvolgono l'esterno della canala)
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {project.jointBands && (
+                                <div className="relative">
+                                    <Input type="number" min="50" max="300" step="10"
+                                        value={project.jointBandWidth || 100}
+                                        onChange={e => onProjectChange(p => ({ ...p, jointBandWidth: parseFloat(e.target.value) || 100 }))}
+                                        className="h-6 w-16 text-[10px] pr-6 py-0 border-border/40" />
+                                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                                </div>
+                            )}
+                            <button type="button"
+                                onClick={() => onProjectChange(p => ({ ...p, jointBands: !p.jointBands }))}
+                                className={cn(
+                                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+                                    project.jointBands ? "bg-primary" : "bg-input"
+                                )}
+                            >
+                                <span className={cn(
+                                    "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                                    project.jointBands ? "translate-x-4" : "translate-x-0"
+                                )} />
+                            </button>
+                        </div>
+                    </div>
+
                     {/* === STRUTTURA === */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -272,40 +316,104 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                     const sepId = group.separator?.id || `no-sep-${groupIdx}`;
                                     const isCollapsed = collapsedTracks[sepId] || false;
 
+                                    // Calcolo sotto-tratti: le curve separano i sotto-tratti
+                                    type SubTrack = { items: { seg: Segment; index: number }[]; expectedLength: number; sourceId: string; field: string; label: string };
+                                    const subTracks: SubTrack[] = [];
+                                    let curItems: { seg: Segment; index: number }[] = [];
+                                    let stIdx = 0;
+                                    for (const item of group.items) {
+                                        if (item.seg.type === 'elbow90') {
+                                            subTracks.push({ items: curItems, expectedLength: stIdx === 0 ? (group.separator?.expectedLength || 0) : 0, sourceId: stIdx === 0 ? sepId : '', field: stIdx === 0 ? 'expectedLength' : '', label: `Sotto-tratto ${String.fromCharCode(65 + stIdx)}` });
+                                            stIdx++;
+                                            curItems = [];
+                                            subTracks.push({ items: [], expectedLength: (item.seg as Elbow90Segment).expectedLengthAfter || 0, sourceId: item.seg.id, field: 'expectedLengthAfter', label: `Sotto-tratto ${String.fromCharCode(65 + stIdx)}` });
+                                        } else {
+                                            curItems.push(item);
+                                        }
+                                    }
+                                    if (subTracks.length === 0) {
+                                        subTracks.push({ items: curItems, expectedLength: group.separator?.expectedLength || 0, sourceId: sepId, field: 'expectedLength', label: 'Tratto' });
+                                    } else if (curItems.length > 0) {
+                                        subTracks[subTracks.length - 1].items = curItems;
+                                    }
+                                    const visibleSTs = subTracks.filter(st => st.items.length > 0);
+
                                     return (
                                         <div key={sepId} className="border border-border/60 rounded-lg overflow-hidden bg-card/50 shadow-sm relative">
                                             {/* Header del Gruppo (Segmento/Isola) */}
                                             {group.separator && (
-                                                <div className="bg-muted/40 px-3 py-2 flex items-center justify-between border-b border-border/40">
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground"
-                                                            onClick={() => setCollapsedTracks(prev => ({ ...prev, [sepId]: !isCollapsed }))}
-                                                        >
-                                                            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                                        </Button>
-                                                        <div className="h-3 w-3 bg-primary/80 rounded block shadow-sm" />
-                                                        <span className="text-xs font-bold uppercase tracking-wider">{group.separator.name}</span>
-                                                        <span className="text-[10px] text-muted-foreground ml-2 px-1.5 py-0.5 bg-background rounded-md border border-border/50">
-                                                            {group.items.length} tratti
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <Label className="text-[10px] text-muted-foreground uppercase">Teorica:</Label>
-                                                            <div className="relative">
-                                                                <Input type="number" min="0" step="1"
-                                                                    value={group.separator?.expectedLength || 0}
-                                                                    onChange={e => updateSegment(sepId, { expectedLength: parseFloat(e.target.value) || 0 })}
-                                                                    className="h-6 w-20 text-[10px] pr-6 py-0 border-border/40" />
-                                                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                                                            </div>
+                                                <div className="bg-muted/40 px-3 py-2 flex flex-col gap-1.5 border-b border-border/40">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <Button
+                                                                type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground"
+                                                                onClick={() => setCollapsedTracks(prev => ({ ...prev, [sepId]: !isCollapsed }))}
+                                                            >
+                                                                {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                            </Button>
+                                                            <div className="h-3 w-3 bg-primary/80 rounded block shadow-sm" />
+                                                            <span className="text-xs font-bold uppercase tracking-wider">{group.separator.name}</span>
+                                                            <span className="text-[10px] text-muted-foreground ml-2 px-1.5 py-0.5 bg-background rounded-md border border-border/50">
+                                                                {group.items.length} tratti
+                                                            </span>
                                                         </div>
-                                                        <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
-                                                            onClick={() => removeSegment(sepId)}>
-                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                        </Button>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-[8px] text-muted-foreground uppercase">Sp:</span>
+                                                                <div className="relative">
+                                                                    <Input type="number" min="0" step="0.5"
+                                                                        placeholder={`${project.section.thickness}`}
+                                                                        value={group.separator?.thicknessOverride ?? ''}
+                                                                        onChange={e => {
+                                                                            const v = e.target.value;
+                                                                            updateSegment(sepId, { thicknessOverride: v === '' ? undefined : (parseFloat(v) || 0) } as any);
+                                                                        }}
+                                                                        className="h-5 w-14 text-[9px] pr-5 py-0 border-border/40 bg-background/50" />
+                                                                    <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-muted-foreground">mm</span>
+                                                                </div>
+                                                            </div>
+                                                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
+                                                                onClick={() => removeSegment(sepId)}>
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
                                                     </div>
+
+                                                    {/* Badge Misure per ogni sotto-tratto */}
+                                                    {visibleSTs.map((st, i) => {
+                                                        const rl = computeTrackLength(st.items);
+                                                        const el = st.expectedLength;
+                                                        const dd = el > 0 ? rl - el : 0;
+                                                        const hw = el > 0 && Math.abs(dd) > 1;
+                                                        const io = dd > 0;
+                                                        return (
+                                                            <div key={`st-${i}`} className={cn(
+                                                                "flex items-center gap-2 px-2 py-1 rounded text-[10px] font-mono",
+                                                                !hw && el > 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                                                    : hw && io ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                                                                        : hw ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                                                            : "bg-muted/30 text-muted-foreground border border-border/30"
+                                                            )}>
+                                                                {hw ? <AlertTriangle className="h-3 w-3 shrink-0" />
+                                                                    : el > 0 ? <CheckCircle2 className="h-3 w-3 shrink-0" /> : null}
+                                                                <span className="flex-1 truncate">
+                                                                    {visibleSTs.length > 1 && <strong className="mr-1">{st.label}:</strong>}
+                                                                    <strong>{rl.toFixed(0)}</strong>
+                                                                    {el > 0 && <> / {el.toFixed(0)} mm{hw && <span className="font-bold ml-1">({io ? '+' : ''}{dd.toFixed(0)})</span>}</>}
+                                                                </span>
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <span className="text-[8px] opacity-60">Att:</span>
+                                                                    <div className="relative">
+                                                                        <Input type="number" min="0" step="1"
+                                                                            value={st.expectedLength || 0}
+                                                                            onChange={e => updateSegment(st.sourceId, { [st.field]: parseFloat(e.target.value) || 0 } as any)}
+                                                                            className="h-5 w-16 text-[9px] pr-5 py-0 border-border/40 bg-background/50" />
+                                                                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-muted-foreground">mm</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
 
@@ -379,6 +487,9 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                 <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight))} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Pilastro/Ostacolo
                                                                 </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createPendinoSegment())} className="text-xs cursor-pointer">
+                                                                    <Pin className="h-3 w-3 mr-1.5 opacity-70" /> Pendino
+                                                                </DropdownMenuItem>
                                                                 <DropdownMenuItem disabled className="text-xs text-muted-foreground">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Tappo (Prossimamente)
                                                                 </DropdownMenuItem>
@@ -440,7 +551,8 @@ function SegmentRow({
 }) {
     const isStraight = segment.type === 'straight';
     const isObstacle = segment.type === 'obstacle';
-    const accent = isStraight ? 'border-l-blue-500' : isObstacle ? 'border-l-purple-500' : 'border-l-amber-500';
+    const isPendino = segment.type === 'pendino';
+    const accent = isStraight ? 'border-l-blue-500' : isObstacle ? 'border-l-purple-500' : isPendino ? 'border-l-green-500' : 'border-l-amber-500';
 
     return (
         <div className={cn(
@@ -466,6 +578,8 @@ function SegmentRow({
                     <StraightFields seg={segment as StraightSegment} deductionText={deductionText} onUpdate={onUpdate as any} />
                 ) : isObstacle ? (
                     <ObstacleFields seg={segment as ContextualElementSegment} onUpdate={onUpdate as any} />
+                ) : isPendino ? (
+                    <PendinoFields seg={segment as PendinoSegment} onUpdate={onUpdate as any} />
                 ) : (
                     <ElbowFields seg={segment as Elbow90Segment} onUpdate={onUpdate as any} />
                 )}
@@ -501,22 +615,7 @@ function StraightFields({ seg, deductionText, onUpdate }: {
                     <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
                 </div>
 
-                {/* Orientamento */}
-                <div className="flex gap-0.5">
-                    {(['horizontal', 'vertical'] as const).map(o => (
-                        <button key={o} type="button"
-                            onClick={() => onUpdate({ orientation: o })}
-                            className={cn(
-                                "px-1.5 py-0.5 text-[9px] rounded transition-all",
-                                seg.orientation === o
-                                    ? "bg-blue-500/20 text-blue-300 font-medium"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {o === 'horizontal' ? 'Oriz.' : 'Vert.'}
-                        </button>
-                    ))}
-                </div>
+
             </div>
 
             {deductionText && (
@@ -869,6 +968,26 @@ function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[], tota
                     </Button>
                 </div>
             )}
+        </div>
+    );
+}
+
+// ==================== Pendino ====================
+
+function PendinoFields({ seg, onUpdate }: {
+    seg: PendinoSegment;
+    onUpdate: (patch: Partial<PendinoSegment>) => void;
+}) {
+    return (
+        <div className="flex items-center gap-2">
+            <Pin className="h-3.5 w-3.5 text-green-500 shrink-0" />
+            <span className="text-xs font-medium text-green-400">Pendino</span>
+            <Input
+                placeholder="Nota (opzionale)"
+                value={seg.note || ''}
+                onChange={e => onUpdate({ note: e.target.value })}
+                className="h-5 flex-1 text-[9px] py-0 border-border/40 bg-background/50"
+            />
         </div>
     );
 }
