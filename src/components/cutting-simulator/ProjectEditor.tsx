@@ -313,7 +313,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
 
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; segIdx: number } | null>(null);
-    const [splitDialog, setSplitDialog] = useState<{ mode: 'atDistance' | 'half' | 'equalParts'; segIdx: number } | null>(null);
+    const [splitDialog, setSplitDialog] = useState<{ mode: 'atDistance' | 'half' | 'equalParts' | 'nPartsOfX'; segIdx: number } | null>(null);
     const [splitValue, setSplitValue] = useState<number>(0);
     const [isPanning, setIsPanning] = useState(false);
     const [isRotatingIso, setIsRotatingIso] = useState(false);
@@ -616,7 +616,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     }, [contextMenu]);
 
     // ==================== Funzioni Context Menu ====================
-    const splitSegment = useCallback((segIdx: number, mode: 'half' | 'atDistance' | 'equalParts', value?: number) => {
+    const splitSegment = useCallback((segIdx: number, mode: 'half' | 'atDistance' | 'equalParts' | 'nPartsOfX', value?: number) => {
         const seg = project.segments[segIdx];
         if (seg.type !== 'straight') return;
         const len = (seg as StraightSegment).length;
@@ -641,11 +641,35 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                 remaining -= partLen;
             }
             newSegments.splice(segIdx, 1, ...parts);
+        } else if (mode === 'nPartsOfX' && value && value > 0) {
+            const numParts = Math.ceil(len / value);
+            const parts: Segment[] = [];
+            let remaining = len;
+            for (let i = 0; i < numParts; i++) {
+                const pLen = Math.min(value, remaining);
+                parts.push(createStraightSegment(pLen));
+                remaining -= pLen;
+            }
+            newSegments.splice(segIdx, 1, ...parts);
+        } else {
+            return; // Valore non valido, non fare nulla
         }
 
         onProjectChange({ ...project, segments: newSegments });
         setContextMenu(null);
         setSplitDialog(null);
+    }, [project, onProjectChange]);
+
+    const mergeWithNext = useCallback((segIdx: number) => {
+        const seg = project.segments[segIdx];
+        const nextSeg = project.segments[segIdx + 1];
+        if (!seg || !nextSeg || seg.type !== 'straight' || nextSeg.type !== 'straight') return;
+        const mergedLen = (seg as StraightSegment).length + (nextSeg as StraightSegment).length;
+        const merged = createStraightSegment(mergedLen);
+        const newSegments = [...project.segments];
+        newSegments.splice(segIdx, 2, merged);
+        onProjectChange({ ...project, segments: newSegments });
+        setContextMenu(null);
     }, [project, onProjectChange]);
 
     const insertSegmentAfter = useCallback((segIdx: number, newSeg: Segment) => {
@@ -657,6 +681,9 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
 
     const handleCanvasClick = useCallback((e: React.MouseEvent) => {
         if (isPanning) return;
+        // Chiudi context menu e split dialog se aperti
+        if (contextMenu) { setContextMenu(null); return; }
+        if (splitDialog) { setSplitDialog(null); return; }
         setSelectedIdx(null);
         setSelectedAnnId(null);
 
@@ -702,7 +729,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                 setActiveTool('select');
             }
         }
-    }, [isPanning, activeTool, drawingDim, getSvgPoint, onProjectChange, project, view, viewFamily, sideFace]);
+    }, [isPanning, activeTool, drawingDim, getSvgPoint, onProjectChange, project, view, viewFamily, sideFace, contextMenu, splitDialog]);
 
     const handleUpdate = useCallback((idx: number, patch: Partial<StraightSegment> | Partial<Elbow90Segment>) => {
         const newSegments = [...project.segments];
@@ -1287,9 +1314,25 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                                     onClick={() => { setSplitDialog({ mode: 'equalParts', segIdx: contextMenu.segIdx }); setSplitValue(2); setContextMenu(null); }}>
                                     📐 Dividi in N parti uguali
                                 </button>
+                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                    onClick={() => { setSplitDialog({ mode: 'nPartsOfX', segIdx: contextMenu.segIdx }); setSplitValue(500); setContextMenu(null); }}>
+                                    📐 Dividi in pezzi da X mm
+                                </button>
                                 <div className="border-t border-border/50 my-1" />
                             </>
                         )}
+
+                        {/* Unisci col successivo (solo dritti adiacenti) */}
+                        {isStraight && contextMenu.segIdx < project.segments.length - 1 &&
+                            project.segments[contextMenu.segIdx + 1]?.type === 'straight' && (
+                                <>
+                                    <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                        onClick={() => mergeWithNext(contextMenu.segIdx)}>
+                                        🔗 Unisci col segmento successivo
+                                    </button>
+                                    <div className="border-t border-border/50 my-1" />
+                                </>
+                            )}
 
                         {/* Inserisci dopo */}
                         <div className="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">Inserisci dopo</div>
@@ -1333,19 +1376,23 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setSplitDialog(null)}>
                         <div className="bg-popover border border-border rounded-xl shadow-2xl p-4 min-w-[280px] space-y-3 animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
                             <h3 className="text-sm font-semibold">
-                                {splitDialog.mode === 'atDistance' ? '📏 Dividi a distanza' : '📐 Dividi in parti uguali'}
+                                {splitDialog.mode === 'atDistance' ? '📏 Dividi a distanza' :
+                                    splitDialog.mode === 'nPartsOfX' ? '📐 Dividi in pezzi da X mm' :
+                                        '📐 Dividi in parti uguali'}
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 Segmento dritto: <strong>{seg.length}mm</strong>
                             </p>
                             <div className="space-y-1">
                                 <label className="text-xs text-muted-foreground">
-                                    {splitDialog.mode === 'atDistance' ? 'Distanza dall\'inizio (mm)' : 'Numero di parti'}
+                                    {splitDialog.mode === 'atDistance' ? 'Distanza dall\'inizio (mm)' :
+                                        splitDialog.mode === 'nPartsOfX' ? 'Lunghezza di ogni pezzo (mm)' :
+                                            'Numero di parti'}
                                 </label>
                                 <input
                                     type="number"
-                                    min={splitDialog.mode === 'atDistance' ? 1 : 2}
-                                    max={splitDialog.mode === 'atDistance' ? seg.length - 1 : 20}
+                                    min={splitDialog.mode === 'atDistance' ? 1 : splitDialog.mode === 'nPartsOfX' ? 1 : 2}
+                                    max={splitDialog.mode === 'atDistance' ? seg.length - 1 : splitDialog.mode === 'nPartsOfX' ? seg.length : 20}
                                     step={1}
                                     value={splitValue}
                                     onChange={e => setSplitValue(parseInt(e.target.value) || 0)}
@@ -1355,6 +1402,12 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                                 {splitDialog.mode === 'equalParts' && splitValue >= 2 && (
                                     <p className="text-[10px] text-muted-foreground">
                                         Ogni parte: ~{Math.round(seg.length / splitValue)}mm
+                                    </p>
+                                )}
+                                {splitDialog.mode === 'nPartsOfX' && splitValue > 0 && (
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {Math.ceil(seg.length / splitValue)} pezzi
+                                        {seg.length % splitValue !== 0 && ` (ultimo: ${seg.length % splitValue}mm)`}
                                     </p>
                                 )}
                             </div>
