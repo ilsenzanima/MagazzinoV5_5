@@ -359,7 +359,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <div className="flex items-center gap-1">
-                                                                <span className="text-[8px] text-muted-foreground uppercase">Sp:</span>
+                                                                <span className="text-[10px] text-muted-foreground uppercase">Sp:</span>
                                                                 <div className="relative">
                                                                     <Input type="number" min="0" step="0.5"
                                                                         placeholder={`${project.section.thickness}`}
@@ -368,8 +368,8 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                             const v = e.target.value;
                                                                             updateSegment(sepId, { thicknessOverride: v === '' ? undefined : (parseFloat(v) || 0) } as any);
                                                                         }}
-                                                                        className="h-5 w-14 text-[9px] pr-5 py-0 border-border/40 bg-background/50" />
-                                                                    <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-muted-foreground">mm</span>
+                                                                        className="h-7 w-20 text-xs pr-7 py-0 border-border/40 bg-background/50" />
+                                                                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">mm</span>
                                                                 </div>
                                                             </div>
                                                             <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
@@ -407,7 +407,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                         <Input type="number" min="0" step="1"
                                                                             value={st.expectedLength || 0}
                                                                             onChange={e => updateSegment(st.sourceId, { [st.field]: parseFloat(e.target.value) || 0 } as any)}
-                                                                            className="h-7 w-20 text-xs pr-7 py-0 border-border/40 bg-background/50" />
+                                                                            className="h-7 w-24 text-xs pr-7 py-0 border-border/40 bg-background/50" />
                                                                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">mm</span>
                                                                     </div>
                                                                 </div>
