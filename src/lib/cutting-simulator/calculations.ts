@@ -374,7 +374,7 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
 
 // ==================== CALCOLO PROGETTO COMPLETO ====================
 
-import type { DuctProject, DuctSides, Segment, TrackSeparatorSegment } from '@/lib/cutting-simulator/project-model';
+import type { DuctProject, DuctSides, Segment, TrackSeparatorSegment, StraightSegment, Elbow90Segment, ContextualElementSegment } from '@/lib/cutting-simulator/project-model';
 
 /**
  * Filtra i pezzi in base a quali lati sono attivi.
@@ -435,101 +435,144 @@ export function calculateProject(project: DuctProject): CalculationResult {
     const { section, segments, globalMeasurements } = project;
     const allPieces: CutPiece[] = [];
 
-    // Traccia il TrackSeparator corrente per determinare spessore override
-    let currentSeparator: TrackSeparatorSegment | null = null;
-
+    // ====== STEP 1: raggruppa per isola (trackSeparator) ======
+    type IslandGroup = { separator: TrackSeparatorSegment | null; items: { seg: Segment; idx: number }[] };
+    const islands: IslandGroup[] = [];
+    let curIsland: IslandGroup | null = null;
     segments.forEach((seg, idx) => {
         if (seg.type === 'trackSeparator') {
-            currentSeparator = seg as TrackSeparatorSegment;
-            return; // I separatori non producono lamiere
+            if (curIsland) islands.push(curIsland);
+            curIsland = { separator: seg as TrackSeparatorSegment, items: [] };
+        } else {
+            if (!curIsland) curIsland = { separator: null, items: [] };
+            curIsland.items.push({ seg, idx });
         }
-        if (seg.type === 'pendino') return; // Solo rappresentativo, nessun pezzo
+    });
+    if (curIsland) islands.push(curIsland);
 
-        // Spessore effettivo: override dell'isola oppure globale
-        const effectiveThickness = currentSeparator?.thicknessOverride ?? section.thickness;
+    // ====== STEP 2: per ogni isola, dividi per sotto-tratti (le curve separano) ======
+    for (const island of islands) {
+        const effectiveThickness = island.separator?.thicknessOverride ?? section.thickness;
 
-        const prefix = `S${idx + 1}`;
-        let result: CalculationResult | null = null;
-        let actualLength = 0;
-        let deductionText = '';
+        // Divide gli items in sotto-tratti: ogni elbow90 separa
+        type SubTrackItem = { seg: Segment; idx: number };
+        type SubTrack = { straights: SubTrackItem[]; totalLength: number };
+        const subTracks: SubTrack[] = [];
+        const elbows: SubTrackItem[] = [];
+        let curST: SubTrackItem[] = [];
 
-        if (seg.type === 'straight' || seg.type === 'obstacle') {
-            actualLength = seg.type === 'straight' ? seg.length : seg.thickness;
+        for (const item of island.items) {
+            if (item.seg.type === 'elbow90') {
+                // Chiudi sotto-tratto corrente
+                const totalLen = curST.reduce((sum, it) => {
+                    if (it.seg.type === 'straight') return sum + (it.seg as StraightSegment).length;
+                    if (it.seg.type === 'obstacle') return sum + (it.seg as ContextualElementSegment).thickness;
+                    return sum;
+                }, 0);
+                subTracks.push({ straights: curST, totalLength: totalLen });
+                elbows.push(item);
+                curST = [];
+            } else if (item.seg.type === 'straight' || item.seg.type === 'obstacle') {
+                curST.push(item);
+            }
+            // pendino: skip silenzioso
+        }
+        // Chiudi ultimo sotto-tratto
+        if (curST.length > 0) {
+            const totalLen = curST.reduce((sum, it) => {
+                if (it.seg.type === 'straight') return sum + (it.seg as StraightSegment).length;
+                if (it.seg.type === 'obstacle') return sum + (it.seg as ContextualElementSegment).thickness;
+                return sum;
+            }, 0);
+            subTracks.push({ straights: curST, totalLength: totalLen });
+        }
 
-            // Se abilitate le misure globali, sottraiamo l'ingombro degli angoli adiacenti
+        // ====== STEP 3: genera pezzi per ogni sotto-tratto (un unico rettilineo) ======
+        subTracks.forEach((st, stIdx) => {
+            if (st.totalLength <= 0 || st.straights.length === 0) return;
+
+            let actualLength = st.totalLength;
+            let deductionText = '';
+
+            // Deduzione ingombri curve adiacenti
             if (globalMeasurements) {
-                // Find previous non-separator segment
-                const prevArray = segments.slice(0, idx).filter(s => s.type !== 'trackSeparator');
-                const prev = prevArray[prevArray.length - 1];
-                // Find next non-separator segment
-                const next = segments.slice(idx + 1).find(s => s.type !== 'trackSeparator');
-                let deduction = 0;
                 const outerWidth = section.innerWidth + 2 * effectiveThickness;
+                let deduction = 0;
 
-                // Il segmento precedente si aggancia con il suo braccio B all'ingresso di questo
-                if (prev && prev.type === 'elbow90') {
-                    deduction += prev.armB + outerWidth;
+                // Curva PRIMA di questo sotto-tratto = elbows[stIdx - 1]
+                if (stIdx > 0 && elbows[stIdx - 1]) {
+                    const prevElbow = elbows[stIdx - 1].seg as Elbow90Segment;
+                    deduction += prevElbow.armB + outerWidth;
                 }
-                // Il segmento successivo si aggancia con il suo braccio A all'uscita di questo
-                if (next && next.type === 'elbow90') {
-                    deduction += next.armA + outerWidth;
+                // Curva DOPO questo sotto-tratto = elbows[stIdx]
+                if (stIdx < elbows.length && elbows[stIdx]) {
+                    const nextElbow = elbows[stIdx].seg as Elbow90Segment;
+                    deduction += nextElbow.armA + outerWidth;
                 }
 
                 if (deduction > 0) {
-                    const originalLength = seg.type === 'straight' ? seg.length : seg.thickness;
-                    actualLength = Math.max(0, originalLength - deduction);
-                    deductionText = ` (Ingombro: ${originalLength} − ${deduction} = ${actualLength})`;
+                    actualLength = Math.max(0, st.totalLength - deduction);
+                    deductionText = ` (Tot: ${st.totalLength} − Ingombro: ${deduction} = ${actualLength})`;
                 }
             }
 
-            result = calculateRectangularDuct({
+            // Genera i pezzi per un unico tratto dritto unificato
+            const result = calculateRectangularDuct({
                 innerWidth: section.innerWidth,
                 innerHeight: section.innerHeight,
-                length: actualLength, // Uso lunghezza effettiva
+                length: actualLength,
                 thickness: effectiveThickness,
                 extraMargin: section.extraMargin,
             });
 
-            if (seg.type === 'obstacle') {
-                // Override label per chiarezza nel piano di taglio
-                const typeLabel = seg.obstacleType === 'wall' ? 'Muro' : seg.obstacleType === 'floor' ? 'Solaio' : 'Ostacolo';
-                result.pieces.forEach(p => {
-                    p.label = p.label.replace('Dritto', `Passaggio ${typeLabel}`);
+            // Build label descrittiva
+            const segLabels = st.straights.map(it => {
+                if (it.seg.type === 'obstacle') {
+                    const obs = it.seg as ContextualElementSegment;
+                    const tl = obs.obstacleType === 'wall' ? 'Muro' : obs.obstacleType === 'floor' ? 'Solaio' : 'Ost.';
+                    return `${tl} ${obs.thickness}`;
+                }
+                return `${(it.seg as StraightSegment).length}`;
+            }).join('+');
+
+            const prefix = st.straights.length === 1
+                ? `S${st.straights[0].idx + 1}`
+                : `T${stIdx + 1}`;
+
+            const filtered = filterBySides(result.pieces, section.sides);
+            filtered.forEach(p => {
+                allPieces.push({
+                    ...p,
+                    id: `${prefix}-${p.id}`,
+                    label: `[${prefix}] ${p.label} (${segLabels}=${st.totalLength}mm)${deductionText}`,
                 });
-            }
-
-            // Aggiungiamo il deductionText al summary del dritto, o nella label
-            // (La filterBySides manterrà questi valori)
-            if (deductionText) {
-                result.pieces.forEach(p => {
-                    p.label += deductionText;
-                });
-            }
-
-        } else if (seg.type === 'elbow90') {
-            result = calculateElbow90({
-                innerWidth: section.innerWidth,
-                innerHeight: section.innerHeight,
-                thickness: effectiveThickness,
-                armA: seg.armA,
-                armB: seg.armB,
-                extraMargin: section.extraMargin,
-                baseMode: seg.baseMode,
-            });
-        }
-
-        if (!result) return;
-
-        // Filtra per lati attivi e rinomina
-        const filtered = filterBySides(result.pieces, section.sides);
-        filtered.forEach(p => {
-            allPieces.push({
-                ...p,
-                id: `${prefix}-${p.id}`,
-                label: `[${prefix}] ${p.label}`,
             });
         });
-    });
+
+        // ====== STEP 4: genera pezzi per le curve ======
+        elbows.forEach((elItem) => {
+            const elbowSeg = elItem.seg as Elbow90Segment;
+            const result = calculateElbow90({
+                innerWidth: section.innerWidth,
+                innerHeight: section.innerHeight,
+                thickness: effectiveThickness,
+                armA: elbowSeg.armA,
+                armB: elbowSeg.armB,
+                extraMargin: section.extraMargin,
+                baseMode: elbowSeg.baseMode,
+            });
+
+            const prefix = `S${elItem.idx + 1}`;
+            const filtered = filterBySides(result.pieces, section.sides);
+            filtered.forEach(p => {
+                allPieces.push({
+                    ...p,
+                    id: `${prefix}-${p.id}`,
+                    label: `[${prefix}] ${p.label}`,
+                });
+            });
+        });
+    }
 
     // Fasce Giunti: 4 fasce per ogni giunto tra due segmenti non-separator consecutivi
     if (project.jointBands) {
