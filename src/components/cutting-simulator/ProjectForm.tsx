@@ -402,20 +402,21 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                     {el > 0 && <> / {el.toFixed(0)} mm{hw && <span className="font-bold ml-1">({io ? '+' : ''}{dd.toFixed(0)})</span>}</>}
                                                                 </span>
                                                                 <div className="flex items-center gap-1 shrink-0">
-                                                                    <span className="text-[8px] opacity-60">Att:</span>
+                                                                    <span className="text-[10px] opacity-60">Att:</span>
                                                                     <div className="relative">
                                                                         <Input type="number" min="0" step="1"
                                                                             value={st.expectedLength || 0}
                                                                             onChange={e => updateSegment(st.sourceId, { [st.field]: parseFloat(e.target.value) || 0 } as any)}
-                                                                            className="h-5 w-16 text-[9px] pr-5 py-0 border-border/40 bg-background/50" />
-                                                                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-muted-foreground">mm</span>
+                                                                            className="h-7 w-20 text-xs pr-7 py-0 border-border/40 bg-background/50" />
+                                                                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">mm</span>
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
-                                            )}
+                                            )
+                                            }
 
                                             {!isCollapsed && (
                                                 <div className="p-2 space-y-2">
@@ -468,7 +469,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
                                                                 <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] w-full border-dashed bg-background hover:bg-muted/50">
-                                                                    <Plus className="h-3 w-3 mr-1" /> Aggiungi Tratto Singolo
+                                                                    <Plus className="h-3 w-3 mr-1" /> Aggiungi Tratto
                                                                 </Button>
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="start" className="w-48 border-border/40">
@@ -490,25 +491,8 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                 <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createPendinoSegment())} className="text-xs cursor-pointer">
                                                                     <Pin className="h-3 w-3 mr-1.5 opacity-70" /> Pendino
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Tappo (Prossimamente)
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Raccordo (Prossimamente)
-                                                                </DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
-                                                        <TrackGenerator
-                                                            onGenerate={(segs, requestedLength) => {
-                                                                if (group.separator) {
-                                                                    updateSegment(group.separator.id, { expectedLength: requestedLength });
-                                                                }
-                                                                // Usa timeout per evitare React render loop issue se si fan troppi update insieme
-                                                                segs.forEach((s, idx) => {
-                                                                    addSegmentToGroup(group.separatorIndex, group.items.length + idx, s);
-                                                                });
-                                                            }}
-                                                        />
                                                     </div>
                                                 </div>
                                             )}
@@ -532,7 +516,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                     </Button>
                 </form>
             </CardContent>
-        </Card>
+        </Card >
     );
 }
 
@@ -800,177 +784,6 @@ function ObstacleFields({ seg, onUpdate }: {
     );
 }
 
-// ==================== Generatore Tratti Concatenati ====================
-
-function TrackGenerator({ onGenerate }: { onGenerate: (segments: Segment[], totalLength: number) => void }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const [trackLength, setTrackLength] = useState(10000);
-    const [standardLength, setStandardLength] = useState(2500);
-    const [hasElbow, setHasElbow] = useState(false);
-    const [elbowDirection, setElbowDirection] = useState<SegmentDirection>('left');
-    const [armA, setArmA] = useState(150);
-    const [armB, setArmB] = useState(150);
-
-    const handleGenerate = () => {
-        let remainingLength = trackLength;
-        const newSegments: Segment[] = [];
-
-        // Sottrarre l'ingombro del gomito dalla lunghezza totale dei dritti
-        if (hasElbow) {
-            remainingLength = Math.max(0, remainingLength - armA);
-        }
-
-        const numStandard = Math.floor(remainingLength / standardLength);
-        const remainder = remainingLength - (numStandard * standardLength);
-
-        // Aggiungi dritti standard
-        for (let i = 0; i < numStandard; i++) {
-            const seg = createStraightSegment();
-            seg.length = standardLength;
-            newSegments.push(seg);
-        }
-
-        // Aggiungi il riempitivo
-        if (remainder > 0) {
-            const seg = createStraightSegment();
-            seg.length = remainder;
-            newSegments.push(seg);
-        }
-
-        // Aggiungi l'angolo
-        if (hasElbow) {
-            const elbow = createElbow90Segment();
-            elbow.direction = elbowDirection;
-            elbow.armA = armA;
-            elbow.armB = armB;
-            newSegments.push(elbow);
-        }
-
-        if (newSegments.length > 0) {
-            onGenerate(newSegments, trackLength);
-            setIsOpen(false);
-        }
-    };
-
-    return (
-        <div className="border border-primary/30 rounded-lg overflow-hidden bg-primary/5">
-            <button type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 bg-primary/10 hover:bg-primary/20 transition-colors text-left"
-            >
-                <FastForward className="h-3.5 w-3.5 text-primary" />
-                <span className="text-[11px] font-medium flex-1 text-primary">Genera successione di Tratti da Misura</span>
-                {isOpen ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-primary" />}
-            </button>
-
-            {isOpen && (
-                <div className="p-3 space-y-4 border-t border-primary/20">
-                    <p className="text-xs text-muted-foreground">
-                        Genera automaticamente i moduli dritti e la curva finale data una misura totale.
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground uppercase">Misura Totale</Label>
-                            <div className="relative">
-                                <Input type="number" min="1" step="1"
-                                    value={trackLength}
-                                    onChange={e => setTrackLength(parseFloat(e.target.value) || 0)}
-                                    className="h-8 text-xs pr-7 border-primary/30 focus-visible:ring-primary/50" />
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground uppercase">Modulo Standard</Label>
-                            <div className="relative">
-                                <Input type="number" min="1" step="1"
-                                    value={standardLength}
-                                    onChange={e => setStandardLength(parseFloat(e.target.value) || 0)}
-                                    className="h-8 text-xs pr-7 border-primary/30" />
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-primary/20 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <Label className="text-[11px] font-medium text-foreground cursor-pointer flex items-center gap-1"
-                                onClick={() => setHasElbow(!hasElbow)}>
-                                <CornerDownRight className="h-3 w-3 text-amber-500" />
-                                Inserisci Curva alla fine
-                            </Label>
-                            <button type="button"
-                                onClick={() => setHasElbow(!hasElbow)}
-                                className={cn(
-                                    "relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-                                    hasElbow ? "bg-amber-500" : "bg-muted-foreground/30"
-                                )}
-                            >
-                                <span className={cn(
-                                    "pointer-events-none block h-3 w-3 rounded-full bg-background shadow-lg ring-0 transition-transform",
-                                    hasElbow ? "translate-x-3" : "translate-x-0"
-                                )} />
-                            </button>
-                        </div>
-
-                        {hasElbow && (
-                            <div className="p-2.5 bg-background rounded border border-border/50 space-y-2 animate-in fade-in slide-in-from-top-1">
-                                <div className="space-y-1">
-                                    <Label className="text-[9px] text-muted-foreground uppercase">Direzione Curva</Label>
-                                    <div className="flex gap-1">
-                                        {(['left', 'right', 'up', 'down'] as const).map(d => {
-                                            const Icon = DIRECTION_ICONS[d];
-                                            return (
-                                                <button key={d} type="button"
-                                                    onClick={() => setElbowDirection(d)}
-                                                    title={DIRECTION_LABELS[d]}
-                                                    className={cn(
-                                                        "p-1.5 rounded transition-all flex-1 flex justify-center border",
-                                                        elbowDirection === d
-                                                            ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
-                                                            : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
-                                                    )}
-                                                >
-                                                    <Icon className="h-3.5 w-3.5" />
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 pt-1">
-                                    <div className="space-y-1">
-                                        <Label className="text-[9px] text-muted-foreground uppercase">Braccio A (Entrata)</Label>
-                                        <div className="relative">
-                                            <Input type="number" min="1" step="1"
-                                                value={armA}
-                                                onChange={e => setArmA(parseFloat(e.target.value) || 0)}
-                                                className="h-7 text-[11px] font-mono pr-6" />
-                                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] text-muted-foreground">mm</span>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-[9px] text-muted-foreground uppercase">Braccio B (Uscita)</Label>
-                                        <div className="relative">
-                                            <Input type="number" min="1" step="1"
-                                                value={armB}
-                                                onChange={e => setArmB(parseFloat(e.target.value) || 0)}
-                                                className="h-7 text-[11px] font-mono pr-6" />
-                                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] text-muted-foreground">mm</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <Button type="button" onClick={handleGenerate} className="w-full h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground">
-                        Inserisci sequenza nel Segmento
-                    </Button>
-                </div>
-            )}
-        </div>
-    );
-}
 
 // ==================== Pendino ====================
 
