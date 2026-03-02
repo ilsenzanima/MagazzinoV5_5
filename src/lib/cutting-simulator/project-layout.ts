@@ -87,6 +87,7 @@ const SEGMENT_COLORS: Record<string, string> = {
     straight: '#3b82f6',   // blue
     elbow90: '#f59e0b',    // amber
     obstacle: '#a855f7',   // purple
+    pendino: '#22c55e',    // green
 };
 
 // ==================== LAYOUT ENGINE ====================
@@ -256,6 +257,18 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
             // Aggiorna posizione e direzione dopo la curva
             pos = end;
             dir = dirOut;
+        } else if (seg.type === 'pendino') {
+            // Il pendino non occupa spazio, è solo un marker nella posizione corrente
+            nodes.push({
+                segment: seg,
+                index: i,
+                start: { ...pos },
+                end: { ...pos },
+                direction: dir,
+                outerW,
+                outerH,
+                trackId: currentTrackId,
+            });
         }
     }
 
@@ -280,6 +293,7 @@ export function projectTo2D(
             if (seg.type === 'straight') labelText = `${seg.length} mm`;
             else if (seg.type === 'elbow90') labelText = `↱ ${seg.direction}`;
             else if (seg.type === 'obstacle') labelText = `${seg.obstacleType === 'wall' ? 'Muro' : seg.obstacleType === 'floor' ? 'Solaio' : 'Ost.'} ${seg.thickness}mm`;
+            else if (seg.type === 'pendino') labelText = `📌${seg.note ? ' ' + seg.note : ''}`;
         }
 
         const baseResult = {
@@ -459,6 +473,44 @@ export function projectTo2D(
                     y: (node.start.y + node.end.y) / 2 + off.y,
                     z: (node.start.z + node.end.z) / 2 + off.z
                 });
+            } else if (seg.type === 'pendino') {
+                // Pendino: piccola barra trasversale come marker
+                const markerSize = node.outerW * 0.6;
+                const p = node.start;
+                const d = node.direction;
+                // Barra perpendicolare alla direzione
+                let bar1: Vec3, bar2: Vec3;
+                if (d === '+x' || d === '-x') {
+                    bar1 = { x: p.x, y: p.y - markerSize, z: p.z };
+                    bar2 = { x: p.x, y: p.y + markerSize, z: p.z };
+                } else {
+                    bar1 = { x: p.x - markerSize, y: p.y, z: p.z };
+                    bar2 = { x: p.x + markerSize, y: p.y, z: p.z };
+                }
+                // Linea verticale per il "filo" del pendino
+                const top: Vec3 = { x: p.x, y: p.y, z: p.z + node.outerH * 0.8 };
+                const pendColor = SEGMENT_COLORS['pendino'] || '#22c55e';
+                // Barra orizzontale
+                polygons.push({
+                    points: [iso(bar1), iso(bar2)],
+                    x: 0, y: 0,
+                    fill: 'none',
+                    stroke: pendColor,
+                    strokeWidth: 3,
+                    strokeDasharray: undefined,
+                    depth: 9999, // sempre in primo piano
+                } as any);
+                // Linea verticale
+                polygons.push({
+                    points: [iso(p), iso(top)],
+                    x: 0, y: 0,
+                    fill: 'none',
+                    stroke: pendColor,
+                    strokeWidth: 2,
+                    strokeDasharray: '4,3',
+                    depth: 9999,
+                } as any);
+                labelPos = iso(top);
             } else {
                 polygons = generateBoxPolygons(node.start, node.end, node.outerW, node.outerH, baseColor);
                 polygons.sort((a: any, b: any) => a.depth - b.depth);
@@ -611,6 +663,19 @@ export function projectTo2D(
 
             labelX = ((u1 + u2) / 2) + offU;
             labelY = ((v1 + v2) / 2) + offV;
+        } else if (node.segment.type === 'pendino') {
+            // Pendino: piccolo cerchio/marker
+            const mSize = crossW * 0.35;
+            rects.push({
+                x: u1 - mSize,
+                y: v1 - mSize,
+                width: mSize * 2,
+                height: mSize * 2,
+                rx: mSize, // cerchio
+                color: SEGMENT_COLORS['pendino'],
+            });
+            labelX = u1;
+            labelY = v1 - mSize * 2;
         } else {
             const r = createRect(u1, v1, u2, v2);
             rects.push(r);
