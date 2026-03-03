@@ -607,12 +607,12 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         setContextMenu({ x: e.clientX, y: e.clientY, segIdx });
     }, []);
 
-    // Chiudi context menu al click ovunque
+    // Chiudi context menu con Escape
     useEffect(() => {
         if (!contextMenu) return;
-        const close = () => setContextMenu(null);
-        window.addEventListener('click', close);
-        return () => window.removeEventListener('click', close);
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setContextMenu(null); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
     }, [contextMenu]);
 
     // ==================== Funzioni Context Menu ====================
@@ -660,16 +660,34 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         setSplitDialog(null);
     }, [project, onProjectChange]);
 
-    const mergeWithNext = useCallback((segIdx: number) => {
-        const seg = project.segments[segIdx];
-        const nextSeg = project.segments[segIdx + 1];
-        if (!seg || !nextSeg || seg.type !== 'straight' || nextSeg.type !== 'straight') return;
-        const mergedLen = (seg as StraightSegment).length + (nextSeg as StraightSegment).length;
-        const merged = createStraightSegment(mergedLen);
-        const newSegments = [...project.segments];
-        newSegments.splice(segIdx, 2, merged);
+    // Unisci tutti i segmenti adiacenti (dritti + ostacoli) in un unico tratto dritto
+    const mergeRun = useCallback((segIdx: number) => {
+        const segments = project.segments;
+        // Trova inizio del run (espandi a sinistra)
+        let start = segIdx;
+        while (start > 0 && (segments[start - 1].type === 'straight' || segments[start - 1].type === 'obstacle')) {
+            start--;
+        }
+        // Trova fine del run (espandi a destra)
+        let end = segIdx;
+        while (end < segments.length - 1 && (segments[end + 1].type === 'straight' || segments[end + 1].type === 'obstacle')) {
+            end++;
+        }
+        // Se c'è solo 1 pezzo, niente da unire
+        if (start === end) return;
+        // Calcola lunghezza totale
+        let totalLen = 0;
+        for (let i = start; i <= end; i++) {
+            const s = segments[i];
+            if (s.type === 'straight') totalLen += (s as StraightSegment).length;
+            else if (s.type === 'obstacle') totalLen += (s as ContextualElementSegment).thickness;
+        }
+        const merged = createStraightSegment(totalLen);
+        const newSegments = [...segments];
+        newSegments.splice(start, end - start + 1, merged);
         onProjectChange({ ...project, segments: newSegments });
         setContextMenu(null);
+        setSelectedIdx(start);
     }, [project, onProjectChange]);
 
     const insertSegmentAfter = useCallback((segIdx: number, newSeg: Segment) => {
@@ -1283,88 +1301,114 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
             {contextMenu && (() => {
                 const seg = project.segments[contextMenu.segIdx];
                 const isStraight = seg?.type === 'straight';
-                const isFirst = contextMenu.segIdx === 0;
-                const isLast = contextMenu.segIdx === project.segments.length - 1;
+                // Controlla se c'è un run di dritti+ostacoli da unire
+                const canMerge = (() => {
+                    const segs = project.segments;
+                    const idx = contextMenu.segIdx;
+                    const cur = segs[idx];
+                    if (cur?.type !== 'straight' && cur?.type !== 'obstacle') return false;
+                    const prevOk = idx > 0 && (segs[idx - 1].type === 'straight' || segs[idx - 1].type === 'obstacle');
+                    const nextOk = idx < segs.length - 1 && (segs[idx + 1].type === 'straight' || segs[idx + 1].type === 'obstacle');
+                    return prevOk || nextOk;
+                })();
+                // Calcola lunghezza totale run
+                const runTotal = (() => {
+                    if (!canMerge) return 0;
+                    const segs = project.segments;
+                    let start = contextMenu.segIdx;
+                    while (start > 0 && (segs[start - 1].type === 'straight' || segs[start - 1].type === 'obstacle')) start--;
+                    let end = contextMenu.segIdx;
+                    while (end < segs.length - 1 && (segs[end + 1].type === 'straight' || segs[end + 1].type === 'obstacle')) end++;
+                    let total = 0;
+                    for (let i = start; i <= end; i++) {
+                        const s = segs[i];
+                        if (s.type === 'straight') total += (s as StraightSegment).length;
+                        else if (s.type === 'obstacle') total += (s as ContextualElementSegment).thickness;
+                    }
+                    return total;
+                })();
                 return (
-                    <div
-                        className="fixed z-[9999] min-w-[200px] bg-popover border border-border rounded-lg shadow-xl py-1 animate-in fade-in zoom-in-95"
-                        style={{ left: contextMenu.x, top: contextMenu.y }}
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Titolo */}
-                        <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wide border-b border-border/50">
-                            {seg?.type === 'straight' ? `Dritto ${(seg as StraightSegment).length}mm` :
-                                seg?.type === 'elbow90' ? 'Curva 90°' :
-                                    seg?.type === 'obstacle' ? `Ostacolo (${(seg as ContextualElementSegment).obstacleType})` :
-                                        seg?.type === 'pendino' ? 'Pendino' : 'Segmento'}
-                        </div>
+                    <>
+                        {/* Backdrop overlay — click per chiudere */}
+                        <div className="fixed inset-0 z-[9998]" onClick={() => setContextMenu(null)} />
+                        <div
+                            className="fixed z-[9999] min-w-[220px] bg-popover border border-border rounded-lg shadow-xl py-1 animate-in fade-in zoom-in-95"
+                            style={{ left: contextMenu.x, top: contextMenu.y }}
+                        >
+                            {/* Titolo */}
+                            <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wide border-b border-border/50">
+                                {seg?.type === 'straight' ? `Dritto ${(seg as StraightSegment).length}mm` :
+                                    seg?.type === 'elbow90' ? 'Curva 90\u00b0' :
+                                        seg?.type === 'obstacle' ? `Ostacolo (${(seg as ContextualElementSegment).obstacleType})` :
+                                            seg?.type === 'pendino' ? 'Pendino' : 'Segmento'}
+                            </div>
 
-                        {/* Opzioni Divisione (solo per dritti) */}
-                        {isStraight && (
-                            <>
-                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                    onClick={() => { splitSegment(contextMenu.segIdx, 'half'); }}>
-                                    ✂️ Dividi a metà
-                                </button>
-                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                    onClick={() => { setSplitDialog({ mode: 'atDistance', segIdx: contextMenu.segIdx }); setSplitValue(Math.round((seg as StraightSegment).length / 2)); setContextMenu(null); }}>
-                                    📏 Dividi a X mm dall&apos;inizio
-                                </button>
-                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                    onClick={() => { setSplitDialog({ mode: 'equalParts', segIdx: contextMenu.segIdx }); setSplitValue(2); setContextMenu(null); }}>
-                                    📐 Dividi in N parti uguali
-                                </button>
-                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                    onClick={() => { setSplitDialog({ mode: 'nPartsOfX', segIdx: contextMenu.segIdx }); setSplitValue(500); setContextMenu(null); }}>
-                                    📐 Dividi in pezzi da X mm
-                                </button>
-                                <div className="border-t border-border/50 my-1" />
-                            </>
-                        )}
-
-                        {/* Unisci col successivo (solo dritti adiacenti) */}
-                        {isStraight && contextMenu.segIdx < project.segments.length - 1 &&
-                            project.segments[contextMenu.segIdx + 1]?.type === 'straight' && (
+                            {/* Opzioni Divisione (solo per dritti) */}
+                            {isStraight && (
                                 <>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                        onClick={() => mergeWithNext(contextMenu.segIdx)}>
-                                        🔗 Unisci col segmento successivo
+                                        onClick={() => { splitSegment(contextMenu.segIdx, 'half'); }}>
+                                        \u2702\ufe0f Dividi a met\u00e0
+                                    </button>
+                                    <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                        onClick={() => { setSplitDialog({ mode: 'atDistance', segIdx: contextMenu.segIdx }); setSplitValue(Math.round((seg as StraightSegment).length / 2)); setContextMenu(null); }}>
+                                        \ud83d\udccf Dividi a X mm dall&apos;inizio
+                                    </button>
+                                    <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                        onClick={() => { setSplitDialog({ mode: 'equalParts', segIdx: contextMenu.segIdx }); setSplitValue(2); setContextMenu(null); }}>
+                                        \ud83d\udcd0 Dividi in N parti uguali
+                                    </button>
+                                    <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                        onClick={() => { setSplitDialog({ mode: 'nPartsOfX', segIdx: contextMenu.segIdx }); setSplitValue(500); setContextMenu(null); }}>
+                                        \ud83d\udcd0 Dividi in pezzi da X mm
                                     </button>
                                     <div className="border-t border-border/50 my-1" />
                                 </>
                             )}
 
-                        {/* Inserisci dopo */}
-                        <div className="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">Inserisci dopo</div>
-                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createStraightSegment(1000))}>
-                            ➕ Dritto (1000mm)
-                        </button>
-                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createElbow90Segment('right'))}>
-                            🔄 Curva 90°
-                        </button>
-                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight))}>
-                            🧱 Muro
-                        </button>
-                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight))}>
-                            🏗️ Solaio
-                        </button>
-                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                            onClick={() => insertSegmentAfter(contextMenu.segIdx, createPendinoSegment())}>
-                            📌 Pendino
-                        </button>
+                            {/* Unisci tratto (dritti + ostacoli adiacenti) */}
+                            {canMerge && (
+                                <>
+                                    <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                        onClick={() => mergeRun(contextMenu.segIdx)}>
+                                        \ud83d\udd17 Unisci tratto ({runTotal}mm totali)
+                                    </button>
+                                    <div className="border-t border-border/50 my-1" />
+                                </>
+                            )}
 
-                        <div className="border-t border-border/50 my-1" />
+                            {/* Inserisci dopo */}
+                            <div className="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">Inserisci dopo</div>
+                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createStraightSegment(1000))}>
+                                ➕ Dritto (1000mm)
+                            </button>
+                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createElbow90Segment('right'))}>
+                                🔄 Curva 90°
+                            </button>
+                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight))}>
+                                🧱 Muro
+                            </button>
+                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight))}>
+                                🏗️ Solaio
+                            </button>
+                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createPendinoSegment())}>
+                                📌 Pendino
+                            </button>
 
-                        {/* Elimina */}
-                        <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-destructive/10 text-destructive flex items-center gap-2"
-                            onClick={() => { handleRemove(contextMenu.segIdx); setContextMenu(null); }}>
-                            🗑️ Elimina segmento
-                        </button>
-                    </div>
+                            <div className="border-t border-border/50 my-1" />
+
+                            {/* Elimina */}
+                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-destructive/10 text-destructive flex items-center gap-2"
+                                onClick={() => { handleRemove(contextMenu.segIdx); setContextMenu(null); }}>
+                                🗑️ Elimina segmento
+                            </button>
+                        </div>
+                    </>
                 );
             })()}
 
@@ -1427,6 +1471,6 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                     </div>
                 );
             })()}
-        </div>
+        </div >
     );
 }
