@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment, PendinoSegment } from "@/lib/cutting-simulator/project-model";
@@ -660,27 +660,20 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         setSplitDialog(null);
     }, [project, onProjectChange]);
 
-    // Unisci tutti i segmenti adiacenti (dritti + ostacoli) in un unico tratto dritto
+    // Unisci solo i segmenti DRITTI consecutivi adiacenti (i muri/ostacoli restano al loro posto)
     const mergeRun = useCallback((segIdx: number) => {
         const segments = project.segments;
-        // Trova inizio del run (espandi a sinistra)
+        if (segments[segIdx]?.type !== 'straight') return;
+        // Espandi a sinistra: solo dritti consecutivi
         let start = segIdx;
-        while (start > 0 && (segments[start - 1].type === 'straight' || segments[start - 1].type === 'obstacle')) {
-            start--;
-        }
-        // Trova fine del run (espandi a destra)
+        while (start > 0 && segments[start - 1].type === 'straight') start--;
+        // Espandi a destra: solo dritti consecutivi
         let end = segIdx;
-        while (end < segments.length - 1 && (segments[end + 1].type === 'straight' || segments[end + 1].type === 'obstacle')) {
-            end++;
-        }
-        // Se c'è solo 1 pezzo, niente da unire
-        if (start === end) return;
-        // Calcola lunghezza totale
+        while (end < segments.length - 1 && segments[end + 1].type === 'straight') end++;
+        if (start === end) return; // niente da unire
         let totalLen = 0;
         for (let i = start; i <= end; i++) {
-            const s = segments[i];
-            if (s.type === 'straight') totalLen += (s as StraightSegment).length;
-            else if (s.type === 'obstacle') totalLen += (s as ContextualElementSegment).thickness;
+            totalLen += (segments[i] as StraightSegment).length;
         }
         const merged = createStraightSegment(totalLen);
         const newSegments = [...segments];
@@ -1301,30 +1294,25 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
             {contextMenu && (() => {
                 const seg = project.segments[contextMenu.segIdx];
                 const isStraight = seg?.type === 'straight';
-                // Controlla se c'è un run di dritti+ostacoli da unire
+                // Controlla se ci sono dritti adiacenti da unire
                 const canMerge = (() => {
                     const segs = project.segments;
                     const idx = contextMenu.segIdx;
-                    const cur = segs[idx];
-                    if (cur?.type !== 'straight' && cur?.type !== 'obstacle') return false;
-                    const prevOk = idx > 0 && (segs[idx - 1].type === 'straight' || segs[idx - 1].type === 'obstacle');
-                    const nextOk = idx < segs.length - 1 && (segs[idx + 1].type === 'straight' || segs[idx + 1].type === 'obstacle');
+                    if (segs[idx]?.type !== 'straight') return false;
+                    const prevOk = idx > 0 && segs[idx - 1].type === 'straight';
+                    const nextOk = idx < segs.length - 1 && segs[idx + 1].type === 'straight';
                     return prevOk || nextOk;
                 })();
-                // Calcola lunghezza totale run
+                // Calcola lunghezza totale run di soli dritti
                 const runTotal = (() => {
                     if (!canMerge) return 0;
                     const segs = project.segments;
                     let start = contextMenu.segIdx;
-                    while (start > 0 && (segs[start - 1].type === 'straight' || segs[start - 1].type === 'obstacle')) start--;
+                    while (start > 0 && segs[start - 1].type === 'straight') start--;
                     let end = contextMenu.segIdx;
-                    while (end < segs.length - 1 && (segs[end + 1].type === 'straight' || segs[end + 1].type === 'obstacle')) end++;
+                    while (end < segs.length - 1 && segs[end + 1].type === 'straight') end++;
                     let total = 0;
-                    for (let i = start; i <= end; i++) {
-                        const s = segs[i];
-                        if (s.type === 'straight') total += (s as StraightSegment).length;
-                        else if (s.type === 'obstacle') total += (s as ContextualElementSegment).thickness;
-                    }
+                    for (let i = start; i <= end; i++) total += (segs[i] as StraightSegment).length;
                     return total;
                 })();
                 return (
@@ -1338,7 +1326,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                             {/* Titolo */}
                             <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wide border-b border-border/50">
                                 {seg?.type === 'straight' ? `Dritto ${(seg as StraightSegment).length}mm` :
-                                    seg?.type === 'elbow90' ? 'Curva 90\u00b0' :
+                                    seg?.type === 'elbow90' ? 'Curva 90°' :
                                         seg?.type === 'obstacle' ? `Ostacolo (${(seg as ContextualElementSegment).obstacleType})` :
                                             seg?.type === 'pendino' ? 'Pendino' : 'Segmento'}
                             </div>
@@ -1348,30 +1336,30 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                                 <>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
                                         onClick={() => { splitSegment(contextMenu.segIdx, 'half'); }}>
-                                        \u2702\ufe0f Dividi a met\u00e0
+                                        ✂️ Dividi a metà
                                     </button>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
                                         onClick={() => { setSplitDialog({ mode: 'atDistance', segIdx: contextMenu.segIdx }); setSplitValue(Math.round((seg as StraightSegment).length / 2)); setContextMenu(null); }}>
-                                        \ud83d\udccf Dividi a X mm dall&apos;inizio
+                                        📏 Dividi a X mm dall&apos;inizio
                                     </button>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
                                         onClick={() => { setSplitDialog({ mode: 'equalParts', segIdx: contextMenu.segIdx }); setSplitValue(2); setContextMenu(null); }}>
-                                        \ud83d\udcd0 Dividi in N parti uguali
+                                        📐 Dividi in N parti uguali
                                     </button>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
                                         onClick={() => { setSplitDialog({ mode: 'nPartsOfX', segIdx: contextMenu.segIdx }); setSplitValue(500); setContextMenu(null); }}>
-                                        \ud83d\udcd0 Dividi in pezzi da X mm
+                                        📐 Dividi in pezzi da X mm
                                     </button>
                                     <div className="border-t border-border/50 my-1" />
                                 </>
                             )}
 
-                            {/* Unisci tratto (dritti + ostacoli adiacenti) */}
+                            {/* Unisci dritti adiacenti (i muri restano) */}
                             {canMerge && (
                                 <>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
                                         onClick={() => mergeRun(contextMenu.segIdx)}>
-                                        \ud83d\udd17 Unisci tratto ({runTotal}mm totali)
+                                        🔗 Unisci dritti adiacenti ({runTotal}mm)
                                     </button>
                                     <div className="border-t border-border/50 my-1" />
                                 </>
