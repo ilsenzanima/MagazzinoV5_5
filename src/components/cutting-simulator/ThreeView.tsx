@@ -153,17 +153,17 @@ function ElbowMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     );
 }
 
-/** Muro / Solaio — la canala passa continua, il muro è un overlay semi-trasparente */
+/** Muro / Solaio — canala continua, muro come contorno wireframe */
 function ObstacleMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     const seg = node.segment as ContextualElementSegment;
     const isWall = seg.obstacleType === 'wall';
-    const color = selected ? DUCT_COLOR_SELECTED : (isWall ? WALL_COLOR : FLOOR_COLOR);
+    const wallColor = selected ? DUCT_COLOR_SELECTED : (isWall ? WALL_COLOR : FLOOR_COLOR);
+    const ductColor = selected ? DUCT_COLOR_SELECTED : DUCT_COLOR;
 
     const wallW = seg.width * SCALE;
     const wallH = seg.height * SCALE;
     const outerW = node.outerW * SCALE;
     const outerH = node.outerH * SCALE;
-    const t = section.thickness * SCALE;
 
     const { position, quaternion, length } = useMemo(
         () => orientBetween(node.start, node.end),
@@ -171,45 +171,36 @@ function ObstacleMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     );
     const depth = length > 0.0001 ? length : seg.thickness * SCALE;
 
-    // Canala continua: si estende 20mm oltre il muro su ogni lato per raccordo perfetto
-    const overlap = 0.020;
-    const ductLength = depth + overlap * 2;
-
-    const ductGeometry = useMemo(() => {
-        const s = new THREE.Shape();
-        const hw = outerW / 2, hh = outerH / 2;
-        s.moveTo(-hw, -hh); s.lineTo(hw, -hh); s.lineTo(hw, hh); s.lineTo(-hw, hh); s.closePath();
-        const inner = new THREE.Path();
-        inner.moveTo(-hw + t, -hh + t); inner.lineTo(hw - t, -hh + t);
-        inner.lineTo(hw - t, hh - t); inner.lineTo(-hw + t, hh - t); inner.closePath();
-        s.holes.push(inner);
-        const geo = new THREE.ExtrudeGeometry(s, { steps: 1, depth: ductLength, bevelEnabled: false });
-        geo.translate(0, 0, -ductLength / 2);
-        return geo;
-    }, [outerW, outerH, t, ductLength]);
+    // Canala si estende 30mm oltre il muro su ogni lato per raccordo
+    const ductDepth = depth + 0.060;
 
     return (
         <group position={position} quaternion={quaternion} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-            {/* Muro: semplice box overlay semi-trasparente */}
-            <mesh>
-                <boxGeometry args={[wallW, wallH, depth]} />
+            {/* CANALA SOLIDA che attraversa il muro */}
+            <mesh renderOrder={1}>
+                <boxGeometry args={[outerW, outerH, ductDepth]} />
                 <meshStandardMaterial
-                    color={color} transparent opacity={selected ? 0.35 : 0.2}
-                    side={THREE.DoubleSide} roughness={0.95}
-                    depthWrite={false}
+                    color={ductColor}
+                    transparent opacity={selected ? 0.85 : 0.7}
+                    roughness={0.8} metalness={0.05}
                 />
             </mesh>
-            {/* Contorno wireframe del muro */}
-            <mesh>
-                <boxGeometry args={[wallW, wallH, depth]} />
-                <meshBasicMaterial color={color} wireframe transparent opacity={0.5} />
+            {/* Wireframe della canala */}
+            <mesh renderOrder={2}>
+                <boxGeometry args={[outerW, outerH, ductDepth]} />
+                <meshBasicMaterial color={selected ? "#f59e0b" : "#999"} wireframe transparent opacity={0.25} />
             </mesh>
-            {/* Canala cava CONTINUA che attraversa il muro */}
-            <mesh geometry={ductGeometry}>
+            {/* MURO: solo contorno wireframe + facce molto trasparenti */}
+            <mesh renderOrder={0}>
+                <boxGeometry args={[wallW, wallH, depth]} />
                 <meshStandardMaterial
-                    color={DUCT_COLOR} transparent opacity={0.7}
-                    side={THREE.DoubleSide} roughness={0.8} metalness={0.05}
+                    color={wallColor} transparent opacity={0.12}
+                    depthWrite={false} side={THREE.DoubleSide}
                 />
+            </mesh>
+            <mesh renderOrder={3}>
+                <boxGeometry args={[wallW, wallH, depth]} />
+                <meshBasicMaterial color={wallColor} wireframe transparent opacity={0.6} />
             </mesh>
         </group>
     );
