@@ -153,57 +153,29 @@ function ElbowMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     );
 }
 
-/** Muro / Solaio — pannello CON FORO dove la canala passa continuamente */
+/** Muro / Solaio — la canala passa continua, il muro è un overlay semi-trasparente */
 function ObstacleMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     const seg = node.segment as ContextualElementSegment;
     const isWall = seg.obstacleType === 'wall';
     const color = selected ? DUCT_COLOR_SELECTED : (isWall ? WALL_COLOR : FLOOR_COLOR);
 
-    const wallW = seg.width * SCALE;   // larghezza muro
-    const wallH = seg.height * SCALE;  // altezza muro
-    const outerW = node.outerW * SCALE; // larghezza canala
-    const outerH = node.outerH * SCALE; // altezza canala
+    const wallW = seg.width * SCALE;
+    const wallH = seg.height * SCALE;
+    const outerW = node.outerW * SCALE;
+    const outerH = node.outerH * SCALE;
     const t = section.thickness * SCALE;
 
-    // Orientamento: il muro è perpendicolare alla direzione di percorso
     const { position, quaternion, length } = useMemo(
         () => orientBetween(node.start, node.end),
         [node.start, node.end]
     );
     const depth = length > 0.0001 ? length : seg.thickness * SCALE;
 
-    // Offset del foro nel muro (se ci sono quote)
-    const holeOffsetX = ((seg.quotaLeft || 0) - (seg.quotaRight || 0)) * SCALE / 2;
-    const holeOffsetY = ((seg.quotaBottom || 0) - (seg.quotaTop || 0)) * SCALE / 2;
+    // Canala continua: si estende 20mm oltre il muro su ogni lato per raccordo perfetto
+    const overlap = 0.020;
+    const ductLength = depth + overlap * 2;
 
-    // Shape del muro con foro rettangolare
-    const wallGeometry = useMemo(() => {
-        const shape = new THREE.Shape();
-        const hw = wallW / 2, hh = wallH / 2;
-        // Rettangolo esterno del muro
-        shape.moveTo(-hw, -hh); shape.lineTo(hw, -hh);
-        shape.lineTo(hw, hh); shape.lineTo(-hw, hh); shape.closePath();
-
-        // Foro: dimensioni canala + piccolo margine
-        const holeW = outerW / 2 + 0.002;
-        const holeH = outerH / 2 + 0.002;
-        const hole = new THREE.Path();
-        hole.moveTo(-holeW + holeOffsetX, -holeH + holeOffsetY);
-        hole.lineTo(holeW + holeOffsetX, -holeH + holeOffsetY);
-        hole.lineTo(holeW + holeOffsetX, holeH + holeOffsetY);
-        hole.lineTo(-holeW + holeOffsetX, holeH + holeOffsetY);
-        hole.closePath();
-        shape.holes.push(hole);
-
-        const geo = new THREE.ExtrudeGeometry(shape, {
-            steps: 1, depth, bevelEnabled: false,
-        });
-        geo.translate(0, 0, -depth / 2); // centra
-        return geo;
-    }, [wallW, wallH, outerW, outerH, depth, holeOffsetX, holeOffsetY]);
-
-    // Pezzo di canala che passa attraverso il muro (continua)
-    const ductThroughGeometry = useMemo(() => {
+    const ductGeometry = useMemo(() => {
         const s = new THREE.Shape();
         const hw = outerW / 2, hh = outerH / 2;
         s.moveTo(-hw, -hh); s.lineTo(hw, -hh); s.lineTo(hw, hh); s.lineTo(-hw, hh); s.closePath();
@@ -211,33 +183,34 @@ function ObstacleMesh({ node, section, selected, onClick }: SegmentMeshProps) {
         inner.moveTo(-hw + t, -hh + t); inner.lineTo(hw - t, -hh + t);
         inner.lineTo(hw - t, hh - t); inner.lineTo(-hw + t, hh - t); inner.closePath();
         s.holes.push(inner);
-        const geo = new THREE.ExtrudeGeometry(s, { steps: 1, depth: depth + 0.002, bevelEnabled: false });
-        geo.translate(0, 0, -(depth + 0.002) / 2);
+        const geo = new THREE.ExtrudeGeometry(s, { steps: 1, depth: ductLength, bevelEnabled: false });
+        geo.translate(0, 0, -ductLength / 2);
         return geo;
-    }, [outerW, outerH, t, depth]);
+    }, [outerW, outerH, t, ductLength]);
 
     return (
         <group position={position} quaternion={quaternion} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-            {/* Pannello muro con foro */}
-            <mesh geometry={wallGeometry}>
+            {/* Muro: semplice box overlay semi-trasparente */}
+            <mesh>
+                <boxGeometry args={[wallW, wallH, depth]} />
                 <meshStandardMaterial
-                    color={color} transparent opacity={selected ? 0.6 : 0.4}
+                    color={color} transparent opacity={selected ? 0.35 : 0.2}
                     side={THREE.DoubleSide} roughness={0.95}
+                    depthWrite={false}
                 />
             </mesh>
-            {/* Bordi wireframe del muro */}
-            <mesh geometry={wallGeometry}>
-                <meshBasicMaterial color={color} wireframe transparent opacity={0.3} />
+            {/* Contorno wireframe del muro */}
+            <mesh>
+                <boxGeometry args={[wallW, wallH, depth]} />
+                <meshBasicMaterial color={color} wireframe transparent opacity={0.5} />
             </mesh>
-            {/* Canala che passa ATTRAVERSO il muro */}
-            <group position={[holeOffsetX, holeOffsetY, 0]}>
-                <mesh geometry={ductThroughGeometry}>
-                    <meshStandardMaterial
-                        color={DUCT_COLOR} transparent opacity={0.6}
-                        side={THREE.DoubleSide} roughness={0.8} metalness={0.05}
-                    />
-                </mesh>
-            </group>
+            {/* Canala cava CONTINUA che attraversa il muro */}
+            <mesh geometry={ductGeometry}>
+                <meshStandardMaterial
+                    color={DUCT_COLOR} transparent opacity={0.7}
+                    side={THREE.DoubleSide} roughness={0.8} metalness={0.05}
+                />
+            </mesh>
         </group>
     );
 }
