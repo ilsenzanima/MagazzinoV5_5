@@ -19,13 +19,18 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SegmentDirection } from "@/lib/cutting-simulator/project-model";
+import dynamic from 'next/dynamic';
+
+// Lazy-load ThreeView per evitare problemi SSR con Three.js
+const ThreeView = dynamic(() => import('./ThreeView').then(m => ({ default: m.ThreeView })), { ssr: false });
 
 // ==================== VISTA LABELS ====================
 
 const VIEW_LABELS: Record<string, string> = {
     top: 'Dall\'Alto',
     side: 'Laterale',
-    iso: '3D',
+    iso: 'Iso',
+    '3d': '3D',
 };
 
 const SIDE_FACES = ['front', 'right', 'back', 'left'] as const;
@@ -297,10 +302,10 @@ interface ProjectEditorProps {
 }
 
 export function ProjectEditor({ project, onProjectChange, sidebarContent }: ProjectEditorProps) {
-    const [viewFamily, setViewFamily] = useState<'top' | 'side' | 'iso'>('iso');
+    const [viewFamily, setViewFamily] = useState<'top' | 'side' | 'iso' | '3d'>('3d');
     const [sideFace, setSideFace] = useState<SideFaceType>('front');
 
-    const view: ViewType = viewFamily === 'side' ? sideFace : viewFamily;
+    const view: ViewType = viewFamily === 'side' ? sideFace : viewFamily === '3d' ? 'iso' : viewFamily;
 
     const [activeTool, setActiveTool] = useState<'select' | 'pan' | 'add_note' | 'add_dim'>('select');
     const [selectedAnnId, setSelectedAnnId] = useState<string | null>(null);
@@ -795,12 +800,12 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                 <div className="flex bg-muted/50 p-0.5 rounded-md backdrop-blur-sm shadow-sm">
                     {/* Selettore vista */}
                     <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md shrink-0">
-                        {(['top', 'side', 'iso'] as const).map(v => (
+                        {(['top', 'side', 'iso', '3d'] as const).map(v => (
                             <button
                                 key={v}
                                 onClick={() => {
                                     setViewFamily(v);
-                                    if (v === 'iso') {
+                                    if (v === 'iso' || v === '3d') {
                                         setActiveTool('select');
                                         setDrawingDim(null);
                                     }
@@ -900,268 +905,219 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                 </div>
             </div>
 
-            {/* Canvas SVG */}
-            <svg
-                ref={svgRef}
-                viewBox={`${vbX.toFixed(0)} ${vbY.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}`}
-                className="w-full h-full flex-1 bg-background touch-none"
-                style={{ cursor: isPanning ? 'grabbing' : 'crosshair', minHeight: 500 }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onClick={handleCanvasClick}
-            >
-                {/* Markers per frecce quote */}
-                <defs>
-                    <marker id="arrow-start" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
-                        <path d="M6,0 L0,2 L6,4" fill="currentColor" className="text-foreground opacity-80" />
-                    </marker>
-                    <marker id="arrow-end" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
-                        <path d="M0,0 L6,2 L0,4" fill="currentColor" className="text-foreground opacity-80" />
-                    </marker>
-                    <marker id="arrow-start-sel" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
-                        <path d="M6,0 L0,2 L6,4" fill="currentColor" className="text-primary" />
-                    </marker>
-                    <marker id="arrow-end-sel" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
-                        <path d="M0,0 L6,2 L0,4" fill="currentColor" className="text-primary" />
-                    </marker>
-                </defs>
+            {/* ===== CANVAS 3D (Three.js) oppure SVG ===== */}
+            {viewFamily === '3d' ? (
+                <div className="w-full flex-1" style={{ minHeight: 500 }}>
+                    <ThreeView
+                        nodes3D={nodes3D}
+                        section={project.section}
+                        selectedIdx={selectedIdx}
+                        onSelect={(idx) => { setSelectedIdx(idx >= 0 ? idx : null); }}
+                        jointBands={project.jointBands}
+                        jointBandWidth={project.jointBandWidth}
+                    />
+                </div>
+            ) : (
+                <svg
+                    ref={svgRef}
+                    viewBox={`${vbX.toFixed(0)} ${vbY.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}`}
+                    className="w-full h-full flex-1 bg-background touch-none"
+                    style={{ cursor: isPanning ? 'grabbing' : 'crosshair', minHeight: 500 }}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    onClick={handleCanvasClick}
+                >
+                    {/* Markers per frecce quote */}
+                    <defs>
+                        <marker id="arrow-start" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
+                            <path d="M6,0 L0,2 L6,4" fill="currentColor" className="text-foreground opacity-80" />
+                        </marker>
+                        <marker id="arrow-end" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+                            <path d="M0,0 L6,2 L0,4" fill="currentColor" className="text-foreground opacity-80" />
+                        </marker>
+                        <marker id="arrow-start-sel" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
+                            <path d="M6,0 L0,2 L6,4" fill="currentColor" className="text-primary" />
+                        </marker>
+                        <marker id="arrow-end-sel" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+                            <path d="M0,0 L6,2 L0,4" fill="currentColor" className="text-primary" />
+                        </marker>
+                    </defs>
 
-                {/* Griglia CAD */}
-                <CadGrid bbox={bbox} gridSize={100} />
+                    {/* Griglia CAD */}
+                    <CadGrid bbox={bbox} gridSize={100} />
 
-                {/* Assi di riferimento */}
-                <line x1={bbox.minX} y1={0} x2={bbox.maxX} y2={0}
-                    stroke="hsl(var(--foreground) / 0.1)" strokeWidth={1} strokeDasharray="8,4" />
-                <line x1={0} y1={bbox.minY} x2={0} y2={bbox.maxY}
-                    stroke="hsl(var(--foreground) / 0.1)" strokeWidth={1} strokeDasharray="8,4" />
+                    {/* Assi di riferimento */}
+                    <line x1={bbox.minX} y1={0} x2={bbox.maxX} y2={0}
+                        stroke="hsl(var(--foreground) / 0.1)" strokeWidth={1} strokeDasharray="8,4" />
+                    <line x1={0} y1={bbox.minY} x2={0} y2={bbox.maxY}
+                        stroke="hsl(var(--foreground) / 0.1)" strokeWidth={1} strokeDasharray="8,4" />
 
-                {/* Segmenti */}
-                {nodes2D.map((node, i) => {
-                    const isSelected = selectedIdx === node.index;
-                    const isDraggingThisTrack = node.trackId === draggingTrackId && draggingTrackId !== null;
-                    return (
-                        <g
-                            key={node.segment.id}
-                            onClick={e => handleSegmentClick(node.index, e)}
-                            onContextMenu={e => handleContextMenu(node.index, e)}
-                            onMouseDown={e => handleSegmentMouseDown(node.trackId, e)}
-                            style={{
-                                cursor: isDraggingThisTrack ? 'grabbing' : (activeTool === 'select' ? (node.trackId ? 'grab' : 'pointer') : 'default'),
-                                transform: isDraggingThisTrack ? `translate(${trackDragOffset.x}px, ${trackDragOffset.y}px)` : undefined,
-                                transition: isDraggingThisTrack ? 'none' : 'transform 0.1s ease-out'
-                            }}
-                        >
-                            {/* Corpo segmento */}
-                            {node.polygons && node.polygons.length > 0 ? (
-                                node.polygons.map((poly, pIdx) => (
-                                    <polygon
-                                        key={`poly-${i}-${pIdx}`}
-                                        points={poly.points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-                                        fill={isSelected ? `${node.color}60` : poly.fill}
-                                        stroke={poly.stroke}
-                                        strokeWidth={isSelected ? 2.5 : poly.strokeWidth}
-                                        strokeLinejoin="round"
-                                        strokeDasharray={poly.strokeDasharray}
-                                    />
-                                ))
-                            ) : (
-                                node.rects.map((r, rIdx) => {
-                                    const rectColor = r.color || node.color;
-                                    return (
-                                        <rect
-                                            key={rIdx}
-                                            x={r.x}
-                                            y={r.y}
-                                            width={r.width}
-                                            height={r.height}
-                                            fill={isSelected ? `${rectColor}50` : `${rectColor}25`}
-                                            stroke={rectColor}
-                                            strokeWidth={isSelected ? 3 : 1.5}
-                                            rx={r.rx || 0}
-                                        />
-                                    );
-                                })
-                            )}
-
-                            {/* Etichetta */}
-                            <text
-                                x={node.labelX}
-                                y={node.labelY}
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                                className="fill-foreground font-mono pointer-events-none"
-                                style={{ fontSize: `${11 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
-                            >
-                                {node.label}
-                            </text>
-
-                            {/* Indice */}
-                            <circle
-                                cx={node.labelX + 16 * fScale} cy={node.labelY + 16 * fScale} r={9 * fScale}
-                                fill={node.color} opacity={0.8}
-                            />
-                            <text
-                                x={node.labelX + 16 * fScale} y={node.labelY + 16 * fScale}
-                                textAnchor="middle" dominantBaseline="central"
-                                className="fill-white font-bold pointer-events-none"
-                                style={{ fontSize: `${9 * fScale}px` }}
-                            >
-                                {i + 1}
-                            </text>
-
-                            {/* Quote ostacolo in testo */}
-                            {node.segment.type === 'obstacle' && (node.segment as ContextualElementSegment).showQuotas && (
-                                <g transform={`translate(${node.labelX}, ${node.labelY + 36 * fScale})`}>
-                                    <rect x={-30 * fScale} y={-10 * fScale} width={60 * fScale} height={16 * fScale} fill="hsl(var(--background)/0.8)" rx={4 * fScale} />
-                                    <text textAnchor="middle" className="fill-purple-500 font-mono font-bold pointer-events-none" style={{ fontSize: `${10 * fScale}px` }}>
-                                        {(() => {
-                                            const o = node.segment as ContextualElementSegment;
-                                            const q = [];
-                                            if (o.quotaLeft) q.push(`←${o.quotaLeft}`);
-                                            if (o.quotaRight) q.push(`${o.quotaRight}→`);
-                                            if (o.quotaTop) q.push(`↑${o.quotaTop}`);
-                                            if (o.quotaBottom) q.push(`↓${o.quotaBottom}`);
-                                            return q.join(' ');
-                                        })()}
-                                    </text>
-                                </g>
-                            )}
-                        </g>
-                    );
-                })}
-
-                {/* Indicatore visivo Snap */}
-                {snapTarget && draggingTrackId && (() => {
-                    // Proiettiamo in 2D la posizione world dello snap
-                    let sx = 0, sy = 0;
-                    // Mock rapido di proiezione 2D
-                    if (viewFamily === 'top') {
-                        sx = snapTarget.x; sy = -snapTarget.y;
-                    } else if (viewFamily === 'side') {
-                        if (sideFace === 'front') { sx = snapTarget.x; sy = -snapTarget.z; }
-                        else if (sideFace === 'back') { sx = -snapTarget.x; sy = -snapTarget.z; }
-                        else if (sideFace === 'right') { sx = snapTarget.y; sy = -snapTarget.z; }
-                        else if (sideFace === 'left') { sx = -snapTarget.y; sy = -snapTarget.z; }
-                    } else if (viewFamily === 'iso') {
-                        const rad = (isoAngle * Math.PI) / 180;
-                        const cosA = Math.cos(rad); const sinA = Math.sin(rad);
-                        const rx = snapTarget.x * cosA - snapTarget.y * sinA;
-                        const ry = snapTarget.x * sinA + snapTarget.y * cosA;
-                        const cos30 = 0.866; const sin30 = 0.5;
-                        sx = (rx - ry) * cos30;
-                        sy = (rx + ry) * sin30 - snapTarget.z;
-                    }
-
-                    return (
-                        <g>
-                            <circle cx={sx} cy={sy} r={25 * fScale} fill="hsl(var(--primary)/0.2)" stroke="hsl(var(--primary))" strokeWidth={2 * fScale} />
-                            <circle cx={sx} cy={sy} r={8 * fScale} fill="hsl(var(--primary))" />
-                            <line x1={sx - 40 * fScale} y1={sy} x2={sx + 40 * fScale} y2={sy} stroke="hsl(var(--primary))" strokeWidth={1 * fScale} pointerEvents="none" strokeDasharray="4 4" />
-                            <line x1={sx} y1={sy - 40 * fScale} x2={sx} y2={sy + 40 * fScale} stroke="hsl(var(--primary))" strokeWidth={1 * fScale} pointerEvents="none" strokeDasharray="4 4" />
-                        </g>
-                    );
-                })()}
-
-                {/* TODO: Quote automatiche rimosse per evitare sovrapposizioni con l'etichetta base */}
-
-                {/* Annotazioni Utente */}
-                {project.annotations?.filter(a => !a.viewId || a.viewId === viewFamily || (viewFamily === 'side' && a.viewId === sideFace)).map((ann) => {
-                    const isSelected = selectedAnnId === ann.id;
-                    if (ann.type === 'note') {
+                    {/* Segmenti */}
+                    {nodes2D.map((node, i) => {
+                        const isSelected = selectedIdx === node.index;
+                        const isDraggingThisTrack = node.trackId === draggingTrackId && draggingTrackId !== null;
                         return (
-                            <g key={ann.id}
-                                className="annotation-draggable"
-                                onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
-                                onMouseDown={e => {
-                                    if (activeTool === 'select') {
-                                        e.stopPropagation();
-                                        setDraggingAnnId(ann.id);
-                                    }
+                            <g
+                                key={node.segment.id}
+                                onClick={e => handleSegmentClick(node.index, e)}
+                                onContextMenu={e => handleContextMenu(node.index, e)}
+                                onMouseDown={e => handleSegmentMouseDown(node.trackId, e)}
+                                style={{
+                                    cursor: isDraggingThisTrack ? 'grabbing' : (activeTool === 'select' ? (node.trackId ? 'grab' : 'pointer') : 'default'),
+                                    transform: isDraggingThisTrack ? `translate(${trackDragOffset.x}px, ${trackDragOffset.y}px)` : undefined,
+                                    transition: isDraggingThisTrack ? 'none' : 'transform 0.1s ease-out'
                                 }}
-                                style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
                             >
-                                <rect
-                                    x={ann.x - 5 * fScale} y={ann.y - 18 * fScale}
-                                    width={(ann.text.length * 9 * fScale) + 14 * fScale} height={26 * fScale}
-                                    fill={isSelected ? 'hsl(var(--primary)/0.15)' : 'hsl(var(--background)/0.9)'}
-                                    stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground)/0.4)'}
-                                    strokeDasharray={isSelected ? "none" : `${2 * fScale} ${2 * fScale}`}
-                                    strokeWidth={1.5 * fScale}
-                                    rx={6 * fScale}
+                                {/* Corpo segmento */}
+                                {node.polygons && node.polygons.length > 0 ? (
+                                    node.polygons.map((poly, pIdx) => (
+                                        <polygon
+                                            key={`poly-${i}-${pIdx}`}
+                                            points={poly.points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+                                            fill={isSelected ? `${node.color}60` : poly.fill}
+                                            stroke={poly.stroke}
+                                            strokeWidth={isSelected ? 2.5 : poly.strokeWidth}
+                                            strokeLinejoin="round"
+                                            strokeDasharray={poly.strokeDasharray}
+                                        />
+                                    ))
+                                ) : (
+                                    node.rects.map((r, rIdx) => {
+                                        const rectColor = r.color || node.color;
+                                        return (
+                                            <rect
+                                                key={rIdx}
+                                                x={r.x}
+                                                y={r.y}
+                                                width={r.width}
+                                                height={r.height}
+                                                fill={isSelected ? `${rectColor}50` : `${rectColor}25`}
+                                                stroke={rectColor}
+                                                strokeWidth={isSelected ? 3 : 1.5}
+                                                rx={r.rx || 0}
+                                            />
+                                        );
+                                    })
+                                )}
+
+                                {/* Etichetta */}
+                                <text
+                                    x={node.labelX}
+                                    y={node.labelY}
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    className="fill-foreground font-mono pointer-events-none"
+                                    style={{ fontSize: `${11 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
+                                >
+                                    {node.label}
+                                </text>
+
+                                {/* Indice */}
+                                <circle
+                                    cx={node.labelX + 16 * fScale} cy={node.labelY + 16 * fScale} r={9 * fScale}
+                                    fill={node.color} opacity={0.8}
                                 />
-                                <text x={ann.x} y={ann.y} className="fill-foreground font-sans font-medium pointer-events-none" style={{ fontSize: `${16 * fScale}px` }}>{ann.text}</text>
+                                <text
+                                    x={node.labelX + 16 * fScale} y={node.labelY + 16 * fScale}
+                                    textAnchor="middle" dominantBaseline="central"
+                                    className="fill-white font-bold pointer-events-none"
+                                    style={{ fontSize: `${9 * fScale}px` }}
+                                >
+                                    {i + 1}
+                                </text>
+
+                                {/* Quote ostacolo in testo */}
+                                {node.segment.type === 'obstacle' && (node.segment as ContextualElementSegment).showQuotas && (
+                                    <g transform={`translate(${node.labelX}, ${node.labelY + 36 * fScale})`}>
+                                        <rect x={-30 * fScale} y={-10 * fScale} width={60 * fScale} height={16 * fScale} fill="hsl(var(--background)/0.8)" rx={4 * fScale} />
+                                        <text textAnchor="middle" className="fill-purple-500 font-mono font-bold pointer-events-none" style={{ fontSize: `${10 * fScale}px` }}>
+                                            {(() => {
+                                                const o = node.segment as ContextualElementSegment;
+                                                const q = [];
+                                                if (o.quotaLeft) q.push(`←${o.quotaLeft}`);
+                                                if (o.quotaRight) q.push(`${o.quotaRight}→`);
+                                                if (o.quotaTop) q.push(`↑${o.quotaTop}`);
+                                                if (o.quotaBottom) q.push(`↓${o.quotaBottom}`);
+                                                return q.join(' ');
+                                            })()}
+                                        </text>
+                                    </g>
+                                )}
                             </g>
                         );
-                    } else if (ann.type === 'dimension' && ann.x2 !== undefined && ann.y2 !== undefined) {
-                        const label = ann.text || `Quota ?`; // Se custom è vuota, richiede all'utente
-                        const x1 = ann.x;
-                        const y1 = ann.y;
-                        const x2 = ann.x2;
-                        const y2 = ann.y2;
-                        const offset = 0; // Manual dimensions don't have an auto offset
+                    })}
 
-                        // Calculate dimension line points
-                        const angle = Math.atan2(y2 - y1, x2 - x1);
-                        const perpAngle = angle + Math.PI / 2;
-
-                        const ax = x1 + Math.cos(perpAngle) * offset;
-                        const ay = y1 + Math.sin(perpAngle) * offset;
-                        const bx = x2 + Math.cos(perpAngle) * offset;
-                        const by = y2 + Math.sin(perpAngle) * offset;
-
-                        // Calculate label position
-                        const mx = (ax + bx) / 2;
-                        const my = (ay + by) / 2;
-
-                        const lineClass = isSelected ? "stroke-primary" : "stroke-foreground opacity-80";
-                        const extClass = isSelected ? "stroke-primary opacity-60" : "stroke-foreground opacity-40";
+                    {/* Indicatore visivo Snap */}
+                    {snapTarget && draggingTrackId && (() => {
+                        // Proiettiamo in 2D la posizione world dello snap
+                        let sx = 0, sy = 0;
+                        // Mock rapido di proiezione 2D
+                        if (viewFamily === 'top') {
+                            sx = snapTarget.x; sy = -snapTarget.y;
+                        } else if (viewFamily === 'side') {
+                            if (sideFace === 'front') { sx = snapTarget.x; sy = -snapTarget.z; }
+                            else if (sideFace === 'back') { sx = -snapTarget.x; sy = -snapTarget.z; }
+                            else if (sideFace === 'right') { sx = snapTarget.y; sy = -snapTarget.z; }
+                            else if (sideFace === 'left') { sx = -snapTarget.y; sy = -snapTarget.z; }
+                        } else if (viewFamily === 'iso') {
+                            const rad = (isoAngle * Math.PI) / 180;
+                            const cosA = Math.cos(rad); const sinA = Math.sin(rad);
+                            const rx = snapTarget.x * cosA - snapTarget.y * sinA;
+                            const ry = snapTarget.x * sinA + snapTarget.y * cosA;
+                            const cos30 = 0.866; const sin30 = 0.5;
+                            sx = (rx - ry) * cos30;
+                            sy = (rx + ry) * sin30 - snapTarget.z;
+                        }
 
                         return (
-                            <g key={ann.id}
-                                onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
-                                style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
-                            >
-                                {/* Extension lines */}
-                                <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
-                                <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
-                                {/* Dimension line with dasharray per le quote manuali e fisso */}
-                                <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
-                                {/* Label - font ingrandito per visibilità */}
-                                <text
-                                    x={mx} y={my - 6 * fScale}
-                                    textAnchor="middle"
-                                    className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
-                                    style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
-                                >
-                                    {label}
-                                </text>
-                                {/* Hitbox invisibile per cliccarla più facilmente */}
-                                <line x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} stroke="transparent" strokeWidth={30 * fScale} />
+                            <g>
+                                <circle cx={sx} cy={sy} r={25 * fScale} fill="hsl(var(--primary)/0.2)" stroke="hsl(var(--primary))" strokeWidth={2 * fScale} />
+                                <circle cx={sx} cy={sy} r={8 * fScale} fill="hsl(var(--primary))" />
+                                <line x1={sx - 40 * fScale} y1={sy} x2={sx + 40 * fScale} y2={sy} stroke="hsl(var(--primary))" strokeWidth={1 * fScale} pointerEvents="none" strokeDasharray="4 4" />
+                                <line x1={sx} y1={sy - 40 * fScale} x2={sx} y2={sy + 40 * fScale} stroke="hsl(var(--primary))" strokeWidth={1 * fScale} pointerEvents="none" strokeDasharray="4 4" />
                             </g>
                         );
-                    }
-                    return null;
-                })}
+                    })()}
 
-                {/* Quota in fase di disegno */}
-                {activeTool === 'add_dim' && drawingDim && (
-                    <g>
-                        {/* Linea guida tratteggiata */}
-                        {(() => {
-                            const dx = Math.abs(mousePos.x - drawingDim.x);
-                            const dy = Math.abs(mousePos.y - drawingDim.y);
-                            const snapX = dx > dy ? mousePos.x : drawingDim.x;
-                            const snapY = dx > dy ? drawingDim.y : mousePos.y;
+                    {/* TODO: Quote automatiche rimosse per evitare sovrapposizioni con l'etichetta base */}
 
-                            const x1 = drawingDim.x;
-                            const y1 = drawingDim.y;
-                            const x2 = snapX;
-                            const y2 = snapY;
-                            const label = ""; // No label during drawing
-                            const offset = 0;
-                            const isSelected = true;
+                    {/* Annotazioni Utente */}
+                    {project.annotations?.filter(a => !a.viewId || a.viewId === viewFamily || (viewFamily === 'side' && a.viewId === sideFace)).map((ann) => {
+                        const isSelected = selectedAnnId === ann.id;
+                        if (ann.type === 'note') {
+                            return (
+                                <g key={ann.id}
+                                    className="annotation-draggable"
+                                    onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
+                                    onMouseDown={e => {
+                                        if (activeTool === 'select') {
+                                            e.stopPropagation();
+                                            setDraggingAnnId(ann.id);
+                                        }
+                                    }}
+                                    style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
+                                >
+                                    <rect
+                                        x={ann.x - 5 * fScale} y={ann.y - 18 * fScale}
+                                        width={(ann.text.length * 9 * fScale) + 14 * fScale} height={26 * fScale}
+                                        fill={isSelected ? 'hsl(var(--primary)/0.15)' : 'hsl(var(--background)/0.9)'}
+                                        stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground)/0.4)'}
+                                        strokeDasharray={isSelected ? "none" : `${2 * fScale} ${2 * fScale}`}
+                                        strokeWidth={1.5 * fScale}
+                                        rx={6 * fScale}
+                                    />
+                                    <text x={ann.x} y={ann.y} className="fill-foreground font-sans font-medium pointer-events-none" style={{ fontSize: `${16 * fScale}px` }}>{ann.text}</text>
+                                </g>
+                            );
+                        } else if (ann.type === 'dimension' && ann.x2 !== undefined && ann.y2 !== undefined) {
+                            const label = ann.text || `Quota ?`; // Se custom è vuota, richiede all'utente
+                            const x1 = ann.x;
+                            const y1 = ann.y;
+                            const x2 = ann.x2;
+                            const y2 = ann.y2;
+                            const offset = 0; // Manual dimensions don't have an auto offset
 
                             // Calculate dimension line points
                             const angle = Math.atan2(y2 - y1, x2 - x1);
@@ -1180,40 +1136,101 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                             const extClass = isSelected ? "stroke-primary opacity-60" : "stroke-foreground opacity-40";
 
                             return (
-                                <>
-                                    <line x1={drawingDim.x} y1={drawingDim.y} x2={snapX} y2={snapY} stroke="hsl(var(--primary))" strokeWidth={1.5 * fScale} strokeDasharray={`${6 * fScale},${4 * fScale}`} opacity={0.6} />
-                                    <g className="dimension-line">
-                                        {/* Extension lines */}
-                                        <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
-                                        <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
-                                        {/* Dimension line with dasharray per le quote manuali e fisso */}
-                                        <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
-                                        {/* Label - font ingrandito per visibilità */}
-                                        <text
-                                            x={mx} y={my - 6 * fScale}
-                                            textAnchor="middle"
-                                            className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
-                                            style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
-                                        >
-                                            {label}
-                                        </text>
-                                    </g>
-                                </>
-                            )
-                        })()}
-                    </g>
-                )}
+                                <g key={ann.id}
+                                    onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
+                                    style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
+                                >
+                                    {/* Extension lines */}
+                                    <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
+                                    <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
+                                    {/* Dimension line with dasharray per le quote manuali e fisso */}
+                                    <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
+                                    {/* Label - font ingrandito per visibilità */}
+                                    <text
+                                        x={mx} y={my - 6 * fScale}
+                                        textAnchor="middle"
+                                        className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
+                                        style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
+                                    >
+                                        {label}
+                                    </text>
+                                    {/* Hitbox invisibile per cliccarla più facilmente */}
+                                    <line x1={ann.x} y1={ann.y} x2={ann.x2} y2={ann.y2} stroke="transparent" strokeWidth={30 * fScale} />
+                                </g>
+                            );
+                        }
+                        return null;
+                    })}
 
-                {/* Label vista */}
-                <text
-                    x={vbX + 10} y={vbY + 20}
-                    className="fill-muted-foreground text-[12px] font-semibold pointer-events-none"
-                    style={{ paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 3, strokeLinejoin: 'round' }}
-                >
-                    Vista: {VIEW_LABELS[view]}
-                </text>
-            </svg>
+                    {/* Quota in fase di disegno */}
+                    {activeTool === 'add_dim' && drawingDim && (
+                        <g>
+                            {/* Linea guida tratteggiata */}
+                            {(() => {
+                                const dx = Math.abs(mousePos.x - drawingDim.x);
+                                const dy = Math.abs(mousePos.y - drawingDim.y);
+                                const snapX = dx > dy ? mousePos.x : drawingDim.x;
+                                const snapY = dx > dy ? drawingDim.y : mousePos.y;
 
+                                const x1 = drawingDim.x;
+                                const y1 = drawingDim.y;
+                                const x2 = snapX;
+                                const y2 = snapY;
+                                const label = ""; // No label during drawing
+                                const offset = 0;
+                                const isSelected = true;
+
+                                // Calculate dimension line points
+                                const angle = Math.atan2(y2 - y1, x2 - x1);
+                                const perpAngle = angle + Math.PI / 2;
+
+                                const ax = x1 + Math.cos(perpAngle) * offset;
+                                const ay = y1 + Math.sin(perpAngle) * offset;
+                                const bx = x2 + Math.cos(perpAngle) * offset;
+                                const by = y2 + Math.sin(perpAngle) * offset;
+
+                                // Calculate label position
+                                const mx = (ax + bx) / 2;
+                                const my = (ay + by) / 2;
+
+                                const lineClass = isSelected ? "stroke-primary" : "stroke-foreground opacity-80";
+                                const extClass = isSelected ? "stroke-primary opacity-60" : "stroke-foreground opacity-40";
+
+                                return (
+                                    <>
+                                        <line x1={drawingDim.x} y1={drawingDim.y} x2={snapX} y2={snapY} stroke="hsl(var(--primary))" strokeWidth={1.5 * fScale} strokeDasharray={`${6 * fScale},${4 * fScale}`} opacity={0.6} />
+                                        <g className="dimension-line">
+                                            {/* Extension lines */}
+                                            <line x1={x1} y1={y1} x2={ax} y2={ay} className={extClass} strokeWidth={0.5 * fScale} />
+                                            <line x1={x2} y1={y2} x2={bx} y2={by} className={extClass} strokeWidth={0.5 * fScale} />
+                                            {/* Dimension line with dasharray per le quote manuali e fisso */}
+                                            <line x1={ax} y1={ay} x2={bx} y2={by} className={lineClass} strokeWidth={(isSelected ? 2 : 1.2) * fScale} strokeDasharray={`${4 * fScale} ${2 * fScale}`} markerStart={isSelected ? "url(#arrow-start-sel)" : "url(#arrow-start)"} markerEnd={isSelected ? "url(#arrow-end-sel)" : "url(#arrow-end)"} />
+                                            {/* Label - font ingrandito per visibilità */}
+                                            <text
+                                                x={mx} y={my - 6 * fScale}
+                                                textAnchor="middle"
+                                                className={isSelected ? "fill-primary font-mono font-bold font-sans" : "fill-foreground font-mono font-bold font-sans"}
+                                                style={{ fontSize: `${14 * fScale}px`, paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 4 * fScale, strokeLinejoin: 'round' }}
+                                            >
+                                                {label}
+                                            </text>
+                                        </g>
+                                    </>
+                                )
+                            })()}
+                        </g>
+                    )}
+
+                    {/* Label vista */}
+                    <text
+                        x={vbX + 10} y={vbY + 20}
+                        className="fill-muted-foreground text-[12px] font-semibold pointer-events-none"
+                        style={{ paintOrder: 'stroke', stroke: 'hsl(var(--background))', strokeWidth: 3, strokeLinejoin: 'round' }}
+                    >
+                        Vista: {VIEW_LABELS[view]}
+                    </text>
+                </svg>
+            )}
 
 
             {/* Pannello proprietà segmenti */}
