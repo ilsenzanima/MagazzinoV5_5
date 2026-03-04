@@ -153,17 +153,18 @@ function ElbowMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     );
 }
 
-/** Muro / Solaio — canala continua, muro come contorno wireframe */
+/** Muro / Solaio — il tratto canala è identico a un dritto, il muro è un overlay separato */
 function ObstacleMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     const seg = node.segment as ContextualElementSegment;
     const isWall = seg.obstacleType === 'wall';
-    const wallColor = selected ? DUCT_COLOR_SELECTED : (isWall ? WALL_COLOR : FLOOR_COLOR);
+    const wallColor = isWall ? WALL_COLOR : FLOOR_COLOR;
     const ductColor = selected ? DUCT_COLOR_SELECTED : DUCT_COLOR;
 
     const wallW = seg.width * SCALE;
     const wallH = seg.height * SCALE;
     const outerW = node.outerW * SCALE;
     const outerH = node.outerH * SCALE;
+    const t = section.thickness * SCALE;
 
     const { position, quaternion, length } = useMemo(
         () => orientBetween(node.start, node.end),
@@ -171,37 +172,42 @@ function ObstacleMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     );
     const depth = length > 0.0001 ? length : seg.thickness * SCALE;
 
-    // Canala si estende 30mm oltre il muro su ogni lato per raccordo
-    const ductDepth = depth + 0.060;
+    // Canala: stessa geometria cava di StraightMesh, con overlap per raccordo
+    const overlap = 0.030; // 30mm per lato
+    const ductLength = depth + overlap * 2;
+
+    const ductGeometry = useMemo(() => {
+        const s = new THREE.Shape();
+        const hw = outerW / 2, hh = outerH / 2;
+        s.moveTo(-hw, -hh); s.lineTo(hw, -hh); s.lineTo(hw, hh); s.lineTo(-hw, hh); s.closePath();
+        const hole = new THREE.Path();
+        hole.moveTo(-hw + t, -hh + t); hole.lineTo(hw - t, -hh + t);
+        hole.lineTo(hw - t, hh - t); hole.lineTo(-hw + t, hh - t); hole.closePath();
+        s.holes.push(hole);
+        const geo = new THREE.ExtrudeGeometry(s, { steps: 1, depth: ductLength, bevelEnabled: false });
+        geo.translate(0, 0, -ductLength / 2);
+        return geo;
+    }, [outerW, outerH, t, ductLength]);
+
+    if (depth < 0.0001) return null;
 
     return (
         <group position={position} quaternion={quaternion} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-            {/* CANALA SOLIDA che attraversa il muro */}
-            <mesh renderOrder={1}>
-                <boxGeometry args={[outerW, outerH, ductDepth]} />
+            {/* CANALA: identica a un tratto dritto */}
+            <mesh geometry={ductGeometry}>
                 <meshStandardMaterial
-                    color={ductColor}
-                    transparent opacity={selected ? 0.85 : 0.7}
-                    roughness={0.8} metalness={0.05}
+                    color={ductColor} transparent opacity={selected ? 0.85 : 0.7}
+                    side={THREE.DoubleSide} roughness={0.8} metalness={0.05}
                 />
             </mesh>
-            {/* Wireframe della canala */}
-            <mesh renderOrder={2}>
-                <boxGeometry args={[outerW, outerH, ductDepth]} />
+            <mesh geometry={ductGeometry}>
                 <meshBasicMaterial color={selected ? "#f59e0b" : "#999"} wireframe transparent opacity={0.25} />
             </mesh>
-            {/* MURO: solo contorno wireframe + facce molto trasparenti */}
-            <mesh renderOrder={0}>
-                <boxGeometry args={[wallW, wallH, depth]} />
-                <meshStandardMaterial
-                    color={wallColor} transparent opacity={0.12}
-                    depthWrite={false} side={THREE.DoubleSide}
-                />
-            </mesh>
-            <mesh renderOrder={3}>
-                <boxGeometry args={[wallW, wallH, depth]} />
-                <meshBasicMaterial color={wallColor} wireframe transparent opacity={0.6} />
-            </mesh>
+            {/* MURO/SOLAIO: overlay wireframe separato — solo bordi visibili */}
+            <lineSegments>
+                <edgesGeometry args={[new THREE.BoxGeometry(wallW, wallH, depth)]} />
+                <lineBasicMaterial color={wallColor} transparent opacity={0.8} />
+            </lineSegments>
         </group>
     );
 }
