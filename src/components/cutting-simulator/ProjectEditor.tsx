@@ -665,24 +665,36 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         setSplitDialog(null);
     }, [project, onProjectChange]);
 
-    // Unisci solo i segmenti DRITTI consecutivi adiacenti (i muri/ostacoli restano al loro posto)
+    // Unisci tutti i segmenti dritti nella stessa "corsa" (attraversando muri/solai)
+    // I muri restano come segmenti separati, i dritti vengono unificati
     const mergeRun = useCallback((segIdx: number) => {
         const segments = project.segments;
-        if (segments[segIdx]?.type !== 'straight') return;
-        // Espandi a sinistra: solo dritti consecutivi
+        const seg = segments[segIdx];
+        if (seg?.type !== 'straight' && seg?.type !== 'obstacle') return;
+
+        // Espandi a sinistra: attraversa straight e obstacle
         let start = segIdx;
-        while (start > 0 && segments[start - 1].type === 'straight') start--;
-        // Espandi a destra: solo dritti consecutivi
+        while (start > 0 && (segments[start - 1].type === 'straight' || segments[start - 1].type === 'obstacle')) start--;
+        // Espandi a destra: attraversa straight e obstacle
         let end = segIdx;
-        while (end < segments.length - 1 && segments[end + 1].type === 'straight') end++;
-        if (start === end) return; // niente da unire
+        while (end < segments.length - 1 && (segments[end + 1].type === 'straight' || segments[end + 1].type === 'obstacle')) end++;
+
+        // Raccogli tutti i dritti e gli ostacoli nella corsa
+        const runSegments = segments.slice(start, end + 1);
+        const straights = runSegments.filter(s => s.type === 'straight') as StraightSegment[];
+        const obstacles = runSegments.filter(s => s.type === 'obstacle');
+
+        if (straights.length <= 1 && obstacles.length === 0) return; // niente da unire
+
+        // Somma le lunghezze di tutti i dritti
         let totalLen = 0;
-        for (let i = start; i <= end; i++) {
-            totalLen += (segments[i] as StraightSegment).length;
-        }
+        for (const s of straights) totalLen += s.length;
+
+        // Crea un unico dritto + mantieni i muri separati
         const merged = createStraightSegment(totalLen);
         const newSegments = [...segments];
-        newSegments.splice(start, end - start + 1, merged);
+        // Sostituisci la corsa con: [dritto unificato] + [muri rimanenti]
+        newSegments.splice(start, end - start + 1, merged, ...obstacles);
         onProjectChange({ ...project, segments: newSegments });
         setContextMenu(null);
         setSelectedIdx(start);
