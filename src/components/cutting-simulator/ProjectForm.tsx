@@ -481,34 +481,64 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem onClick={() => {
                                                                     let len = 0;
+                                                                    let lastStraightIdx = -1;
                                                                     for (let i = group.items.length - 1; i >= 0; i--) {
                                                                         const s = group.items[i];
-                                                                        if (s.seg.type === 'straight') len += s.seg.length;
+                                                                        if (s.seg.type === 'straight') {
+                                                                            len += s.seg.length;
+                                                                            if (lastStraightIdx === -1) lastStraightIdx = i;
+                                                                        }
                                                                         else if (s.seg.type !== 'obstacle') break;
                                                                     }
-                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight, len));
+                                                                    const obs = createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight, len);
+                                                                    if (lastStraightIdx !== -1) {
+                                                                        updateSegment(group.items[lastStraightIdx].seg.id, { length: (group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment).length + obs.thickness });
+                                                                    } else {
+                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment(obs.thickness));
+                                                                    }
+                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, obs);
                                                                 }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Muro
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem onClick={() => {
                                                                     let len = 0;
+                                                                    let lastStraightIdx = -1;
                                                                     for (let i = group.items.length - 1; i >= 0; i--) {
                                                                         const s = group.items[i];
-                                                                        if (s.seg.type === 'straight') len += s.seg.length;
+                                                                        if (s.seg.type === 'straight') {
+                                                                            len += s.seg.length;
+                                                                            if (lastStraightIdx === -1) lastStraightIdx = i;
+                                                                        }
                                                                         else if (s.seg.type !== 'obstacle') break;
                                                                     }
-                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight, len));
+                                                                    const obs = createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight, len);
+                                                                    if (lastStraightIdx !== -1) {
+                                                                        updateSegment(group.items[lastStraightIdx].seg.id, { length: (group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment).length + obs.thickness });
+                                                                    } else {
+                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment(obs.thickness));
+                                                                    }
+                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, obs);
                                                                 }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Solaio
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem onClick={() => {
                                                                     let len = 0;
+                                                                    let lastStraightIdx = -1;
                                                                     for (let i = group.items.length - 1; i >= 0; i--) {
                                                                         const s = group.items[i];
-                                                                        if (s.seg.type === 'straight') len += s.seg.length;
+                                                                        if (s.seg.type === 'straight') {
+                                                                            len += s.seg.length;
+                                                                            if (lastStraightIdx === -1) lastStraightIdx = i;
+                                                                        }
                                                                         else if (s.seg.type !== 'obstacle') break;
                                                                     }
-                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight, len));
+                                                                    const obs = createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight, len);
+                                                                    if (lastStraightIdx !== -1) {
+                                                                        updateSegment(group.items[lastStraightIdx].seg.id, { length: (group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment).length + obs.thickness });
+                                                                    } else {
+                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment(obs.thickness));
+                                                                    }
+                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, obs);
                                                                 }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Pilastro/Ostacolo
                                                                 </DropdownMenuItem>
