@@ -1,4 +1,4 @@
-import { CuttingSimulatorClient } from "@/components/cutting-simulator/CuttingSimulatorClient";
+import CuttingSimulatorClient from "@/components/cutting-simulator/CuttingSimulatorClient";
 
 export const metadata = {
     title: "Disegno e Taglio | Magazzino V5.5",

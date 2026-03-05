@@ -299,9 +299,12 @@ interface ProjectEditorProps {
     project: DuctProject;
     onProjectChange: (project: DuctProject) => void;
     sidebarContent?: React.ReactNode;
+    disableInteraction?: boolean;
+    hideCutPlan?: boolean;
+    boardDimensions?: { width: number; height: number; };
 }
 
-export function ProjectEditor({ project, onProjectChange, sidebarContent }: ProjectEditorProps) {
+export function ProjectEditor({ project, onProjectChange, sidebarContent, disableInteraction, hideCutPlan, boardDimensions }: ProjectEditorProps) {
     const [viewFamily, setViewFamily] = useState<'top' | 'side' | 'iso' | '3d'>('3d');
     const [sideFace, setSideFace] = useState<SideFaceType>('front');
 
@@ -317,7 +320,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     const [trackDragOffset, setTrackDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; segIdx: number } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; segIdx?: number; annId?: string } | null>(null);
     const [splitDialog, setSplitDialog] = useState<{ mode: 'atDistance' | 'half' | 'equalParts' | 'nPartsOfX'; segIdx: number } | null>(null);
     const [splitValue, setSplitValue] = useState<number>(0);
     const [isPanning, setIsPanning] = useState(false);
@@ -1158,6 +1161,13 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                                 <g key={ann.id}
                                     className="annotation-draggable"
                                     onClick={e => { e.stopPropagation(); if (activeTool === 'select') { setSelectedAnnId(ann.id); setSelectedIdx(null); } }}
+                                    onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (disableInteraction) return;
+                                        setContextMenu({ x: e.clientX, y: e.clientY, annId: ann.id });
+                                        setSelectedAnnId(ann.id);
+                                    }}
                                     onMouseDown={e => {
                                         if (activeTool === 'select') {
                                             e.stopPropagation();
@@ -1301,7 +1311,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
 
 
             {/* Pannello proprietà segmenti */}
-            {selectedSegment && selectedIdx !== null && activeTool === 'select' && (
+            {selectedSegment && selectedIdx !== null && activeTool === 'select' && !disableInteraction && (
                 <PropertiesPanel
                     segment={selectedSegment}
                     index={selectedIdx}
@@ -1375,7 +1385,8 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
             </div>
 
             {/* ==================== CONTEXT MENU ==================== */}
-            {contextMenu && (() => {
+            {contextMenu && !disableInteraction && (() => {
+                if (contextMenu.segIdx === undefined) return null;
                 const seg = project.segments[contextMenu.segIdx];
                 const isStraight = seg?.type === 'straight';
                 // Controlla se ci sono dritti adiacenti da unire
@@ -1419,19 +1430,19 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                             {isStraight && (
                                 <>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                        onClick={() => { splitSegment(contextMenu.segIdx, 'half'); }}>
+                                        onClick={() => { splitSegment(contextMenu.segIdx as number, 'half'); }}>
                                         ✂️ Dividi a metà
                                     </button>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                        onClick={() => { setSplitDialog({ mode: 'atDistance', segIdx: contextMenu.segIdx }); setSplitValue(Math.round((seg as StraightSegment).length / 2)); setContextMenu(null); }}>
+                                        onClick={() => { setSplitDialog({ mode: 'atDistance', segIdx: contextMenu.segIdx as number }); setSplitValue(Math.round((seg as StraightSegment).length / 2)); setContextMenu(null); }}>
                                         📏 Dividi a X mm dall&apos;inizio
                                     </button>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                        onClick={() => { setSplitDialog({ mode: 'equalParts', segIdx: contextMenu.segIdx }); setSplitValue(2); setContextMenu(null); }}>
+                                        onClick={() => { setSplitDialog({ mode: 'equalParts', segIdx: contextMenu.segIdx as number }); setSplitValue(2); setContextMenu(null); }}>
                                         📐 Dividi in N parti uguali
                                     </button>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                        onClick={() => { setSplitDialog({ mode: 'nPartsOfX', segIdx: contextMenu.segIdx }); setSplitValue(500); setContextMenu(null); }}>
+                                        onClick={() => { setSplitDialog({ mode: 'nPartsOfX', segIdx: contextMenu.segIdx as number }); setSplitValue(500); setContextMenu(null); }}>
                                         📐 Dividi in pezzi da X mm
                                     </button>
                                     <div className="border-t border-border/50 my-1" />
@@ -1442,7 +1453,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                             {canMerge && (
                                 <>
                                     <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                        onClick={() => mergeRun(contextMenu.segIdx)}>
+                                        onClick={() => mergeRun(contextMenu.segIdx as number)}>
                                         🔗 Unisci dritti adiacenti ({runTotal}mm)
                                     </button>
                                     <div className="border-t border-border/50 my-1" />
@@ -1452,23 +1463,23 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                             {/* Inserisci dopo */}
                             <div className="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">Inserisci dopo</div>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createStraightSegment(1000))}>
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx as number, createStraightSegment(1000))}>
                                 ➕ Dritto (1000mm)
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createElbow90Segment('right'))}>
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx as number, createElbow90Segment('right'))}>
                                 🔄 Curva 90°
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertObstacleAfter(contextMenu.segIdx, 'wall')}>
+                                onClick={() => insertObstacleAfter(contextMenu.segIdx as number, 'wall')}>
                                 🧱 Muro
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertObstacleAfter(contextMenu.segIdx, 'floor')}>
+                                onClick={() => insertObstacleAfter(contextMenu.segIdx as number, 'floor')}>
                                 🏗️ Solaio
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createPendinoSegment())}>
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx as number, createPendinoSegment())}>
                                 📌 Pendino
                             </button>
 
@@ -1476,7 +1487,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
 
                             {/* Elimina */}
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-destructive/10 text-destructive flex items-center gap-2"
-                                onClick={() => { handleRemove(contextMenu.segIdx); setContextMenu(null); }}>
+                                onClick={() => { handleRemove(contextMenu.segIdx as number); setContextMenu(null); }}>
                                 🗑️ Elimina segmento
                             </button>
                         </div>

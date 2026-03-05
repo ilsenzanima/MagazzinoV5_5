@@ -28,7 +28,8 @@ import {
 interface ProjectFormProps {
     project: DuctProject;
     onProjectChange: React.Dispatch<React.SetStateAction<DuctProject>>;
-    onCalculateProject: (project: DuctProject) => void;
+    onCalculateProject?: () => void;
+    isRoutingMode?: boolean;
 }
 
 const DIRECTION_ICONS: Record<SegmentDirection, typeof ArrowRight> = {
@@ -107,7 +108,7 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onCalculateProject(project);
+        onCalculateProject?.();
     };
 
     // Calcola la lunghezza reale dai segmenti in un gruppo
