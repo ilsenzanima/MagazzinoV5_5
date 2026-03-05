@@ -907,7 +907,15 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
 
             {/* ===== CANVAS 3D (Three.js) oppure SVG ===== */}
             {viewFamily === '3d' ? (
-                <div className="w-full flex-1" style={{ minHeight: 500 }}>
+                <div className="w-full flex-1" style={{ minHeight: 500 }}
+                    onContextMenu={(e) => {
+                        e.preventDefault();
+                        // Click destro nella vista 3D → apre context menu sul segmento selezionato
+                        if (selectedIdx !== null && selectedIdx >= 0) {
+                            handleContextMenu(selectedIdx, e);
+                        }
+                    }}
+                >
                     <ThreeView
                         nodes3D={nodes3D}
                         section={project.section}
