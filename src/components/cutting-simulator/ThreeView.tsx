@@ -153,18 +153,14 @@ function ElbowMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     );
 }
 
-/** Muro / Solaio — il tratto canala è identico a un dritto, il muro è un overlay separato */
-function ObstacleMesh({ node, section, selected, onClick }: SegmentMeshProps) {
+/** Indicatore muro/solaio — SOLO bordi wireframe, nessuna geometria duct */
+function WallIndicator({ node }: { node: SegmentNode3D }) {
     const seg = node.segment as ContextualElementSegment;
     const isWall = seg.obstacleType === 'wall';
     const wallColor = isWall ? WALL_COLOR : FLOOR_COLOR;
-    const ductColor = selected ? DUCT_COLOR_SELECTED : DUCT_COLOR;
 
     const wallW = seg.width * SCALE;
     const wallH = seg.height * SCALE;
-    const outerW = node.outerW * SCALE;
-    const outerH = node.outerH * SCALE;
-    const t = section.thickness * SCALE;
 
     const { position, quaternion, length } = useMemo(
         () => orientBetween(node.start, node.end),
@@ -172,41 +168,15 @@ function ObstacleMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     );
     const depth = length > 0.0001 ? length : seg.thickness * SCALE;
 
-    // Canala: stessa geometria cava di StraightMesh, con overlap per raccordo
-    const overlap = 0.030; // 30mm per lato
-    const ductLength = depth + overlap * 2;
-
-    const ductGeometry = useMemo(() => {
-        const s = new THREE.Shape();
-        const hw = outerW / 2, hh = outerH / 2;
-        s.moveTo(-hw, -hh); s.lineTo(hw, -hh); s.lineTo(hw, hh); s.lineTo(-hw, hh); s.closePath();
-        const hole = new THREE.Path();
-        hole.moveTo(-hw + t, -hh + t); hole.lineTo(hw - t, -hh + t);
-        hole.lineTo(hw - t, hh - t); hole.lineTo(-hw + t, hh - t); hole.closePath();
-        s.holes.push(hole);
-        const geo = new THREE.ExtrudeGeometry(s, { steps: 1, depth: ductLength, bevelEnabled: false });
-        geo.translate(0, 0, -ductLength / 2);
-        return geo;
-    }, [outerW, outerH, t, ductLength]);
-
-    if (depth < 0.0001) return null;
+    const edgesGeo = useMemo(
+        () => new THREE.EdgesGeometry(new THREE.BoxGeometry(wallW, wallH, depth)),
+        [wallW, wallH, depth]
+    );
 
     return (
-        <group position={position} quaternion={quaternion} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-            {/* CANALA: identica a un tratto dritto */}
-            <mesh geometry={ductGeometry}>
-                <meshStandardMaterial
-                    color={ductColor} transparent opacity={selected ? 0.85 : 0.7}
-                    side={THREE.DoubleSide} roughness={0.8} metalness={0.05}
-                />
-            </mesh>
-            <mesh geometry={ductGeometry}>
-                <meshBasicMaterial color={selected ? "#f59e0b" : "#999"} wireframe transparent opacity={0.25} />
-            </mesh>
-            {/* MURO/SOLAIO: overlay wireframe separato — solo bordi visibili */}
-            <lineSegments>
-                <edgesGeometry args={[new THREE.BoxGeometry(wallW, wallH, depth)]} />
-                <lineBasicMaterial color={wallColor} transparent opacity={0.8} />
+        <group position={position} quaternion={quaternion}>
+            <lineSegments geometry={edgesGeo}>
+                <lineBasicMaterial color={wallColor} transparent opacity={0.7} />
             </lineSegments>
         </group>
     );
@@ -329,11 +299,23 @@ function Scene({ nodes3D, section, selectedIdx, onSelect, jointBands, jointBandW
                     jointBands, jointBandWidth,
                 };
                 switch (node.segment.type) {
-                    case 'straight': return <StraightMesh key={node.segment.id} {...props} />;
-                    case 'elbow90': return <ElbowMesh key={node.segment.id} {...props} />;
-                    case 'obstacle': return <ObstacleMesh key={node.segment.id} {...props} />;
-                    case 'pendino': return <PendinoMesh key={node.segment.id} {...props} />;
-                    default: return null;
+                    case 'straight':
+                        return <StraightMesh key={node.segment.id} {...props} />;
+                    case 'elbow90':
+                        return <ElbowMesh key={node.segment.id} {...props} />;
+                    case 'obstacle':
+                        // Canala = identica a un tratto dritto (stesso componente!)
+                        // Muro = solo indicatore bordi separato
+                        return (
+                            <React.Fragment key={node.segment.id}>
+                                <StraightMesh {...props} />
+                                <WallIndicator node={node} />
+                            </React.Fragment>
+                        );
+                    case 'pendino':
+                        return <PendinoMesh key={node.segment.id} {...props} />;
+                    default:
+                        return null;
                 }
             })}
 
