@@ -621,6 +621,17 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
     }, [contextMenu]);
 
     // ==================== Funzioni Context Menu ====================
+    // Calcola la lunghezza cumulativa dei dritti fino all'indice indicato (per pre-compilare il muro)
+    const getRunLengthUpTo = useCallback((idx: number) => {
+        let len = 0;
+        for (let i = idx; i >= 0; i--) {
+            const s = project.segments[i];
+            if (s.type === 'straight') len += s.length;
+            else if (s.type !== 'obstacle') break;
+        }
+        return len;
+    }, [project.segments]);
+
     const splitSegment = useCallback((segIdx: number, mode: 'half' | 'atDistance' | 'equalParts' | 'nPartsOfX', value?: number) => {
         const seg = project.segments[segIdx];
         if (seg.type !== 'straight') return;
@@ -1413,11 +1424,11 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                                 🔄 Curva 90°
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight))}>
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight, getRunLengthUpTo(contextMenu.segIdx)))}>
                                 🧱 Muro
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight))}>
+                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight, getRunLengthUpTo(contextMenu.segIdx)))}>
                                 🏗️ Solaio
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"

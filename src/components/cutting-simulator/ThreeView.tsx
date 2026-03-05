@@ -172,10 +172,13 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
     const depth = length > 0.0001 ? length : seg.thickness * SCALE;
 
     // Offset del muro rispetto alla canala (calcolato dal layout engine con le quote)
-    const offset = useMemo(() => {
-        if (!node.obstacleOffset) return new THREE.Vector3(0, 0, 0);
-        return v3(node.obstacleOffset);
-    }, [node.obstacleOffset]);
+    const finalPosition = useMemo(() => {
+        const p = position.clone();
+        if (node.obstacleOffset) {
+            p.add(v3(node.obstacleOffset));
+        }
+        return p;
+    }, [position, node.obstacleOffset]);
 
     const edgesGeo = useMemo(
         () => new THREE.EdgesGeometry(new THREE.BoxGeometry(wallW, wallH, depth)),
@@ -183,12 +186,10 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
     );
 
     return (
-        <group position={position} quaternion={quaternion}>
-            <group position={offset}>
-                <lineSegments geometry={edgesGeo}>
-                    <lineBasicMaterial color={wallColor} transparent opacity={0.7} />
-                </lineSegments>
-            </group>
+        <group position={finalPosition} quaternion={quaternion}>
+            <lineSegments geometry={edgesGeo}>
+                <lineBasicMaterial color={wallColor} transparent opacity={0.7} />
+            </lineSegments>
         </group>
     );
 }
@@ -322,14 +323,8 @@ function Scene({ nodes3D, section, selectedIdx, onSelect, onContextMenu, jointBa
                     case 'elbow90':
                         return <ElbowMesh key={node.segment.id} {...props} />;
                     case 'obstacle':
-                        // Canala = identica a un tratto dritto (stesso componente!)
-                        // Muro = solo indicatore bordi separato
-                        return (
-                            <React.Fragment key={node.segment.id}>
-                                <StraightMesh {...props} />
-                                <WallIndicator node={node} />
-                            </React.Fragment>
-                        );
+                        // Muro = solo indicatore bordi overlay (non consuma lunghezza)
+                        return <WallIndicator key={node.segment.id} node={node} />;
                     case 'pendino':
                         return <PendinoMesh key={node.segment.id} {...props} />;
                     default:

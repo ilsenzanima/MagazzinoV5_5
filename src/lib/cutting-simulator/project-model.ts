@@ -70,6 +70,8 @@ export interface ContextualElementSegment extends BaseSegment {
     quotaRight?: number;
     quotaTop?: number;
     quotaBottom?: number;
+    /** Distanza dalla partenza del tratto dritto corrente (overlay mode) */
+    distanceFromStart?: number;
 }
 
 export interface PendinoSegment extends BaseSegment {
@@ -163,7 +165,7 @@ export function createTrackSeparator(expectedLength: number, name: string = 'Tra
     };
 }
 
-export function createObstacleSegment(obstacleType: ObstacleType = 'wall', innerWidth: number = 200, innerHeight: number = 200): ContextualElementSegment {
+export function createObstacleSegment(obstacleType: ObstacleType = 'wall', innerWidth: number = 200, innerHeight: number = 200, distanceFromStart: number = 0): ContextualElementSegment {
     return {
         id: `obs-${++_segCounter}-${Date.now()}`,
         type: 'obstacle',
@@ -171,7 +173,8 @@ export function createObstacleSegment(obstacleType: ObstacleType = 'wall', inner
         thickness: 300,
         width: innerWidth + 500, // Margine default
         height: innerHeight + 500,
-        showQuotas: false
+        showQuotas: false,
+        distanceFromStart
     };
 }
 
