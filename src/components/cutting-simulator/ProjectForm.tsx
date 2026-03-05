@@ -479,13 +479,37 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                 <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createElbow90Segment())} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Angolo 90°
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight))} className="text-xs cursor-pointer">
+                                                                <DropdownMenuItem onClick={() => {
+                                                                    let len = 0;
+                                                                    for (let i = group.items.length - 1; i >= 0; i--) {
+                                                                        const s = group.items[i];
+                                                                        if (s.seg.type === 'straight') len += s.seg.length;
+                                                                        else if (s.seg.type !== 'obstacle') break;
+                                                                    }
+                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight, len));
+                                                                }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Muro
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight))} className="text-xs cursor-pointer">
+                                                                <DropdownMenuItem onClick={() => {
+                                                                    let len = 0;
+                                                                    for (let i = group.items.length - 1; i >= 0; i--) {
+                                                                        const s = group.items[i];
+                                                                        if (s.seg.type === 'straight') len += s.seg.length;
+                                                                        else if (s.seg.type !== 'obstacle') break;
+                                                                    }
+                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight, len));
+                                                                }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Solaio
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight))} className="text-xs cursor-pointer">
+                                                                <DropdownMenuItem onClick={() => {
+                                                                    let len = 0;
+                                                                    for (let i = group.items.length - 1; i >= 0; i--) {
+                                                                        const s = group.items[i];
+                                                                        if (s.seg.type === 'straight') len += s.seg.length;
+                                                                        else if (s.seg.type !== 'obstacle') break;
+                                                                    }
+                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight, len));
+                                                                }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Pilastro/Ostacolo
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createPendinoSegment())} className="text-xs cursor-pointer">
@@ -714,6 +738,17 @@ function ObstacleFields({ seg, onUpdate }: {
                         <Input type="number" min="1" step="1"
                             value={seg.thickness}
                             onChange={e => onUpdate({ thickness: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-[1.5] min-w-[120px]">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Dist. Inizio:</span>
+                    <div className="relative flex-1">
+                        <Input type="number" min="0" step="1"
+                            value={seg.distanceFromStart ?? 0}
+                            onChange={e => onUpdate({ distanceFromStart: parseFloat(e.target.value) || 0 })}
                             className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
                     </div>
