@@ -214,8 +214,8 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 start: { ...pos },
                 end,
                 direction: dir,
-                outerW: isObs ? seg.width : outerW,
-                outerH: isObs ? seg.height : outerH,
+                outerW,  // Canala mantiene la sua larghezza
+                outerH,  // Canala mantiene la sua altezza
                 ductW: isObs ? outerW : undefined,
                 ductH: isObs ? outerH : undefined,
                 obstacleOffset,
