@@ -683,32 +683,44 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         const seg = segments[segIdx];
         if (seg?.type !== 'straight' && seg?.type !== 'obstacle') return;
 
-        // Espandi a sinistra: attraversa straight e obstacle
-        let start = segIdx;
-        while (start > 0 && (segments[start - 1].type === 'straight' || segments[start - 1].type === 'obstacle')) start--;
-        // Espandi a destra: attraversa straight e obstacle
-        let end = segIdx;
-        while (end < segments.length - 1 && (segments[end + 1].type === 'straight' || segments[end + 1].type === 'obstacle')) end++;
+        const segs = [...project.segments];
+        // Trovo l'inizio della "run" di dritti (ed eventuali ostacoli in mezzo)
+        let startIndex = segIdx;
+        while (startIndex > 0 && (segs[startIndex - 1].type === 'straight' || segs[startIndex - 1].type === 'obstacle')) {
+            startIndex--;
+        }
 
-        // Raccogli tutti i dritti e gli ostacoli nella corsa
-        const runSegments = segments.slice(start, end + 1);
-        const straights = runSegments.filter(s => s.type === 'straight') as StraightSegment[];
-        const obstacles = runSegments.filter(s => s.type === 'obstacle');
+        // Trovo la fine
+        let endIndex = segIdx;
+        while (endIndex < segs.length - 1 && (segs[endIndex + 1].type === 'straight' || segs[endIndex + 1].type === 'obstacle')) {
+            endIndex++;
+        }
 
-        if (straights.length <= 1 && obstacles.length === 0) return; // niente da unire
+        if (startIndex === endIndex) return; // Nessun altro segmento dritto/ostacolo con cui unire
 
-        // Somma le lunghezze di tutti i dritti
-        let totalLen = 0;
-        for (const s of straights) totalLen += s.length;
+        const runSegments = segs.slice(startIndex, endIndex + 1);
 
-        // Crea un unico dritto + mantieni i muri separati
-        const merged = createStraightSegment(totalLen);
-        const newSegments = [...segments];
-        // Sostituisci la corsa con: [dritto unificato] + [muri rimanenti]
-        newSegments.splice(start, end - start + 1, merged, ...obstacles);
-        onProjectChange({ ...project, segments: newSegments });
+        // Sommo la lunghezza di TUTTI i dritti + spessori degli ostacoli che si trovano nel mezzo
+        let totalLength = 0;
+        const obstaclesToKeep: import('@/lib/cutting-simulator/project-model').ContextualElementSegment[] = [];
+
+        for (const s of runSegments) {
+            if (s.type === 'straight') {
+                totalLength += s.length;
+            } else if (s.type === 'obstacle') {
+                obstaclesToKeep.push(s as import('@/lib/cutting-simulator/project-model').ContextualElementSegment);
+            }
+        }
+
+        // Creo l'unico segmento dritto che attraversa tutto
+        const unifiedStraight = createStraightSegment(totalLength);
+
+        // Sostituisco l'intero blocco (dritti + ostacoli) con l'UNICO dritto... e poi reinserisco gli ostacoli come overlay
+        segs.splice(startIndex, runSegments.length, unifiedStraight, ...obstaclesToKeep);
+
+        onProjectChange({ ...project, segments: segs });
         setContextMenu(null);
-        setSelectedIdx(start);
+        setSelectedIdx(segIdx); // Keep selection on the new unified segment
     }, [project, onProjectChange]);
 
     const insertSegmentAfter = useCallback((segIdx: number, newSeg: Segment) => {
@@ -716,7 +728,31 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
         newSegments.splice(segIdx + 1, 0, newSeg);
         onProjectChange({ ...project, segments: newSegments });
         setContextMenu(null);
+        setSelectedIdx(segIdx + 1);
     }, [project, onProjectChange]);
+
+    const insertObstacleAfter = useCallback((segIdx: number, obstacleType: 'wall' | 'floor' | 'column') => {
+        const len = getRunLengthUpTo(segIdx);
+        const obs = createObstacleSegment(obstacleType, project.section.innerWidth, project.section.innerHeight, len);
+
+        const newSegments = [...project.segments];
+        const currentSeg = newSegments[segIdx];
+
+        if (currentSeg?.type === 'straight') {
+            // Selezioniamo il dritto e lo allunghiamo dello spessore
+            const updatedStraight = { ...currentSeg, length: currentSeg.length + obs.thickness };
+            newSegments.splice(segIdx, 1, updatedStraight);
+            newSegments.splice(segIdx + 1, 0, obs);
+        } else {
+            // Se non è dritto (es. curva precedente), creiamo il dritto e l'ostacolo assieme
+            const passThroughStraight = createStraightSegment(obs.thickness);
+            newSegments.splice(segIdx + 1, 0, passThroughStraight, obs);
+        }
+
+        onProjectChange({ ...project, segments: newSegments });
+        setContextMenu(null);
+        setSelectedIdx(segIdx + 1); // Rende selezionato il dritto passante se aggiunto
+    }, [getRunLengthUpTo, project, onProjectChange]);
 
     const handleCanvasClick = useCallback((e: React.MouseEvent) => {
         if (isPanning) return;
@@ -1424,11 +1460,11 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent }: Proj
                                 🔄 Curva 90°
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight, getRunLengthUpTo(contextMenu.segIdx)))}>
+                                onClick={() => insertObstacleAfter(contextMenu.segIdx, 'wall')}>
                                 🧱 Muro
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx, createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight, getRunLengthUpTo(contextMenu.segIdx)))}>
+                                onClick={() => insertObstacleAfter(contextMenu.segIdx, 'floor')}>
                                 🏗️ Solaio
                             </button>
                             <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
