@@ -56,6 +56,7 @@ interface SegmentMeshProps {
     section: SectionProfile;
     selected: boolean;
     onClick: () => void;
+    onContextMenu?: (e: React.MouseEvent) => void;
     jointBands?: boolean;
     jointBandWidth?: number;
 }
@@ -90,7 +91,9 @@ function StraightMesh({ node, section, selected, onClick, jointBands, jointBandW
 
     return (
         <group position={position} quaternion={quaternion}>
-            <mesh geometry={geometry} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+            <mesh geometry={geometry}
+                onClick={(e) => { e.stopPropagation(); onClick(); }}
+            >
                 <meshStandardMaterial
                     color={color} transparent opacity={selected ? 0.85 : 0.7}
                     side={THREE.DoubleSide} roughness={0.8} metalness={0.05}
@@ -153,7 +156,7 @@ function ElbowMesh({ node, section, selected, onClick }: SegmentMeshProps) {
     );
 }
 
-/** Indicatore muro/solaio — SOLO bordi wireframe, nessuna geometria duct */
+/** Indicatore muro/solaio — bordi wireframe con offset dalle quote */
 function WallIndicator({ node }: { node: SegmentNode3D }) {
     const seg = node.segment as ContextualElementSegment;
     const isWall = seg.obstacleType === 'wall';
@@ -168,6 +171,12 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
     );
     const depth = length > 0.0001 ? length : seg.thickness * SCALE;
 
+    // Offset del muro rispetto alla canala (calcolato dal layout engine con le quote)
+    const offset = useMemo(() => {
+        if (!node.obstacleOffset) return new THREE.Vector3(0, 0, 0);
+        return v3(node.obstacleOffset);
+    }, [node.obstacleOffset]);
+
     const edgesGeo = useMemo(
         () => new THREE.EdgesGeometry(new THREE.BoxGeometry(wallW, wallH, depth)),
         [wallW, wallH, depth]
@@ -175,9 +184,11 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
 
     return (
         <group position={position} quaternion={quaternion}>
-            <lineSegments geometry={edgesGeo}>
-                <lineBasicMaterial color={wallColor} transparent opacity={0.7} />
-            </lineSegments>
+            <group position={offset}>
+                <lineSegments geometry={edgesGeo}>
+                    <lineBasicMaterial color={wallColor} transparent opacity={0.7} />
+                </lineSegments>
+            </group>
         </group>
     );
 }
@@ -249,11 +260,12 @@ interface SceneProps {
     section: SectionProfile;
     selectedIdx: number | null;
     onSelect: (idx: number) => void;
+    onContextMenu?: (idx: number, e: React.MouseEvent) => void;
     jointBands?: boolean;
     jointBandWidth?: number;
 }
 
-function Scene({ nodes3D, section, selectedIdx, onSelect, jointBands, jointBandWidth }: SceneProps) {
+function Scene({ nodes3D, section, selectedIdx, onSelect, onContextMenu, jointBands, jointBandWidth }: SceneProps) {
     const center = useMemo(() => {
         if (nodes3D.length === 0) return new THREE.Vector3();
         const c = new THREE.Vector3();
@@ -281,6 +293,11 @@ function Scene({ nodes3D, section, selectedIdx, onSelect, jointBands, jointBandW
                 target={center}
                 enableDamping dampingFactor={0.15}
                 maxDistance={cameraDistance * 3} minDistance={0.1}
+                mouseButtons={{
+                    LEFT: THREE.MOUSE.PAN,
+                    MIDDLE: THREE.MOUSE.ROTATE,
+                    RIGHT: undefined as unknown as THREE.MOUSE,
+                }}
             />
 
             <Grid
@@ -296,6 +313,7 @@ function Scene({ nodes3D, section, selectedIdx, onSelect, jointBands, jointBandW
                     node, section,
                     selected: selectedIdx === node.index,
                     onClick: () => onSelect(node.index),
+                    onContextMenu: onContextMenu ? (e: React.MouseEvent) => onContextMenu(node.index, e) : undefined,
                     jointBands, jointBandWidth,
                 };
                 switch (node.segment.type) {
@@ -333,11 +351,12 @@ interface ThreeViewProps {
     section: SectionProfile;
     selectedIdx: number | null;
     onSelect: (idx: number) => void;
+    onContextMenu?: (idx: number, e: React.MouseEvent) => void;
     jointBands?: boolean;
     jointBandWidth?: number;
 }
 
-export function ThreeView({ nodes3D, section, selectedIdx, onSelect, jointBands, jointBandWidth }: ThreeViewProps) {
+export function ThreeView({ nodes3D, section, selectedIdx, onSelect, onContextMenu, jointBands, jointBandWidth }: ThreeViewProps) {
     const cameraPos = useMemo(() => {
         if (nodes3D.length === 0) return [1, 1, 1] as [number, number, number];
         const c = new THREE.Vector3();
@@ -363,6 +382,7 @@ export function ThreeView({ nodes3D, section, selectedIdx, onSelect, jointBands,
                 <Scene
                     nodes3D={nodes3D} section={section}
                     selectedIdx={selectedIdx} onSelect={onSelect}
+                    onContextMenu={onContextMenu}
                     jointBands={jointBands} jointBandWidth={jointBandWidth}
                 />
             </Canvas>
