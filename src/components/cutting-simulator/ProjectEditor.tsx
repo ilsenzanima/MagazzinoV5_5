@@ -298,13 +298,12 @@ function PropertiesPanel({
 interface ProjectEditorProps {
     project: DuctProject;
     onProjectChange: (project: DuctProject) => void;
-    sidebarContent?: React.ReactNode;
     disableInteraction?: boolean;
     hideCutPlan?: boolean;
     boardDimensions?: { width: number; height: number; };
 }
 
-export function ProjectEditor({ project, onProjectChange, sidebarContent, disableInteraction, hideCutPlan, boardDimensions }: ProjectEditorProps) {
+export function ProjectEditor({ project, onProjectChange, disableInteraction, hideCutPlan, boardDimensions }: ProjectEditorProps) {
     const [viewFamily, setViewFamily] = useState<'top' | 'side' | 'iso' | '3d'>('3d');
     const [sideFace, setSideFace] = useState<SideFaceType>('front');
 
@@ -331,9 +330,6 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent, disabl
     const svgRef = useRef<SVGSVGElement>(null);
     const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
     const rotStart = useRef<{ x: number; angle: number } | null>(null);
-
-    // Gestione sidebar
-    const [showSidebar, setShowSidebar] = useState(false);
 
     // Layout 3D → Proiezione 2D
     const nodes3D = useMemo(() => computeLayout(project), [project]);
@@ -679,51 +675,46 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent, disabl
         setSplitDialog(null);
     }, [project, onProjectChange]);
 
-    // Unisci tutti i segmenti dritti nella stessa "corsa" (attraversando muri/solai)
-    // I muri restano come segmenti separati, i dritti vengono unificati
+    // Unisci SOLO i segmenti dritti contigui (NON attraversa muri/solai)
+    // I muri interrompono la corsa, impedendo a due tratti di fondersi passando attraverso
     const mergeRun = useCallback((segIdx: number) => {
         const segments = project.segments;
         const seg = segments[segIdx];
-        if (seg?.type !== 'straight' && seg?.type !== 'obstacle') return;
+        if (seg?.type !== 'straight') return;
 
         const segs = [...project.segments];
-        // Trovo l'inizio della "run" di dritti (ed eventuali ostacoli in mezzo)
+        // Trovo l'inizio della "run" di dritti (mi fermo al primo ostacolo/curva)
         let startIndex = segIdx;
-        while (startIndex > 0 && (segs[startIndex - 1].type === 'straight' || segs[startIndex - 1].type === 'obstacle')) {
+        while (startIndex > 0 && segs[startIndex - 1].type === 'straight') {
             startIndex--;
         }
 
         // Trovo la fine
         let endIndex = segIdx;
-        while (endIndex < segs.length - 1 && (segs[endIndex + 1].type === 'straight' || segs[endIndex + 1].type === 'obstacle')) {
+        while (endIndex < segs.length - 1 && segs[endIndex + 1].type === 'straight') {
             endIndex++;
         }
 
-        if (startIndex === endIndex) return; // Nessun altro segmento dritto/ostacolo con cui unire
+        if (startIndex === endIndex) return;
 
         const runSegments = segs.slice(startIndex, endIndex + 1);
 
-        // Sommo la lunghezza di TUTTI i dritti + spessori degli ostacoli che si trovano nel mezzo
+        // Sommo la lunghezza di TUTTI i dritti contigui
         let totalLength = 0;
-        const obstaclesToKeep: import('@/lib/cutting-simulator/project-model').ContextualElementSegment[] = [];
-
         for (const s of runSegments) {
-            if (s.type === 'straight') {
-                totalLength += s.length;
-            } else if (s.type === 'obstacle') {
-                obstaclesToKeep.push(s as import('@/lib/cutting-simulator/project-model').ContextualElementSegment);
-            }
+            totalLength += (s as StraightSegment).length;
         }
 
-        // Creo l'unico segmento dritto che attraversa tutto
+        // Creo l'unico segmento dritto unificato
         const unifiedStraight = createStraightSegment(totalLength);
 
-        // Sostituisco l'intero blocco (dritti + ostacoli) con l'UNICO dritto... e poi reinserisco gli ostacoli come overlay
-        segs.splice(startIndex, runSegments.length, unifiedStraight, ...obstaclesToKeep);
+        // Sostituisco i dritti con quello unito
+        segs.splice(startIndex, runSegments.length, unifiedStraight);
 
         onProjectChange({ ...project, segments: segs });
         setContextMenu(null);
-        setSelectedIdx(segIdx); // Keep selection on the new unified segment
+        setSelectedIdx(startIndex); // Mantieni la selezione sul nuovo segmento
+
     }, [project, onProjectChange]);
 
     const insertSegmentAfter = useCallback((segIdx: number, newSeg: Segment) => {
@@ -848,17 +839,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent, disabl
         }}>
             {/* Toolbar superiore fissa */}
             <div className="absolute top-2 left-2 right-2 flex items-center gap-2 z-10 flex-wrap shrink-0">
-                {sidebarContent && (
-                    <div className="flex bg-muted/50 p-0.5 rounded-md backdrop-blur-sm mr-2 shadow-sm">
-                        <button
-                            title="Opzioni Progetto"
-                            onClick={() => setShowSidebar(!showSidebar)}
-                            className={cn("p-1.5 rounded transition-all flex items-center justify-center", showSidebar ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}
-                        >
-                            <Menu className="h-4 w-4" />
-                        </button>
-                    </div>
-                )}
+
                 <div className="flex bg-muted/50 p-0.5 rounded-md backdrop-blur-sm shadow-sm">
                     {/* Selettore vista */}
                     <div className="flex gap-1 p-0.5 bg-muted/50 rounded-md shrink-0">
@@ -1340,40 +1321,7 @@ export function ProjectEditor({ project, onProjectChange, sidebarContent, disabl
                 />
             )}
 
-            {/* Pannello globale (nessuna selezione) e Settings Form Sidebar */}
-            {sidebarContent && showSidebar && (
-                <div className="absolute top-14 left-2 bottom-6 w-80 bg-background/95 backdrop-blur-md border border-border rounded-lg shadow-xl z-20 overflow-y-auto flex flex-col">
-                    <div className="p-3 border-b flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur-md z-10">
-                        <h3 className="font-semibold text-sm">Opzioni Progetto</h3>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowSidebar(false)}>
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                    {/* Impostazioni Globali dell'editor */}
-                    <div className="p-4 space-y-4 border-b">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-primary">Direzione Iniziale Canale</Label>
-                            <select
-                                className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                                value={project.initialDirection || '+x'}
-                                onChange={e => onProjectChange({ ...project, initialDirection: e.target.value as any })}
-                            >
-                                <option value="+x">Verso Destra (→)</option>
-                                <option value="-x">Verso Sinistra (←)</option>
-                                <option value="-y">Verso il Fronte (↓)</option>
-                                <option value="+y">Verso il Retro (↑)</option>
-                                <option value="+z">Verso l'Alto</option>
-                                <option value="-z">Verso il Basso</option>
-                            </select>
-                        </div>
-                    </div>
-                    {/* Contenuto iniettato (SheetConfig e TracksAnalysis) */}
-                    <div className="p-2 space-y-4">
-                        {sidebarContent}
-                    </div>
-                </div>
-            )}
-            {!selectedSegment && selectedIdx === null && selectedAnnId === null && activeTool === 'select' && !showSidebar && (
+            {!selectedSegment && selectedIdx === null && selectedAnnId === null && activeTool === 'select' && (
                 <div className="absolute right-2 top-2 p-2 bg-background/50 backdrop-blur border rounded-md text-xs text-muted-foreground opacity-60 pointer-events-none">
                     Nessuna selezione
                 </div>

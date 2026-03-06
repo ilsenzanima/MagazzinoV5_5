@@ -400,51 +400,54 @@ export default function CuttingSimulatorClient() {
                         )}
 
                         {projectStep === "engineering" && (
-                            <div className="flex flex-col h-full min-h-0 bg-background border border-border/50 rounded-xl shadow-sm overflow-hidden relative">
-                                <div className="absolute top-4 left-4 z-10 bg-background/90 backdrop-blur-sm px-3 pt-1 pb-1.5 rounded-lg border border-border/50 shadow-sm flex flex-col gap-0.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Editor Produzione Pezzi</span>
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full min-h-0">
+                                {/* Left Panel - Sidebar (Ottimizzazione, Inviluppo, Risultati) */}
+                                <div className="lg:col-span-4 h-full min-h-0 flex flex-col bg-background border border-border/50 rounded-xl shadow-sm overflow-y-auto p-4 space-y-5">
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-primary uppercase">Ottimizzazione Pannelli</p>
+                                        <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
                                     </div>
-                                    <span className="text-[10px] text-muted-foreground pl-4">Clic destro sul tracciato per tagliare gli spezzoni finali.</span>
-                                </div>
-                                <ProjectEditor
-                                    project={project}
-                                    onProjectChange={setProject}
-                                    boardDimensions={{ width: 1200, height: 2400 }}
-                                    hideCutPlan={false} // Qui mostriamo i moduli del nesting laterale
-                                    disableInteraction={false} // Lasciamo tagliare i pezzi con il tasto destro
-                                    sidebarContent={
-                                        <div className="space-y-5 px-3 pb-6">
-                                            <div className="space-y-2 mt-4">
-                                                <p className="text-xs font-semibold text-primary uppercase">Ottimizzazione</p>
-                                                <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
-                                            </div>
+                                    <div className="w-full h-px bg-border my-2" />
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-primary uppercase">Verifica Inviluppo Tracciato</p>
+                                        <TracksAnalysisPanel project={project} />
+                                    </div>
+
+                                    {/* Preview rapida Cut Plan se calcolato */}
+                                    {calcResult && nestingResult && nestingResult.sheets.length > 0 && (
+                                        <>
                                             <div className="w-full h-px bg-border my-2" />
                                             <div className="space-y-2">
-                                                <p className="text-xs font-semibold text-primary uppercase">Verifica Inviluppo</p>
-                                                <TracksAnalysisPanel project={project} />
-                                            </div>
-
-                                            {/* Preview rapida Cut Plan se calcolato */}
-                                            {calcResult && nestingResult && nestingResult.sheets.length > 0 && (
-                                                <>
-                                                    <div className="w-full h-px bg-border my-2" />
-                                                    <div className="space-y-2">
-                                                        <p className="text-xs font-semibold text-primary uppercase">Risultato Tagli</p>
-                                                        <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
-                                                            <Sparkles className="h-4 w-4 text-primary" />
-                                                            <div className="text-center">
-                                                                <strong>{nestingResult.totalSheets}</strong> lastr{nestingResult.totalSheets === 1 ? 'a' : 'e'}<br />
-                                                                Utilizzo: <strong>{(nestingResult.sheets.reduce((s, sh) => s + sh.utilization, 0) / nestingResult.sheets.length).toFixed(1)}%</strong>
-                                                            </div>
-                                                        </div>
+                                                <p className="text-xs font-semibold text-primary uppercase">Risultato Tagli Nesting</p>
+                                                <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+                                                    <Sparkles className="h-4 w-4 text-primary" />
+                                                    <div className="text-center">
+                                                        <strong>{nestingResult.totalSheets}</strong> lastr{nestingResult.totalSheets === 1 ? 'a' : 'e'}<br />
+                                                        Utilizzo: <strong>{(nestingResult.sheets.reduce((s, sh) => s + sh.utilization, 0) / nestingResult.sheets.length).toFixed(1)}%</strong>
                                                     </div>
-                                                </>
-                                            )}
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Right Panel - Project Editor per l'Ingegnerizzazione */}
+                                <div className="lg:col-span-8 h-full min-h-[500px] bg-background border border-border/50 rounded-xl shadow-sm overflow-hidden flex flex-col relative">
+                                    <div className="absolute top-4 left-4 z-10 bg-background/90 backdrop-blur-sm px-3 pt-1 pb-1.5 rounded-lg border border-border/50 shadow-sm flex flex-col gap-0.5 pointer-events-none">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Editor Produzione Pezzi</span>
                                         </div>
-                                    }
-                                />
+                                        <span className="text-[10px] text-muted-foreground pl-4">Clic destro sul tracciato per tagliare gli spezzoni.</span>
+                                    </div>
+                                    <ProjectEditor
+                                        project={project}
+                                        onProjectChange={setProject}
+                                        boardDimensions={{ width: 1200, height: 2400 }}
+                                        hideCutPlan={true} // Il piano di taglio lo mostriamo sotto a tutto o nella colonna sx, non dentro il canvas 3D
+                                        disableInteraction={false} // Lasciamo tagliare i pezzi con il tasto destro
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
