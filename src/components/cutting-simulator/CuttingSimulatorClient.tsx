@@ -377,7 +377,7 @@ export default function CuttingSimulatorClient() {
 
                             <div className="flex-1 overflow-y-auto w-full p-4 sm:p-6 bg-slate-50/30">
                                 {/* Il form del rilievo (verrà riprogettato) */}
-                                <ProjectForm config={sheetConfig}
+                                <ProjectForm
                                     project={project}
                                     onProjectChange={setProject}
                                     isRoutingMode={true}
