@@ -162,27 +162,31 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
     const isWall = seg.obstacleType === 'wall';
     const wallColor = isWall ? WALL_COLOR : FLOOR_COLOR;
 
-    const wallW = seg.width * SCALE;
-    const wallH = seg.height * SCALE;
-
-    const { position, quaternion, length } = useMemo(
+    const { position, quaternion } = useMemo(
         () => orientBetween(node.start, node.end),
         [node.start, node.end]
     );
-    const depth = length > 0.0001 ? length : seg.thickness * SCALE;
 
-    // Offset del muro rispetto alla canala (calcolato dal layout engine con le quote)
+    // Lo "spessore" è lungo la direzione di flusso (depth).
+    // La "width" (base) è ortogonale al flusso (asse X locale del muro).
+    // La "height" è verticale (asse Y locale del muro, che corrisponde a Z globale).
+    const w = seg.width * SCALE;
+    const h = seg.height * SCALE;
+    const d = seg.thickness * SCALE;
+
+    // Offset calcolato dal layout engine (quote top/bottom/left/right)
     const finalPosition = useMemo(() => {
         const p = position.clone();
         if (node.obstacleOffset) {
+            // Le quote sono state aggiunte in coords mondiali prima, le ribadiamo su v3
             p.add(v3(node.obstacleOffset));
         }
         return p;
     }, [position, node.obstacleOffset]);
 
     const edgesGeo = useMemo(
-        () => new THREE.EdgesGeometry(new THREE.BoxGeometry(wallW, wallH, depth)),
-        [wallW, wallH, depth]
+        () => new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)),
+        [w, h, d]
     );
 
     return (
@@ -190,6 +194,10 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
             <lineSegments geometry={edgesGeo}>
                 <lineBasicMaterial color={wallColor} transparent opacity={0.7} />
             </lineSegments>
+            <mesh>
+                <boxGeometry args={[w, h, d]} />
+                <meshStandardMaterial color={wallColor} transparent opacity={0.2} depthWrite={false} />
+            </mesh>
         </group>
     );
 }

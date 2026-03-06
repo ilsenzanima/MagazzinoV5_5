@@ -194,61 +194,73 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 outerH,
                 trackId: currentTrackId,
             });
+
+            // Layout inline obstacles nested nello straight
+            if (seg.obstacles && seg.obstacles.length > 0) {
+                // Per ogni ostacolo all'interno, pushamo un nodo per la sua visualizzazione (overlay)
+                for (let oIdx = 0; oIdx < seg.obstacles.length; oIdx++) {
+                    const obs = seg.obstacles[oIdx];
+                    const dist = obs.distanceFromStart ?? 0;
+
+                    const obsStart: Vec3 = {
+                        x: pos.x + v.x * dist,
+                        y: pos.y + v.y * dist,
+                        z: pos.z + v.z * dist,
+                    };
+                    const obsEnd: Vec3 = {
+                        x: obsStart.x + v.x * obs.thickness,
+                        y: obsStart.y + v.y * obs.thickness,
+                        z: obsStart.z + v.z * obs.thickness,
+                    };
+
+                    let dx = 0, dy = 0, dz = 0;
+                    if (obs.quotaTop !== undefined) {
+                        dz = (outerH / 2) + obs.quotaTop - (obs.height / 2);
+                    } else if (obs.quotaBottom !== undefined) {
+                        dz = -((outerH / 2) + obs.quotaBottom - (obs.height / 2));
+                    }
+
+                    // Se solaio è posizionato top/bottom se la canala corre lungo x o y
+                    if (dir === '+x' || dir === '-x' || dir === '+y' || dir === '-y') {
+                        if (obs.obstacleType === 'floor' && obs.quotaTop === undefined && obs.quotaBottom === undefined) {
+                            dz = (outerH / 2) + (obs.height / 2); // default incastro a filo superiore
+                        }
+                    }
+
+                    let leftDir: Vec3;
+                    if (dir === '+x') leftDir = { x: 0, y: -1, z: 0 };
+                    else if (dir === '-x') leftDir = { x: 0, y: 1, z: 0 };
+                    else if (dir === '+y') leftDir = { x: 1, y: 0, z: 0 };
+                    else if (dir === '-y') leftDir = { x: -1, y: 0, z: 0 };
+                    else leftDir = { x: 1, y: 0, z: 0 };
+
+                    if (obs.quotaLeft !== undefined) {
+                        const d_lat = (outerW / 2) + obs.quotaLeft - (obs.width / 2);
+                        dx += leftDir.x * d_lat;
+                        dy += leftDir.y * d_lat;
+                    } else if (obs.quotaRight !== undefined) {
+                        const d_lat = (outerW / 2) + obs.quotaRight - (obs.width / 2);
+                        dx -= leftDir.x * d_lat;
+                        dy -= leftDir.y * d_lat;
+                    }
+
+                    nodes.push({
+                        segment: obs,
+                        index: i + (oIdx + 1) * 0.01, // Pseudo-index per non collidere
+                        start: obsStart,
+                        end: obsEnd,
+                        direction: dir,
+                        outerW: obs.width,
+                        outerH: obs.height,
+                        ductW: outerW,
+                        ductH: outerH,
+                        obstacleOffset: { x: dx, y: dy, z: dz },
+                        trackId: currentTrackId,
+                    });
+                }
+            }
+
             pos = end;
-        } else if (seg.type === 'obstacle') {
-            const obs = seg as import('./project-model').ContextualElementSegment;
-            const v = dirVec(dir);
-            const dist = obs.distanceFromStart ?? 0;
-
-            const obsStart: Vec3 = {
-                x: currentRunStartPos.x + v.x * dist,
-                y: currentRunStartPos.y + v.y * dist,
-                z: currentRunStartPos.z + v.z * dist,
-            };
-            const obsEnd: Vec3 = {
-                x: obsStart.x + v.x * obs.thickness,
-                y: obsStart.y + v.y * obs.thickness,
-                z: obsStart.z + v.z * obs.thickness,
-            };
-
-            let dx = 0, dy = 0, dz = 0;
-            if (obs.quotaTop !== undefined) {
-                dz = (outerH / 2) + obs.quotaTop - (obs.height / 2);
-            } else if (obs.quotaBottom !== undefined) {
-                dz = -((outerH / 2) + obs.quotaBottom - (obs.height / 2));
-            }
-
-            let leftDir: Vec3;
-            if (dir === '+x') leftDir = { x: 0, y: -1, z: 0 };
-            else if (dir === '-x') leftDir = { x: 0, y: 1, z: 0 };
-            else if (dir === '+y') leftDir = { x: 1, y: 0, z: 0 };
-            else if (dir === '-y') leftDir = { x: -1, y: 0, z: 0 };
-            else leftDir = { x: 1, y: 0, z: 0 };
-
-            if (obs.quotaLeft !== undefined) {
-                const d_lat = (outerW / 2) + obs.quotaLeft - (obs.width / 2);
-                dx += leftDir.x * d_lat;
-                dy += leftDir.y * d_lat;
-            } else if (obs.quotaRight !== undefined) {
-                const d_lat = (outerW / 2) + obs.quotaRight - (obs.width / 2);
-                dx -= leftDir.x * d_lat;
-                dy -= leftDir.y * d_lat;
-            }
-
-            nodes.push({
-                segment: seg,
-                index: i,
-                start: obsStart,
-                end: obsEnd,
-                direction: dir,
-                outerW,
-                outerH,
-                ductW: outerW,
-                ductH: outerH,
-                obstacleOffset: { x: dx, y: dy, z: dz },
-                trackId: currentTrackId,
-            });
-            // L'ostacolo è un overlay: pos NON viene avanzato
         } else if (seg.type === 'elbow90') {
             const vIn = dirVec(dir);
             const dirOut = turnDirection(dir, seg.direction);
