@@ -43,7 +43,7 @@ const DIRECTION_LABELS: Record<SegmentDirection, string> = {
 };
 
 
-export function ProjectForm({ project, onProjectChange, onCalculateProject }: ProjectFormProps) {
+export function ProjectForm({ project, onProjectChange, onCalculateProject, isRoutingMode }: ProjectFormProps) {
     const [collapsedTracks, setCollapsedTracks] = useState<Record<string, boolean>>({});
     const [sectionOpen, setSectionOpen] = useState(true);
 
@@ -140,72 +140,88 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* La sezione "Impostazioni di Sezione" (Largh, Alt, Spessore) è stata spostata globalmente nello Step 1 (Settings) di CuttingSimulatorClient */}
 
-                    {/* === IMPOSTAZIONI MISURE === */}
-                    <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
-                        <div className="space-y-0.5 pr-4">
-                            <Label className="text-xs font-medium cursor-pointer" onClick={() => onProjectChange(p => ({ ...p, globalMeasurements: !p.globalMeasurements }))}>
-                                Misure finite (globali)
-                            </Label>
-                            <p className="text-[10px] text-muted-foreground leading-tight">
-                                Sottrae in automatico l'ingombro delle curve dai tratti dritti adiacenti
-                            </p>
-                        </div>
-                        <button type="button"
-                            onClick={() => onProjectChange(p => ({ ...p, globalMeasurements: !p.globalMeasurements }))}
-                            className={cn(
-                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-                                project.globalMeasurements ? "bg-primary" : "bg-input"
-                            )}
-                        >
-                            <span className={cn(
-                                "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
-                                project.globalMeasurements ? "translate-x-4" : "translate-x-0"
-                            )} />
-                        </button>
-                    </div>
-
-                    {/* === FASCE GIUNTI === */}
-                    <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
-                        <div className="space-y-0.5 pr-4">
-                            <Label className="text-xs font-medium cursor-pointer" onClick={() => onProjectChange(p => ({ ...p, jointBands: !p.jointBands }))}>
-                                Fasce Giunti
-                            </Label>
-                            <p className="text-[10px] text-muted-foreground leading-tight">
-                                Aggiunge 4 fasce per ogni giunto tra pezzi dritti (avvolgono l'esterno della canala)
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {project.jointBands && (
-                                <div className="relative">
-                                    <Input type="number" min="50" max="300" step="10"
-                                        value={project.jointBandWidth || 100}
-                                        onChange={e => onProjectChange(p => ({ ...p, jointBandWidth: parseFloat(e.target.value) || 100 }))}
-                                        className="h-6 w-16 text-[10px] pr-6 py-0 border-border/40" />
-                                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                    {/* Le impostazioni globali e giunti non servono nel rilievo puro, le nascondiamo se in routing mode */}
+                    {!isRoutingMode && (
+                        <>
+                            {/* === IMPOSTAZIONI MISURE === */}
+                            <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
+                                <div className="space-y-0.5 pr-4">
+                                    <Label className="text-xs font-medium cursor-pointer" onClick={() => onProjectChange(p => ({ ...p, globalMeasurements: !p.globalMeasurements }))}>
+                                        Misure finite (globali)
+                                    </Label>
+                                    <p className="text-[10px] text-muted-foreground leading-tight">
+                                        Sottrae in automatico l'ingombro delle curve dai tratti dritti adiacenti
+                                    </p>
                                 </div>
-                            )}
-                            <button type="button"
-                                onClick={() => onProjectChange(p => ({ ...p, jointBands: !p.jointBands }))}
-                                className={cn(
-                                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-                                    project.jointBands ? "bg-primary" : "bg-input"
-                                )}
-                            >
-                                <span className={cn(
-                                    "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
-                                    project.jointBands ? "translate-x-4" : "translate-x-0"
-                                )} />
-                            </button>
-                        </div>
-                    </div>
+                                <button type="button"
+                                    onClick={() => onProjectChange(p => ({ ...p, globalMeasurements: !p.globalMeasurements }))}
+                                    className={cn(
+                                        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+                                        project.globalMeasurements ? "bg-primary" : "bg-input"
+                                    )}
+                                >
+                                    <span className={cn(
+                                        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                                        project.globalMeasurements ? "translate-x-4" : "translate-x-0"
+                                    )} />
+                                </button>
+                            </div>
+
+                            {/* === FASCE GIUNTI === */}
+                            <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
+                                <div className="space-y-0.5 pr-4">
+                                    <Label className="text-xs font-medium cursor-pointer" onClick={() => onProjectChange(p => ({ ...p, jointBands: !p.jointBands }))}>
+                                        Fasce Giunti
+                                    </Label>
+                                    <p className="text-[10px] text-muted-foreground leading-tight">
+                                        Aggiunge 4 fasce per ogni giunto tra pezzi dritti (avvolgono l'esterno della canala)
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {project.jointBands && (
+                                        <div className="relative">
+                                            <Input type="number" min="50" max="300" step="10"
+                                                value={project.jointBandWidth || 100}
+                                                onChange={e => onProjectChange(p => ({ ...p, jointBandWidth: parseFloat(e.target.value) || 100 }))}
+                                                className="h-6 w-16 text-[10px] pr-6 py-0 border-border/40" />
+                                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                                        </div>
+                                    )}
+                                    <button type="button"
+                                        onClick={() => onProjectChange(p => ({ ...p, jointBands: !p.jointBands }))}
+                                        className={cn(
+                                            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+                                            project.jointBands ? "bg-primary" : "bg-input"
+                                        )}
+                                    >
+                                        <span className={cn(
+                                            "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                                            project.jointBands ? "translate-x-4" : "translate-x-0"
+                                        )} />
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
 
                     {/* === STRUTTURA === */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">Isole nel Progetto ({project.segments.filter(s => s.type === 'trackSeparator').length})</p>
-                            <Button type="button" onClick={addEmptySegment} size="sm" className="h-7 text-xs gap-1">
-                                <Plus className="h-3 w-3" /> Crea Nuovo Segmento (Isola)
-                            </Button>
+                            <p className="text-sm font-medium">Tratte nel Progetto ({project.segments.filter(s => s.type === 'trackSeparator').length})</p>
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button type="button" size="sm" className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+                                        <Plus className="h-4 w-4" /> Aggiungi
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={addEmptySegment} className="flex items-center gap-2 cursor-pointer font-medium">
+                                        <Layers className="h-4 w-4 text-primary" />
+                                        <span>Canala Fumi</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
 
                         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
@@ -267,16 +283,20 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                             {group.separator && (
                                                 <div className="bg-muted/40 px-3 py-2 flex flex-col gap-1.5 border-b border-border/40">
                                                     <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-2 flex-1">
                                                             <Button
                                                                 type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground"
                                                                 onClick={() => setCollapsedTracks(prev => ({ ...prev, [sepId]: !isCollapsed }))}
                                                             >
                                                                 {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                                             </Button>
-                                                            <div className="h-3 w-3 bg-primary/80 rounded block shadow-sm" />
-                                                            <span className="text-xs font-bold uppercase tracking-wider">{group.separator.name}</span>
-                                                            <span className="text-[10px] text-muted-foreground ml-2 px-1.5 py-0.5 bg-background rounded-md border border-border/50">
+                                                            <div className="h-3 w-3 bg-primary/80 rounded block shadow-sm shrink-0" />
+                                                            <Input
+                                                                value={group.separator.name}
+                                                                onChange={e => updateSegment(sepId, { name: e.target.value } as any)}
+                                                                className="h-7 text-sm font-bold uppercase tracking-wider bg-transparent border-transparent hover:border-border/50 focus:border-primary px-1 max-w-[200px]"
+                                                            />
+                                                            <span className="text-[10px] text-muted-foreground ml-2 px-1.5 py-0.5 bg-background rounded-md border border-border/50 whitespace-nowrap">
                                                                 {group.items.length} tratti
                                                             </span>
                                                         </div>
@@ -403,65 +423,70 @@ export function ProjectForm({ project, onProjectChange, onCalculateProject }: Pr
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Angolo 90°
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem onClick={() => {
-                                                                    let len = 0;
                                                                     let lastStraightIdx = -1;
                                                                     for (let i = group.items.length - 1; i >= 0; i--) {
-                                                                        const s = group.items[i];
-                                                                        if (s.seg.type === 'straight') {
-                                                                            len += s.seg.length;
-                                                                            if (lastStraightIdx === -1) lastStraightIdx = i;
+                                                                        if (group.items[i].seg.type === 'straight') {
+                                                                            lastStraightIdx = i;
+                                                                            break;
                                                                         }
-                                                                        else if (s.seg.type !== 'obstacle') break;
                                                                     }
-                                                                    const obs = createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight, len);
+                                                                    // Usa spessore fisso o l'intera length del dritto come base. Qui mettiamo 200mm default e allineato all'inizio (dist=0)
+                                                                    const obs = createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight, 200);
+                                                                    obs.distanceFromStart = 0;
+
                                                                     if (lastStraightIdx !== -1) {
-                                                                        updateSegment(group.items[lastStraightIdx].seg.id, { length: (group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment).length + obs.thickness });
+                                                                        const existingStraight = group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment;
+                                                                        updateSegment(existingStraight.id, { obstacles: [...(existingStraight.obstacles || []), obs] });
                                                                     } else {
-                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment(obs.thickness));
+                                                                        // Se non c'è un dritto prima, crea un dritto fittizio di base 1000mm e mettici sopra il muro
+                                                                        const newStraight = createStraightSegment(1000);
+                                                                        newStraight.obstacles = [obs];
+                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, newStraight);
                                                                     }
-                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, obs);
                                                                 }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Muro
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem onClick={() => {
-                                                                    let len = 0;
                                                                     let lastStraightIdx = -1;
                                                                     for (let i = group.items.length - 1; i >= 0; i--) {
-                                                                        const s = group.items[i];
-                                                                        if (s.seg.type === 'straight') {
-                                                                            len += s.seg.length;
-                                                                            if (lastStraightIdx === -1) lastStraightIdx = i;
+                                                                        if (group.items[i].seg.type === 'straight') {
+                                                                            lastStraightIdx = i;
+                                                                            break;
                                                                         }
-                                                                        else if (s.seg.type !== 'obstacle') break;
                                                                     }
-                                                                    const obs = createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight, len);
+                                                                    const obs = createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight, 200);
+                                                                    obs.distanceFromStart = 0;
+
                                                                     if (lastStraightIdx !== -1) {
-                                                                        updateSegment(group.items[lastStraightIdx].seg.id, { length: (group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment).length + obs.thickness });
+                                                                        const existingStraight = group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment;
+                                                                        updateSegment(existingStraight.id, { obstacles: [...(existingStraight.obstacles || []), obs] });
                                                                     } else {
-                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment(obs.thickness));
+                                                                        const newStraight = createStraightSegment(1000);
+                                                                        newStraight.obstacles = [obs];
+                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, newStraight);
                                                                     }
-                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, obs);
                                                                 }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Solaio
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem onClick={() => {
-                                                                    let len = 0;
                                                                     let lastStraightIdx = -1;
                                                                     for (let i = group.items.length - 1; i >= 0; i--) {
-                                                                        const s = group.items[i];
-                                                                        if (s.seg.type === 'straight') {
-                                                                            len += s.seg.length;
-                                                                            if (lastStraightIdx === -1) lastStraightIdx = i;
+                                                                        if (group.items[i].seg.type === 'straight') {
+                                                                            lastStraightIdx = i;
+                                                                            break;
                                                                         }
-                                                                        else if (s.seg.type !== 'obstacle') break;
                                                                     }
-                                                                    const obs = createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight, len);
+                                                                    const obs = createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight, 200);
+                                                                    obs.distanceFromStart = 0;
+
                                                                     if (lastStraightIdx !== -1) {
-                                                                        updateSegment(group.items[lastStraightIdx].seg.id, { length: (group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment).length + obs.thickness });
+                                                                        const existingStraight = group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment;
+                                                                        updateSegment(existingStraight.id, { obstacles: [...(existingStraight.obstacles || []), obs] });
                                                                     } else {
-                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment(obs.thickness));
+                                                                        const newStraight = createStraightSegment(1000);
+                                                                        newStraight.obstacles = [obs];
+                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, newStraight);
                                                                     }
-                                                                    addSegmentToGroup(group.separatorIndex, group.items.length, obs);
                                                                 }} className="text-xs cursor-pointer">
                                                                     <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Pilastro/Ostacolo
                                                                 </DropdownMenuItem>
@@ -511,9 +536,8 @@ function SegmentRow({
     onMove: (dir: 'up' | 'down') => void;
 }) {
     const isStraight = segment.type === 'straight';
-    const isObstacle = segment.type === 'obstacle';
     const isPendino = segment.type === 'pendino';
-    const accent = isStraight ? 'border-l-blue-500' : isObstacle ? 'border-l-purple-500' : isPendino ? 'border-l-green-500' : 'border-l-amber-500';
+    const accent = isStraight ? 'border-l-blue-500' : isPendino ? 'border-l-green-500' : 'border-l-amber-500';
 
     return (
         <div className={cn(
@@ -537,8 +561,6 @@ function SegmentRow({
             <div className="flex-1 min-w-0">
                 {isStraight ? (
                     <StraightFields seg={segment as StraightSegment} deductionText={deductionText} onUpdate={onUpdate as any} />
-                ) : isObstacle ? (
-                    <ObstacleFields seg={segment as ContextualElementSegment} onUpdate={onUpdate as any} />
                 ) : isPendino ? (
                     <PendinoFields seg={segment as PendinoSegment} onUpdate={onUpdate as any} />
                 ) : (
@@ -562,23 +584,47 @@ function StraightFields({ seg, deductionText, onUpdate }: {
     deductionText?: string;
     onUpdate: (patch: Partial<StraightSegment>) => void;
 }) {
+    const removeObstacle = (obsId: string) => {
+        const newObs = (seg.obstacles || []).filter(o => o.id !== obsId);
+        onUpdate({ obstacles: newObs });
+    };
+
+    const updateObstacle = (obsId: string, patch: Partial<ContextualElementSegment>) => {
+        const newObs = (seg.obstacles || []).map(o => o.id === obsId ? { ...o, ...patch } as ContextualElementSegment : o);
+        onUpdate({ obstacles: newObs });
+    };
+
     return (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
                 <Ruler className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                 <span className="text-xs font-medium text-blue-400 shrink-0 w-12">Dritto</span>
 
-                <div className="relative flex-1 min-w-[80px]">
-                    <Input type="number" min="1" step="1"
-                        value={seg.length}
-                        onChange={e => onUpdate({ length: parseFloat(e.target.value) || 0 })}
-                        className="h-7 text-xs font-mono pr-8 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                <div className="flex items-center gap-1.5 flex-1 max-w-[150px]">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Dist. Tot.</span>
+                    <div className="relative flex-1">
+                        <Input type="number" min="1" step="1"
+                            value={seg.length}
+                            onChange={e => onUpdate({ length: parseFloat(e.target.value) || 0 })}
+                            className="h-8 text-xs font-mono pr-8 w-full bg-background border-border" />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">mm</span>
+                    </div>
                 </div>
-
-
             </div>
 
+            {/* Lista Ostacoli Nested */}
+            {seg.obstacles && seg.obstacles.length > 0 && (
+                <div className="mt-1 pl-6 pr-2 space-y-1.5 relative border-l border-border/50 ml-2">
+                    {seg.obstacles.map(obs => (
+                        <div key={obs.id} className="relative bg-background p-2 pr-8 rounded border border-border shadow-sm">
+                            <ObstacleFields seg={obs} onUpdate={(p) => updateObstacle(obs.id, p)} inlineMode />
+                            <button type="button" onClick={() => removeObstacle(obs.id)} className="absolute right-1 text-muted-foreground hover:text-destructive top-1/2 -translate-y-1/2 p-1.5">
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
             {deductionText && (
                 <div className="flex items-center gap-1 pl-[64px] animate-in slide-in-from-top-1 fade-in duration-300">
                     <CornerDownRight className="h-2.5 w-2.5 text-muted-foreground/60" />
@@ -671,30 +717,21 @@ function ElbowFields({ seg, onUpdate }: {
 
 // ==================== Ostacolo/Muro/Solaio ====================
 
-function ObstacleFields({ seg, onUpdate }: {
+function ObstacleFields({ seg, onUpdate, inlineMode = false }: {
     seg: ContextualElementSegment;
     onUpdate: (patch: Partial<ContextualElementSegment>) => void;
+    inlineMode?: boolean;
 }) {
     const typeLabel = seg.obstacleType === 'wall' ? 'Muro' : seg.obstacleType === 'floor' ? 'Solaio' : 'Ostacolo';
 
     return (
-        <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
+        <div className={cn("flex flex-col gap-2", inlineMode && "gap-1")}>
+            <div className="flex items-center gap-2 flex-wrap">
                 <div className="p-1 rounded bg-purple-500/20 text-purple-400">
-                    <Layers className="h-3.5 w-3.5" />
+                    <Layers className={cn("h-3.5 w-3.5", inlineMode && "h-3 w-3")} />
                 </div>
-                <span className="text-xs font-semibold text-purple-400 w-16">{typeLabel}</span>
-
-                <div className="flex items-center gap-1.5 flex-1 max-w-[120px]">
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Spessore:</span>
-                    <div className="relative flex-1">
-                        <Input type="number" min="1" step="1"
-                            value={seg.thickness}
-                            onChange={e => onUpdate({ thickness: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                    </div>
-                </div>
+                {!inlineMode && <span className="text-xs font-semibold text-purple-400 w-16">{typeLabel}</span>}
+                {inlineMode && <span className="text-[10px] font-semibold text-purple-400 w-14 shrink-0">{typeLabel}</span>}
 
                 <div className="flex items-center gap-1.5 flex-[1.5] min-w-[120px]">
                     <span className="text-[10px] text-muted-foreground whitespace-nowrap">Dist. Inizio:</span>
@@ -702,36 +739,51 @@ function ObstacleFields({ seg, onUpdate }: {
                         <Input type="number" min="0" step="1"
                             value={seg.distanceFromStart ?? 0}
                             onChange={e => onUpdate({ distanceFromStart: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                            className={cn("text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none", inlineMode ? "h-6" : "h-7")} />
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Base:</span>
+                <div className="flex items-center gap-1.5 flex-1 min-w-[100px]">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Spessore:</span>
                     <div className="relative flex-1">
                         <Input type="number" min="1" step="1"
-                            value={seg.width}
-                            onChange={e => onUpdate({ width: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                            value={seg.thickness}
+                            onChange={e => onUpdate({ thickness: parseFloat(e.target.value) || 0 })}
+                            className={cn("text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none", inlineMode ? "h-6" : "h-7")} />
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Altezza:</span>
-                    <div className="relative flex-1">
-                        <Input type="number" min="1" step="1"
-                            value={seg.height}
-                            onChange={e => onUpdate({ height: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                    </div>
-                </div>
+                {!inlineMode && (
+                    <>
+                        <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">Base:</span>
+                            <div className="relative flex-1">
+                                <Input type="number" min="1" step="1"
+                                    value={seg.width}
+                                    onChange={e => onUpdate({ width: parseFloat(e.target.value) || 0 })}
+                                    className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                            </div>
+                        </div>
 
-                <div className="flex items-center gap-1 ml-auto">
+                        <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">Altezza:</span>
+                            <div className="relative flex-1">
+                                <Input type="number" min="1" step="1"
+                                    value={seg.height}
+                                    onChange={e => onUpdate({ height: parseFloat(e.target.value) || 0 })}
+                                    className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                <div className="flex items-center gap-1 ml-auto shrink-0">
                     <Label className="text-[10px] text-muted-foreground mr-1 cursor-pointer" onClick={() => onUpdate({ showQuotas: !seg.showQuotas })}>
-                        Quote
+                        {inlineMode ? "Q" : "Quote"}
                     </Label>
                     <button type="button"
                         onClick={() => onUpdate({ showQuotas: !seg.showQuotas })}

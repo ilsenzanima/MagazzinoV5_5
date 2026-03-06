@@ -1,0 +1,25 @@
+
+> temp_app@0.1.0 build
+> next build
+
+Ôû▓ Next.js 16.1.0 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  ┬À optimizePackageImports
+
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 15.4s
+  Running TypeScript ...
+Failed to compile.
+
+./src/components/cutting-simulator/ProjectForm.tsx:144:23
+Type error: Cannot find name 'isRoutingMode'.
+
+  142 |
+  143 |                     {/* Le impostazioni globali e giunti non servono nel rilievo puro, le nascondiamo se in routing mode */}
+> 144 |                     {!isRoutingMode && (
+      |                       ^
+  145 |                         <>
+  146 |                             {/* === IMPOSTAZIONI MISURE === */}
+  147 |                             <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
+Next.js build worker exited with code: 1 and signal: null

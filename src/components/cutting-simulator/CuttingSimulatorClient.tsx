@@ -343,58 +343,38 @@ export default function CuttingSimulatorClient() {
                         )}
 
                         {projectStep === "routing" && (
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full min-h-0">
-                                {/* Left Panel - Lista Segmenti / Tracciato */}
-                                <div className="lg:col-span-5 xl:col-span-4 h-full min-h-0 flex flex-col bg-background border border-border/50 rounded-xl shadow-sm overflow-hidden">
-                                    <div className="p-4 border-b border-border/50 flex-shrink-0 flex items-center justify-between bg-muted/10">
-                                        <div>
-                                            <h3 className="font-semibold text-sm flex items-center gap-2">
-                                                <Pin className="h-4 w-4 text-primary" /> Costruzione Tracciato
-                                            </h3>
-                                            <p className="text-xs text-muted-foreground mt-1">Aggiungi i tratti continui principali e gli ostacoli</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto w-full max-w-full">
-                                        <div className="w-full">
-                                            <ProjectForm
-                                                project={project}
-                                                onProjectChange={setProject}
-                                                isRoutingMode={true}
-                                            />
-                                        </div>
-                                    </div>
-                                    {/* Action footer */}
-                                    <div className="p-4 border-t border-border/50 bg-muted/10 shrink-0">
-                                        <div className="flex items-center justify-between gap-4">
-                                            <div className="flex-1">
-                                                <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1 tracking-wider">Totale Sviluppo</div>
-                                                <div className="font-mono font-medium text-lg leading-none">{(project.segments.reduce((acc, s) => acc + (s.type === 'straight' ? s.length : 0), 0) / 1000).toFixed(2)}m</div>
-                                            </div>
-                                            <Button
-                                                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white flex-1 whitespace-nowrap lg:flex-none justify-center"
-                                                onClick={() => setProjectStep('engineering')}
-                                            >
-                                                <Scissors className="h-4 w-4" /> Esplodi Tagli
-                                            </Button>
-                                        </div>
+                            <div className="h-full min-h-0 flex flex-col bg-background border border-border/50 rounded-xl shadow-sm overflow-hidden w-full max-w-4xl mx-auto">
+                                <div className="p-4 border-b border-border/50 flex-shrink-0 flex items-center justify-between bg-muted/10">
+                                    <div>
+                                        <h3 className="font-semibold text-sm flex items-center gap-2">
+                                            <Pin className="h-4 w-4 text-primary" /> Costruzione Tracciato
+                                        </h3>
+                                        <p className="text-xs text-muted-foreground mt-1">Aggiungi i tratti continui principali e gli ostacoli</p>
                                     </div>
                                 </div>
-
-                                {/* Right Panel - Preview 3D per il Routing (No Editor interattivo di tagli) */}
-                                <div className="lg:col-span-7 xl:col-span-8 h-full min-h-[400px] bg-background border border-border/50 rounded-xl shadow-sm overflow-hidden flex flex-col relative">
-                                    <div className="absolute top-4 left-4 z-10 bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border/50 shadow-sm flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                            Preview Tracciato Completo
-                                        </span>
+                                <div className="flex-1 overflow-y-auto w-full p-6">
+                                    <div className="w-full">
+                                        <ProjectForm
+                                            project={project}
+                                            onProjectChange={setProject}
+                                            isRoutingMode={true}
+                                        />
                                     </div>
-                                    <ProjectEditor
-                                        project={project}
-                                        onProjectChange={setProject}
-                                        boardDimensions={{ width: 1200, height: 2400 }} // Non usata al momento qui
-                                        hideCutPlan={true}
-                                        disableInteraction={true} // Non si edita il taglio nella fase 1
-                                    />
+                                </div>
+                                {/* Action footer */}
+                                <div className="p-4 border-t border-border/50 bg-muted/10 shrink-0">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex-1">
+                                            <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1 tracking-wider">Totale Sviluppo</div>
+                                            <div className="font-mono font-medium text-lg leading-none">{(project.segments.reduce((acc, s) => acc + (s.type === 'straight' ? s.length : 0), 0) / 1000).toFixed(2)}m</div>
+                                        </div>
+                                        <Button
+                                            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white flex-1 lg:flex-none justify-center px-10"
+                                            onClick={() => setProjectStep('engineering')}
+                                        >
+                                            <Scissors className="h-4 w-4" /> Esplodi Tagli
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         )}

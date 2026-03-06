@@ -32,9 +32,25 @@ export interface BaseSegment {
     label?: string; // Etichetta personalizzata
 }
 
+export interface ContextualElementSegment extends BaseSegment {
+    type: 'obstacle';
+    obstacleType: ObstacleType;
+    thickness: number;   // Lunghezza spesa lungo la canala (es. 300mm)
+    width: number;       // Trasversale (se muro, molto largo)
+    height: number;      // Verticale
+    showQuotas: boolean;
+    quotaLeft?: number;
+    quotaRight?: number;
+    quotaTop?: number;
+    quotaBottom?: number;
+    /** Distanza dalla partenza del tratto dritto corrente (overlay mode) */
+    distanceFromStart?: number;
+}
+
 export interface StraightSegment extends BaseSegment {
     type: 'straight';
     length: number;
+    obstacles?: ContextualElementSegment[];
 }
 
 export interface Elbow90Segment extends BaseSegment {
@@ -57,21 +73,6 @@ export interface TrackSeparatorSegment extends BaseSegment {
     startX?: number;
     startY?: number;
     startZ?: number;
-}
-
-export interface ContextualElementSegment extends BaseSegment {
-    type: 'obstacle';
-    obstacleType: ObstacleType;
-    thickness: number;   // Lunghezza spesa lungo la canala (es. 300mm)
-    width: number;       // Trasversale (se muro, molto largo)
-    height: number;      // Verticale
-    showQuotas: boolean;
-    quotaLeft?: number;
-    quotaRight?: number;
-    quotaTop?: number;
-    quotaBottom?: number;
-    /** Distanza dalla partenza del tratto dritto corrente (overlay mode) */
-    distanceFromStart?: number;
 }
 
 export interface PendinoSegment extends BaseSegment {
