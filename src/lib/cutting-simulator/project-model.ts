@@ -298,19 +298,48 @@ export function translateRilievoToSegments(cards: RilievoCard[]): Segment[] {
 
     cards.forEach((card, index) => {
         if (card.type === 'dritto') {
-            // Calcola la somma
             let totalLen = card.baseLength;
+            let offsetStartDecrease = 0;
+            // Somma sotto-misure
             card.subMisure.forEach(sm => totalLen += sm.length);
+
+            // Sottrae lo spessore dell'ostacolo dal pezzo dritto (come richiesto)
+            card.ostacoli.forEach(o => {
+                totalLen -= o.thickness;
+            });
+
+            const prevCard = cards[index - 1];
+            if (prevCard && prevCard.type === 'curva') {
+                totalLen -= 300; // Valore armB uscita curva precedente
+                offsetStartDecrease += 300; // Poiché il pezzo dritto 3D nascerà 300mm dopo, scala anche l'immissione
+            }
+
+            const nextCard = cards[index + 1];
+            if (nextCard && nextCard.type === 'curva') {
+                totalLen -= 300; // Valore di default per armA curva seguente
+            }
+
+            // Mai lunghezze negative (minimo tecnico 50mm)
+            if (totalLen < 50) totalLen = 50;
 
             // Crea un segmento Dritto (base 3d)
             const straight = createStraightSegment(totalLen);
             straight.label = `Tratto ${index + 1}`;
 
-            // Crea gli ostacoli collegandoli al segmento
+            // Memorizziamo il decurtamento inzio nel segmento? 
+            // Meglio sistemarlo direttamente traslando la quota utente (distanceFromStart) degli ostacoli:
             if (card.ostacoli.length > 0) {
                 straight.obstacles = card.ostacoli.map(o => {
-                    const obs = createObstacleSegment(o.type, 200, 200, o.distanceFromStart);
+                    // Sottrae lo spostamento fittizio dell'inizio asse generato dalla curva, in modo che 
+                    // i 500mm imputati dall'utente equivalgano ancora a 500 dal muro architettonico.
+                    const realDist = Math.max(0, o.distanceFromStart - offsetStartDecrease);
+
+                    const obs = createObstacleSegment(o.type, 200, 200, realDist);
                     obs.thickness = o.thickness;
+                    obs.quotaLeft = o.offsetFromLeft;
+                    obs.quotaRight = o.offsetFromRight;
+                    obs.quotaTop = o.offsetFromTop;
+                    obs.quotaBottom = o.offsetFromBottom;
                     return obs;
                 });
             }
