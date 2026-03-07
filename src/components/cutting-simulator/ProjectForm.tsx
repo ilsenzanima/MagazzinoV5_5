@@ -120,7 +120,12 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
         }));
     };
 
-    const updateOstacolo = (cardId: string, ostId: string, field: 'thickness' | 'distanceFromStart', value: number) => {
+    const updateOstacolo = (
+        cardId: string,
+        ostId: string,
+        field: 'thickness' | 'distanceFromStart' | 'holeWidth' | 'holeHeight' | 'offsetFromCeiling' | 'offsetFromRight',
+        value: number
+    ) => {
         updateProjectSegments(cards.map(c => {
             if (c.id === cardId && c.type === 'dritto') {
                 return {
@@ -235,22 +240,63 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                                                                 <span className="flex items-center gap-2 text-foreground font-semibold text-sm">Muro / Solaio</span>
                                                                 <Button variant="ghost" size="icon" onClick={() => removeOstacolo(card.id, o.id)} className="h-6 w-6 text-destructive hover:bg-destructive/10"><XIcon /></Button>
                                                             </div>
-                                                            <div className="grid grid-cols-2 gap-3">
+                                                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                                                                 <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Spessore Muro (mm)</Label>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Spessore Muro</Label>
                                                                     <Input
                                                                         type="number"
-                                                                        value={o.thickness}
+                                                                        value={o.thickness || 0}
                                                                         onChange={(e) => updateOstacolo(card.id, o.id, 'thickness', Number(e.target.value))}
                                                                         className="h-8 mt-1 font-mono text-xs bg-background border-border"
                                                                     />
                                                                 </div>
                                                                 <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Posiz. da inizio asse (mm)</Label>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Distanza asse</Label>
                                                                     <Input
                                                                         type="number"
-                                                                        value={o.distanceFromStart}
+                                                                        value={o.distanceFromStart || 0}
                                                                         onChange={(e) => updateOstacolo(card.id, o.id, 'distanceFromStart', Number(e.target.value))}
+                                                                        title="Distanza dall'inizio dell'asse su cui si trova il muro"
+                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Larghezza Foro</Label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={o.holeWidth || ''}
+                                                                        placeholder="es. 500"
+                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'holeWidth', Number(e.target.value))}
+                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Altezza Foro</Label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={o.holeHeight || ''}
+                                                                        placeholder="es. 400"
+                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'holeHeight', Number(e.target.value))}
+                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Soffitto</Label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={o.offsetFromCeiling || ''}
+                                                                        placeholder="es. 300"
+                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromCeiling', Number(e.target.value))}
+                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Destra</Label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={o.offsetFromRight || ''}
+                                                                        placeholder="es. 500"
+                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromRight', Number(e.target.value))}
                                                                         className="h-8 mt-1 font-mono text-xs bg-background border-border"
                                                                     />
                                                                 </div>

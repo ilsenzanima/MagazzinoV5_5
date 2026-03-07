@@ -364,10 +364,10 @@ export default function CuttingSimulatorClient() {
                         <div className="w-full max-w-4xl h-full min-h-[500px] flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden animate-in fade-in duration-300">
                             <div className="p-4 border-b border-border flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-muted gap-4">
                                 <div>
-                                    <h3 className="font-semibold text-base flex items-center gap-2 text-slate-800">
-                                        <Pin className="h-5 w-5 text-blue-600" /> Costruzione Tracciato Architettonico
+                                    <h3 className="font-semibold text-base flex items-center gap-2 text-foreground">
+                                        <Pin className="h-5 w-5 text-primary" /> Costruzione Tracciato Architettonico
                                     </h3>
-                                    <p className="text-sm text-slate-500 mt-1">Costruisci il percorso continuo. Aggiungi i tratti e le curve come in cantiere.</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Costruisci il percorso continuo. Aggiungi i tratti e le curve come in cantiere.</p>
                                 </div>
                                 <div className="bg-background border border-border px-4 py-2 rounded-lg shadow-sm w-full sm:w-auto text-center sm:text-left">
                                     <div className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5 tracking-wider">Totale Sviluppo Impianto</div>
