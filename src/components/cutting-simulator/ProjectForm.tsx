@@ -45,7 +45,7 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                             {/* Dati Finti per Mostrare L'idea */}
                             <div className="space-y-2">
                                 {/* Intestazione tabella */}
-                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center px-3 py-2 bg-slate-100 rounded-md text-xs font-semibold uppercase tracking-wider text-slate-500 overflow-hidden">
+                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center px-3 py-2 bg-muted rounded-md text-xs font-semibold uppercase tracking-wider text-muted-foreground overflow-hidden">
                                     <div className="w-6 text-center">#</div>
                                     <div>Tipologia</div>
                                     <div>Misura A (mm)</div>
@@ -54,25 +54,25 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                                 </div>
 
                                 {/* Riga 1 */}
-                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center p-2 border border-slate-200 rounded-md hover:bg-slate-50">
-                                    <div className="w-6 text-center text-sm text-slate-400">1</div>
+                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center p-2 border border-border rounded-md hover:bg-muted/50">
+                                    <div className="w-6 text-center text-sm text-muted-foreground">1</div>
                                     <Input defaultValue="Tratto Dritto" className="h-9" />
                                     <Input defaultValue="3000" type="number" className="h-9 font-mono" />
                                     <Input placeholder="Es: muro..." className="h-9" />
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"><XIcon /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"><XIcon /></Button>
                                 </div>
 
                                 {/* Riga 2 */}
-                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center p-2 border border-slate-200 rounded-md hover:bg-slate-50">
-                                    <div className="w-6 text-center text-sm text-slate-400">2</div>
+                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center p-2 border border-border rounded-md hover:bg-muted/50">
+                                    <div className="w-6 text-center text-sm text-muted-foreground">2</div>
                                     <Input defaultValue="Curva 90" className="h-9" />
                                     <Input defaultValue="200" type="number" className="h-9 font-mono" />
                                     <Input defaultValue="Destra" className="h-9" />
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"><XIcon /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"><XIcon /></Button>
                                 </div>
                             </div>
 
-                            <Button variant="outline" className="w-full gap-2 border-dashed border-2 py-6 text-slate-500 hover:text-slate-800">
+                            <Button variant="outline" className="w-full gap-2 border-dashed border-2 py-6 text-muted-foreground hover:text-foreground">
                                 <Plus className="h-5 w-5" /> Aggiungi Riga
                             </Button>
                         </CardContent>
@@ -111,17 +111,17 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                             </div>
 
                             {/* Card dei Segmenti */}
-                            <div className="space-y-4 mt-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+                            <div className="space-y-4 mt-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
 
                                 {/* Item 1 */}
                                 <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                                    <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-blue-100 text-blue-600 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 font-bold">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full border border-background bg-primary/10 text-primary shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 font-bold">
                                         1
                                     </div>
-                                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded border border-blue-200 shadow-sm shadow-blue-100">
+                                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-4 rounded border border-primary/20 shadow-sm">
                                         <div className="flex items-center justify-between mb-3">
-                                            <div className="font-bold text-slate-800">Tratto Dritto</div>
-                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500"><XIcon /></Button>
+                                            <div className="font-bold text-foreground">Tratto Dritto</div>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><XIcon /></Button>
                                         </div>
                                         <div className="space-y-3">
                                             <div>
@@ -135,17 +135,17 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
 
                                 {/* Item 2 */}
                                 <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                                    <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-amber-100 text-amber-600 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 font-bold">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full border border-background bg-amber-500/10 text-amber-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 font-bold">
                                         2
                                     </div>
-                                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded border border-slate-200 shadow-sm opacity-60 hover:opacity-100 transition-opacity">
+                                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-4 rounded border border-border flex flex-col shadow-sm opacity-60 hover:opacity-100 transition-opacity">
                                         <div className="flex items-center justify-between mb-3">
-                                            <div className="font-bold text-slate-800">Curva 90°</div>
-                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500"><XIcon /></Button>
+                                            <div className="font-bold text-foreground">Curva 90°</div>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><XIcon /></Button>
                                         </div>
                                         <div className="space-y-3">
                                             <div className="grid grid-cols-2 gap-2">
-                                                <Button variant="outline" className="h-10 border-blue-500 bg-blue-50 text-blue-700">Destra</Button>
+                                                <Button variant="outline" className="h-10 border-primary bg-primary/10 text-primary">Destra</Button>
                                                 <Button variant="outline" className="h-10">Sinistra</Button>
                                                 <Button variant="outline" className="h-10">Alto</Button>
                                                 <Button variant="outline" className="h-10">Basso</Button>
