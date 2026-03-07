@@ -223,3 +223,100 @@ export function sidesLabel(sides: DuctSides): string {
     if (sides.right) names.push('Dx');
     return `${n} lati (${names.join(', ')})`;
 }
+
+// ==================== NUOVA GESTIONE A CARD (RILIEVO - WIZARD) ====================
+// Questa sezione definisce lo stato per l'inserimento dei dati del Rilievo in cantiere (Opzione B)
+
+export type RilievoCardType = 'dritto' | 'curva';
+
+export interface RilievoOstacolo {
+    id: string;
+    type: 'wall' | 'floor';
+    thickness: number; // Ingombro lungo la canala (mm)
+    distanceFromStart: number; // Misura parziale dove inserire visivamente l'ostacolo 
+}
+
+export interface RilievoSottomisura {
+    id: string;
+    length: number; // Pezzo dritto aggiunto al totale
+    description?: string;
+}
+
+export interface CardDritto {
+    id: string;
+    type: 'dritto';
+    /** 
+     * Il valore "manuale" principale inserito nell'input.
+     * La somma totale dell'asse dritto sarà questo valore + la somma di subMisure e ostacoli.
+     */
+    baseLength: number;
+    subMisure: RilievoSottomisura[];
+    ostacoli: RilievoOstacolo[];
+}
+
+export interface CardCurva {
+    id: string;
+    type: 'curva';
+    direction: SegmentDirection;
+}
+
+export type RilievoCard = CardDritto | CardCurva;
+
+// Helper per istanziare le nuove Card
+let _cardCounter = 0;
+
+export function createCardDritto(): CardDritto {
+    return {
+        id: `card-dritto-${++_cardCounter}-${Date.now()}`,
+        type: 'dritto',
+        baseLength: 1000,
+        subMisure: [],
+        ostacoli: []
+    };
+}
+
+export function createCardCurva(direction: SegmentDirection = 'right'): CardCurva {
+    return {
+        id: `card-curva-${++_cardCounter}-${Date.now()}`,
+        type: 'curva',
+        direction
+    };
+}
+
+/**
+ * Traduce una lista di RilievoCards (compilate col dito/tablet) 
+ * in una lista di Segments compatibili col motore 3D e col Nesting.
+ */
+export function translateRilievoToSegments(cards: RilievoCard[]): Segment[] {
+    const segments: Segment[] = [];
+
+    cards.forEach((card, index) => {
+        if (card.type === 'dritto') {
+            // Calcola la somma
+            let totalLen = card.baseLength;
+            card.subMisure.forEach(sm => totalLen += sm.length);
+
+            // Crea un segmento Dritto (base 3d)
+            const straight = createStraightSegment(totalLen);
+            straight.label = `Tratto ${index + 1}`;
+
+            // Crea gli ostacoli collegandoli al segmento
+            if (card.ostacoli.length > 0) {
+                straight.obstacles = card.ostacoli.map(o => {
+                    const obs = createObstacleSegment(o.type, 200, 200, o.distanceFromStart);
+                    obs.thickness = o.thickness;
+                    return obs;
+                });
+            }
+
+            segments.push(straight);
+        }
+        else if (card.type === 'curva') {
+            const elbow = createElbow90Segment(card.direction);
+            elbow.label = `Curva ${index + 1}`;
+            segments.push(elbow);
+        }
+    });
+
+    return segments;
+}
