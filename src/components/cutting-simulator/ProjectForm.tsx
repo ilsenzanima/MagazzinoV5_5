@@ -1,846 +1,171 @@
-"use client";
-
-import { useState, useCallback } from "react";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import {
-    Plus, Trash2, ArrowDown, ArrowUp, ArrowLeft, ArrowRight,
-    CornerDownRight, Ruler, GripVertical, Layers, ChevronDown, ChevronUp, FastForward, ChevronRight,
-    AlertTriangle, CheckCircle2, Pin
-} from "lucide-react";
-import { SectionSidesSelector } from "@/components/cutting-simulator/SectionSidesSelector";
-import {
-    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import type {
-    DuctProject, Segment, StraightSegment, Elbow90Segment, TrackSeparatorSegment,
-    SectionProfile, SegmentDirection,
-    ContextualElementSegment, ObstacleType, PendinoSegment
-} from "@/lib/cutting-simulator/project-model";
-import {
-    defaultProject, createStraightSegment, createElbow90Segment, createTrackSeparator,
-    createObstacleSegment, createPendinoSegment, sidesLabel,
-} from "@/lib/cutting-simulator/project-model";
+import { Button } from "@/components/ui/button";
+import { Plus, Ruler, MousePointerClick } from "lucide-react";
+import type { DuctProject } from "@/lib/cutting-simulator/project-model";
 
 interface ProjectFormProps {
     project: DuctProject;
     onProjectChange: React.Dispatch<React.SetStateAction<DuctProject>>;
-    onCalculateProject?: () => void;
     isRoutingMode?: boolean;
 }
 
-const DIRECTION_ICONS: Record<SegmentDirection, typeof ArrowRight> = {
-    right: ArrowRight,
-    left: ArrowLeft,
-    up: ArrowUp,
-    down: ArrowDown,
-};
-const DIRECTION_LABELS: Record<SegmentDirection, string> = {
-    right: 'Destra', left: 'Sinistra', up: 'Sopra', down: 'Sotto',
-};
-
-
-export function ProjectForm({ project, onProjectChange, onCalculateProject, isRoutingMode }: ProjectFormProps) {
-    const [collapsedTracks, setCollapsedTracks] = useState<Record<string, boolean>>({});
-    const [sectionOpen, setSectionOpen] = useState(true);
-
-    // --- Sezione ---
-
-    const updateSection = useCallback((patch: Partial<SectionProfile>) => {
-        onProjectChange(p => ({ ...p, section: { ...p.section, ...patch } }));
-    }, [onProjectChange]);
-
-    // --- Segmenti ---
-
-    const addSegment = useCallback((seg: Segment) => {
-        onProjectChange(p => ({ ...p, segments: [...p.segments, seg] }));
-    }, [onProjectChange]);
-
-    const removeSegment = useCallback((id: string) => {
-        onProjectChange(p => ({ ...p, segments: p.segments.filter(s => s.id !== id) }));
-    }, [onProjectChange]);
-
-    const updateSegment = useCallback((id: string, patch: Partial<StraightSegment> | Partial<Elbow90Segment> | Partial<TrackSeparatorSegment> | Partial<ContextualElementSegment>) => {
-        onProjectChange(p => ({
-            ...p,
-            segments: p.segments.map(s => s.id === id ? { ...s, ...patch } as Segment : s),
-        }));
-    }, [onProjectChange]);
-
-    const moveSegment = useCallback((id: string, dir: 'up' | 'down') => {
-        onProjectChange(p => {
-            const idx = p.segments.findIndex(s => s.id === id);
-            if (idx < 0) return p;
-            const newIdx = dir === 'up' ? idx - 1 : idx + 1;
-            if (newIdx < 0 || newIdx >= p.segments.length) return p;
-            // Prevent moving a regular segment outside its TrackSeparator group or before it
-            if (p.segments[idx].type !== 'trackSeparator' && p.segments[newIdx].type === 'trackSeparator') return p;
-            if (p.segments[idx].type === 'trackSeparator' && p.segments[newIdx].type !== 'trackSeparator') return p;
-
-            const segs = [...p.segments];
-            [segs[idx], segs[newIdx]] = [segs[newIdx], segs[idx]];
-            return { ...p, segments: segs };
-        });
-    }, [onProjectChange]);
-
-    const addEmptySegment = useCallback(() => {
-        const existingTracksCount = project.segments.filter(s => s.type === 'trackSeparator').length;
-        const trackLetter = String.fromCharCode(65 + existingTracksCount);
-        addSegment(createTrackSeparator(1000, `SEGMENTO ${trackLetter}`));
-    }, [project.segments, addSegment]);
-
-    const addSegmentToGroup = useCallback((separatorIndex: number | null, itemsCount: number, newSeg: Segment) => {
-        onProjectChange(p => {
-            const segs = [...p.segments];
-            const insertIndex = separatorIndex === null ? itemsCount : separatorIndex + 1 + itemsCount;
-            segs.splice(insertIndex, 0, newSeg);
-            // Assicurati che se aggiungiamo a un gruppo, non sia collassato
-            if (separatorIndex !== null) {
-                const sepId = segs[separatorIndex].id;
-                setCollapsedTracks(prev => ({ ...prev, [sepId]: false }));
-            }
-            return { ...p, segments: segs };
-        });
-    }, [onProjectChange]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onCalculateProject?.();
-    };
-
-    // Calcola la lunghezza reale dai segmenti in un gruppo
-    const computeTrackLength = useCallback((items: { seg: Segment }[]): number => {
-        return items.reduce((sum, { seg }) => {
-            if (seg.type === 'straight') return sum + seg.length;
-            if (seg.type === 'obstacle') return sum + seg.thickness;
-            if (seg.type === 'elbow90') return sum + seg.armA + seg.armB;
-            return sum;
-        }, 0);
-    }, []);
-
-    const sec = project.section;
+export function ProjectForm({ project, onProjectChange, isRoutingMode }: ProjectFormProps) {
+    const [subStep, setSubStep] = useState<"A" | "B">("A");
 
     return (
-        <Card className="border-border/60 shadow-lg bg-gradient-to-br from-card to-card/80">
-            <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                        <Layers className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                        <CardTitle className="text-lg">Progetto Canalizzazione</CardTitle>
-                        <CardDescription>Definisci sezione e struttura, poi genera il piano di taglio</CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* La sezione "Impostazioni di Sezione" (Largh, Alt, Spessore) è stata spostata globalmente nello Step 1 (Settings) di CuttingSimulatorClient */}
+        <div className="space-y-4">
+            <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500">
+                Costruzione Impianto: Test UI
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+                Valuta le due opzioni di form in cantiere e decidi quale approccio preferisci per il rilievo dei tratti.
+            </p>
 
-                    {/* Le impostazioni globali e giunti non servono nel rilievo puro, le nascondiamo se in routing mode */}
-                    {!isRoutingMode && (
-                        <>
-                            {/* === IMPOSTAZIONI MISURE === */}
-                            <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
-                                <div className="space-y-0.5 pr-4">
-                                    <Label className="text-xs font-medium cursor-pointer" onClick={() => onProjectChange(p => ({ ...p, globalMeasurements: !p.globalMeasurements }))}>
-                                        Misure finite (globali)
-                                    </Label>
-                                    <p className="text-[10px] text-muted-foreground leading-tight">
-                                        Sottrae in automatico l'ingombro delle curve dai tratti dritti adiacenti
-                                    </p>
+            <Tabs value={subStep} onValueChange={(val) => setSubStep(val as "A" | "B")}>
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="A" className="gap-2"><Ruler className="h-4 w-4" /> Opzione A (Tabellare)</TabsTrigger>
+                    <TabsTrigger value="B" className="gap-2"><MousePointerClick className="h-4 w-4" /> Opzione B (Wizard Visuale)</TabsTrigger>
+                </TabsList>
+
+                {/* ---------- OPZIONE A: TABELLA ---------- */}
+                <TabsContent value="A">
+                    <Card>
+                        <CardContent className="pt-6 space-y-4">
+                            <h3 className="font-semibold mb-2 flex items-center gap-2">
+                                📝 Stile Excel Rapido
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                                Veloce da scrivere tramite tastiera/tablet se hai i dati pronti in sequenza.
+                            </p>
+
+                            {/* Dati Finti per Mostrare L'idea */}
+                            <div className="space-y-2">
+                                {/* Intestazione tabella */}
+                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center px-3 py-2 bg-slate-100 rounded-md text-xs font-semibold uppercase tracking-wider text-slate-500 overflow-hidden">
+                                    <div className="w-6 text-center">#</div>
+                                    <div>Tipologia</div>
+                                    <div>Misura A (mm)</div>
+                                    <div>Misura B / Note</div>
+                                    <div className="w-8"></div>
                                 </div>
-                                <button type="button"
-                                    onClick={() => onProjectChange(p => ({ ...p, globalMeasurements: !p.globalMeasurements }))}
-                                    className={cn(
-                                        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-                                        project.globalMeasurements ? "bg-primary" : "bg-input"
-                                    )}
-                                >
-                                    <span className={cn(
-                                        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
-                                        project.globalMeasurements ? "translate-x-4" : "translate-x-0"
-                                    )} />
-                                </button>
+
+                                {/* Riga 1 */}
+                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center p-2 border border-slate-200 rounded-md hover:bg-slate-50">
+                                    <div className="w-6 text-center text-sm text-slate-400">1</div>
+                                    <Input defaultValue="Tratto Dritto" className="h-9" />
+                                    <Input defaultValue="3000" type="number" className="h-9 font-mono" />
+                                    <Input placeholder="Es: muro..." className="h-9" />
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"><XIcon /></Button>
+                                </div>
+
+                                {/* Riga 2 */}
+                                <div className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center p-2 border border-slate-200 rounded-md hover:bg-slate-50">
+                                    <div className="w-6 text-center text-sm text-slate-400">2</div>
+                                    <Input defaultValue="Curva 90" className="h-9" />
+                                    <Input defaultValue="200" type="number" className="h-9 font-mono" />
+                                    <Input defaultValue="Destra" className="h-9" />
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"><XIcon /></Button>
+                                </div>
                             </div>
 
-                            {/* === FASCE GIUNTI === */}
-                            <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
-                                <div className="space-y-0.5 pr-4">
-                                    <Label className="text-xs font-medium cursor-pointer" onClick={() => onProjectChange(p => ({ ...p, jointBands: !p.jointBands }))}>
-                                        Fasce Giunti
-                                    </Label>
-                                    <p className="text-[10px] text-muted-foreground leading-tight">
-                                        Aggiunge 4 fasce per ogni giunto tra pezzi dritti (avvolgono l'esterno della canala)
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {project.jointBands && (
-                                        <div className="relative">
-                                            <Input type="number" min="50" max="300" step="10"
-                                                value={project.jointBandWidth || 100}
-                                                onChange={e => onProjectChange(p => ({ ...p, jointBandWidth: parseFloat(e.target.value) || 100 }))}
-                                                className="h-6 w-16 text-[10px] pr-6 py-0 border-border/40" />
-                                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
+                            <Button variant="outline" className="w-full gap-2 border-dashed border-2 py-6 text-slate-500 hover:text-slate-800">
+                                <Plus className="h-5 w-5" /> Aggiungi Riga
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* ---------- OPZIONE B: WIZARD ---------- */}
+                <TabsContent value="B">
+                    <Card>
+                        <CardContent className="pt-6 space-y-6">
+                            <h3 className="font-semibold mb-2 flex items-center gap-2">
+                                👆 Stile Touch Wizard
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                                Grandi bottoni touch e schede isolate per facilitare l'uso sul posto.
+                            </p>
+
+                            {/* Pulsantiera di Aggiunta Rapida */}
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <Button className="h-16 flex flex-col items-center justify-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-none">
+                                    <Plus className="h-5 w-5" />
+                                    <span className="text-xs font-semibold">Dritto</span>
+                                </Button>
+                                <Button className="h-16 flex flex-col items-center justify-center gap-1 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 border-none">
+                                    <Plus className="h-5 w-5" />
+                                    <span className="text-xs font-semibold">Curva</span>
+                                </Button>
+                                <Button className="h-16 flex flex-col items-center justify-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-800 border-none">
+                                    <Plus className="h-5 w-5" />
+                                    <span className="text-xs font-semibold">Ostacolo</span>
+                                </Button>
+                                <Button className="h-16 flex flex-col items-center justify-center gap-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border-none">
+                                    <Plus className="h-5 w-5" />
+                                    <span className="text-xs font-semibold">Terminale</span>
+                                </Button>
+                            </div>
+
+                            {/* Card dei Segmenti */}
+                            <div className="space-y-4 mt-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+
+                                {/* Item 1 */}
+                                <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-blue-100 text-blue-600 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 font-bold">
+                                        1
+                                    </div>
+                                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded border border-blue-200 shadow-sm shadow-blue-100">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="font-bold text-slate-800">Tratto Dritto</div>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500"><XIcon /></Button>
                                         </div>
-                                    )}
-                                    <button type="button"
-                                        onClick={() => onProjectChange(p => ({ ...p, jointBands: !p.jointBands }))}
-                                        className={cn(
-                                            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-                                            project.jointBands ? "bg-primary" : "bg-input"
-                                        )}
-                                    >
-                                        <span className={cn(
-                                            "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
-                                            project.jointBands ? "translate-x-4" : "translate-x-0"
-                                        )} />
-                                    </button>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {/* === STRUTTURA === */}
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">Tratte nel Progetto ({project.segments.filter(s => s.type === 'trackSeparator').length})</p>
-
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button type="button" size="sm" className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
-                                        <Plus className="h-4 w-4" /> Aggiungi
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onClick={addEmptySegment} className="flex items-center gap-2 cursor-pointer font-medium">
-                                        <Layers className="h-4 w-4 text-primary" />
-                                        <span>Canala Fumi</span>
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-                            {(() => {
-                                const groupedSegments: {
-                                    separator: TrackSeparatorSegment | null;
-                                    separatorIndex: number | null;
-                                    items: { seg: Segment; index: number }[];
-                                }[] = [];
-
-                                let currentGroup: {
-                                    separator: TrackSeparatorSegment | null;
-                                    separatorIndex: number | null;
-                                    items: { seg: Segment; index: number }[];
-                                } | null = null;
-
-                                project.segments.forEach((seg, idx) => {
-                                    if (seg.type === 'trackSeparator') {
-                                        if (currentGroup) groupedSegments.push(currentGroup);
-                                        currentGroup = { separator: seg as TrackSeparatorSegment, separatorIndex: idx, items: [] };
-                                    } else {
-                                        if (!currentGroup) {
-                                            currentGroup = { separator: null, separatorIndex: null, items: [] };
-                                        }
-                                        currentGroup.items.push({ seg, index: idx });
-                                    }
-                                });
-                                if (currentGroup) groupedSegments.push(currentGroup);
-
-                                return groupedSegments.map((group, groupIdx) => {
-                                    const sepId = group.separator?.id || `no-sep-${groupIdx}`;
-                                    const isCollapsed = collapsedTracks[sepId] || false;
-
-                                    // Calcolo sotto-tratti: le curve separano i sotto-tratti
-                                    type SubTrack = { items: { seg: Segment; index: number }[]; expectedLength: number; sourceId: string; field: string; label: string };
-                                    const subTracks: SubTrack[] = [];
-                                    let curItems: { seg: Segment; index: number }[] = [];
-                                    let stIdx = 0;
-                                    for (const item of group.items) {
-                                        if (item.seg.type === 'elbow90') {
-                                            subTracks.push({ items: curItems, expectedLength: stIdx === 0 ? (group.separator?.expectedLength || 0) : 0, sourceId: stIdx === 0 ? sepId : '', field: stIdx === 0 ? 'expectedLength' : '', label: `Sotto-tratto ${String.fromCharCode(65 + stIdx)}` });
-                                            stIdx++;
-                                            curItems = [];
-                                            subTracks.push({ items: [], expectedLength: (item.seg as Elbow90Segment).expectedLengthAfter || 0, sourceId: item.seg.id, field: 'expectedLengthAfter', label: `Sotto-tratto ${String.fromCharCode(65 + stIdx)}` });
-                                        } else {
-                                            curItems.push(item);
-                                        }
-                                    }
-                                    if (subTracks.length === 0) {
-                                        subTracks.push({ items: curItems, expectedLength: group.separator?.expectedLength || 0, sourceId: sepId, field: 'expectedLength', label: 'Tratto' });
-                                    } else if (curItems.length > 0) {
-                                        subTracks[subTracks.length - 1].items = curItems;
-                                    }
-                                    const visibleSTs = subTracks.filter(st => st.items.length > 0);
-
-                                    return (
-                                        <div key={sepId} className="border border-border/60 rounded-lg overflow-hidden bg-card/50 shadow-sm relative">
-                                            {/* Header del Gruppo (Segmento/Isola) */}
-                                            {group.separator && (
-                                                <div className="bg-muted/40 px-3 py-2 flex flex-col gap-1.5 border-b border-border/40">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2 flex-1">
-                                                            <Button
-                                                                type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground"
-                                                                onClick={() => setCollapsedTracks(prev => ({ ...prev, [sepId]: !isCollapsed }))}
-                                                            >
-                                                                {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                                            </Button>
-                                                            <div className="h-3 w-3 bg-primary/80 rounded block shadow-sm shrink-0" />
-                                                            <Input
-                                                                value={group.separator.name}
-                                                                onChange={e => updateSegment(sepId, { name: e.target.value } as any)}
-                                                                className="h-7 text-sm font-bold uppercase tracking-wider bg-transparent border-transparent hover:border-border/50 focus:border-primary px-1 max-w-[200px]"
-                                                            />
-                                                            <span className="text-[10px] text-muted-foreground ml-2 px-1.5 py-0.5 bg-background rounded-md border border-border/50 whitespace-nowrap">
-                                                                {group.items.length} tratti
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex items-center gap-1">
-                                                                <span className="text-[10px] text-muted-foreground uppercase">Sp:</span>
-                                                                <div className="relative">
-                                                                    <Input type="number" min="0" step="0.5"
-                                                                        placeholder={`${project.section.thickness}`}
-                                                                        value={group.separator?.thicknessOverride ?? ''}
-                                                                        onChange={e => {
-                                                                            const v = e.target.value;
-                                                                            updateSegment(sepId, { thicknessOverride: v === '' ? undefined : (parseFloat(v) || 0) } as any);
-                                                                        }}
-                                                                        className="h-7 w-20 text-xs pr-7 py-0 border-border/40 bg-background/50" />
-                                                                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">mm</span>
-                                                                </div>
-                                                            </div>
-                                                            <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
-                                                                onClick={() => removeSegment(sepId)}>
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Badge Misure per ogni sotto-tratto */}
-                                                    {visibleSTs.map((st, i) => {
-                                                        const rl = computeTrackLength(st.items);
-                                                        const el = st.expectedLength;
-                                                        const dd = el > 0 ? rl - el : 0;
-                                                        const hw = el > 0 && Math.abs(dd) > 1;
-                                                        const io = dd > 0;
-                                                        return (
-                                                            <div key={`st-${i}`} className={cn(
-                                                                "flex items-center gap-2 px-2 py-1 rounded text-[10px] font-mono",
-                                                                !hw && el > 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                                                    : hw && io ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                                                                        : hw ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                                                            : "bg-muted/30 text-muted-foreground border border-border/30"
-                                                            )}>
-                                                                {hw ? <AlertTriangle className="h-3 w-3 shrink-0" />
-                                                                    : el > 0 ? <CheckCircle2 className="h-3 w-3 shrink-0" /> : null}
-                                                                <span className="flex-1 truncate">
-                                                                    {visibleSTs.length > 1 && <strong className="mr-1">{st.label}:</strong>}
-                                                                    <strong>{rl.toFixed(0)}</strong>
-                                                                    {el > 0 && <> / {el.toFixed(0)} mm{hw && <span className="font-bold ml-1">({io ? '+' : ''}{dd.toFixed(0)})</span>}</>}
-                                                                </span>
-                                                                <div className="flex items-center gap-1 shrink-0">
-                                                                    <span className="text-[10px] opacity-60">Att:</span>
-                                                                    <div className="relative">
-                                                                        <Input type="number" min="0" step="1"
-                                                                            value={st.expectedLength || 0}
-                                                                            onChange={e => updateSegment(st.sourceId, { [st.field]: parseFloat(e.target.value) || 0 } as any)}
-                                                                            className="h-7 w-24 text-xs pr-7 py-0 border-border/40 bg-background/50" />
-                                                                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">mm</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )
-                                            }
-
-                                            {!isCollapsed && (
-                                                <div className="p-2 space-y-2">
-                                                    {/* Lista dei Tratti concatenati */}
-                                                    {group.items.length > 0 ? (
-                                                        <div className="space-y-1.5 relative">
-                                                            {/* Barra visiva di concatenazione */}
-                                                            <div className="absolute top-4 bottom-4 left-3 w-0.5 bg-primary/20 pointer-events-none" />
-
-                                                            {group.items.map(({ seg, index }) => {
-                                                                let deductionText = '';
-                                                                if (project.globalMeasurements && seg.type === 'straight') {
-                                                                    const prev = project.segments.slice(0, index).reverse().find(s => s.type !== 'trackSeparator');
-                                                                    const next = project.segments.slice(index + 1).find(s => s.type !== 'trackSeparator');
-                                                                    let deduction = 0;
-                                                                    const outerWidth = project.section.innerWidth + (2 * project.section.thickness);
-                                                                    if (prev && prev.type === 'elbow90') deduction += prev.armB + outerWidth;
-                                                                    if (next && next.type === 'elbow90') deduction += next.armA + outerWidth;
-                                                                    if (deduction > 0) {
-                                                                        const actualLength = Math.max(0, seg.length - deduction);
-                                                                        deductionText = `Taglio: ${actualLength} (-${deduction})`;
-                                                                    }
-                                                                }
-
-                                                                return (
-                                                                    <div key={seg.id} className="relative z-10 pl-6">
-                                                                        {/* Pallino di congiunzione */}
-                                                                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rounded-full border-[1.5px] border-primary/50 bg-background" />
-                                                                        <SegmentRow
-                                                                            segment={seg as StraightSegment | Elbow90Segment}
-                                                                            index={index}
-                                                                            total={project.segments.length}
-                                                                            deductionText={deductionText}
-                                                                            onUpdate={(patch) => updateSegment(seg.id, patch)}
-                                                                            onRemove={() => removeSegment(seg.id)}
-                                                                            onMove={(dir) => moveSegment(seg.id, dir)}
-                                                                        />
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-[11px] text-muted-foreground text-center py-4 italic">
-                                                            Nessun tratto in questo segmento.
-                                                        </p>
-                                                    )}
-
-                                                    {/* Toolbar di aggiunta per QUESTO gruppo */}
-                                                    <div className="mt-2 ml-6 space-y-2">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] w-full border-dashed bg-background hover:bg-muted/50">
-                                                                    <Plus className="h-3 w-3 mr-1" /> Aggiungi Tratto
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="start" className="w-48 border-border/40">
-                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createStraightSegment())} className="text-xs cursor-pointer">
-                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Dritto
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createElbow90Segment())} className="text-xs cursor-pointer">
-                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Angolo 90°
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => {
-                                                                    let lastStraightIdx = -1;
-                                                                    for (let i = group.items.length - 1; i >= 0; i--) {
-                                                                        if (group.items[i].seg.type === 'straight') {
-                                                                            lastStraightIdx = i;
-                                                                            break;
-                                                                        }
-                                                                    }
-                                                                    // Usa spessore fisso o l'intera length del dritto come base. Qui mettiamo 200mm default e allineato all'inizio (dist=0)
-                                                                    const obs = createObstacleSegment('wall', project.section.innerWidth, project.section.innerHeight, 200);
-                                                                    obs.distanceFromStart = 0;
-
-                                                                    if (lastStraightIdx !== -1) {
-                                                                        const existingStraight = group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment;
-                                                                        updateSegment(existingStraight.id, { obstacles: [...(existingStraight.obstacles || []), obs] });
-                                                                    } else {
-                                                                        // Se non c'è un dritto prima, crea un dritto fittizio di base 1000mm e mettici sopra il muro
-                                                                        const newStraight = createStraightSegment(1000);
-                                                                        newStraight.obstacles = [obs];
-                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, newStraight);
-                                                                    }
-                                                                }} className="text-xs cursor-pointer">
-                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Muro
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => {
-                                                                    let lastStraightIdx = -1;
-                                                                    for (let i = group.items.length - 1; i >= 0; i--) {
-                                                                        if (group.items[i].seg.type === 'straight') {
-                                                                            lastStraightIdx = i;
-                                                                            break;
-                                                                        }
-                                                                    }
-                                                                    const obs = createObstacleSegment('floor', project.section.innerWidth, project.section.innerHeight, 200);
-                                                                    obs.distanceFromStart = 0;
-
-                                                                    if (lastStraightIdx !== -1) {
-                                                                        const existingStraight = group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment;
-                                                                        updateSegment(existingStraight.id, { obstacles: [...(existingStraight.obstacles || []), obs] });
-                                                                    } else {
-                                                                        const newStraight = createStraightSegment(1000);
-                                                                        newStraight.obstacles = [obs];
-                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, newStraight);
-                                                                    }
-                                                                }} className="text-xs cursor-pointer">
-                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Solaio
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => {
-                                                                    let lastStraightIdx = -1;
-                                                                    for (let i = group.items.length - 1; i >= 0; i--) {
-                                                                        if (group.items[i].seg.type === 'straight') {
-                                                                            lastStraightIdx = i;
-                                                                            break;
-                                                                        }
-                                                                    }
-                                                                    const obs = createObstacleSegment('column', project.section.innerWidth, project.section.innerHeight, 200);
-                                                                    obs.distanceFromStart = 0;
-
-                                                                    if (lastStraightIdx !== -1) {
-                                                                        const existingStraight = group.items[lastStraightIdx].seg as import('@/lib/cutting-simulator/project-model').StraightSegment;
-                                                                        updateSegment(existingStraight.id, { obstacles: [...(existingStraight.obstacles || []), obs] });
-                                                                    } else {
-                                                                        const newStraight = createStraightSegment(1000);
-                                                                        newStraight.obstacles = [obs];
-                                                                        addSegmentToGroup(group.separatorIndex, group.items.length, newStraight);
-                                                                    }
-                                                                }} className="text-xs cursor-pointer">
-                                                                    <Plus className="h-3 w-3 mr-1.5 opacity-70" /> Pilastro/Ostacolo
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => addSegmentToGroup(group.separatorIndex, group.items.length, createPendinoSegment())} className="text-xs cursor-pointer">
-                                                                    <Pin className="h-3 w-3 mr-1.5 opacity-70" /> Pendino
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </div>
-                                                </div>
-                                            )}
+                                        <div className="space-y-3">
+                                            <div>
+                                                <Label className="text-xs text-slate-500">Lunghezza Totale (mm)</Label>
+                                                <Input type="number" defaultValue="3000" className="mt-1 font-mono h-12 text-lg" />
+                                            </div>
+                                            <Button variant="secondary" size="sm" className="w-full text-xs">Aggiungi Proprietà (Muro/Ostacolo)</Button>
                                         </div>
-                                    );
-                                });
-                            })()}
+                                    </div>
+                                </div>
 
-                            {project.segments.length === 0 && (
-                                <p className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-lg">
-                                    Nessun elemento. Clicca su "Crea Nuovo Segmento (Isola)".
-                                </p>
-                            )}
-                        </div>
-                    </div>
+                                {/* Item 2 */}
+                                <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-amber-100 text-amber-600 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 font-bold">
+                                        2
+                                    </div>
+                                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded border border-slate-200 shadow-sm opacity-60 hover:opacity-100 transition-opacity">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="font-bold text-slate-800">Curva 90°</div>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500"><XIcon /></Button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Button variant="outline" className="h-10 border-blue-500 bg-blue-50 text-blue-700">Destra</Button>
+                                                <Button variant="outline" className="h-10">Sinistra</Button>
+                                                <Button variant="outline" className="h-10">Alto</Button>
+                                                <Button variant="outline" className="h-10">Basso</Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                    {/* === AZIONI === */}
-                    <Button type="submit" className="w-full h-11 font-semibold" disabled={project.segments.length === 0}>
-                        <Layers className="mr-2 h-4 w-4" />
-                        Genera Piano di Taglio ({project.segments.length} elementi)
-                    </Button>
-                </form>
-            </CardContent>
-        </Card >
-    );
-}
-
-// ==================== Riga tratto ====================
-
-function SegmentRow({
-    segment, index, total, deductionText, onUpdate, onRemove, onMove,
-}: {
-    segment: Segment;
-    index: number;
-    total: number;
-    deductionText?: string;
-    onUpdate: (patch: Partial<StraightSegment> | Partial<Elbow90Segment> | Partial<ContextualElementSegment>) => void;
-    onRemove: () => void;
-    onMove: (dir: 'up' | 'down') => void;
-}) {
-    const isStraight = segment.type === 'straight';
-    const isPendino = segment.type === 'pendino';
-    const accent = isStraight ? 'border-l-blue-500' : isPendino ? 'border-l-green-500' : 'border-l-amber-500';
-
-    return (
-        <div className={cn(
-            "flex items-center gap-1.5 p-2 rounded-lg bg-muted/20 border border-border/40 border-l-[3px]",
-            accent
-        )}>
-            {/* Ordine */}
-            <div className="flex flex-col items-center gap-0.5">
-                <button type="button" onClick={() => onMove('up')} disabled={index === 0}
-                    className="p-0.5 rounded hover:bg-muted disabled:opacity-20 transition-opacity">
-                    <ChevronUp className="h-3 w-3" />
-                </button>
-                <span className="text-[10px] text-muted-foreground font-mono w-4 text-center">{index + 1}</span>
-                <button type="button" onClick={() => onMove('down')} disabled={index === total - 1}
-                    className="p-0.5 rounded hover:bg-muted disabled:opacity-20 transition-opacity">
-                    <ChevronDown className="h-3 w-3" />
-                </button>
-            </div>
-
-            {/* Contenuto */}
-            <div className="flex-1 min-w-0">
-                {isStraight ? (
-                    <StraightFields seg={segment as StraightSegment} deductionText={deductionText} onUpdate={onUpdate as any} />
-                ) : isPendino ? (
-                    <PendinoFields seg={segment as PendinoSegment} onUpdate={onUpdate as any} />
-                ) : (
-                    <ElbowFields seg={segment as Elbow90Segment} onUpdate={onUpdate as any} />
-                )}
-            </div>
-
-            {/* Elimina */}
-            <button type="button" onClick={onRemove}
-                className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
-                <Trash2 className="h-3.5 w-3.5" />
-            </button>
-        </div>
-    );
-}
-
-// ==================== Tratto Dritto ====================
-
-function StraightFields({ seg, deductionText, onUpdate }: {
-    seg: StraightSegment;
-    deductionText?: string;
-    onUpdate: (patch: Partial<StraightSegment>) => void;
-}) {
-    const removeObstacle = (obsId: string) => {
-        const newObs = (seg.obstacles || []).filter(o => o.id !== obsId);
-        onUpdate({ obstacles: newObs });
-    };
-
-    const updateObstacle = (obsId: string, patch: Partial<ContextualElementSegment>) => {
-        const newObs = (seg.obstacles || []).map(o => o.id === obsId ? { ...o, ...patch } as ContextualElementSegment : o);
-        onUpdate({ obstacles: newObs });
-    };
-
-    return (
-        <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-                <Ruler className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                <span className="text-xs font-medium text-blue-400 shrink-0 w-12">Dritto</span>
-
-                <div className="flex items-center gap-1.5 flex-1 max-w-[150px]">
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Dist. Tot.</span>
-                    <div className="relative flex-1">
-                        <Input type="number" min="1" step="1"
-                            value={seg.length}
-                            onChange={e => onUpdate({ length: parseFloat(e.target.value) || 0 })}
-                            className="h-8 text-xs font-mono pr-8 w-full bg-background border-border" />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">mm</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Lista Ostacoli Nested */}
-            {seg.obstacles && seg.obstacles.length > 0 && (
-                <div className="mt-1 pl-6 pr-2 space-y-1.5 relative border-l border-border/50 ml-2">
-                    {seg.obstacles.map(obs => (
-                        <div key={obs.id} className="relative bg-background p-2 pr-8 rounded border border-border shadow-sm">
-                            <ObstacleFields seg={obs} onUpdate={(p) => updateObstacle(obs.id, p)} inlineMode />
-                            <button type="button" onClick={() => removeObstacle(obs.id)} className="absolute right-1 text-muted-foreground hover:text-destructive top-1/2 -translate-y-1/2 p-1.5">
-                                <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-            {deductionText && (
-                <div className="flex items-center gap-1 pl-[64px] animate-in slide-in-from-top-1 fade-in duration-300">
-                    <CornerDownRight className="h-2.5 w-2.5 text-muted-foreground/60" />
-                    <span className="text-[10px] text-muted-foreground/80 font-mono tracking-tight bg-muted/40 px-1 rounded">
-                        {deductionText}
-                    </span>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ==================== Angolo 90° ====================
-
-function ElbowFields({ seg, onUpdate }: {
-    seg: Elbow90Segment;
-    onUpdate: (patch: Partial<Elbow90Segment>) => void;
-}) {
-    return (
-        <div className="space-y-1">
-            <div className="flex items-center gap-2">
-                <CornerDownRight className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                <span className="text-xs font-medium text-amber-400 shrink-0">Angolo</span>
-
-                {/* Direzione */}
-                <div className="flex gap-0.5">
-                    {(['left', 'right', 'up', 'down'] as const).map(d => {
-                        const Icon = DIRECTION_ICONS[d];
-                        return (
-                            <button key={d} type="button"
-                                onClick={() => onUpdate({ direction: d })}
-                                title={DIRECTION_LABELS[d]}
-                                className={cn(
-                                    "p-1 rounded transition-all",
-                                    seg.direction === d
-                                        ? "bg-amber-500/20 text-amber-300"
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                <Icon className="h-3 w-3" />
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Base mode */}
-                <div className="flex gap-0.5 ml-auto">
-                    {(['split', 'single'] as const).map(m => (
-                        <button key={m} type="button"
-                            onClick={() => onUpdate({ baseMode: m })}
-                            className={cn(
-                                "px-1.5 py-0.5 text-[9px] rounded transition-all",
-                                seg.baseMode === m
-                                    ? "bg-amber-500/20 text-amber-300 font-medium"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {m === 'split' ? 'Sep.' : 'Unica'}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Bracci */}
-            <div className="flex gap-2 pl-5 mt-1">
-                <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-medium text-muted-foreground">A:</span>
-                    <div className="relative">
-                        <Input type="number" min="1" step="1"
-                            value={seg.armA}
-                            onChange={e => onUpdate({ armA: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-[11px] font-mono w-[84px] pr-7 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                    </div>
-                </div>
-                <div className="flex items-center gap-1.5 border-l border-border/50 pl-2">
-                    <span className="text-[10px] font-medium text-muted-foreground">B:</span>
-                    <div className="relative">
-                        <Input type="number" min="1" step="1"
-                            value={seg.armB}
-                            onChange={e => onUpdate({ armB: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-[11px] font-mono w-[84px] pr-7 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                    </div>
-                </div>
-            </div>
-        </div >
-    );
-}
-
-// ==================== Ostacolo/Muro/Solaio ====================
-
-function ObstacleFields({ seg, onUpdate, inlineMode = false }: {
-    seg: ContextualElementSegment;
-    onUpdate: (patch: Partial<ContextualElementSegment>) => void;
-    inlineMode?: boolean;
-}) {
-    const typeLabel = seg.obstacleType === 'wall' ? 'Muro' : seg.obstacleType === 'floor' ? 'Solaio' : 'Ostacolo';
-
-    return (
-        <div className={cn("flex flex-col gap-2", inlineMode && "gap-1")}>
-            <div className="flex items-center gap-2 flex-wrap">
-                <div className="p-1 rounded bg-purple-500/20 text-purple-400">
-                    <Layers className={cn("h-3.5 w-3.5", inlineMode && "h-3 w-3")} />
-                </div>
-                {!inlineMode && <span className="text-xs font-semibold text-purple-400 w-16">{typeLabel}</span>}
-                {inlineMode && <span className="text-[10px] font-semibold text-purple-400 w-14 shrink-0">{typeLabel}</span>}
-
-                <div className="flex items-center gap-1.5 flex-[1.5] min-w-[120px]">
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Dist. Inizio:</span>
-                    <div className="relative flex-1">
-                        <Input type="number" min="0" step="1"
-                            value={seg.distanceFromStart ?? 0}
-                            onChange={e => onUpdate({ distanceFromStart: parseFloat(e.target.value) || 0 })}
-                            className={cn("text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none", inlineMode ? "h-6" : "h-7")} />
-                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-1 min-w-[100px]">
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Spessore:</span>
-                    <div className="relative flex-1">
-                        <Input type="number" min="1" step="1"
-                            value={seg.thickness}
-                            onChange={e => onUpdate({ thickness: parseFloat(e.target.value) || 0 })}
-                            className={cn("text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none", inlineMode ? "h-6" : "h-7")} />
-                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                    </div>
-                </div>
-
-                {!inlineMode && (
-                    <>
-                        <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
-                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">Base:</span>
-                            <div className="relative flex-1">
-                                <Input type="number" min="1" step="1"
-                                    value={seg.width}
-                                    onChange={e => onUpdate({ width: parseFloat(e.target.value) || 0 })}
-                                    className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
                             </div>
-                        </div>
 
-                        <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
-                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">Altezza:</span>
-                            <div className="relative flex-1">
-                                <Input type="number" min="1" step="1"
-                                    value={seg.height}
-                                    onChange={e => onUpdate({ height: parseFloat(e.target.value) || 0 })}
-                                    className="h-7 text-xs font-mono pr-6 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">mm</span>
-                            </div>
-                        </div>
-                    </>
-                )}
-
-                <div className="flex items-center gap-1 ml-auto shrink-0">
-                    <Label className="text-[10px] text-muted-foreground mr-1 cursor-pointer" onClick={() => onUpdate({ showQuotas: !seg.showQuotas })}>
-                        {inlineMode ? "Q" : "Quote"}
-                    </Label>
-                    <button type="button"
-                        onClick={() => onUpdate({ showQuotas: !seg.showQuotas })}
-                        className={cn(
-                            "relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors",
-                            seg.showQuotas ? "bg-purple-500" : "bg-input"
-                        )}
-                    >
-                        <span className={cn(
-                            "pointer-events-none block h-3 w-3 rounded-full bg-background shadow-lg ring-0 transition-transform",
-                            seg.showQuotas ? "translate-x-3.5" : "translate-x-0"
-                        )} />
-                    </button>
-                </div>
-            </div>
-
-            {seg.showQuotas && (
-                <div className="grid grid-cols-2 gap-2 pl-8 pt-1 border-t border-border/40 animate-in fade-in slide-in-from-top-1">
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted-foreground w-10">Sinistra:</span>
-                        <Input type="number" placeholder="-" value={seg.quotaLeft || ''} onChange={e => onUpdate({ quotaLeft: parseFloat(e.target.value) || undefined })} className="h-6 text-[10px] pr-0 w-16" />
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted-foreground w-10">Destra:</span>
-                        <Input type="number" placeholder="-" value={seg.quotaRight || ''} onChange={e => onUpdate({ quotaRight: parseFloat(e.target.value) || undefined })} className="h-6 text-[10px] pr-0 w-16" />
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted-foreground w-10">Alto:</span>
-                        <Input type="number" placeholder="-" value={seg.quotaTop || ''} onChange={e => onUpdate({ quotaTop: parseFloat(e.target.value) || undefined })} className="h-6 text-[10px] pr-0 w-16" />
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted-foreground w-10">Basso:</span>
-                        <Input type="number" placeholder="-" value={seg.quotaBottom || ''} onChange={e => onUpdate({ quotaBottom: parseFloat(e.target.value) || undefined })} className="h-6 text-[10px] pr-0 w-16" />
-                    </div>
-                </div>
-            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
 
-
-// ==================== Pendino ====================
-
-function PendinoFields({ seg, onUpdate }: {
-    seg: PendinoSegment;
-    onUpdate: (patch: Partial<PendinoSegment>) => void;
-}) {
+function XIcon() {
     return (
-        <div className="flex items-center gap-2">
-            <Pin className="h-3.5 w-3.5 text-green-500 shrink-0" />
-            <span className="text-xs font-medium text-green-400">Pendino</span>
-            <Input
-                placeholder="Nota (opzionale)"
-                value={seg.note || ''}
-                onChange={e => onUpdate({ note: e.target.value })}
-                className="h-5 flex-1 text-[9px] py-0 border-border/40 bg-background/50"
-            />
-        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
     );
 }
