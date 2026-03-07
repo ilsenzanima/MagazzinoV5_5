@@ -236,10 +236,10 @@ export interface RilievoOstacolo {
     distanceFromStart: number; // Misura parziale dove inserire visivamente l'ostacolo 
 
     // Quote aggiuntive foro/passaggio
-    holeWidth?: number; // Base del foro
-    holeHeight?: number; // Altezza del foro
-    offsetFromCeiling?: number; // Distanza dal soffitto
+    offsetFromLeft?: number; // Distanza da sinistra
     offsetFromRight?: number; // Distanza da destra
+    offsetFromTop?: number; // Distanza dal soffitto (sopra)
+    offsetFromBottom?: number; // Distanza dal pavimento (sotto)
 }
 
 export interface RilievoSottomisura {
