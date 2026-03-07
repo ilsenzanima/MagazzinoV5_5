@@ -361,21 +361,21 @@ export default function CuttingSimulatorClient() {
                     )}
 
                     {viewMode === "project" && projectStep === "routing" && (
-                        <div className="w-full max-w-4xl h-full min-h-[500px] flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden animate-in fade-in duration-300">
-                            <div className="p-4 border-b border-border flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-muted gap-4">
+                        <div className="w-full h-full flex flex-col animate-in fade-in duration-300">
+                            <div className="pb-4 flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div>
-                                    <h3 className="font-semibold text-base flex items-center gap-2 text-foreground">
+                                    <h3 className="font-semibold text-lg flex items-center gap-2 text-foreground">
                                         <Pin className="h-5 w-5 text-primary" /> Costruzione Tracciato Architettonico
                                     </h3>
                                     <p className="text-sm text-muted-foreground mt-1">Costruisci il percorso continuo. Aggiungi i tratti e le curve come in cantiere.</p>
                                 </div>
-                                <div className="bg-background border border-border px-4 py-2 rounded-lg shadow-sm w-full sm:w-auto text-center sm:text-left">
+                                <div className="bg-card border border-border px-4 py-2 rounded-lg shadow-sm w-full sm:w-auto text-center sm:text-left">
                                     <div className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5 tracking-wider">Totale Sviluppo Impianto</div>
                                     <div className="font-mono font-bold text-xl leading-none text-foreground">{(project.segments.reduce((acc, s) => acc + (s.type === 'straight' ? s.length : 0), 0) / 1000).toFixed(2)} <span className="text-sm text-muted-foreground">m</span></div>
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto w-full p-4 sm:p-6 bg-muted/30">
+                            <div className="flex-1 w-full relative">
                                 {/* Il form del rilievo (verrà riprogettato) */}
                                 <ProjectForm
                                     project={project}
@@ -384,7 +384,7 @@ export default function CuttingSimulatorClient() {
                                 />
                             </div>
 
-                            <div className="p-4 border-t border-border bg-card shrink-0 flex justify-end">
+                            <div className="pt-6 shrink-0 flex justify-end">
                                 <Button
                                     className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md font-medium text-base w-full sm:w-auto px-8 py-6 h-auto"
                                     onClick={() => setProjectStep('engineering')}

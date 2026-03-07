@@ -123,7 +123,7 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
     const updateOstacolo = (
         cardId: string,
         ostId: string,
-        field: 'thickness' | 'distanceFromStart' | 'holeWidth' | 'holeHeight' | 'offsetFromCeiling' | 'offsetFromRight',
+        field: 'thickness' | 'distanceFromStart' | 'offsetFromLeft' | 'offsetFromRight' | 'offsetFromTop' | 'offsetFromBottom',
         value: number
     ) => {
         updateProjectSegments(cards.map(c => {
@@ -261,32 +261,12 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                                                                     />
                                                                 </div>
                                                                 <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Larghezza Foro</Label>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sinistra</Label>
                                                                     <Input
                                                                         type="number"
-                                                                        value={o.holeWidth || ''}
+                                                                        value={o.offsetFromLeft || ''}
                                                                         placeholder="es. 500"
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'holeWidth', Number(e.target.value))}
-                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Altezza Foro</Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={o.holeHeight || ''}
-                                                                        placeholder="es. 400"
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'holeHeight', Number(e.target.value))}
-                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Soffitto</Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={o.offsetFromCeiling || ''}
-                                                                        placeholder="es. 300"
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromCeiling', Number(e.target.value))}
+                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromLeft', Number(e.target.value))}
                                                                         className="h-8 mt-1 font-mono text-xs bg-background border-border"
                                                                     />
                                                                 </div>
@@ -297,6 +277,26 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                                                                         value={o.offsetFromRight || ''}
                                                                         placeholder="es. 500"
                                                                         onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromRight', Number(e.target.value))}
+                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sopra</Label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={o.offsetFromTop || ''}
+                                                                        placeholder="es. 300"
+                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromTop', Number(e.target.value))}
+                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sotto</Label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={o.offsetFromBottom || ''}
+                                                                        placeholder="es. 400"
+                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromBottom', Number(e.target.value))}
                                                                         className="h-8 mt-1 font-mono text-xs bg-background border-border"
                                                                     />
                                                                 </div>
