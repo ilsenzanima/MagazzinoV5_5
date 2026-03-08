@@ -399,14 +399,14 @@ export default function CuttingSimulatorClient() {
                     {viewMode === "project" && projectStep === "engineering" && (
                         <div className="w-full h-full min-h-0 flex flex-col xl:flex-row gap-4 animate-in fade-in duration-300">
                             {/* Colonna Editor 3D - Prende quasi tutto lo spazio */}
-                            <div className="flex-1 xl:w-3/4 h-[60vh] xl:h-full min-h-[400px] bg-slate-900 rounded-xl overflow-hidden relative shadow-lg ring-1 ring-slate-800">
+                            <div className="flex-1 xl:w-3/4 h-[60vh] xl:h-full min-h-[400px] bg-muted/20 rounded-xl overflow-hidden relative shadow-md ring-1 ring-border">
                                 {/* UI Sovrapposta al 3D */}
-                                <div className="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur-[2px] px-3 py-2 rounded-lg border border-slate-700 shadow-xl pointer-events-none">
+                                <div className="absolute top-4 left-4 z-10 bg-background/80 backdrop-blur-[2px] px-3 py-2 rounded-lg border border-border shadow-md pointer-events-none">
                                     <div className="flex items-center gap-2 mb-1">
                                         <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-200">Editor Taglio Produzione</span>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-foreground">Editor Taglio Produzione</span>
                                     </div>
-                                    <span className="text-[11px] text-slate-400">Tasto Destro sui tratti per tagliare gli spezzoni. Clic SX per selezionare.</span>
+                                    <span className="text-[11px] text-muted-foreground">Tasto Destro sui tratti per tagliare gli spezzoni. Clic SX per selezionare.</span>
                                 </div>
 
                                 <ProjectEditor
@@ -456,7 +456,7 @@ export default function CuttingSimulatorClient() {
                                 )}
 
                                 <Button
-                                    className="w-full gap-2 bg-slate-800 hover:bg-slate-900 text-white shadow-md font-medium text-sm py-6 h-auto mt-2"
+                                    className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md font-medium text-sm py-6 h-auto mt-2 transition-all"
                                     onClick={() => {
                                         handleCalculateProject(project);
                                         setProjectStep("nesting");

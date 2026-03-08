@@ -790,9 +790,12 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
 
     const handleCanvasClick = useCallback((e: React.MouseEvent) => {
         if (isPanning) return;
-        // Chiudi context menu e split dialog se aperti
+        // Chiudi SOLO context menu se aperto. Il dialog Split ora si chiude solo da "Annulla" o "Conferma"
         if (contextMenu) { setContextMenu(null); return; }
-        if (splitDialog) { setSplitDialog(null); return; }
+
+        // Evitiamo di deselettare se c'è uno splitDialog aperto, l'utente sta puntando la quota
+        if (splitDialog) return;
+
         setSelectedIdx(null);
         setSelectedAnnId(null);
 
@@ -904,7 +907,10 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
 
     return (
         <div className="relative w-full h-full flex flex-col overflow-hidden shrink-0 border border-border rounded-xl bg-muted/20" tabIndex={0} onKeyDown={e => {
-            if (e.key === 'Delete' || e.key === 'Backspace') {
+            const activeEl = document.activeElement;
+            const isInput = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || activeEl?.tagName === 'SELECT' || activeEl?.getAttribute('contenteditable') === 'true';
+
+            if (!isInput && (e.key === 'Delete' || e.key === 'Backspace')) {
                 if (selectedIdx !== null) handleRemove(selectedIdx);
                 else if (selectedAnnId !== null) {
                     onProjectChange({ ...project, annotations: project.annotations?.filter(a => a.id !== selectedAnnId) });
