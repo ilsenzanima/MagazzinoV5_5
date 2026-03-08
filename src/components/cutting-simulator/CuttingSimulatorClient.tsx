@@ -22,7 +22,7 @@ import {
 import type { DuctProject } from "@/lib/cutting-simulator/project-model";
 import { defaultProject } from "@/lib/cutting-simulator/project-model";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
-import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid, List, PenTool, MousePointer2, Pin, PencilRuler, ArrowRight } from "lucide-react";
+import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid, List, PenTool, MousePointer2, Pin, PencilRuler, ArrowRight, LayoutTemplate } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,7 +45,7 @@ export default function CuttingSimulatorClient() {
     const [viewMode, setViewMode] = useState<"single" | "project">("project");
 
     // Project workflow step
-    const [projectStep, setProjectStep] = useState<"settings" | "routing" | "engineering">("settings");
+    const [projectStep, setProjectStep] = useState<"settings" | "routing" | "engineering" | "nesting">("settings");
 
     // Form states
     const [project, setProject] = useState<DuctProject>(createInitialProject());
@@ -172,14 +172,15 @@ export default function CuttingSimulatorClient() {
                         {[
                             { id: "settings", label: "1. Parametri Canala", icon: PencilRuler },
                             { id: "routing", label: "2. Tracciato Principale", icon: Pin },
-                            { id: "engineering", label: "3. Taglio Pezzi", icon: Scissors }
+                            { id: "engineering", label: "3. Taglio Pezzi", icon: Scissors },
+                            { id: "nesting", label: "4. Taglio Lastra", icon: LayoutTemplate }
                         ].map(step => {
                             const Icon = step.icon;
                             const isActive = projectStep === step.id;
                             return (
                                 <button
                                     key={step.id}
-                                    onClick={() => setProjectStep(step.id as "settings" | "routing" | "engineering")}
+                                    onClick={() => setProjectStep(step.id as "settings" | "routing" | "engineering" | "nesting")}
                                     className={cn(
                                         "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300",
                                         isActive
@@ -455,29 +456,54 @@ export default function CuttingSimulatorClient() {
                                 )}
 
                                 <Button
-                                    className="w-full gap-2 bg-slate-800 hover:bg-slate-900 text-white shadow-md font-medium text-sm py-6 h-auto"
-                                    onClick={() => handleCalculateProject(project)}
+                                    className="w-full gap-2 bg-slate-800 hover:bg-slate-900 text-white shadow-md font-medium text-sm py-6 h-auto mt-2"
+                                    onClick={() => {
+                                        handleCalculateProject(project);
+                                        setProjectStep("nesting");
+                                    }}
                                 >
-                                    <Layers className="h-5 w-5" /> Ricalcola Piano di Taglio
+                                    {nestingResult ? "Ricalcola e Vai al Taglio Lastra" : "Calcola e Vai al Taglio Lastra"}
+                                    <ArrowRight className="h-5 w-5" />
                                 </Button>
                             </div>
                         </div>
                     )}
 
-                    {/* Visualizzatore Piani di Taglio Nesting Sotto al 3D (se ingegnerizzazione attiva e nested) */}
-                    {viewMode === "project" && projectStep === "engineering" && nestingResult && nestingResult.sheets.length > 0 && (
-                        <div className="w-full border border-border rounded-xl bg-card shadow-md overflow-hidden min-h-[600px] flex flex-col mt-6 flex-shrink-0 animate-in slide-in-from-bottom-8">
-                            <div className="p-4 bg-muted border-b border-border text-foreground flex items-center gap-3">
-                                <Scissors className="h-5 w-5 text-primary" />
-                                <h3 className="font-semibold text-lg">Piano di Produzione Macchina (G-Code)</h3>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4 bg-muted/30">
-                                <CutPlanViewer
-                                    sheets={nestingResult?.sheets || []}
-                                    sheetConfig={sheetConfig}
-                                    unplacedCount={nestingResult?.unplaced.length || 0}
-                                />
-                            </div>
+                    {/* VISTA TAGLIO LASTRA (Nesting) */}
+                    {viewMode === "project" && projectStep === "nesting" && (
+                        <div className="w-full h-full flex flex-col gap-4 animate-in fade-in duration-300">
+                            {nestingResult && nestingResult.sheets.length > 0 ? (
+                                <div className="w-full h-full border border-border rounded-xl bg-card shadow-md flex flex-col">
+                                    <div className="p-4 bg-muted border-b border-border flex items-center justify-between gap-3 shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg">
+                                                <LayoutTemplate className="h-6 w-6" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-lg">Piano di Produzione Macchina (G-Code)</h3>
+                                                <p className="text-sm text-muted-foreground">Distribuzione dei pezzi sulle lastre ({nestingResult.totalSheets} lastre totali).</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-4 bg-muted/30">
+                                        <CutPlanViewer
+                                            sheets={nestingResult?.sheets || []}
+                                            sheetConfig={sheetConfig}
+                                            unplacedCount={nestingResult?.unplaced.length || 0}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex-1 flex items-center justify-center p-8 bg-card rounded-xl border border-dashed border-border/60">
+                                    <div className="text-center space-y-4 max-w-sm">
+                                        <LayoutTemplate className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
+                                        <p className="text-muted-foreground">Nessun piano di taglio calcolato. Torna allo Step 3 ed esplodi i pezzi per generarlo.</p>
+                                        <Button variant="outline" onClick={() => setProjectStep('engineering')}>
+                                            Torna al Taglio Pezzi
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

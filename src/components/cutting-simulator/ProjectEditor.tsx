@@ -634,41 +634,67 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
     const splitSegment = useCallback((segIdx: number, mode: 'half' | 'atDistance' | 'equalParts' | 'nPartsOfX', value?: number) => {
         const seg = project.segments[segIdx];
         if (seg.type !== 'straight') return;
-        const len = (seg as StraightSegment).length;
+        const sSeg = seg as StraightSegment;
+        const len = sSeg.length;
+        const oldObstacles = sSeg.obstacles || [];
         const newSegments = [...project.segments];
+
+        let parts: StraightSegment[] = [];
 
         if (mode === 'half') {
             const half = Math.round(len / 2);
-            const s1 = createStraightSegment(half);
-            const s2 = createStraightSegment(len - half);
-            newSegments.splice(segIdx, 1, s1, s2);
+            parts.push(createStraightSegment(half));
+            parts.push(createStraightSegment(len - half));
         } else if (mode === 'atDistance' && value && value > 0 && value < len) {
-            const s1 = createStraightSegment(value);
-            const s2 = createStraightSegment(len - value);
-            newSegments.splice(segIdx, 1, s1, s2);
+            parts.push(createStraightSegment(value));
+            parts.push(createStraightSegment(len - value));
         } else if (mode === 'equalParts' && value && value >= 2) {
             const partLen = Math.round(len / value);
-            const parts: Segment[] = [];
             let remaining = len;
             for (let i = 0; i < value; i++) {
                 const pLen = i === value - 1 ? remaining : partLen;
                 parts.push(createStraightSegment(pLen));
                 remaining -= partLen;
             }
-            newSegments.splice(segIdx, 1, ...parts);
         } else if (mode === 'nPartsOfX' && value && value > 0) {
             const numParts = Math.ceil(len / value);
-            const parts: Segment[] = [];
             let remaining = len;
             for (let i = 0; i < numParts; i++) {
                 const pLen = Math.min(value, remaining);
                 parts.push(createStraightSegment(pLen));
                 remaining -= pLen;
             }
-            newSegments.splice(segIdx, 1, ...parts);
         } else {
             return; // Valore non valido, non fare nulla
         }
+
+        // Riassegna gli ostacoli alle nuove parti in base al distanceFromStart
+        if (oldObstacles.length > 0) {
+            let currentOffset = 0;
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                const partStart = currentOffset;
+                const partEnd = currentOffset + part.length;
+
+                // Trova gli ostacoli che cadono in questa parte
+                const partObstacles = oldObstacles.filter(o => {
+                    const oDist = o.distanceFromStart || 0;
+                    // L'ostacolo appartiene a questo segmento se il suo centro/inizio è contenuto
+                    return oDist >= partStart && oDist < partEnd;
+                });
+
+                if (partObstacles.length > 0) {
+                    part.obstacles = partObstacles.map(o => ({
+                        ...o,
+                        distanceFromStart: (o.distanceFromStart || 0) - partStart
+                    }));
+                }
+
+                currentOffset += part.length;
+            }
+        }
+
+        newSegments.splice(segIdx, 1, ...parts);
 
         onProjectChange({ ...project, segments: newSegments });
         setContextMenu(null);
