@@ -198,14 +198,20 @@ function PropertiesPanel({
             {segment.type === 'straight' ? (
                 <div className="space-y-2">
                     <div>
-                        <Label className="text-[10px] uppercase text-muted-foreground">Lunghezza (mm)</Label>
+                        <Label className="text-[10px] uppercase text-muted-foreground flex justify-between items-center">
+                            Lunghezza (mm)
+                        </Label>
                         <Input
                             type="number"
-                            min={50}
                             value={segment.length}
-                            onChange={e => onUpdate(index, { length: Number(e.target.value) })}
-                            className="h-8 text-sm"
+                            readOnly
+                            disabled
+                            className="h-8 text-sm opacity-70 bg-muted cursor-not-allowed"
+                            title="La lunghezza dei tratti dritti è gestita dal Wizard iniziale o dividendo/unendo i segmenti in 3D."
                         />
+                        <p className="text-[9px] text-muted-foreground mt-1 leading-tight">
+                            Gestito da Tagli/Unioni 3D o dal Wizard.
+                        </p>
                     </div>
                     <div>
                         <Label className="text-[10px] uppercase text-muted-foreground">Etichetta</Label>
@@ -251,7 +257,7 @@ function PropertiesPanel({
                                         key={d}
                                         onClick={() => onUpdate(index, { direction: d })}
                                         className={cn(
-                                            "p-1.5 rounded text-xs flex items-center justify-center",
+                                            "p-1.5 rounded text-xs flex items-center justify-center transition-colors",
                                             (segment as Elbow90Segment).direction === d
                                                 ? "bg-primary text-primary-foreground"
                                                 : "bg-muted/50 hover:bg-muted"
@@ -261,6 +267,30 @@ function PropertiesPanel({
                                     </button>
                                 );
                             })}
+                        </div>
+                    </div>
+
+                    <div className="pt-1 border-t border-border/50">
+                        <Label className="text-[10px] uppercase text-muted-foreground mt-1 block mb-1">Costruzione Angolo</Label>
+                        <div className="grid grid-cols-2 gap-1">
+                            <button
+                                onClick={() => onUpdate(index, { baseMode: 'split' })}
+                                className={cn(
+                                    "p-1.5 text-xs rounded transition-colors whitespace-nowrap overflow-hidden text-ellipsis",
+                                    (segment as Elbow90Segment).baseMode === 'split' ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-foreground"
+                                )}
+                            >
+                                2 Pezzi (Diviso)
+                            </button>
+                            <button
+                                onClick={() => onUpdate(index, { baseMode: 'single' })}
+                                className={cn(
+                                    "p-1.5 text-xs rounded transition-colors whitespace-nowrap overflow-hidden text-ellipsis",
+                                    (segment as Elbow90Segment).baseMode === 'single' ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-foreground"
+                                )}
+                            >
+                                Pezzo Unico
+                            </button>
                         </div>
                     </div>
                 </div>
