@@ -108,6 +108,16 @@ function StraightMesh({ node, section, selected, onClick, jointBands, jointBandW
                     <meshStandardMaterial color={JOINT_COLOR} transparent opacity={0.4} />
                 </mesh>
             )}
+
+            {/* Freccia Direzionale (Overlay) */}
+            {length > 0.1 && (
+                <group position={[0, outerH / 2 + 0.005, -length / 2]}>
+                    <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                        <coneGeometry args={[outerW * 0.25, 0.1, 4]} />
+                        <meshBasicMaterial color={selected ? "#f59e0b" : "#3b82f6"} transparent opacity={0.6} depthTest={false} />
+                    </mesh>
+                </group>
+            )}
         </group>
     );
 }
@@ -205,26 +215,48 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
 /** Pendino — barra verticale dal soffitto alla canala */
 function PendinoMesh({ node, selected, onClick }: SegmentMeshProps) {
     const pos = useMemo(() => v3(node.start), [node.start]);
-    const pendHeight = 0.6;
+    const pendHeight = 0.6; // Distanza dal top della canala verso il soffitto
     const color = selected ? DUCT_COLOR_SELECTED : PENDINO_COLOR;
     const outerH = node.outerH * SCALE;
     const outerW = node.outerW * SCALE;
 
+    // Le barre laterali distano un pelo dalla canala
+    const barX = outerW / 2 + 0.01;
+
+    // Piastra a soffitto
+    const ceilY = outerH / 2 + pendHeight;
+
+    // Asse di supporto sotto la canala
+    const barY = -outerH / 2 - 0.005;
+
+    // Le barre verticali vanno dal soffitto (ceilY) fin sotto l'asse di supporto (barY - 0.02)
+    const rodBottom = barY - 0.02;
+    const rodLen = ceilY - rodBottom;
+    const rodY = (ceilY + rodBottom) / 2;
+
     return (
         <group position={pos} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-            {/* Barra verticale */}
-            <mesh position={[0, pendHeight / 2 + outerH / 2, 0]}>
-                <cylinderGeometry args={[0.005, 0.005, pendHeight, 8]} />
+            {/* Barre verticali */}
+            <mesh position={[-barX, rodY, 0]}>
+                <cylinderGeometry args={[0.004, 0.004, rodLen, 8]} />
                 <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
             </mesh>
-            {/* Piastra fissaggio */}
-            <mesh position={[0, pendHeight + outerH / 2, 0]}>
+            <mesh position={[barX, rodY, 0]}>
+                <cylinderGeometry args={[0.004, 0.004, rodLen, 8]} />
+                <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
+            </mesh>
+            {/* Piastre fissaggio a soffitto */}
+            <mesh position={[-barX, ceilY, 0]}>
                 <boxGeometry args={[0.04, 0.003, 0.04]} />
                 <meshStandardMaterial color={color} metalness={0.7} roughness={0.2} />
             </mesh>
-            {/* Staffa */}
-            <mesh position={[0, outerH / 2, 0]}>
-                <boxGeometry args={[outerW + 0.01, 0.004, 0.03]} />
+            <mesh position={[barX, ceilY, 0]}>
+                <boxGeometry args={[0.04, 0.003, 0.04]} />
+                <meshStandardMaterial color={color} metalness={0.7} roughness={0.2} />
+            </mesh>
+            {/* Staffa di supporto orizzontale sotto la canala */}
+            <mesh position={[0, barY, 0]}>
+                <boxGeometry args={[outerW + 0.04, 0.004, 0.03]} />
                 <meshStandardMaterial color={color} metalness={0.5} roughness={0.3} />
             </mesh>
         </group>
