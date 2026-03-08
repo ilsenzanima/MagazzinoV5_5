@@ -87,7 +87,7 @@ const SEGMENT_COLORS: Record<string, string> = {
     straight: '#3b82f6',   // blue
     elbow90: '#f59e0b',    // amber
     obstacle: '#a855f7',   // purple
-    pendino: '#22c55e',    // green
+    pendino: '#94a3b8',    // slate-400 (acciaio)
 };
 
 // ==================== LAYOUT ENGINE ====================
@@ -526,46 +526,94 @@ export function projectTo2D(
                     z: (node.start.z + node.end.z) / 2 + off.z
                 });
             } else if (seg.type === 'pendino') {
-                // Pendino: piccola barra trasversale come marker
-                const markerSize = node.outerW * 0.6;
+                // Pendino: due barre filettate scendono sotto la canala, collegate da una sbarra
+                const markerSize = node.outerW / 2 + 10;
+                const dropDown = node.outerH / 2 + 30; // 30mm sotto la canala
+                const topUp = node.outerH / 2 + 200; // 200mm sopra
                 const p = node.start;
                 const d = node.direction;
-                // Barra perpendicolare alla direzione
-                let bar1: Vec3, bar2: Vec3;
+
+                let left: Vec3, right: Vec3;
                 if (d === '+x' || d === '-x') {
-                    bar1 = { x: p.x, y: p.y - markerSize, z: p.z };
-                    bar2 = { x: p.x, y: p.y + markerSize, z: p.z };
+                    left = { x: p.x, y: p.y - markerSize, z: p.z };
+                    right = { x: p.x, y: p.y + markerSize, z: p.z };
                 } else {
-                    bar1 = { x: p.x - markerSize, y: p.y, z: p.z };
-                    bar2 = { x: p.x + markerSize, y: p.y, z: p.z };
+                    left = { x: p.x - markerSize, y: p.y, z: p.z };
+                    right = { x: p.x + markerSize, y: p.y, z: p.z };
                 }
-                // Linea verticale per il "filo" del pendino
-                const top: Vec3 = { x: p.x, y: p.y, z: p.z + node.outerH * 0.8 };
-                const pendColor = SEGMENT_COLORS['pendino'] || '#22c55e';
-                // Barra orizzontale
+
+                const leftBottom = { x: left.x, y: left.y, z: left.z - dropDown };
+                const rightBottom = { x: right.x, y: right.y, z: right.z - dropDown };
+
+                const leftTop = { x: left.x, y: left.y, z: left.z + topUp };
+                const rightTop = { x: right.x, y: right.y, z: right.z + topUp };
+
+                const pendColor = SEGMENT_COLORS['pendino'];
+
+                // Barra orizzontale sotto
                 polygons.push({
-                    points: [iso(bar1), iso(bar2)],
-                    x: 0, y: 0,
-                    fill: 'none',
-                    stroke: pendColor,
-                    strokeWidth: 3,
-                    strokeDasharray: undefined,
-                    depth: 9999, // sempre in primo piano
+                    points: [iso(leftBottom), iso(rightBottom)],
+                    fill: 'none', stroke: pendColor, strokeWidth: 4, depth: 9999
                 } as any);
-                // Linea verticale
+                // Asta verticale sinistra
                 polygons.push({
-                    points: [iso(p), iso(top)],
-                    x: 0, y: 0,
-                    fill: 'none',
-                    stroke: pendColor,
-                    strokeWidth: 2,
-                    strokeDasharray: '4,3',
-                    depth: 9999,
+                    points: [iso(leftBottom), iso(leftTop)],
+                    fill: 'none', stroke: pendColor, strokeWidth: 2, depth: 9999
                 } as any);
-                labelPos = iso(top);
+                // Asta verticale destra
+                polygons.push({
+                    points: [iso(rightBottom), iso(rightTop)],
+                    fill: 'none', stroke: pendColor, strokeWidth: 2, depth: 9999
+                } as any);
+
+                labelPos = iso({ ...p, z: p.z + topUp });
             } else {
                 polygons = generateBoxPolygons(node.start, node.end, node.outerW, node.outerH, baseColor);
                 polygons.sort((a: any, b: any) => a.depth - b.depth);
+
+                // Disegna freccia su tratti dritti per indicare direzione
+                if (seg.type === 'straight') {
+                    const midX = (node.start.x + node.end.x) / 2;
+                    const midY = (node.start.y + node.end.y) / 2;
+                    const midZ = (node.start.z + node.end.z) / 2;
+
+                    const arrowLen = Math.min(node.outerW / 2, 100);
+                    const topZ = midZ + node.outerH / 2 + 2;
+
+                    const arrowCenter = { x: midX, y: midY, z: topZ };
+                    const d = node.direction;
+                    const w = arrowLen / 1.5;
+
+                    let p1: Vec3 | null = null, p2: Vec3 | null = null, p3: Vec3 | null = null;
+                    if (d === '+x') {
+                        p1 = { x: arrowCenter.x + arrowLen, y: arrowCenter.y, z: topZ };
+                        p2 = { x: arrowCenter.x - arrowLen, y: arrowCenter.y - w, z: topZ };
+                        p3 = { x: arrowCenter.x - arrowLen, y: arrowCenter.y + w, z: topZ };
+                    } else if (d === '-x') {
+                        p1 = { x: arrowCenter.x - arrowLen, y: arrowCenter.y, z: topZ };
+                        p2 = { x: arrowCenter.x + arrowLen, y: arrowCenter.y - w, z: topZ };
+                        p3 = { x: arrowCenter.x + arrowLen, y: arrowCenter.y + w, z: topZ };
+                    } else if (d === '+y') {
+                        p1 = { x: arrowCenter.x, y: arrowCenter.y + arrowLen, z: topZ };
+                        p2 = { x: arrowCenter.x - w, y: arrowCenter.y - arrowLen, z: topZ };
+                        p3 = { x: arrowCenter.x + w, y: arrowCenter.y - arrowLen, z: topZ };
+                    } else if (d === '-y') {
+                        p1 = { x: arrowCenter.x, y: arrowCenter.y - arrowLen, z: topZ };
+                        p2 = { x: arrowCenter.x - w, y: arrowCenter.y + arrowLen, z: topZ };
+                        p3 = { x: arrowCenter.x + w, y: arrowCenter.y + arrowLen, z: topZ };
+                    }
+
+                    if (p1 && p2 && p3) {
+                        polygons.push({
+                            points: [iso(p1), iso(p2), iso(p3)],
+                            fill: 'rgba(255,255,255,0.8)',
+                            stroke: 'rgba(0,0,0,0.5)',
+                            strokeWidth: 1,
+                            depth: 9999
+                        } as any);
+                    }
+                }
+
                 labelPos = iso({
                     x: (node.start.x + node.end.x) / 2,
                     y: (node.start.y + node.end.y) / 2,
