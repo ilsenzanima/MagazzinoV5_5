@@ -47,10 +47,17 @@ export interface ContextualElementSegment extends BaseSegment {
     distanceFromStart?: number;
 }
 
+export interface PendinoItem {
+    id: string;
+    distance: number;
+    fromEnd: boolean;
+}
+
 export interface StraightSegment extends BaseSegment {
     type: 'straight';
     length: number;
     obstacles?: ContextualElementSegment[];
+    pendini?: PendinoItem[];
 }
 
 export interface Elbow90Segment extends BaseSegment {
@@ -75,15 +82,11 @@ export interface TrackSeparatorSegment extends BaseSegment {
     startZ?: number;
 }
 
-export interface PendinoSegment extends BaseSegment {
+export interface RenderPendinoSegment extends BaseSegment {
     type: 'pendino';
-    /** Posizione lungo il tratto (mm dalla partenza del segmento precedente) */
-    position?: number;
-    /** Nota testuale opzionale */
-    note?: string;
 }
 
-export type Segment = StraightSegment | Elbow90Segment | TrackSeparatorSegment | ContextualElementSegment | PendinoSegment;
+export type Segment = StraightSegment | Elbow90Segment | TrackSeparatorSegment | ContextualElementSegment | RenderPendinoSegment;
 
 // ==================== ANNOTAZIONI & CONTESTO ====================
 
@@ -180,14 +183,6 @@ export function createObstacleSegment(obstacleType: ObstacleType = 'wall', inner
         distanceFromStart
     };
 }
-
-export function createPendinoSegment(): PendinoSegment {
-    return {
-        id: `pen-${++_segCounter}-${Date.now()}`,
-        type: 'pendino',
-    };
-}
-
 export function defaultSection(): SectionProfile {
     return {
         innerWidth: 200,
