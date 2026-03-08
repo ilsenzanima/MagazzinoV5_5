@@ -260,6 +260,31 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 }
             }
 
+            if (seg.type === 'straight' && seg.pendini && seg.pendini.length > 0) {
+                for (let pIdx = 0; pIdx < seg.pendini.length; pIdx++) {
+                    const pend = seg.pendini[pIdx];
+                    const dist = pend.fromEnd ? (seg.length - pend.distance) : pend.distance;
+                    const safeDist = Math.max(0, Math.min(dist, seg.length));
+
+                    const pStart: Vec3 = {
+                        x: pos.x + v.x * safeDist,
+                        y: pos.y + v.y * safeDist,
+                        z: pos.z + v.z * safeDist,
+                    };
+
+                    nodes.push({
+                        segment: { type: 'pendino', id: pend.id, label: 'Pendino' } as any,
+                        index: i + (pIdx + 1) * 0.001,
+                        start: pStart,
+                        end: pStart, // Il pendino è un punto singolo
+                        direction: dir,
+                        outerW,
+                        outerH,
+                        trackId: currentTrackId,
+                    });
+                }
+            }
+
             pos = end;
         } else if (seg.type === 'elbow90') {
             const vIn = dirVec(dir);
@@ -296,18 +321,6 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
             // Aggiorna posizione e direzione dopo la curva
             pos = end;
             dir = dirOut;
-        } else if (seg.type === 'pendino') {
-            // Il pendino non occupa spazio, è solo un marker nella posizione corrente
-            nodes.push({
-                segment: seg,
-                index: i,
-                start: { ...pos },
-                end: { ...pos },
-                direction: dir,
-                outerW,
-                outerH,
-                trackId: currentTrackId,
-            });
         }
     }
 
@@ -332,7 +345,7 @@ export function projectTo2D(
             if (seg.type === 'straight') labelText = `${seg.length} mm`;
             else if (seg.type === 'elbow90') labelText = `↱ ${seg.direction}`;
             else if (seg.type === 'obstacle') labelText = `${seg.obstacleType === 'wall' ? 'Muro' : seg.obstacleType === 'floor' ? 'Solaio' : 'Ost.'} ${seg.thickness}mm`;
-            else if (seg.type === 'pendino') labelText = `📌${seg.note ? ' ' + seg.note : ''}`;
+            else if (seg.type === 'pendino') labelText = `📌 Pendino`;
         }
 
         const baseResult = {

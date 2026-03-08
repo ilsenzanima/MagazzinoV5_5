@@ -1,8 +1,8 @@
 ﻿"use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment, PendinoSegment } from "@/lib/cutting-simulator/project-model";
-import { createStraightSegment, createElbow90Segment, createObstacleSegment, createPendinoSegment } from "@/lib/cutting-simulator/project-model";
+import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment } from "@/lib/cutting-simulator/project-model";
+import { createStraightSegment, createElbow90Segment, createObstacleSegment } from "@/lib/cutting-simulator/project-model";
 import {
     computeLayout,
     projectTo2D,
@@ -221,6 +221,76 @@ function PropertiesPanel({
                             placeholder="opzionale"
                             className="h-8 text-sm"
                         />
+                    </div>
+
+                    <div className="pt-2 border-t border-border/50">
+                        <div className="flex items-center justify-between mb-2">
+                            <Label className="text-[10px] uppercase text-muted-foreground">📌 Pendini</Label>
+                            <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{(segment as StraightSegment).pendini?.length || 0}</span>
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="flex gap-1">
+                                <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 px-1" onClick={() => {
+                                    const current = (segment as StraightSegment).pendini || [];
+                                    onUpdate(index, { pendini: [...current, { id: `pend-${Date.now()}`, distance: 500, fromEnd: false }] });
+                                }}>
+                                    + Singolo (500)
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 px-1" onClick={() => {
+                                    const start = 500;
+                                    const step = 1000;
+                                    const len = (segment as StraightSegment).length;
+                                    const newPendini = [];
+                                    for (let dist = start; dist <= len - 100; dist += step) {
+                                        newPendini.push({ id: `pend-${Date.now()}-${dist}`, distance: dist, fromEnd: false });
+                                    }
+                                    onUpdate(index, { pendini: newPendini });
+                                }}>
+                                    + Passo 50+100
+                                </Button>
+                            </div>
+
+                            {((segment as StraightSegment).pendini || []).length > 0 && (
+                                <div className="space-y-1 max-h-32 overflow-y-auto pr-1 mt-2 custom-scrollbar">
+                                    {((segment as StraightSegment).pendini || []).map((p, pIdx) => (
+                                        <div key={p.id} className="flex items-center gap-1 bg-muted/50 p-1 rounded">
+                                            <Input
+                                                className="h-6 text-[10px] w-14 px-1 text-center font-mono"
+                                                type="number"
+                                                value={p.distance}
+                                                onChange={e => {
+                                                    const arr = [...((segment as StraightSegment).pendini || [])];
+                                                    arr[pIdx] = { ...arr[pIdx], distance: Number(e.target.value) };
+                                                    onUpdate(index, { pendini: arr });
+                                                }}
+                                            />
+                                            <button
+                                                className="text-[9px] text-muted-foreground mr-auto hover:text-foreground cursor-pointer"
+                                                title="Clicca per invertire da Inizio/Fine"
+                                                onClick={() => {
+                                                    const arr = [...((segment as StraightSegment).pendini || [])];
+                                                    arr[pIdx] = { ...arr[pIdx], fromEnd: !arr[pIdx].fromEnd };
+                                                    onUpdate(index, { pendini: arr });
+                                                }}
+                                            >
+                                                {p.fromEnd ? 'da fine' : 'da inizio'}
+                                            </button>
+                                            <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-destructive/10 text-destructive shrink-0" onClick={() => {
+                                                const arr = [...((segment as StraightSegment).pendini || [])];
+                                                arr.splice(pIdx, 1);
+                                                onUpdate(index, { pendini: arr });
+                                            }}>
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                    <Button variant="ghost" size="sm" className="w-full h-6 text-[9px] text-destructive hover:bg-destructive/10 mt-1" onClick={() => onUpdate(index, { pendini: [] })}>
+                                        Rimuovi Tutti
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             ) : (
@@ -1482,7 +1552,7 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
                                 {seg?.type === 'straight' ? `Dritto ${(seg as StraightSegment).length}mm` :
                                     seg?.type === 'elbow90' ? 'Curva 90°' :
                                         seg?.type === 'obstacle' ? `Ostacolo (${(seg as ContextualElementSegment).obstacleType})` :
-                                            seg?.type === 'pendino' ? 'Pendino' : 'Segmento'}
+                                            'Segmento'}
                             </div>
 
                             {/* Opzioni Divisione (solo per dritti) */}
@@ -1567,36 +1637,24 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
                                 </>
                             )}
 
-                            {/* Inserisci dopo */}
-                            <div className="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">Inserisci dopo</div>
-                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx as number, createStraightSegment(1000))}>
-                                ➕ Dritto (1000mm)
-                            </button>
-                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx as number, createElbow90Segment('right'))}>
-                                🔄 Curva 90°
-                            </button>
-                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertObstacleAfter(contextMenu.segIdx as number, 'wall')}>
-                                🧱 Muro
-                            </button>
-                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertObstacleAfter(contextMenu.segIdx as number, 'floor')}>
-                                🏗️ Solaio
-                            </button>
-                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2"
-                                onClick={() => insertSegmentAfter(contextMenu.segIdx as number, createPendinoSegment())}>
-                                📌 Pendino
-                            </button>
-
-                            <div className="border-t border-border/50 my-1" />
-
-                            {/* Elimina */}
-                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-destructive/10 text-destructive flex items-center gap-2"
-                                onClick={() => { handleRemove(contextMenu.segIdx as number); setContextMenu(null); }}>
-                                🗑️ Elimina segmento
-                            </button>
+                            {/* Elimina / Merge */}
+                            {seg?.type === 'straight' && canMerge ? (
+                                <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-destructive/10 text-destructive flex items-center gap-2"
+                                    onClick={() => {
+                                        // "Elimina" per un pezzo dritto in una run significa fonderlo.
+                                        mergeRun(contextMenu.segIdx as number);
+                                        setContextMenu(null);
+                                    }}>
+                                    🗑️ Elimina (Fondi tratto)
+                                </button>
+                            ) : (
+                                seg?.type !== 'straight' && (
+                                    <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-destructive/10 text-destructive flex items-center gap-2"
+                                        onClick={() => { handleRemove(contextMenu.segIdx as number); setContextMenu(null); }}>
+                                        🗑️ Elimina elemento
+                                    </button>
+                                )
+                            )}
                         </div>
                     </>
                 );

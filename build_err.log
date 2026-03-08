@@ -8,18 +8,63 @@
   ┬À optimizePackageImports
 
   Creating an optimized production build ...
-Ô£ô Compiled successfully in 15.4s
+Ô£ô Compiled successfully in 34.1s
   Running TypeScript ...
-Failed to compile.
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/33) ...
+  Generating static pages using 7 workers (8/33) 
+  Generating static pages using 7 workers (16/33) 
+  Generating static pages using 7 workers (24/33) 
+Ô£ô Generating static pages using 7 workers (33/33) in 1893.9ms
+  Finalizing page optimization ...
 
-./src/components/cutting-simulator/ProjectForm.tsx:144:23
-Type error: Cannot find name 'isRoutingMode'.
+Route (app)
+Ôöî ãÆ /
+Ôö£ Ôùï /_not-found
+Ôö£ ãÆ /api/health
+Ôö£ ãÆ /attendance
+Ôö£ ãÆ /attendance/request
+Ôö£ ãÆ /auth/callback
+Ôö£ Ôùï /clients
+Ôö£ Ôùï /clients/new
+Ôö£ ãÆ /dashboard
+Ôö£ Ôùï /disegno-taglio
+Ôö£ ãÆ /disegno-taglio/[id]
+Ôö£ ãÆ /inventory
+Ôö£ ãÆ /inventory/[id]
+Ôö£ Ôùï /inventory/new
+Ôö£ ãÆ /jobs
+Ôö£ ãÆ /jobs/[id]
+Ôö£ Ôùï /jobs/new
+Ôö£ Ôùï /load-notes
+Ôö£ ãÆ /load-notes/[id]
+Ôö£ ãÆ /load-notes/[id]/edit
+Ôö£ Ôùï /load-notes/new
+Ôö£ Ôùï /login
+Ôö£ ãÆ /movements
+Ôö£ ãÆ /movements/[id]
+Ôö£ ãÆ /movements/[id]/edit
+Ôö£ ãÆ /movements/new
+Ôö£ ãÆ /print/delivery-note/[id]
+Ôö£ Ôùï /purchases
+Ôö£ ãÆ /purchases/[id]
+Ôö£ Ôùï /purchases/new
+Ôö£ Ôùï /register
+Ôö£ Ôùï /reports
+Ôö£ Ôùï /settings
+Ôö£ Ôùï /settings/admin
+Ôö£ Ôùï /settings/backup
+Ôö£ Ôùï /settings/data
+Ôö£ Ôùï /settings/notifications
+Ôö£ Ôùï /settings/profile
+Ôö£ Ôùï /suppliers
+Ôö£ ãÆ /suppliers/[id]
+Ôö£ Ôùï /suppliers/new
+Ôöö ãÆ /workers
 
-  142 |
-  143 |                     {/* Le impostazioni globali e giunti non servono nel rilievo puro, le nascondiamo se in routing mode */}
-> 144 |                     {!isRoutingMode && (
-      |                       ^
-  145 |                         <>
-  146 |                             {/* === IMPOSTAZIONI MISURE === */}
-  147 |                             <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border border-border/40">
-Next.js build worker exited with code: 1 and signal: null
+
+ãÆ Proxy (Middleware)
+
+Ôùï  (Static)   prerendered as static content
+ãÆ  (Dynamic)  server-rendered on demand
+
