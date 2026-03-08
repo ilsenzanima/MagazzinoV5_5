@@ -166,9 +166,9 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                                                                 </div>
                                                             ) : (
                                                                 <div className="pl-6 relative mt-2 mb-2">
-                                                                    <div className="absolute top-1/2 left-3 w-3 h-px bg-indigo-500/50 -translate-y-1/2"></div>
-                                                                    <div className="p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-lg space-y-3 relative overflow-hidden shadow-sm">
-                                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400"></div>
+                                                                    <div className="absolute top-1/2 left-3 w-3 h-px bg-border -translate-y-1/2"></div>
+                                                                    <div className="p-3 bg-card border border-border rounded-lg space-y-3 relative overflow-hidden shadow-sm">
+                                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
                                                                         <div className="flex items-center justify-between">
                                                                             <span className="flex items-center gap-2 text-foreground font-semibold text-sm">Muro / Solaio</span>
                                                                             <Button variant="ghost" size="icon" onClick={() => removeElement(card.id, el.id)} className="h-6 w-6 text-destructive hover:bg-destructive/10"><XIcon /></Button>
@@ -208,7 +208,7 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                                                                                     variant="outline"
                                                                                     size="sm"
                                                                                     onClick={() => toggleWallAdvanced(el.id)}
-                                                                                    className="h-8 text-[10px] uppercase font-semibold text-indigo-600 dark:text-indigo-400 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/40"
+                                                                                    className="h-8 text-[10px] uppercase font-semibold border-border hover:bg-accent hover:text-accent-foreground"
                                                                                 >
                                                                                     <Settings2 className="h-3 w-3 mr-1" />
                                                                                     {expandedWalls[el.id] ? "Nascondi Distanze" : "Mostra Distanze Foro"}
