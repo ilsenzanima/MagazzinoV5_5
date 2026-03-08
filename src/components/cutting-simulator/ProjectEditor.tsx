@@ -401,9 +401,10 @@ interface ProjectEditorProps {
     disableInteraction?: boolean;
     hideCutPlan?: boolean;
     boardDimensions?: { width: number; height: number; };
+    headerAction?: React.ReactNode;
 }
 
-export function ProjectEditor({ project, onProjectChange, disableInteraction, hideCutPlan, boardDimensions }: ProjectEditorProps) {
+export function ProjectEditor({ project, onProjectChange, disableInteraction, hideCutPlan, boardDimensions, headerAction }: ProjectEditorProps) {
     const [viewFamily, setViewFamily] = useState<'top' | 'side' | 'iso' | '3d'>('3d');
     const [sideFace, setSideFace] = useState<SideFaceType>('front');
 
@@ -1126,6 +1127,12 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
                             <Move className="h-3 w-3" /> Reset
                         </Button>
                     </div>
+
+                    {headerAction && (
+                        <div className="flex items-center ml-2 border-l border-border/50 pl-2">
+                            {headerAction}
+                        </div>
+                    )}
                 </div>
             </div>
 

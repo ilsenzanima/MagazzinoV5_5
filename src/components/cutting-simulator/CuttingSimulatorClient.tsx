@@ -415,20 +415,24 @@ export default function CuttingSimulatorClient() {
                                     boardDimensions={{ width: sheetConfig.width, height: sheetConfig.height }}
                                     hideCutPlan={true}
                                     disableInteraction={false}
+                                    headerAction={(
+                                        <Button
+                                            size="sm"
+                                            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm font-medium transition-all"
+                                            onClick={() => {
+                                                handleCalculateProject(project);
+                                                setProjectStep("nesting");
+                                            }}
+                                        >
+                                            {nestingResult ? "Ricalcola Taglio Lastra" : "Calcola e Vai al Taglio"}
+                                            <ArrowRight className="h-4 w-4" />
+                                        </Button>
+                                    )}
                                 />
                             </div>
 
                             {/* Colonna Risultati e Verifica (Scrollabile Verticalmente a lato) */}
-                            <div className="w-full xl:w-1/4 xl:h-full flex flex-col gap-4 overflow-y-auto pr-1 pb-4 shrink-0">
-                                <div className="bg-card border border-border rounded-xl shadow-sm p-4 space-y-4">
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <Sparkles className="h-4 w-4 text-blue-500" />
-                                            Dimensione Lastra
-                                        </h4>
-                                        <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} inline={true} />
-                                    </div>
-                                </div>
+                            <div className="w-full xl:w-80 xl:h-full flex flex-col gap-4 overflow-y-auto pr-1 pb-4 shrink-0">
 
                                 <div className="bg-card border border-border rounded-xl shadow-sm p-4 space-y-4">
                                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-2">
@@ -454,17 +458,6 @@ export default function CuttingSimulatorClient() {
                                         </div>
                                     </div>
                                 )}
-
-                                <Button
-                                    className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md font-medium text-sm py-6 h-auto mt-2 transition-all"
-                                    onClick={() => {
-                                        handleCalculateProject(project);
-                                        setProjectStep("nesting");
-                                    }}
-                                >
-                                    {nestingResult ? "Ricalcola e Vai al Taglio Lastra" : "Calcola e Vai al Taglio Lastra"}
-                                    <ArrowRight className="h-5 w-5" />
-                                </Button>
                             </div>
                         </div>
                     )}
@@ -480,9 +473,15 @@ export default function CuttingSimulatorClient() {
                                                 <LayoutTemplate className="h-6 w-6" />
                                             </div>
                                             <div>
-                                                <h3 className="font-semibold text-lg">Piano di Produzione Macchina (G-Code)</h3>
-                                                <p className="text-sm text-muted-foreground">Distribuzione dei pezzi sulle lastre ({nestingResult.totalSheets} lastre totali).</p>
+                                                <h3 className="text-lg font-semibold text-foreground leading-tight">Mappa di Taglio Lastre</h3>
+                                                <p className="text-sm text-muted-foreground leading-tight">Ottimizzazione dei pezzi sulla lastra {sheetConfig.width}x{sheetConfig.height}mm</p>
                                             </div>
+                                        </div>
+
+                                        {/* Dimensione Lastra Form nello Step 4 */}
+                                        <div className="bg-background rounded p-2 flex border border-border/50 items-center justify-center gap-2 shadow-sm shrink-0">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase px-2">Imposta Lastra:</div>
+                                            <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} inline={true} />
                                         </div>
                                     </div>
                                     <div className="flex-1 overflow-y-auto p-4 bg-muted/30">
