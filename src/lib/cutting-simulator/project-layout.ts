@@ -108,15 +108,15 @@ function dirVec(dir: Direction3D): Vec3 {
 function turnDirection(current: Direction3D, turn: 'left' | 'right' | 'up' | 'down'): Direction3D {
     // Mappa di rotazione basata sulla vista dall'alto (piano XY)
     const turnMap: Record<string, Direction3D> = {
-        // Orizzontali (piano XY)
-        '+x_right': '+y',
-        '+x_left': '-y',
-        '-x_right': '-y',
-        '-x_left': '+y',
-        '+y_right': '-x',
-        '+y_left': '+x',
-        '-y_right': '+x',
-        '-y_left': '-x',
+        // Orizzontali (piano XY) - Sistema Coordinate Destrorso
+        '+x_right': '-y',
+        '+x_left': '+y',
+        '-x_right': '+y',
+        '-x_left': '-y',
+        '+y_right': '+x',
+        '+y_left': '-x',
+        '-y_right': '-x',
+        '-y_left': '+x',
         // Verticali (su/giù)
         '+x_up': '+z',
         '+x_down': '-z',
@@ -126,7 +126,7 @@ function turnDirection(current: Direction3D, turn: 'left' | 'right' | 'up' | 'do
         '+y_down': '-z',
         '-y_up': '+z',
         '-y_down': '-z',
-        '+z_right': '+x',
+        '+z_right': '+x', // Da rivedere se la logica Z richiede Y o X
         '+z_left': '-x',
         '-z_right': '+x',
         '-z_left': '-x',
