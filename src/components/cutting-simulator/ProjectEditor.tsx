@@ -725,14 +725,28 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
 
         const runSegments = segs.slice(startIndex, endIndex + 1);
 
-        // Sommo la lunghezza di TUTTI i dritti contigui
+        // Sommo la lunghezza di TUTTI i dritti contigui e colleziono gli ostacoli
         let totalLength = 0;
+        const allObstacles: typeof project.segments[0][] = [];
+
         for (const s of runSegments) {
-            totalLength += (s as StraightSegment).length;
+            const sSeg = s as StraightSegment;
+            if (sSeg.obstacles && sSeg.obstacles.length > 0) {
+                // Aggiungiamo il totalLength accumulato finora alla posizione dell'ostacolo
+                const mappedObstacles = sSeg.obstacles.map(o => ({
+                    ...o,
+                    distanceFromStart: (o.distanceFromStart || 0) + totalLength
+                }));
+                allObstacles.push(...mappedObstacles);
+            }
+            totalLength += sSeg.length;
         }
 
         // Creo l'unico segmento dritto unificato
         const unifiedStraight = createStraightSegment(totalLength);
+        if (allObstacles.length > 0) {
+            unifiedStraight.obstacles = allObstacles as any;
+        }
 
         // Sostituisco i dritti con quello unito
         segs.splice(startIndex, runSegments.length, unifiedStraight);
