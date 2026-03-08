@@ -175,12 +175,32 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                                                                         </div>
                                                                         <div className="flex flex-col gap-3 mt-2">
                                                                             <div className="flex items-end gap-3">
-                                                                                <div className="flex-1 max-w-[150px]">
+                                                                                <div className="flex-1 max-w-[120px]">
                                                                                     <Label className="text-[10px] text-muted-foreground uppercase">Spessore Muro</Label>
                                                                                     <Input
                                                                                         type="number"
                                                                                         value={el.thickness || 0}
                                                                                         onChange={(e) => updateElement(card.id, el.id, 'thickness', Number(e.target.value))}
+                                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                                    />
+                                                                                </div>
+                                                                                <div className="flex-1 max-w-[120px]">
+                                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Base Totale</Label>
+                                                                                    <Input
+                                                                                        type="number"
+                                                                                        value={el.width || ''}
+                                                                                        placeholder="es. 3000"
+                                                                                        onChange={(e) => updateElement(card.id, el.id, 'width', Number(e.target.value))}
+                                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                                    />
+                                                                                </div>
+                                                                                <div className="flex-1 max-w-[120px]">
+                                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Altez. Totale</Label>
+                                                                                    <Input
+                                                                                        type="number"
+                                                                                        value={el.height || ''}
+                                                                                        placeholder="es. 3000"
+                                                                                        onChange={(e) => updateElement(card.id, el.id, 'height', Number(e.target.value))}
                                                                                         className="h-8 mt-1 font-mono text-xs bg-background border-border"
                                                                                     />
                                                                                 </div>

@@ -241,6 +241,8 @@ export interface RilievoOstacoloItem {
     id: string;
     type: 'wall' | 'floor';
     thickness: number; // Ingombro lungo la canala (mm)
+    width?: number;    // Larghezza totale
+    height?: number;   // Altezza totale
     offsetFromLeft?: number;
     offsetFromRight?: number;
     offsetFromTop?: number;
@@ -339,6 +341,8 @@ export function translateRilievoToSegments(cards: RilievoCard[]): Segment[] {
 
                     const obs = createObstacleSegment(o.type, 200, 200, realDist);
                     obs.thickness = o.thickness;
+                    if (o.width !== undefined) obs.width = o.width;
+                    if (o.height !== undefined) obs.height = o.height;
                     obs.quotaLeft = o.offsetFromLeft;
                     obs.quotaRight = o.offsetFromRight;
                     obs.quotaTop = o.offsetFromTop;
