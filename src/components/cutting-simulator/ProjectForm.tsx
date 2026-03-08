@@ -47,7 +47,7 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                 if (c.id === lastCard.id && c.type === 'dritto') {
                     return {
                         ...c,
-                        subMisure: [...c.subMisure, { id: `sm-${Date.now()}`, length: 1000 }]
+                        elements: [...c.elements, { id: `measure-${Date.now()}`, type: 'measure', length: 1000 }]
                     };
                 }
                 return c;
@@ -65,28 +65,22 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
         updateProjectSegments(cards.filter(c => c.id !== id));
     };
 
-    const updateDrittoLength = (id: string, length: number) => {
-        updateProjectSegments(cards.map(c =>
-            c.id === id && c.type === 'dritto' ? { ...c, baseLength: length } : c
-        ));
-    };
-
-    const updateSottomisuraLength = (cardId: string, smId: string, length: number) => {
+    const removeElement = (cardId: string, elementId: string) => {
         updateProjectSegments(cards.map(c => {
             if (c.id === cardId && c.type === 'dritto') {
-                return {
-                    ...c,
-                    subMisure: c.subMisure.map(sm => sm.id === smId ? { ...sm, length } : sm)
-                };
+                return { ...c, elements: c.elements.filter(e => e.id !== elementId) };
             }
             return c;
         }));
     };
 
-    const removeSottomisura = (cardId: string, smId: string) => {
+    const updateElement = (cardId: string, elementId: string, field: string, value: any) => {
         updateProjectSegments(cards.map(c => {
             if (c.id === cardId && c.type === 'dritto') {
-                return { ...c, subMisure: c.subMisure.filter(sm => sm.id !== smId) };
+                return {
+                    ...c,
+                    elements: c.elements.map(e => e.id === elementId ? { ...e, [field]: value } : e)
+                };
             }
             return c;
         }));
@@ -98,39 +92,12 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
         ));
     };
 
-    const addOstacoloToDritto = (id: string) => {
-        // Aggiunge un muro fittizio a metà
-        updateProjectSegments(cards.map(c => {
-            if (c.id === id && c.type === 'dritto') {
-                return {
-                    ...c,
-                    ostacoli: [...c.ostacoli, { id: `ost-${Date.now()}`, type: 'wall', thickness: 300, distanceFromStart: c.baseLength / 2 }]
-                };
-            }
-            return c;
-        }));
-    };
-
-    const removeOstacolo = (cardId: string, ostId: string) => {
-        updateProjectSegments(cards.map(c => {
-            if (c.id === cardId && c.type === 'dritto') {
-                return { ...c, ostacoli: c.ostacoli.filter(o => o.id !== ostId) };
-            }
-            return c;
-        }));
-    };
-
-    const updateOstacolo = (
-        cardId: string,
-        ostId: string,
-        field: 'thickness' | 'distanceFromStart' | 'offsetFromLeft' | 'offsetFromRight' | 'offsetFromTop' | 'offsetFromBottom',
-        value: number
-    ) => {
+    const addOstacoloToDritto = (cardId: string) => {
         updateProjectSegments(cards.map(c => {
             if (c.id === cardId && c.type === 'dritto') {
                 return {
                     ...c,
-                    ostacoli: c.ostacoli.map(o => o.id === ostId ? { ...o, [field]: value } : o)
+                    elements: [...c.elements, { id: `ost-${Date.now()}`, type: 'wall', thickness: 300 }]
                 };
             }
             return c;
@@ -193,118 +160,96 @@ export function ProjectForm({ project, onProjectChange, isRoutingMode }: Project
                                         </div>
                                         <div className="space-y-3">
                                             <div className="p-3 bg-muted/20 border border-border rounded-lg space-y-3">
-                                                <div>
-                                                    <Label className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Misura Iniziale Asse (mm)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={card.baseLength}
-                                                        onChange={(e) => updateDrittoLength(card.id, Number(e.target.value))}
-                                                        className="mt-1 font-mono h-12 text-lg focus-visible:ring-primary shadow-inner bg-background border-border"
-                                                    />
-                                                </div>
-
-                                                {/* Rendering Sottomisure in serie */}
-                                                {card.subMisure.length > 0 && (
-                                                    <div className="pt-2 space-y-2 relative before:absolute before:inset-y-0 before:left-3 before:w-px before:bg-border/50 before:-z-10 z-0">
-                                                        {card.subMisure.map((sm, smIndex) => (
-                                                            <div key={sm.id} className="flex gap-2 items-end pl-6 relative">
-                                                                <div className="absolute top-1/2 left-3 w-3 h-px bg-border/50 -translate-y-1/2"></div>
-                                                                <div className="flex-1">
-                                                                    <Label className="text-[10px] text-muted-foreground font-semibold flex items-center justify-between uppercase">
-                                                                        <span>Continua Tratto (mm)</span>
-                                                                    </Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={sm.length}
-                                                                        onChange={(e) => updateSottomisuraLength(card.id, sm.id, Number(e.target.value))}
-                                                                        className="mt-1 font-mono h-10 border-dashed focus-visible:ring-primary shadow-sm bg-background/50"
-                                                                    />
+                                                {/* Rendering Elementi in serie */}
+                                                <div className="space-y-2 relative before:absolute before:inset-y-0 before:left-3 before:w-px before:bg-border/50 before:-z-10 z-0">
+                                                    {card.elements.map((el, elIndex) => (
+                                                        <div key={el.id} className="relative">
+                                                            {el.type === 'measure' ? (
+                                                                <div className="flex gap-2 items-end pl-6 relative">
+                                                                    <div className="absolute top-1/2 left-3 w-3 h-px bg-border/50 -translate-y-1/2"></div>
+                                                                    <div className="flex-1">
+                                                                        <Label className="text-[10px] text-muted-foreground font-semibold flex items-center justify-between uppercase">
+                                                                            <span>{elIndex === 0 ? 'Misura Iniziale Asse (mm)' : 'Continua Tratto (mm)'}</span>
+                                                                        </Label>
+                                                                        <Input
+                                                                            type="number"
+                                                                            value={el.length || ''}
+                                                                            onChange={(e) => updateElement(card.id, el.id, 'length', Number(e.target.value))}
+                                                                            className={`mt-1 font-mono focus-visible:ring-primary shadow-inner bg-background border-border ${elIndex === 0 ? 'h-12 text-lg' : 'h-10 border-dashed bg-background/50'}`}
+                                                                        />
+                                                                    </div>
+                                                                    {elIndex > 0 && (
+                                                                        <Button variant="ghost" size="icon" onClick={() => removeElement(card.id, el.id)} className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10"><XIcon /></Button>
+                                                                    )}
                                                                 </div>
-                                                                <Button variant="ghost" size="icon" onClick={() => removeSottomisura(card.id, sm.id)} className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10"><XIcon /></Button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Rendering Ostacoli Orizzontali legati all'asse */}
-                                            {card.ostacoli.length > 0 && (
-                                                <div className="pt-2 pb-1 space-y-3">
-                                                    <Label className="text-xs text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-2">
-                                                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div> Ostacoli / Attraversamenti
-                                                    </Label>
-                                                    {card.ostacoli.map(o => (
-                                                        <div key={o.id} className="p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-lg space-y-3 relative overflow-hidden">
-                                                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400"></div>
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="flex items-center gap-2 text-foreground font-semibold text-sm">Muro / Solaio</span>
-                                                                <Button variant="ghost" size="icon" onClick={() => removeOstacolo(card.id, o.id)} className="h-6 w-6 text-destructive hover:bg-destructive/10"><XIcon /></Button>
-                                                            </div>
-                                                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                                                                <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Spessore Muro</Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={o.thickness || 0}
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'thickness', Number(e.target.value))}
-                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
-                                                                    />
+                                                            ) : (
+                                                                <div className="pl-6 relative mt-2 mb-2">
+                                                                    <div className="absolute top-1/2 left-3 w-3 h-px bg-indigo-500/50 -translate-y-1/2"></div>
+                                                                    <div className="p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-lg space-y-3 relative overflow-hidden shadow-sm">
+                                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400"></div>
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="flex items-center gap-2 text-foreground font-semibold text-sm">Muro / Solaio</span>
+                                                                            <Button variant="ghost" size="icon" onClick={() => removeElement(card.id, el.id)} className="h-6 w-6 text-destructive hover:bg-destructive/10"><XIcon /></Button>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                                                                            <div>
+                                                                                <Label className="text-[10px] text-muted-foreground uppercase">Spessore Muro</Label>
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    value={el.thickness || 0}
+                                                                                    onChange={(e) => updateElement(card.id, el.id, 'thickness', Number(e.target.value))}
+                                                                                    title="Questo spessore non ridurrà la lunghezza totale della canala, ma si configurerà come ostacolo nel percorso costringendo il materiale"
+                                                                                    className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sinistra</Label>
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    value={el.offsetFromLeft || ''}
+                                                                                    placeholder="es. 500"
+                                                                                    onChange={(e) => updateElement(card.id, el.id, 'offsetFromLeft', Number(e.target.value))}
+                                                                                    className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <Label className="text-[10px] text-muted-foreground uppercase">Dist. Destra</Label>
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    value={el.offsetFromRight || ''}
+                                                                                    placeholder="es. 500"
+                                                                                    onChange={(e) => updateElement(card.id, el.id, 'offsetFromRight', Number(e.target.value))}
+                                                                                    className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sopra</Label>
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    value={el.offsetFromTop || ''}
+                                                                                    placeholder="es. 300"
+                                                                                    onChange={(e) => updateElement(card.id, el.id, 'offsetFromTop', Number(e.target.value))}
+                                                                                    className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sotto</Label>
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    value={el.offsetFromBottom || ''}
+                                                                                    placeholder="es. 400"
+                                                                                    onChange={(e) => updateElement(card.id, el.id, 'offsetFromBottom', Number(e.target.value))}
+                                                                                    className="h-8 mt-1 font-mono text-xs bg-background border-border"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                                <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Distanza asse</Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={o.distanceFromStart || 0}
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'distanceFromStart', Number(e.target.value))}
-                                                                        title="Distanza dall'inizio dell'asse su cui si trova il muro"
-                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sinistra</Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={o.offsetFromLeft || ''}
-                                                                        placeholder="es. 500"
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromLeft', Number(e.target.value))}
-                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Destra</Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={o.offsetFromRight || ''}
-                                                                        placeholder="es. 500"
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromRight', Number(e.target.value))}
-                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sopra</Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={o.offsetFromTop || ''}
-                                                                        placeholder="es. 300"
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromTop', Number(e.target.value))}
-                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <Label className="text-[10px] text-muted-foreground uppercase">Dist. Sotto</Label>
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={o.offsetFromBottom || ''}
-                                                                        placeholder="es. 400"
-                                                                        onChange={(e) => updateOstacolo(card.id, o.id, 'offsetFromBottom', Number(e.target.value))}
-                                                                        className="h-8 mt-1 font-mono text-xs bg-background border-border"
-                                                                    />
-                                                                </div>
-                                                            </div>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
-                                            )}
+                                            </div>
 
                                             <Button variant="secondary" size="sm" onClick={() => addOstacoloToDritto(card.id)} className="w-full text-xs font-semibold mt-2 border-dashed border">
                                                 <Plus className="h-3 w-3 mr-1" /> Aggiungi Ostacolo (Muro)

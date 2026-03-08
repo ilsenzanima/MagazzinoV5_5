@@ -229,35 +229,28 @@ export function sidesLabel(sides: DuctSides): string {
 
 export type RilievoCardType = 'dritto' | 'curva';
 
-export interface RilievoOstacolo {
+export interface RilievoMeasureItem {
+    id: string;
+    type: 'measure';
+    length: number;
+}
+
+export interface RilievoOstacoloItem {
     id: string;
     type: 'wall' | 'floor';
     thickness: number; // Ingombro lungo la canala (mm)
-    distanceFromStart: number; // Misura parziale dove inserire visivamente l'ostacolo 
-
-    // Quote aggiuntive foro/passaggio
-    offsetFromLeft?: number; // Distanza da sinistra
-    offsetFromRight?: number; // Distanza da destra
-    offsetFromTop?: number; // Distanza dal soffitto (sopra)
-    offsetFromBottom?: number; // Distanza dal pavimento (sotto)
+    offsetFromLeft?: number;
+    offsetFromRight?: number;
+    offsetFromTop?: number;
+    offsetFromBottom?: number;
 }
 
-export interface RilievoSottomisura {
-    id: string;
-    length: number; // Pezzo dritto aggiunto al totale
-    description?: string;
-}
+export type RilievoElement = RilievoMeasureItem | RilievoOstacoloItem;
 
 export interface CardDritto {
     id: string;
     type: 'dritto';
-    /** 
-     * Il valore "manuale" principale inserito nell'input.
-     * La somma totale dell'asse dritto sarà questo valore + la somma di subMisure e ostacoli.
-     */
-    baseLength: number;
-    subMisure: RilievoSottomisura[];
-    ostacoli: RilievoOstacolo[];
+    elements: RilievoElement[];
 }
 
 export interface CardCurva {
@@ -275,9 +268,9 @@ export function createCardDritto(): CardDritto {
     return {
         id: `card-dritto-${++_cardCounter}-${Date.now()}`,
         type: 'dritto',
-        baseLength: 1000,
-        subMisure: [],
-        ostacoli: []
+        elements: [
+            { id: `measure-${Date.now()}`, type: 'measure', length: 1000 }
+        ]
     };
 }
 
@@ -298,15 +291,23 @@ export function translateRilievoToSegments(cards: RilievoCard[]): Segment[] {
 
     cards.forEach((card, index) => {
         if (card.type === 'dritto') {
-            let totalLen = card.baseLength;
-            let offsetStartDecrease = 0;
-            // Somma sotto-misure
-            card.subMisure.forEach(sm => totalLen += sm.length);
+            let totalLen = 0;
+            let currentDist = 0;
+            const ostacoliList: (RilievoOstacoloItem & { distanceFromStart: number })[] = [];
 
-            // Sottrae lo spessore dell'ostacolo dal pezzo dritto (come richiesto)
-            card.ostacoli.forEach(o => {
-                totalLen -= o.thickness;
+            card.elements.forEach(el => {
+                if (el.type === 'measure') {
+                    totalLen += el.length;
+                    currentDist += el.length;
+                } else if (el.type === 'wall' || el.type === 'floor') {
+                    // L'ostacolo inizia al currentDist, poi se stesso aggiunge spessore
+                    ostacoliList.push({ ...el, distanceFromStart: currentDist });
+                    totalLen += el.thickness;
+                    currentDist += el.thickness;
+                }
             });
+
+            let offsetStartDecrease = 0;
 
             const prevCard = cards[index - 1];
             if (prevCard && prevCard.type === 'curva') {
@@ -328,8 +329,8 @@ export function translateRilievoToSegments(cards: RilievoCard[]): Segment[] {
 
             // Memorizziamo il decurtamento inzio nel segmento? 
             // Meglio sistemarlo direttamente traslando la quota utente (distanceFromStart) degli ostacoli:
-            if (card.ostacoli.length > 0) {
-                straight.obstacles = card.ostacoli.map(o => {
+            if (ostacoliList.length > 0) {
+                straight.obstacles = ostacoliList.map(o => {
                     // Sottrae lo spostamento fittizio dell'inizio asse generato dalla curva, in modo che 
                     // i 500mm imputati dall'utente equivalgano ancora a 500 dal muro architettonico.
                     const realDist = Math.max(0, o.distanceFromStart - offsetStartDecrease);
