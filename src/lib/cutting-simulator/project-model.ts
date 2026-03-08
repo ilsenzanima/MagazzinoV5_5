@@ -133,6 +133,8 @@ export interface DuctProject {
     jointBands?: boolean;
     /** Larghezza della fascia giunto in mm (default 100-150) */
     jointBandWidth?: number;
+    /** Stato delle card del rilievo per persistere la memoria nel form */
+    rilievoCards?: RilievoCard[];
 }
 
 /** Contatore per ID univoci */

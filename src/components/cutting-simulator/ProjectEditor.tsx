@@ -812,6 +812,41 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
         setSelectedIdx(null);
     }, [project, onProjectChange]);
 
+    const handleMoveSegment = useCallback((idx: number, direction: 'up' | 'down') => {
+        if (direction === 'up' && idx <= 0) return;
+        if (direction === 'down' && idx >= project.segments.length - 1) return;
+
+        const newSegments = [...project.segments];
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+        const temp = newSegments[idx];
+        newSegments[idx] = newSegments[swapIdx];
+        newSegments[swapIdx] = temp;
+
+        onProjectChange({ ...project, segments: newSegments });
+        setContextMenu(null);
+        setSelectedIdx(swapIdx); // Manteniamo la selezione sul segmento spostato
+    }, [project, onProjectChange]);
+
+    const mergeStraightIntoElbow = useCallback((elbowIdx: number, direction: 'prev' | 'next') => {
+        const newSegments = [...project.segments];
+        const elbow = newSegments[elbowIdx] as Elbow90Segment;
+
+        if (direction === 'prev') {
+            const prev = newSegments[elbowIdx - 1] as StraightSegment;
+            newSegments[elbowIdx] = { ...elbow, armA: (elbow.armA || 0) + prev.length };
+            newSegments.splice(elbowIdx - 1, 1);
+            setSelectedIdx(elbowIdx - 1);
+        } else {
+            const nxt = newSegments[elbowIdx + 1] as StraightSegment;
+            newSegments[elbowIdx] = { ...elbow, armB: (elbow.armB || 0) + nxt.length };
+            newSegments.splice(elbowIdx + 1, 1);
+            setSelectedIdx(elbowIdx);
+        }
+
+        onProjectChange({ ...project, segments: newSegments });
+        setContextMenu(null);
+    }, [project, onProjectChange]);
+
     const handleInsertAfter = useCallback((idx: number, type: 'straight' | 'elbow90') => {
         const newSeg = type === 'straight' ? createStraightSegment(1000) : createElbow90Segment('right');
         const newSegments = [...project.segments];
@@ -1404,6 +1439,54 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
                                         onClick={() => mergeRun(contextMenu.segIdx as number)}>
                                         🔗 Unisci dritti adiacenti ({runTotal}mm)
                                     </button>
+                                    <div className="border-t border-border/50 my-1" />
+                                </>
+                            )}
+
+                            {/* Azioni Curva 90° */}
+                            {seg?.type === 'elbow90' && (() => {
+                                const idx = contextMenu.segIdx as number;
+                                const prevIsStraight = idx > 0 && project.segments[idx - 1].type === 'straight';
+                                const nextIsStraight = idx < project.segments.length - 1 && project.segments[idx + 1].type === 'straight';
+
+                                if (!prevIsStraight && !nextIsStraight) return null;
+
+                                return (
+                                    <>
+                                        {prevIsStraight && (
+                                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2 text-primary"
+                                                onClick={() => mergeStraightIntoElbow(idx, 'prev')}>
+                                                ↩️ Allunga braccio ingresso con segmento precedente
+                                            </button>
+                                        )}
+                                        {nextIsStraight && (
+                                            <button className="w-full px-3 py-1.5 text-xs text-left hover:bg-accent flex items-center gap-2 text-primary"
+                                                onClick={() => mergeStraightIntoElbow(idx, 'next')}>
+                                                ↪️ Allunga braccio uscita con segmento successivo
+                                            </button>
+                                        )}
+                                        <div className="border-t border-border/50 my-1" />
+                                    </>
+                                );
+                            })()}
+
+                            {/* Riordino (Sposta prima/Dopo) */}
+                            {contextMenu.segIdx !== undefined && seg?.type !== 'trackSeparator' && (
+                                <>
+                                    <div className="flex w-full divide-x divide-border/50">
+                                        {(contextMenu.segIdx as number) > 0 && (
+                                            <button className="flex-1 px-2 py-1.5 text-xs text-center hover:bg-accent" title="Sposta Prima"
+                                                onClick={() => handleMoveSegment(contextMenu.segIdx as number, 'up')}>
+                                                ⬆️ Sposta
+                                            </button>
+                                        )}
+                                        {(contextMenu.segIdx as number) < project.segments.length - 1 && (
+                                            <button className="flex-1 px-2 py-1.5 text-xs text-center hover:bg-accent" title="Sposta Dopo"
+                                                onClick={() => handleMoveSegment(contextMenu.segIdx as number, 'down')}>
+                                                ⬇️ Sposta
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="border-t border-border/50 my-1" />
                                 </>
                             )}

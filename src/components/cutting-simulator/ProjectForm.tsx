@@ -21,28 +21,23 @@ interface ProjectFormProps {
 
 export function ProjectForm({ project, onProjectChange, isRoutingMode }: ProjectFormProps) {
     // Stato locale per le card utente in cantiere
-    const [cards, setCards] = useState<RilievoCard[]>([]);
+    const [cards, setCards] = useState<RilievoCard[]>(project.rilievoCards || []);
     const [expandedWalls, setExpandedWalls] = useState<Record<string, boolean>>({});
 
     const toggleWallAdvanced = (wallId: string) => {
         setExpandedWalls(prev => ({ ...prev, [wallId]: !prev[wallId] }));
     };
 
-    // Al mount o slegamento peschiamo le card.
-    // In una V2 reale, `project.rilievoCards` manterrà la memoria, per ora
-    // lavoriamo sullo state volatile del componente e generiamo i `segments` puri che
-    // andranno al database.
+    // Sincronizza le cards quando cambia il progetto corrente (es. caricamento da DB futuro)
     useEffect(() => {
-        if (project.segments.length === 0 && cards.length > 0) {
-            setCards([]);
-        }
-    }, [project.segments.length]);
+        setCards(project.rilievoCards || []);
+    }, [project.id]);
 
-    // Ogni volta che modifichiamo le Cards, aggiorniamo l'Editor 3D ("Segments")
+    // Ogni volta che modifichiamo le Cards, aggiorniamo l'Editor 3D ("Segments") e salviamo le cards
     const updateProjectSegments = (newCards: RilievoCard[]) => {
         setCards(newCards);
         const newSegments = translateRilievoToSegments(newCards);
-        onProjectChange(prev => ({ ...prev, segments: newSegments }));
+        onProjectChange(prev => ({ ...prev, rilievoCards: newCards, segments: newSegments }));
     };
 
     const addDritto = () => {
