@@ -4,7 +4,7 @@
  * poi proietta su viste ortogonali (Alto, Fronte, Lato).
  */
 
-import type { DuctProject, Segment } from './project-model';
+import type { DuctProject, Segment, StraightSegment, RenderPendinoSegment, ContextualElementSegment } from './project-model';
 
 // ==================== TIPI ====================
 
@@ -260,30 +260,7 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 }
             }
 
-            if (seg.type === 'straight' && seg.pendini && seg.pendini.length > 0) {
-                for (let pIdx = 0; pIdx < seg.pendini.length; pIdx++) {
-                    const pend = seg.pendini[pIdx];
-                    const dist = pend.fromEnd ? (seg.length - pend.distance) : pend.distance;
-                    const safeDist = Math.max(0, Math.min(dist, seg.length));
-
-                    const pStart: Vec3 = {
-                        x: pos.x + v.x * safeDist,
-                        y: pos.y + v.y * safeDist,
-                        z: pos.z + v.z * safeDist,
-                    };
-
-                    nodes.push({
-                        segment: { type: 'pendino', id: pend.id, label: 'Pendino' } as any,
-                        index: i + (pIdx + 1) * 0.001,
-                        start: pStart,
-                        end: pStart, // Il pendino è un punto singolo
-                        direction: dir,
-                        outerW,
-                        outerH,
-                        trackId: currentTrackId,
-                    });
-                }
-            }
+            // (pendini sono iniettati nel post-processing a livello di corsa intera)
 
             pos = end;
         } else if (seg.type === 'elbow90') {
@@ -324,7 +301,122 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
         }
     }
 
-    return nodes;
+    // ==================== POST-PROCESSING: Pendini sulle corse dritto ====================
+    // I pendini devono essere posizionati a livello di "corsa" (run di segmenti dritti
+    // consecutivi tra due curve o separatori), non per singolo spezzone.
+    // Vengono escluse le zone coperte da muri (obstacleType === 'wall').
+    const pendiniNodesToAdd: SegmentNode3D[] = [];
+    let pendinoCounter = 0;
+
+    // Raggruppa i nodi straight per corsa (ogni corsa termina con un elbow90 o separatore)
+    // Usiamo i nodi già calcolati che hanno le start/end assolute
+    let runStraights: SegmentNode3D[] = [];
+
+    const flushRun = () => {
+        if (runStraights.length === 0) return;
+
+        // Calcola lunghezza totale della corsa
+        let runLen = 0;
+        for (const sn of runStraights) {
+            const seg = sn.segment as StraightSegment;
+            runLen += seg.length;
+        }
+
+        // Raccoglie i pendini: usa la distanza dall'inizio della corsa
+        const runPendini: Array<{ absPos: Vec3; id: string; dir: Direction3D; trackId: string | undefined }> = [];
+        let offset = 0;
+        for (const sn of runStraights) {
+            const seg = sn.segment as StraightSegment;
+            if (!seg.pendini || seg.pendini.length === 0) {
+                offset += seg.length;
+                continue;
+            }
+            const v = dirVec(sn.direction as Direction3D);
+            for (const pend of seg.pendini) {
+                const localDist = pend.fromEnd ? (seg.length - pend.distance) : pend.distance;
+                const safeDist = Math.max(0, Math.min(localDist, seg.length));
+                // Posizione assoluta del pendino
+                const absPos: Vec3 = {
+                    x: sn.start.x + v.x * safeDist,
+                    y: sn.start.y + v.y * safeDist,
+                    z: sn.start.z + v.z * safeDist,
+                };
+                runPendini.push({ absPos, id: pend.id, dir: sn.direction as Direction3D, trackId: sn.trackId });
+            }
+            offset += seg.length;
+        }
+
+        // Costruisci lista di zone "muro" da evitare (in coordinate assolute lungo il run)
+        // Ogni zona è [startAbs, endAbs] lungo la direzione del run
+        const wallZones: Array<{ start: Vec3; end: Vec3 }> = [];
+        for (const sn of runStraights) {
+            const seg = sn.segment as StraightSegment;
+            if (!seg.obstacles) continue;
+            for (const obs of seg.obstacles) {
+                if (obs.obstacleType !== 'wall') continue;
+                const v = dirVec(sn.direction as Direction3D);
+                const dist = obs.distanceFromStart ?? 0;
+                const wallStart: Vec3 = {
+                    x: sn.start.x + v.x * dist,
+                    y: sn.start.y + v.y * dist,
+                    z: sn.start.z + v.z * dist,
+                };
+                const wallEnd: Vec3 = {
+                    x: wallStart.x + v.x * obs.thickness,
+                    y: wallStart.y + v.y * obs.thickness,
+                    z: wallStart.z + v.z * obs.thickness,
+                };
+                wallZones.push({ start: wallStart, end: wallEnd });
+            }
+        }
+
+        // Filtra i pendini che cadono dentro zone muro
+        for (const rp of runPendini) {
+            const { absPos, id, dir, trackId } = rp;
+
+            // Verifica se il pendino cade dentro un muro
+            let blocked = false;
+            for (const wz of wallZones) {
+                const wx0 = Math.min(wz.start.x, wz.end.x) - outerW;
+                const wx1 = Math.max(wz.start.x, wz.end.x) + outerW;
+                const wy0 = Math.min(wz.start.y, wz.end.y) - outerW;
+                const wy1 = Math.max(wz.start.y, wz.end.y) + outerW;
+                if (absPos.x >= wx0 && absPos.x <= wx1 && absPos.y >= wy0 && absPos.y <= wy1) {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (blocked) continue;
+
+            pendiniNodesToAdd.push({
+                segment: { type: 'pendino', id, label: 'Pendino' } as RenderPendinoSegment,
+                index: 1000 + pendinoCounter * 0.001,
+                start: absPos,
+                end: absPos,
+                direction: dir,
+                outerW,
+                outerH,
+                trackId,
+            });
+            pendinoCounter++;
+        }
+
+        runStraights = [];
+    };
+
+    // Scansione dei nodi per estrarre le corse straight
+    for (const node of nodes) {
+        const type = node.segment.type;
+        if (type === 'straight') {
+            runStraights.push(node);
+        } else if (type === 'elbow90' || type === 'trackSeparator') {
+            flushRun();
+        }
+        // obstacle e pendino già filtrati / ignorati
+    }
+    flushRun(); // ultima corsa
+
+    return [...nodes, ...pendiniNodesToAdd];
 }
 
 // ==================== PROIEZIONE 2D ====================
