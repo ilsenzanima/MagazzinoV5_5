@@ -109,15 +109,37 @@ function StraightMesh({ node, section, selected, onClick, jointBands, jointBandW
                 </mesh>
             )}
 
-            {/* Freccia Direzionale (Overlay) */}
-            {length > 0.1 && (
-                <group position={[0, outerH / 2 + 0.005, -length / 2]}>
-                    <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                        <coneGeometry args={[outerW * 0.25, 0.1, 4]} />
-                        <meshBasicMaterial color={selected ? "#f59e0b" : "#3b82f6"} transparent opacity={0.6} depthTest={false} />
-                    </mesh>
-                </group>
-            )}
+            {/* Freccia Direzionale: linea + cono → mostra direzione scorrimento */}
+            {length > 0.1 && (() => {
+                const arrowLen = Math.min(length * 0.5, 0.4); // max 40 cm
+                const coneH = Math.min(outerW * 0.5, arrowLen * 0.4);
+                const shaftLen = arrowLen - coneH;
+                // Il gruppo è già orientato con quaternion corretto:
+                // +Z locale = direzione verso node.end
+                // Posizioniamo la freccia sopra la canala, centrata
+                const posZ = 0;          // centro del segmento (già centrato nella geom)
+                const posY = outerH / 2 + 0.008; // appena sopra il top
+                return (
+                    <group position={[0, posY, posZ]}>
+                        {/* Asta lineare (thin box) */}
+                        <mesh position={[0, 0, shaftLen / 2]}>
+                            <boxGeometry args={[outerW * 0.05, 0.005, shaftLen]} />
+                            <meshBasicMaterial
+                                color={selected ? '#f59e0b' : '#2563eb'}
+                                transparent opacity={0.9} depthTest={false}
+                            />
+                        </mesh>
+                        {/* Punta conica (+Z = verso la fine) */}
+                        <mesh position={[0, 0, shaftLen + coneH / 2]} rotation={[Math.PI / 2, 0, 0]}>
+                            <coneGeometry args={[outerW * 0.22, coneH, 4]} />
+                            <meshBasicMaterial
+                                color={selected ? '#f59e0b' : '#3b82f6'}
+                                transparent opacity={0.9} depthTest={false}
+                            />
+                        </mesh>
+                    </group>
+                );
+            })()}
         </group>
     );
 }
