@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment } from "@/lib/cutting-simulator/project-model";
@@ -233,56 +233,92 @@ function PropertiesPanel({
                             <div className="flex gap-1">
                                 <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 px-1" onClick={() => {
                                     const current = (segment as StraightSegment).pendini || [];
-                                    onUpdate(index, { pendini: [...current, { id: `pend-${Date.now()}`, distance: 500, fromEnd: false }] });
+                                    onUpdate(index, { pendini: [...current, { id: `pend-${Date.now()}`, distance: 500, fromEnd: false, orientation: 'top' }] });
                                 }}>
-                                    + Singolo (500)
+                                    + Da Inizio (500)
                                 </Button>
                                 <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 px-1" onClick={() => {
-                                    const start = 500;
-                                    const step = 1000;
-                                    const len = (segment as StraightSegment).length;
-                                    const newPendini = [];
-                                    for (let dist = start; dist <= len - 100; dist += step) {
-                                        newPendini.push({ id: `pend-${Date.now()}-${dist}`, distance: dist, fromEnd: false });
+                                    const current = (segment as StraightSegment).pendini || [];
+                                    // Calcola distanza dal pendino precedente (o dall'inizio se non ce n'è uno)
+                                    const lastPend = current.length > 0 ? current[current.length - 1] : null;
+                                    const lastDist = lastPend ? (lastPend.fromEnd ? ((segment as StraightSegment).length - lastPend.distance) : lastPend.distance) : 0;
+                                    const newDist = lastDist + 1000; // default 1000mm dal precedente
+                                    if (newDist <= (segment as StraightSegment).length) {
+                                        onUpdate(index, { pendini: [...current, { id: `pend-${Date.now()}`, distance: newDist, fromEnd: false, orientation: 'top' }] });
                                     }
-                                    onUpdate(index, { pendini: newPendini });
                                 }}>
-                                    + Passo 50+100
+                                    + Da Precedente (+1m)
                                 </Button>
                             </div>
+                            <Button variant="outline" size="sm" className="h-7 text-[10px] w-full px-1" onClick={() => {
+                                const start = 500;
+                                const step = 1000;
+                                const len = (segment as StraightSegment).length;
+                                const newPendini: Array<{ id: string; distance: number; fromEnd: boolean; orientation: 'top' | 'bottom' | 'left' | 'right' }> = [];
+                                for (let dist = start; dist <= len - 100; dist += step) {
+                                    newPendini.push({ id: `pend-${Date.now()}-${dist}`, distance: dist, fromEnd: false, orientation: 'top' });
+                                }
+                                onUpdate(index, { pendini: newPendini });
+                            }}>
+                                Auto (50cm + ogni 1m)
+                            </Button>
 
                             {((segment as StraightSegment).pendini || []).length > 0 && (
-                                <div className="space-y-1 max-h-32 overflow-y-auto pr-1 mt-2 custom-scrollbar">
+                                <div className="space-y-1 max-h-40 overflow-y-auto pr-1 mt-2 custom-scrollbar">
                                     {((segment as StraightSegment).pendini || []).map((p, pIdx) => (
-                                        <div key={p.id} className="flex items-center gap-1 bg-muted/50 p-1 rounded">
-                                            <Input
-                                                className="h-6 text-[10px] w-14 px-1 text-center font-mono"
-                                                type="number"
-                                                value={p.distance}
-                                                onChange={e => {
+                                        <div key={p.id} className="flex flex-col gap-1 bg-muted/50 p-1.5 rounded">
+                                            <div className="flex items-center gap-1">
+                                                <Input
+                                                    className="h-6 text-[10px] w-14 px-1 text-center font-mono"
+                                                    type="number"
+                                                    value={p.distance}
+                                                    onChange={e => {
+                                                        const arr = [...((segment as StraightSegment).pendini || [])];
+                                                        arr[pIdx] = { ...arr[pIdx], distance: Number(e.target.value) };
+                                                        onUpdate(index, { pendini: arr });
+                                                    }}
+                                                />
+                                                <span className="text-[8px] text-muted-foreground shrink-0">mm</span>
+                                                <button
+                                                    className="text-[9px] text-muted-foreground mr-auto hover:text-foreground cursor-pointer"
+                                                    title="Clicca per invertire da Inizio/Fine"
+                                                    onClick={() => {
+                                                        const arr = [...((segment as StraightSegment).pendini || [])];
+                                                        arr[pIdx] = { ...arr[pIdx], fromEnd: !arr[pIdx].fromEnd };
+                                                        onUpdate(index, { pendini: arr });
+                                                    }}
+                                                >
+                                                    {p.fromEnd ? 'da fine' : 'da inizio'}
+                                                </button>
+                                                <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-destructive/10 text-destructive shrink-0" onClick={() => {
                                                     const arr = [...((segment as StraightSegment).pendini || [])];
-                                                    arr[pIdx] = { ...arr[pIdx], distance: Number(e.target.value) };
+                                                    arr.splice(pIdx, 1);
                                                     onUpdate(index, { pendini: arr });
-                                                }}
-                                            />
-                                            <button
-                                                className="text-[9px] text-muted-foreground mr-auto hover:text-foreground cursor-pointer"
-                                                title="Clicca per invertire da Inizio/Fine"
-                                                onClick={() => {
-                                                    const arr = [...((segment as StraightSegment).pendini || [])];
-                                                    arr[pIdx] = { ...arr[pIdx], fromEnd: !arr[pIdx].fromEnd };
-                                                    onUpdate(index, { pendini: arr });
-                                                }}
-                                            >
-                                                {p.fromEnd ? 'da fine' : 'da inizio'}
-                                            </button>
-                                            <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-destructive/10 text-destructive shrink-0" onClick={() => {
-                                                const arr = [...((segment as StraightSegment).pendini || [])];
-                                                arr.splice(pIdx, 1);
-                                                onUpdate(index, { pendini: arr });
-                                            }}>
-                                                <X className="h-3 w-3" />
-                                            </Button>
+                                                }}>
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                            {/* Orientamento staffa */}
+                                            <div className="flex items-center gap-0.5">
+                                                <span className="text-[8px] text-muted-foreground mr-1">Staffa:</span>
+                                                {(['top', 'bottom', 'left', 'right'] as const).map(orient => (
+                                                    <button
+                                                        key={orient}
+                                                        className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                                            (p.orientation || 'top') === orient
+                                                                ? 'bg-primary text-primary-foreground'
+                                                                : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                                                        }`}
+                                                        onClick={() => {
+                                                            const arr = [...((segment as StraightSegment).pendini || [])];
+                                                            arr[pIdx] = { ...arr[pIdx], orientation: orient };
+                                                            onUpdate(index, { pendini: arr });
+                                                        }}
+                                                    >
+                                                        {orient === 'top' ? '⬆ Alto' : orient === 'bottom' ? '⬇ Basso' : orient === 'left' ? '⬅ SX' : '➡ DX'}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     ))}
                                     <Button variant="ghost" size="sm" className="w-full h-6 text-[9px] text-destructive hover:bg-destructive/10 mt-1" onClick={() => onUpdate(index, { pendini: [] })}>

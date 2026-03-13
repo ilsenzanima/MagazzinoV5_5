@@ -43,6 +43,8 @@ export interface SegmentNode3D {
     ductH?: number;
     /** (Nuovo) ID del TrackSeparator di appartenenza per Drag&Drop */
     trackId?: string;
+    /** (Solo per pendino) Orientamento della staffa */
+    pendinoOrientation?: 'top' | 'bottom' | 'left' | 'right';
 }
 
 /** Rettangolo base per SVG */
@@ -323,7 +325,7 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
         }
 
         // Raccoglie i pendini: usa la distanza dall'inizio della corsa
-        const runPendini: Array<{ absPos: Vec3; id: string; dir: Direction3D; trackId: string | undefined }> = [];
+        const runPendini: Array<{ absPos: Vec3; id: string; dir: Direction3D; trackId: string | undefined; orientation?: 'top' | 'bottom' | 'left' | 'right' }> = [];
         let offset = 0;
         for (const sn of runStraights) {
             const seg = sn.segment as StraightSegment;
@@ -341,7 +343,7 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                     y: sn.start.y + v.y * safeDist,
                     z: sn.start.z + v.z * safeDist,
                 };
-                runPendini.push({ absPos, id: pend.id, dir: sn.direction as Direction3D, trackId: sn.trackId });
+                runPendini.push({ absPos, id: pend.id, dir: sn.direction as Direction3D, trackId: sn.trackId, orientation: pend.orientation });
             }
             offset += seg.length;
         }
@@ -372,7 +374,7 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
 
         // Filtra i pendini che cadono dentro zone muro
         for (const rp of runPendini) {
-            const { absPos, id, dir, trackId } = rp;
+            const { absPos, id, dir, trackId, orientation } = rp;
 
             // Verifica se il pendino cade dentro un muro
             let blocked = false;
@@ -397,6 +399,7 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 outerW,
                 outerH,
                 trackId,
+                pendinoOrientation: orientation || 'top',
             });
             pendinoCounter++;
         }
