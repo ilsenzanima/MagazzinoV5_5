@@ -234,31 +234,72 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
     );
 }
 
-/** Pendino — barra verticale dal soffitto alla canala */
+/** Pendino — due barre filettate + staffa sotto la canala, orientate in base alla direzione */
 function PendinoMesh({ node, selected, onClick }: SegmentMeshProps) {
     const pos = useMemo(() => v3(node.start), [node.start]);
-    const pendHeight = 0.6; // Distanza dal top della canala verso il soffitto
     const color = selected ? DUCT_COLOR_SELECTED : PENDINO_COLOR;
     const outerH = node.outerH * SCALE;
     const outerW = node.outerW * SCALE;
+    const isVertical = node.direction === '+z' || node.direction === '-z';
 
-    // Le barre laterali distano un pelo dalla canala
+    // Quaternion per ruotare il pendino in modo che l'asse Z locale
+    // sia allineato alla direzione della canala (le barre saranno lungo X locale = perpendicolari)
+    const quat = useMemo(() => {
+        const q = new THREE.Quaternion();
+        const dir = node.direction;
+        // Mappiamo la direzione layout → Three.js (Y=up)
+        // Il pendino di default ha: X=laterale barre, Y=verticale, Z=lungo canala
+        switch (dir) {
+            case '+x': q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); break;
+            case '-x': q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2); break;
+            case '+y': q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI); break;
+            case '-y': /* default, nessuna rotazione */ break;
+            case '+z': q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2); break;
+            case '-z': q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2); break;
+        }
+        return q;
+    }, [node.direction]);
+
+    if (isVertical) {
+        // ---- Fissaggio a muro (tratti verticali) ----
+        // Staffa orizzontale che parte dal lato della canala verso il muro
+        const bracketLen = 0.3; // 30cm di staffa dal muro
+        const bracketY = 0;    // centrata sulla canala nel sistema locale
+
+        return (
+            <group position={pos} quaternion={quat} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+                {/* Staffa orizzontale verso il muro (asse X locale) */}
+                <mesh position={[outerW / 2 + bracketLen / 2, bracketY, 0]}>
+                    <boxGeometry args={[bracketLen, 0.004, 0.03]} />
+                    <meshStandardMaterial color={color} metalness={0.5} roughness={0.3} />
+                </mesh>
+                {/* Piastra a muro */}
+                <mesh position={[outerW / 2 + bracketLen, bracketY, 0]}>
+                    <boxGeometry args={[0.003, 0.06, 0.06]} />
+                    <meshStandardMaterial color={color} metalness={0.7} roughness={0.2} />
+                </mesh>
+                {/* Fascetta attorno la canala */}
+                <mesh position={[0, 0, 0]}>
+                    <boxGeometry args={[outerW + 0.01, outerH + 0.01, 0.006]} />
+                    <meshStandardMaterial color={color} metalness={0.4} roughness={0.4} transparent opacity={0.5} />
+                </mesh>
+            </group>
+        );
+    }
+
+    // ---- Fissaggio a soffitto (tratti orizzontali) ----
+    const pendHeight = 0.6;
+    // Le barre filettate distano un pelo dalla canala (lungo X locale = perpendicolare alla canala)
     const barX = outerW / 2 + 0.01;
-
-    // Piastra a soffitto
     const ceilY = outerH / 2 + pendHeight;
-
-    // Asse di supporto sotto la canala
     const barY = -outerH / 2 - 0.005;
-
-    // Le barre verticali vanno dal soffitto (ceilY) fin sotto l'asse di supporto (barY - 0.02)
     const rodBottom = barY - 0.02;
     const rodLen = ceilY - rodBottom;
     const rodY = (ceilY + rodBottom) / 2;
 
     return (
-        <group position={pos} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-            {/* Barre verticali */}
+        <group position={pos} quaternion={quat} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+            {/* Barre filettate verticali */}
             <mesh position={[-barX, rodY, 0]}>
                 <cylinderGeometry args={[0.004, 0.004, rodLen, 8]} />
                 <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
