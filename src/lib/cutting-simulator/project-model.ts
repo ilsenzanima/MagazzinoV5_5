@@ -47,10 +47,15 @@ export interface ContextualElementSegment extends BaseSegment {
     distanceFromStart?: number;
 }
 
+/** Orientamento della staffa pendino: indica da quale faccia della canala parte il fissaggio */
+export type PendinoOrientation = 'top' | 'bottom' | 'left' | 'right';
+
 export interface PendinoItem {
     id: string;
     distance: number;
     fromEnd: boolean;
+    /** Da quale faccia parte la staffa (default: 'top' = soffitto) */
+    orientation?: PendinoOrientation;
 }
 
 export interface StraightSegment extends BaseSegment {

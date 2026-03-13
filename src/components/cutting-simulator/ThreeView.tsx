@@ -234,62 +234,42 @@ function WallIndicator({ node }: { node: SegmentNode3D }) {
     );
 }
 
-/** Pendino — due barre filettate + staffa sotto la canala, orientate in base alla direzione */
+/** Pendino — fissaggio orientabile (top=soffitto, bottom=pavimento, left/right=muro laterale) */
 function PendinoMesh({ node, selected, onClick }: SegmentMeshProps) {
     const pos = useMemo(() => v3(node.start), [node.start]);
     const color = selected ? DUCT_COLOR_SELECTED : PENDINO_COLOR;
     const outerH = node.outerH * SCALE;
     const outerW = node.outerW * SCALE;
-    const isVertical = node.direction === '+z' || node.direction === '-z';
+    const orient = node.pendinoOrientation || 'top';
 
-    // Quaternion per ruotare il pendino in modo che l'asse Z locale
-    // sia allineato alla direzione della canala (le barre saranno lungo X locale = perpendicolari)
+    // Quaternion composto: prima orienta verso la direzione canala, poi ruota per l'orientamento staffa
     const quat = useMemo(() => {
         const q = new THREE.Quaternion();
         const dir = node.direction;
-        // Mappiamo la direzione layout → Three.js (Y=up)
-        // Il pendino di default ha: X=laterale barre, Y=verticale, Z=lungo canala
+        // Base: asse Z locale = direzione canala
         switch (dir) {
             case '+x': q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); break;
             case '-x': q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2); break;
             case '+y': q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI); break;
-            case '-y': /* default, nessuna rotazione */ break;
+            case '-y': /* default */ break;
             case '+z': q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2); break;
             case '-z': q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2); break;
         }
+        // Ruota attorno Z locale per l'orientamento della staffa
+        const orientQ = new THREE.Quaternion();
+        switch (orient) {
+            case 'top': /* default, nessuna rotazione extra */ break;
+            case 'bottom': orientQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI); break;
+            case 'left': orientQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2); break;
+            case 'right': orientQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2); break;
+        }
+        q.multiply(orientQ);
         return q;
-    }, [node.direction]);
+    }, [node.direction, orient]);
 
-    if (isVertical) {
-        // ---- Fissaggio a muro (tratti verticali) ----
-        // Staffa orizzontale che parte dal lato della canala verso il muro
-        const bracketLen = 0.3; // 30cm di staffa dal muro
-        const bracketY = 0;    // centrata sulla canala nel sistema locale
-
-        return (
-            <group position={pos} quaternion={quat} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-                {/* Staffa orizzontale verso il muro (asse X locale) */}
-                <mesh position={[outerW / 2 + bracketLen / 2, bracketY, 0]}>
-                    <boxGeometry args={[bracketLen, 0.004, 0.03]} />
-                    <meshStandardMaterial color={color} metalness={0.5} roughness={0.3} />
-                </mesh>
-                {/* Piastra a muro */}
-                <mesh position={[outerW / 2 + bracketLen, bracketY, 0]}>
-                    <boxGeometry args={[0.003, 0.06, 0.06]} />
-                    <meshStandardMaterial color={color} metalness={0.7} roughness={0.2} />
-                </mesh>
-                {/* Fascetta attorno la canala */}
-                <mesh position={[0, 0, 0]}>
-                    <boxGeometry args={[outerW + 0.01, outerH + 0.01, 0.006]} />
-                    <meshStandardMaterial color={color} metalness={0.4} roughness={0.4} transparent opacity={0.5} />
-                </mesh>
-            </group>
-        );
-    }
-
-    // ---- Fissaggio a soffitto (tratti orizzontali) ----
+    // Tutto è nello spazio locale orientato dal quaternion
+    // Y locale = alto (verso il fissaggio), X locale = larghezza canala
     const pendHeight = 0.6;
-    // Le barre filettate distano un pelo dalla canala (lungo X locale = perpendicolare alla canala)
     const barX = outerW / 2 + 0.01;
     const ceilY = outerH / 2 + pendHeight;
     const barY = -outerH / 2 - 0.005;
@@ -308,7 +288,7 @@ function PendinoMesh({ node, selected, onClick }: SegmentMeshProps) {
                 <cylinderGeometry args={[0.004, 0.004, rodLen, 8]} />
                 <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
             </mesh>
-            {/* Piastre fissaggio a soffitto */}
+            {/* Piastre fissaggio */}
             <mesh position={[-barX, ceilY, 0]}>
                 <boxGeometry args={[0.04, 0.003, 0.04]} />
                 <meshStandardMaterial color={color} metalness={0.7} roughness={0.2} />
@@ -317,7 +297,7 @@ function PendinoMesh({ node, selected, onClick }: SegmentMeshProps) {
                 <boxGeometry args={[0.04, 0.003, 0.04]} />
                 <meshStandardMaterial color={color} metalness={0.7} roughness={0.2} />
             </mesh>
-            {/* Staffa di supporto orizzontale sotto la canala */}
+            {/* Staffa di supporto sotto la canala */}
             <mesh position={[0, barY, 0]}>
                 <boxGeometry args={[outerW + 0.04, 0.004, 0.03]} />
                 <meshStandardMaterial color={color} metalness={0.5} roughness={0.3} />
