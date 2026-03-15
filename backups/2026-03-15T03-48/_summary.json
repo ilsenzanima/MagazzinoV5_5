@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-03-15T03:48:43.864Z",
+  "tables": [
+    {
+      "name": "profiles",
+      "records": 9
+    },
+    {
+      "name": "clients",
+      "records": 17
+    },
+    {
+      "name": "suppliers",
+      "records": 38
+    },
+    {
+      "name": "inventory",
+      "records": 545
+    },
+    {
+      "name": "jobs",
+      "records": 12
+    },
+    {
+      "name": "purchases",
+      "records": 503
+    },
+    {
+      "name": "purchase_items",
+      "records": 976
+    },
+    {
+      "name": "delivery_notes",
+      "records": 26
+    },
+    {
+      "name": "delivery_note_items",
+      "records": 189
+    },
+    {
+      "name": "workers",
+      "records": 9
+    },
+    {
+      "name": "attendance",
+      "records": 688
+    }
+  ],
+  "totalRecords": 3012
+}
