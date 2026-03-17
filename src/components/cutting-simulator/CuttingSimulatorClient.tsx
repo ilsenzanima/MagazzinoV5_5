@@ -20,7 +20,7 @@ import {
     type CalculationResult,
 } from "@/lib/cutting-simulator/calculations";
 import type { DuctProject } from "@/lib/cutting-simulator/project-model";
-import { defaultProject } from "@/lib/cutting-simulator/project-model";
+import { defaultProject, migrateProject } from "@/lib/cutting-simulator/project-model";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
 import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid, List, PenTool, MousePointer2, Pin, PencilRuler, ArrowRight, LayoutTemplate } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,11 +34,11 @@ type ViewMode = "single" | "project";
 type PieceType = "straight" | "elbow90" | "flatPieces";
 
 // Helper function for initial project state
-const createInitialProject = () => ({
+const createInitialProject = () => migrateProject({
     ...defaultProject(),
     name: "Nuovo Progetto",
     description: "Progetto di esempio per la simulazione di taglio",
-});
+} as DuctProject);
 
 export default function CuttingSimulatorClient() {
     // Mode

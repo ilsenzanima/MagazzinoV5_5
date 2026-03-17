@@ -4,7 +4,7 @@
  * poi proietta su viste ortogonali (Alto, Fronte, Lato).
  */
 
-import type { DuctProject, Segment, StraightSegment, RenderPendinoSegment, ContextualElementSegment } from './project-model';
+import type { DuctProject, Segment, StraightSegment, RenderPendinoSegment, ContextualElementSegment, PendinoOverlay } from './project-model';
 
 // ==================== TIPI ====================
 
@@ -317,27 +317,18 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
     const flushRun = () => {
         if (runStraights.length === 0) return;
 
-        // Calcola lunghezza totale della corsa
-        let runLen = 0;
-        for (const sn of runStraights) {
-            const seg = sn.segment as StraightSegment;
-            runLen += seg.length;
-        }
-
-        // Raccoglie i pendini: usa la distanza dall'inizio della corsa
+        // Raccoglie i pendini globali che appartengono a questo run
+        const globalPendini = project.pendini || [];
         const runPendini: Array<{ absPos: Vec3; id: string; dir: Direction3D; trackId: string | undefined; orientation?: 'top' | 'bottom' | 'left' | 'right' }> = [];
-        let offset = 0;
+
         for (const sn of runStraights) {
             const seg = sn.segment as StraightSegment;
-            if (!seg.pendini || seg.pendini.length === 0) {
-                offset += seg.length;
-                continue;
-            }
             const v = dirVec(sn.direction as Direction3D);
-            for (const pend of seg.pendini) {
-                const localDist = pend.fromEnd ? (seg.length - pend.distance) : pend.distance;
-                const safeDist = Math.max(0, Math.min(localDist, seg.length));
-                // Posizione assoluta del pendino
+
+            // Pendini globali (nuovo sistema overlay)
+            const segPendini = globalPendini.filter(p => p.runId === seg.id);
+            for (const pend of segPendini) {
+                const safeDist = Math.max(0, Math.min(pend.distanceFromStart, seg.length));
                 const absPos: Vec3 = {
                     x: sn.start.x + v.x * safeDist,
                     y: sn.start.y + v.y * safeDist,
@@ -345,11 +336,23 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
                 };
                 runPendini.push({ absPos, id: pend.id, dir: sn.direction as Direction3D, trackId: sn.trackId, orientation: pend.orientation });
             }
-            offset += seg.length;
+
+            // Fallback: pendini inline legacy (retrocompatibilità)
+            if (seg.pendini && seg.pendini.length > 0) {
+                for (const pend of seg.pendini) {
+                    const localDist = pend.fromEnd ? (seg.length - pend.distance) : pend.distance;
+                    const safeDist = Math.max(0, Math.min(localDist, seg.length));
+                    const absPos: Vec3 = {
+                        x: sn.start.x + v.x * safeDist,
+                        y: sn.start.y + v.y * safeDist,
+                        z: sn.start.z + v.z * safeDist,
+                    };
+                    runPendini.push({ absPos, id: pend.id, dir: sn.direction as Direction3D, trackId: sn.trackId, orientation: pend.orientation });
+                }
+            }
         }
 
-        // Costruisci lista di zone "muro" da evitare (in coordinate assolute lungo il run)
-        // Ogni zona è [startAbs, endAbs] lungo la direzione del run
+        // Costruisci lista di zone "muro" da evitare
         const wallZones: Array<{ start: Vec3; end: Vec3 }> = [];
         for (const sn of runStraights) {
             const seg = sn.segment as StraightSegment;
@@ -376,7 +379,6 @@ export function computeLayout(project: DuctProject): SegmentNode3D[] {
         for (const rp of runPendini) {
             const { absPos, id, dir, trackId, orientation } = rp;
 
-            // Verifica se il pendino cade dentro un muro
             let blocked = false;
             for (const wz of wallZones) {
                 const wx0 = Math.min(wz.start.x, wz.end.x) - outerW;
