@@ -122,12 +122,102 @@ export interface ContextElement {
     label?: string;
 }
 
+// ==================== OVERLAY: Tagli ====================
+
+/** Punto di taglio posizionato su un tratto dritto (non distruttivo) */
+export interface CutMark {
+    id: string;
+    /** ID del segmento dritto a cui si riferisce */
+    runId: string;
+    /** Distanza dall'inizio del tratto (mm) */
+    distanceFromStart: number;
+}
+
+// ==================== OVERLAY: Pendini globali ====================
+
+/** Pendino come overlay globale (non più dentro il segmento) */
+export interface PendinoOverlay {
+    id: string;
+    /** ID del segmento dritto a cui si riferisce */
+    runId: string;
+    /** Distanza dall'inizio del tratto (mm) */
+    distanceFromStart: number;
+    /** Da quale faccia parte la staffa */
+    orientation: PendinoOrientation;
+}
+
+// ==================== OVERLAY: Elementi Cantiere ====================
+
+export type SiteElementType =
+    // Reference (solo visualizzazione 3D, non calcolo materiale)
+    | 'muratura' | 'colonna_cemento' | 'trave_hea'
+    // Operativi (calcolo materiale)
+    | 'parete_cartongesso' | 'controparete_cartongesso'
+    | 'controsoffitto_cartongesso'
+    | 'soffitto_membrana' | 'setto';
+
+export interface SiteElement {
+    id: string;
+    type: SiteElementType;
+    /** ID del segmento a cui è associato (opzionale) */
+    runId?: string;
+    /** Posizione 3D assoluta */
+    position: { x: number; y: number; z: number };
+    /** Dimensioni (mm) */
+    dimensions: { width: number; height: number; depth: number };
+    label: string;
+    color?: string;
+    notes?: string;
+}
+
+// ==================== REGOLE GLOBALI PEZZI ====================
+
+export interface GlobalPieceRules {
+    /** Abilita fascia giunto tra i pezzi tagliati */
+    fasciaEnabled: boolean;
+    /** Larghezza fascia (mm) */
+    fasciaWidth: number;
+    /** Tipo di cappuccio inizio */
+    capStart: CapType;
+    /** Tipo di cappuccio fine */
+    capEnd: CapType;
+}
+
+export function defaultPieceRules(): GlobalPieceRules {
+    return {
+        fasciaEnabled: false,
+        fasciaWidth: 100,
+        capStart: 'none',
+        capEnd: 'none',
+    };
+}
+
+// ==================== PEZZO DERIVATO (output di explodeCuts) ====================
+
+/** Pezzo derivato dal taglio: porzione di un tratto dritto tra due cutMarks */
+export interface DerivedPiece {
+    id: string;
+    /** ID del segmento dritto originale */
+    runId: string;
+    /** Inizio pezzo rispetto al run (mm) */
+    startOffset: number;
+    /** Fine pezzo rispetto al run (mm) */
+    endOffset: number;
+    /** Lunghezza derivata (mm) */
+    length: number;
+    /** Indice nel run (0 = primo pezzo) */
+    pieceIndex: number;
+    /** Label descrittiva */
+    label: string;
+}
+
 // ==================== PROGETTO ====================
 
 export interface DuctProject {
     id: string;
     name: string;
     section: SectionProfile;
+    /** Tracciato fisico (Livello 1 — immutabile dopo il rilievo) */
     segments: Segment[];
     /** Se true, le lunghezze dei tratti dritti sono considerate "fuori tutto" (ingombri) e vengono accorciate dalle curve adiacenti */
     globalMeasurements: boolean;
@@ -137,12 +227,24 @@ export interface DuctProject {
     annotations?: Annotation[];
     /** Elementi contestuali: pareti, solai, varchi (fase D) */
     contextElements?: ContextElement[];
-    /** Abilita il calcolo delle fasce giunti tra i tratti */
-    jointBands?: boolean;
-    /** Larghezza della fascia giunto in mm (default 100-150) */
-    jointBandWidth?: number;
     /** Stato delle card del rilievo per persistere la memoria nel form */
     rilievoCards?: RilievoCard[];
+
+    // ==================== OVERLAY (Livello 2) ====================
+    /** Punti di taglio sui tratti dritti */
+    cutMarks?: CutMark[];
+    /** Pendini posizionati sui tratti */
+    pendini?: PendinoOverlay[];
+    /** Elementi cantiere (pareti, soffitti, note) */
+    siteElements?: SiteElement[];
+    /** Regole globali per fasce e cap */
+    pieceRules?: GlobalPieceRules;
+    /** Ordine personalizzato dei pezzi per il nesting (array di DerivedPiece.id) */
+    pieceOrder?: string[];
+    /** @deprecated Usa cutMarks + pendini overlay. Mantenuto per retrocompatibilità */
+    jointBands?: boolean;
+    /** @deprecated */
+    jointBandWidth?: number;
 }
 
 /** Contatore per ID univoci */
@@ -206,7 +308,185 @@ export function defaultProject(): DuctProject {
         section: defaultSection(),
         segments: [],
         globalMeasurements: true,
+        cutMarks: [],
+        pendini: [],
+        siteElements: [],
+        pieceRules: defaultPieceRules(),
+        pieceOrder: [],
     };
+}
+
+// ==================== MIGRAZIONE & TAGLIO ====================
+
+/**
+ * Migra un progetto vecchio (con pendini inline e segmenti splittati)
+ * al nuovo formato con overlay.
+ * - Unisce i segmenti dritti consecutivi in un unico PhysicalRun
+ * - Converte seg.pendini[] → project.pendini[]
+ * - Genera cutMarks dai punti di separazione
+ */
+export function migrateProject(project: DuctProject): DuctProject {
+    // Se ha già cutMarks, è già migrato
+    if (project.cutMarks && project.cutMarks.length > 0) return project;
+    if (project.pendini && project.pendini.length > 0) return project;
+
+    const newSegments: Segment[] = [];
+    const newCutMarks: CutMark[] = [];
+    const newPendini: PendinoOverlay[] = [];
+
+    let i = 0;
+    while (i < project.segments.length) {
+        const seg = project.segments[i];
+
+        if (seg.type === 'straight') {
+            // Raccogli tutti i dritti consecutivi (erano uno split)
+            const run: StraightSegment[] = [];
+            while (i < project.segments.length && project.segments[i].type === 'straight') {
+                run.push(project.segments[i] as StraightSegment);
+                i++;
+            }
+
+            if (run.length === 1) {
+                // Pezzo singolo: migra solo i pendini inline
+                const s = run[0];
+                if (s.pendini) {
+                    for (const p of s.pendini) {
+                        newPendini.push({
+                            id: p.id,
+                            runId: s.id,
+                            distanceFromStart: p.fromEnd ? (s.length - p.distance) : p.distance,
+                            orientation: p.orientation || 'top',
+                        });
+                    }
+                }
+                // Rimuovi pendini inline
+                const clean = { ...s };
+                delete clean.pendini;
+                newSegments.push(clean);
+            } else {
+                // Più dritti consecutivi: unifica in un unico run
+                let totalLen = 0;
+                const allObstacles: ContextualElementSegment[] = [];
+
+                for (const s of run) {
+                    // Migra ostacoli con offset corretto
+                    if (s.obstacles) {
+                        for (const o of s.obstacles) {
+                            allObstacles.push({
+                                ...o,
+                                distanceFromStart: (o.distanceFromStart || 0) + totalLen,
+                            });
+                        }
+                    }
+                    // Migra pendini inline
+                    if (s.pendini) {
+                        for (const p of s.pendini) {
+                            const absD = (p.fromEnd ? (s.length - p.distance) : p.distance) + totalLen;
+                            newPendini.push({
+                                id: p.id,
+                                runId: run[0].id, // Tutti puntano al run unificato
+                                distanceFromStart: absD,
+                                orientation: p.orientation || 'top',
+                            });
+                        }
+                    }
+                    totalLen += s.length;
+                }
+
+                // Crea il segmento unificato usando il primo ID
+                const unified = createStraightSegment(totalLen);
+                unified.id = run[0].id; // Mantieni l'ID originale
+                unified.label = run[0].label;
+                if (allObstacles.length > 0) unified.obstacles = allObstacles;
+
+                // Genera cutMarks dai punti di giunzione
+                let offset = 0;
+                for (let j = 0; j < run.length - 1; j++) {
+                    offset += run[j].length;
+                    newCutMarks.push({
+                        id: `cut-migr-${Date.now()}-${j}`,
+                        runId: unified.id,
+                        distanceFromStart: offset,
+                    });
+                }
+
+                newSegments.push(unified);
+            }
+        } else {
+            newSegments.push(seg);
+            i++;
+        }
+    }
+
+    return {
+        ...project,
+        segments: newSegments,
+        cutMarks: newCutMarks,
+        pendini: newPendini,
+        siteElements: project.siteElements || [],
+        pieceRules: project.pieceRules || defaultPieceRules(),
+        pieceOrder: project.pieceOrder || [],
+    };
+}
+
+/**
+ * Genera i pezzi derivati dai tagli.
+ * Prende tutti i segmenti dritti e li "esplode" secondo i cutMarks.
+ * Se un tratto non ha tagli, il pezzo coincide con il tratto intero.
+ */
+export function explodeCuts(project: DuctProject): DerivedPiece[] {
+    const cuts = project.cutMarks || [];
+    const pieces: DerivedPiece[] = [];
+    let globalPieceIdx = 0;
+
+    for (const seg of project.segments) {
+        if (seg.type !== 'straight') continue;
+        const s = seg as StraightSegment;
+
+        // Trova i tagli per questo tratto, ordinati per distanza
+        const segCuts = cuts
+            .filter(c => c.runId === s.id)
+            .map(c => c.distanceFromStart)
+            .sort((a, b) => a - b);
+
+        // Aggiungi i bordi (0 e lunghezza totale)
+        const boundaries = [0, ...segCuts, s.length];
+
+        for (let i = 0; i < boundaries.length - 1; i++) {
+            const start = boundaries[i];
+            const end = boundaries[i + 1];
+            const len = end - start;
+            if (len <= 0) continue;
+
+            pieces.push({
+                id: `piece-${s.id}-${i}`,
+                runId: s.id,
+                startOffset: start,
+                endOffset: end,
+                length: len,
+                pieceIndex: i,
+                label: segCuts.length > 0
+                    ? `${s.label || 'Tratto'} [${i + 1}/${boundaries.length - 1}]`
+                    : s.label || `Tratto ${globalPieceIdx + 1}`,
+            });
+            globalPieceIdx++;
+        }
+    }
+
+    // Riordina secondo pieceOrder se presente
+    if (project.pieceOrder && project.pieceOrder.length > 0) {
+        const order = project.pieceOrder;
+        pieces.sort((a, b) => {
+            const ia = order.indexOf(a.id);
+            const ib = order.indexOf(b.id);
+            if (ia === -1 && ib === -1) return 0;
+            if (ia === -1) return 1;
+            if (ib === -1) return -1;
+            return ia - ib;
+        });
+    }
+
+    return pieces;
 }
 
 /** Numero di lati attivi */

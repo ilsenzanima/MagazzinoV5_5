@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment } from "@/lib/cutting-simulator/project-model";
+import type { DuctProject, Segment, StraightSegment, Elbow90Segment, Annotation, ContextualElementSegment, CutMark, PendinoOverlay } from "@/lib/cutting-simulator/project-model";
 import { createStraightSegment, createElbow90Segment, createObstacleSegment } from "@/lib/cutting-simulator/project-model";
 import {
     computeLayout,
@@ -174,6 +174,8 @@ function PropertiesPanel({
     onRemove,
     onInsertAfter,
     onClose,
+    project,
+    onProjectChange,
 }: {
     segment: Segment;
     index: number;
@@ -182,6 +184,8 @@ function PropertiesPanel({
     onRemove: (index: number) => void;
     onInsertAfter: (index: number, type: 'straight' | 'elbow90') => void;
     onClose: () => void;
+    project: DuctProject;
+    onProjectChange: (project: DuctProject) => void;
 }) {
     return (
         <div className="absolute right-2 top-2 w-64 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg p-3 z-10 space-y-3">
@@ -224,109 +228,107 @@ function PropertiesPanel({
                     </div>
 
                     <div className="pt-2 border-t border-border/50">
-                        <div className="flex items-center justify-between mb-2">
-                            <Label className="text-[10px] uppercase text-muted-foreground">📌 Pendini</Label>
-                            <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{(segment as StraightSegment).pendini?.length || 0}</span>
-                        </div>
+                        {(() => {
+                            const segId = segment.id;
+                            const segPendini = (project.pendini || []).filter(p => p.runId === segId);
+                            const segLen = (segment as StraightSegment).length;
 
-                        <div className="space-y-2">
-                            <div className="flex gap-1">
-                                <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 px-1" onClick={() => {
-                                    const current = (segment as StraightSegment).pendini || [];
-                                    onUpdate(index, { pendini: [...current, { id: `pend-${Date.now()}`, distance: 500, fromEnd: false, orientation: 'top' }] });
-                                }}>
-                                    + Da Inizio (500)
-                                </Button>
-                                <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 px-1" onClick={() => {
-                                    const current = (segment as StraightSegment).pendini || [];
-                                    // Calcola distanza dal pendino precedente (o dall'inizio se non ce n'è uno)
-                                    const lastPend = current.length > 0 ? current[current.length - 1] : null;
-                                    const lastDist = lastPend ? (lastPend.fromEnd ? ((segment as StraightSegment).length - lastPend.distance) : lastPend.distance) : 0;
-                                    const newDist = lastDist + 1000; // default 1000mm dal precedente
-                                    if (newDist <= (segment as StraightSegment).length) {
-                                        onUpdate(index, { pendini: [...current, { id: `pend-${Date.now()}`, distance: newDist, fromEnd: false, orientation: 'top' }] });
-                                    }
-                                }}>
-                                    + Da Precedente (+1m)
-                                </Button>
-                            </div>
-                            <Button variant="outline" size="sm" className="h-7 text-[10px] w-full px-1" onClick={() => {
-                                const start = 500;
-                                const step = 1000;
-                                const len = (segment as StraightSegment).length;
-                                const newPendini: Array<{ id: string; distance: number; fromEnd: boolean; orientation: 'top' | 'bottom' | 'left' | 'right' }> = [];
-                                for (let dist = start; dist <= len - 100; dist += step) {
-                                    newPendini.push({ id: `pend-${Date.now()}-${dist}`, distance: dist, fromEnd: false, orientation: 'top' });
-                                }
-                                onUpdate(index, { pendini: newPendini });
-                            }}>
-                                Auto (50cm + ogni 1m)
-                            </Button>
+                            const addPendino = (dist: number) => {
+                                const newP: PendinoOverlay = { id: `pend-${Date.now()}`, runId: segId, distanceFromStart: dist, orientation: 'top' };
+                                onProjectChange({ ...project, pendini: [...(project.pendini || []), newP] });
+                            };
 
-                            {((segment as StraightSegment).pendini || []).length > 0 && (
-                                <div className="space-y-1 max-h-40 overflow-y-auto pr-1 mt-2 custom-scrollbar">
-                                    {((segment as StraightSegment).pendini || []).map((p, pIdx) => (
-                                        <div key={p.id} className="flex flex-col gap-1 bg-muted/50 p-1.5 rounded">
-                                            <div className="flex items-center gap-1">
-                                                <Input
-                                                    className="h-6 text-[10px] w-14 px-1 text-center font-mono"
-                                                    type="number"
-                                                    value={p.distance}
-                                                    onChange={e => {
-                                                        const arr = [...((segment as StraightSegment).pendini || [])];
-                                                        arr[pIdx] = { ...arr[pIdx], distance: Number(e.target.value) };
-                                                        onUpdate(index, { pendini: arr });
-                                                    }}
-                                                />
-                                                <span className="text-[8px] text-muted-foreground shrink-0">mm</span>
-                                                <button
-                                                    className="text-[9px] text-muted-foreground mr-auto hover:text-foreground cursor-pointer"
-                                                    title="Clicca per invertire da Inizio/Fine"
-                                                    onClick={() => {
-                                                        const arr = [...((segment as StraightSegment).pendini || [])];
-                                                        arr[pIdx] = { ...arr[pIdx], fromEnd: !arr[pIdx].fromEnd };
-                                                        onUpdate(index, { pendini: arr });
-                                                    }}
-                                                >
-                                                    {p.fromEnd ? 'da fine' : 'da inizio'}
-                                                </button>
-                                                <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-destructive/10 text-destructive shrink-0" onClick={() => {
-                                                    const arr = [...((segment as StraightSegment).pendini || [])];
-                                                    arr.splice(pIdx, 1);
-                                                    onUpdate(index, { pendini: arr });
-                                                }}>
-                                                    <X className="h-3 w-3" />
+                            const updatePendino = (pendId: string, updates: Partial<PendinoOverlay>) => {
+                                const arr = (project.pendini || []).map(p => p.id === pendId ? { ...p, ...updates } : p);
+                                onProjectChange({ ...project, pendini: arr });
+                            };
+
+                            const removePendino = (pendId: string) => {
+                                onProjectChange({ ...project, pendini: (project.pendini || []).filter(p => p.id !== pendId) });
+                            };
+
+                            const removeAllPendini = () => {
+                                onProjectChange({ ...project, pendini: (project.pendini || []).filter(p => p.runId !== segId) });
+                            };
+
+                            return (
+                                <>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <Label className="text-[10px] uppercase text-muted-foreground">📌 Pendini</Label>
+                                        <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{segPendini.length}</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex gap-1">
+                                            <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 px-1" onClick={() => addPendino(500)}>
+                                                + Da Inizio (500)
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 px-1" onClick={() => {
+                                                const last = segPendini.length > 0 ? segPendini[segPendini.length - 1] : null;
+                                                const lastDist = last ? last.distanceFromStart : 0;
+                                                const newDist = lastDist + 1000;
+                                                if (newDist <= segLen) addPendino(newDist);
+                                            }}>
+                                                + Da Precedente (+1m)
+                                            </Button>
+                                        </div>
+                                        <Button variant="outline" size="sm" className="h-7 text-[10px] w-full px-1" onClick={() => {
+                                            // Prima rimuovi i vecchi pendini di questo segmento
+                                            const others = (project.pendini || []).filter(p => p.runId !== segId);
+                                            const newPendini: PendinoOverlay[] = [];
+                                            for (let dist = 500; dist <= segLen - 100; dist += 1000) {
+                                                newPendini.push({ id: `pend-${Date.now()}-${dist}`, runId: segId, distanceFromStart: dist, orientation: 'top' });
+                                            }
+                                            onProjectChange({ ...project, pendini: [...others, ...newPendini] });
+                                        }}>
+                                            Auto (50cm + ogni 1m)
+                                        </Button>
+
+                                        {segPendini.length > 0 && (
+                                            <div className="space-y-1 max-h-40 overflow-y-auto pr-1 mt-2 custom-scrollbar">
+                                                {segPendini.map(p => (
+                                                    <div key={p.id} className="flex flex-col gap-1 bg-muted/50 p-1.5 rounded">
+                                                        <div className="flex items-center gap-1">
+                                                            <Input
+                                                                className="h-6 text-[10px] w-14 px-1 text-center font-mono"
+                                                                type="number"
+                                                                value={p.distanceFromStart}
+                                                                onChange={e => updatePendino(p.id, { distanceFromStart: Number(e.target.value) })}
+                                                            />
+                                                            <span className="text-[8px] text-muted-foreground shrink-0">mm</span>
+                                                            <span className="text-[9px] text-muted-foreground mr-auto">da inizio</span>
+                                                            <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-destructive/10 text-destructive shrink-0"
+                                                                onClick={() => removePendino(p.id)}>
+                                                                <X className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                        <div className="flex items-center gap-0.5">
+                                                            <span className="text-[8px] text-muted-foreground mr-1">Staffa:</span>
+                                                            {(['top', 'bottom', 'left', 'right'] as const).map(orient => (
+                                                                <button
+                                                                    key={orient}
+                                                                    className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                                                        p.orientation === orient
+                                                                            ? 'bg-primary text-primary-foreground'
+                                                                            : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                                                                    }`}
+                                                                    onClick={() => updatePendino(p.id, { orientation: orient })}
+                                                                >
+                                                                    {orient === 'top' ? '⬆ Alto' : orient === 'bottom' ? '⬇ Basso' : orient === 'left' ? '⬅ SX' : '➡ DX'}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <Button variant="ghost" size="sm" className="w-full h-6 text-[9px] text-destructive hover:bg-destructive/10 mt-1"
+                                                    onClick={removeAllPendini}>
+                                                    Rimuovi Tutti
                                                 </Button>
                                             </div>
-                                            {/* Orientamento staffa */}
-                                            <div className="flex items-center gap-0.5">
-                                                <span className="text-[8px] text-muted-foreground mr-1">Staffa:</span>
-                                                {(['top', 'bottom', 'left', 'right'] as const).map(orient => (
-                                                    <button
-                                                        key={orient}
-                                                        className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
-                                                            (p.orientation || 'top') === orient
-                                                                ? 'bg-primary text-primary-foreground'
-                                                                : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-                                                        }`}
-                                                        onClick={() => {
-                                                            const arr = [...((segment as StraightSegment).pendini || [])];
-                                                            arr[pIdx] = { ...arr[pIdx], orientation: orient };
-                                                            onUpdate(index, { pendini: arr });
-                                                        }}
-                                                    >
-                                                        {orient === 'top' ? '⬆ Alto' : orient === 'bottom' ? '⬇ Basso' : orient === 'left' ? '⬅ SX' : '➡ DX'}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <Button variant="ghost" size="sm" className="w-full h-6 text-[9px] text-destructive hover:bg-destructive/10 mt-1" onClick={() => onUpdate(index, { pendini: [] })}>
-                                        Rimuovi Tutti
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
+                                        )}
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
             ) : (
@@ -773,125 +775,58 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
         if (seg.type !== 'straight') return;
         const sSeg = seg as StraightSegment;
         const len = sSeg.length;
-        const oldObstacles = sSeg.obstacles || [];
-        const newSegments = [...project.segments];
 
-        let parts: StraightSegment[] = [];
+        // Calcola le posizioni di taglio
+        const cutPositions: number[] = [];
 
         if (mode === 'half') {
-            const half = Math.round(len / 2);
-            parts.push(createStraightSegment(half));
-            parts.push(createStraightSegment(len - half));
+            cutPositions.push(Math.round(len / 2));
         } else if (mode === 'atDistance' && value && value > 0 && value < len) {
-            parts.push(createStraightSegment(value));
-            parts.push(createStraightSegment(len - value));
+            cutPositions.push(value);
         } else if (mode === 'equalParts' && value && value >= 2) {
             const partLen = Math.round(len / value);
-            let remaining = len;
-            for (let i = 0; i < value; i++) {
-                const pLen = i === value - 1 ? remaining : partLen;
-                parts.push(createStraightSegment(pLen));
-                remaining -= partLen;
+            for (let i = 1; i < value; i++) {
+                cutPositions.push(i * partLen);
             }
         } else if (mode === 'nPartsOfX' && value && value > 0) {
-            const numParts = Math.ceil(len / value);
-            let remaining = len;
-            for (let i = 0; i < numParts; i++) {
-                const pLen = Math.min(value, remaining);
-                parts.push(createStraightSegment(pLen));
-                remaining -= pLen;
+            for (let pos = value; pos < len; pos += value) {
+                cutPositions.push(pos);
             }
         } else {
-            return; // Valore non valido, non fare nulla
+            return;
         }
 
-        // Riassegna gli ostacoli alle nuove parti in base al distanceFromStart
-        if (oldObstacles.length > 0) {
-            let currentOffset = 0;
-            for (let i = 0; i < parts.length; i++) {
-                const part = parts[i];
-                const partStart = currentOffset;
-                const partEnd = currentOffset + part.length;
+        // Aggiungi CutMarks (evita duplicati)
+        const existingCuts = (project.cutMarks || []).filter(c => c.runId === sSeg.id);
+        const existingPositions = new Set(existingCuts.map(c => c.distanceFromStart));
+        const newCutMarks: CutMark[] = [...(project.cutMarks || [])];
 
-                // Trova gli ostacoli che cadono in questa parte
-                const partObstacles = oldObstacles.filter(o => {
-                    const oDist = o.distanceFromStart || 0;
-                    // L'ostacolo appartiene a questo segmento se il suo centro/inizio è contenuto
-                    return oDist >= partStart && oDist < partEnd;
+        for (const pos of cutPositions) {
+            if (!existingPositions.has(pos)) {
+                newCutMarks.push({
+                    id: `cut-${Date.now()}-${pos}`,
+                    runId: sSeg.id,
+                    distanceFromStart: pos,
                 });
-
-                if (partObstacles.length > 0) {
-                    part.obstacles = partObstacles.map(o => ({
-                        ...o,
-                        distanceFromStart: (o.distanceFromStart || 0) - partStart
-                    }));
-                }
-
-                currentOffset += part.length;
             }
         }
 
-        newSegments.splice(segIdx, 1, ...parts);
-
-        onProjectChange({ ...project, segments: newSegments });
+        onProjectChange({ ...project, cutMarks: newCutMarks });
         setContextMenu(null);
         setSplitDialog(null);
     }, [project, onProjectChange]);
 
-    // Unisci SOLO i segmenti dritti contigui (NON attraversa muri/solai)
-    // I muri interrompono la corsa, impedendo a due tratti di fondersi passando attraverso
+    // Rimuovi TUTTI i tagli per unificare il tratto (elimina i CutMarks del segmento)
     const mergeRun = useCallback((segIdx: number) => {
-        const segments = project.segments;
-        const seg = segments[segIdx];
+        const seg = project.segments[segIdx];
         if (seg?.type !== 'straight') return;
 
-        const segs = [...project.segments];
-        // Trovo l'inizio della "run" di dritti (mi fermo al primo ostacolo/curva)
-        let startIndex = segIdx;
-        while (startIndex > 0 && segs[startIndex - 1].type === 'straight') {
-            startIndex--;
-        }
+        // Rimuovi tutti i CutMarks associati a questo segmento
+        const newCutMarks = (project.cutMarks || []).filter(c => c.runId !== seg.id);
 
-        // Trovo la fine
-        let endIndex = segIdx;
-        while (endIndex < segs.length - 1 && segs[endIndex + 1].type === 'straight') {
-            endIndex++;
-        }
-
-        if (startIndex === endIndex) return;
-
-        const runSegments = segs.slice(startIndex, endIndex + 1);
-
-        // Sommo la lunghezza di TUTTI i dritti contigui e colleziono gli ostacoli
-        let totalLength = 0;
-        const allObstacles: typeof project.segments[0][] = [];
-
-        for (const s of runSegments) {
-            const sSeg = s as StraightSegment;
-            if (sSeg.obstacles && sSeg.obstacles.length > 0) {
-                // Aggiungiamo il totalLength accumulato finora alla posizione dell'ostacolo
-                const mappedObstacles = sSeg.obstacles.map(o => ({
-                    ...o,
-                    distanceFromStart: (o.distanceFromStart || 0) + totalLength
-                }));
-                allObstacles.push(...mappedObstacles);
-            }
-            totalLength += sSeg.length;
-        }
-
-        // Creo l'unico segmento dritto unificato
-        const unifiedStraight = createStraightSegment(totalLength);
-        if (allObstacles.length > 0) {
-            unifiedStraight.obstacles = allObstacles as any;
-        }
-
-        // Sostituisco i dritti con quello unito
-        segs.splice(startIndex, runSegments.length, unifiedStraight);
-
-        onProjectChange({ ...project, segments: segs });
+        onProjectChange({ ...project, cutMarks: newCutMarks });
         setContextMenu(null);
-        setSelectedIdx(startIndex); // Mantieni la selezione sul nuovo segmento
-
+        setSelectedIdx(segIdx);
     }, [project, onProjectChange]);
 
     const insertSegmentAfter = useCallback((segIdx: number, newSeg: Segment) => {
@@ -1525,6 +1460,8 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
                     onRemove={handleRemove}
                     onInsertAfter={handleInsertAfter}
                     onClose={() => setSelectedIdx(null)}
+                    project={project}
+                    onProjectChange={onProjectChange}
                 />
             )}
 
