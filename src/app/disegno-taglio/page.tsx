@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Search, FolderOpen, MoreVertical, Trash2 } from "lucide-react";
+import { Plus, Search, FolderOpen, MoreVertical, Trash2, Ruler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -36,6 +36,12 @@ export default function DisegnoTaglioDashboard() {
                         Progetti di Disegno e Taglio
                     </h2>
                     <div className="flex items-center space-x-2">
+                        <Link href="/disegno-taglio/pezzi-singoli">
+                            <Button variant="outline" className="font-medium shadow-sm transition-all focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background w-full sm:w-auto gap-2">
+                                <Ruler className="h-4 w-4" />
+                                📐 Pezzi Singoli
+                            </Button>
+                        </Link>
                         <Link href="/disegno-taglio/new">
                             <Button className="font-medium shadow-sm transition-all focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background w-full sm:w-auto">
                                 <Plus className="mr-2 h-4 w-4" />

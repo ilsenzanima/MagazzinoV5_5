@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CornerDownRight, Plus, RotateCcw, Info } from "lucide-react";
 import { PreviewPopup } from "@/components/cutting-simulator/PreviewPopup";
-import { Isometric3DElbow } from "@/components/cutting-simulator/Isometric3DElbow";
+import { SinglePiece3DView } from "@/components/cutting-simulator/SinglePiece3DView";
 import type { ElbowInput } from "@/lib/cutting-simulator/calculations";
 
 interface ElbowFormProps {
@@ -193,37 +193,29 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
                         </div>
                     </div>
 
-                    {/* Anteprime: vista dall'alto + vista 3D — cliccabili per ingrandimento */}
-                    <div className="border border-dashed border-border/50 rounded-lg bg-muted/30 overflow-hidden">
-                        <div className="grid grid-cols-2 divide-x divide-border/30">
-                            <PreviewPopup title="Schema Gomito 90° — Vista dall'Alto">
-                                <div className="p-3">
-                                    <p className="text-xs text-muted-foreground text-center mb-2">Vista dall&apos;Alto</p>
-                                    <ElbowPreview innerWidth={w} thickness={t} armA={a} armB={b} />
-                                </div>
-                            </PreviewPopup>
-                            <PreviewPopup title="Vista 3D Isometrica — Gomito 90°">
-                                <div className="p-3">
-                                    <p className="text-xs text-muted-foreground text-center mb-2">Vista 3D</p>
-                                    <Isometric3DElbow
-                                        innerWidth={w}
-                                        innerHeight={h}
-                                        armA={a}
-                                        armB={b}
-                                        thickness={t}
-                                    />
-                                </div>
-                            </PreviewPopup>
+                    {/* Anteprima 3D Reale */}
+                    <div className="aspect-video w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-slate-900 group relative">
+                        <div className="absolute top-3 left-3 z-10 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-md text-[10px] text-white font-bold uppercase tracking-wider">
+                            Anteprima 3D
                         </div>
+                        <SinglePiece3DView 
+                            type="elbow90"
+                            dimensions={{
+                                innerWidth: w,
+                                innerHeight: h,
+                                thickness: t,
+                                direction: "right" // Default preview direction
+                            }}
+                        />
                     </div>
 
                     <div className="flex gap-2 pt-2">
-                        <Button type="submit" className="flex-1 h-11 font-semibold">
-                            <Plus className="mr-2 h-4 w-4" />
+                        <Button type="submit" className="flex-1 h-12 font-bold text-base shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98] bg-slate-900 hover:bg-slate-800">
+                            <Plus className="mr-2 h-5 w-5" />
                             Calcola Pezzi
                         </Button>
-                        <Button type="button" variant="outline" onClick={handleReset} className="h-11">
-                            <RotateCcw className="h-4 w-4" />
+                        <Button type="button" variant="outline" onClick={handleReset} className="h-12 w-12 border-slate-200">
+                            <RotateCcw className="h-5 w-5 text-slate-400" />
                         </Button>
                     </div>
                 </form>

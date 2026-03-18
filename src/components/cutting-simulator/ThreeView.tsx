@@ -9,9 +9,10 @@
  */
 
 import React, { useMemo } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useLoader } from "@react-three/fiber";
 import { OrbitControls, Grid, Text } from "@react-three/drei";
 import * as THREE from "three";
+import type { BlueprintConfig } from "@/lib/cutting-simulator/project-model";
 import type { SegmentNode3D, Vec3 } from "@/lib/cutting-simulator/project-layout";
 import type { StraightSegment, Elbow90Segment, ContextualElementSegment, SectionProfile } from "@/lib/cutting-simulator/project-model";
 
@@ -337,6 +338,42 @@ function SegmentLabel({ node }: { node: SegmentNode3D }) {
     );
 }
 
+// ==================== BLUEPRINT MESH ====================
+
+function BlueprintMesh({ config }: { config: BlueprintConfig }) {
+    // Caricamento texture con gestione errori base
+    const texture = useLoader(THREE.TextureLoader, config.url);
+    
+    const { w, h } = useMemo(() => {
+        if (!texture || !texture.image) return { w: 0, h: 0 };
+        // Scala: mm/px -> metri (Three.js units)
+        // Se config.scale è 1, 1px = 1mm
+        const widthMm = texture.image.width * (config.scale || 1);
+        const heightMm = texture.image.height * (config.scale || 1);
+        return { w: widthMm * SCALE, h: heightMm * SCALE };
+    }, [texture, config.scale]);
+
+    if (!texture || w === 0) return null;
+
+    return (
+        <mesh 
+            // Ruotato per essere orizzontale (piano XZ)
+            rotation={[-Math.PI / 2, 0, (config.rotation * Math.PI) / 180]} 
+            // Posizionato leggermente sotto la griglia (-0.005m = -5mm) per evitare z-fighting
+            position={[config.offset.x * SCALE, -0.05, -config.offset.y * SCALE]}
+        >
+            <planeGeometry args={[w, h]} />
+            <meshBasicMaterial 
+                map={texture} 
+                transparent 
+                opacity={config.opacity} 
+                depthWrite={false}
+                side={THREE.DoubleSide}
+            />
+        </mesh>
+    );
+}
+
 // ==================== SCENE ====================
 
 interface SceneProps {
@@ -347,9 +384,10 @@ interface SceneProps {
     onContextMenu?: (idx: number, e: React.MouseEvent) => void;
     jointBands?: boolean;
     jointBandWidth?: number;
+    blueprint?: BlueprintConfig;
 }
 
-function Scene({ nodes3D, section, selectedIdx, onSelect, onContextMenu, jointBands, jointBandWidth }: SceneProps) {
+function Scene({ nodes3D, section, selectedIdx, onSelect, onContextMenu, jointBands, jointBandWidth, blueprint }: SceneProps) {
     const center = useMemo(() => {
         if (nodes3D.length === 0) return new THREE.Vector3();
         const c = new THREE.Vector3();
@@ -392,6 +430,12 @@ function Scene({ nodes3D, section, selectedIdx, onSelect, onContextMenu, jointBa
                 position={[center.x, -0.01, center.z]}
             />
 
+            {blueprint && blueprint.visible && blueprint.url && (
+                <React.Suspense fallback={null}>
+                    <BlueprintMesh config={blueprint} />
+                </React.Suspense>
+            )}
+
             {nodes3D.map((node) => {
                 const props: SegmentMeshProps = {
                     node, section,
@@ -432,9 +476,10 @@ interface ThreeViewProps {
     onContextMenu?: (idx: number, e: React.MouseEvent) => void;
     jointBands?: boolean;
     jointBandWidth?: number;
+    blueprint?: BlueprintConfig;
 }
 
-export function ThreeView({ nodes3D, section, selectedIdx, onSelect, onContextMenu, jointBands, jointBandWidth }: ThreeViewProps) {
+export function ThreeView({ nodes3D, section, selectedIdx, onSelect, onContextMenu, jointBands, jointBandWidth, blueprint }: ThreeViewProps) {
     const cameraPos = useMemo(() => {
         if (nodes3D.length === 0) return [1, 1, 1] as [number, number, number];
         const c = new THREE.Vector3();
@@ -462,6 +507,7 @@ export function ThreeView({ nodes3D, section, selectedIdx, onSelect, onContextMe
                     selectedIdx={selectedIdx} onSelect={onSelect}
                     onContextMenu={onContextMenu}
                     jointBands={jointBands} jointBandWidth={jointBandWidth}
+                    blueprint={blueprint}
                 />
             </Canvas>
         </div>

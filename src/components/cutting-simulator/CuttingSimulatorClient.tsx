@@ -1,37 +1,33 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { DuctForm } from "@/components/cutting-simulator/DuctForm";
-import { ElbowForm } from "@/components/cutting-simulator/ElbowForm";
+import { useParams } from "next/navigation";
 import { ProjectForm } from "@/components/cutting-simulator/ProjectForm";
-import { FlatPiecesForm } from "@/components/cutting-simulator/FlatPiecesForm";
 import { ProjectEditor } from "@/components/cutting-simulator/ProjectEditor";
 import { CutPlanViewer } from "@/components/cutting-simulator/CutPlanViewer";
 import { SheetConfigForm } from "@/components/cutting-simulator/SheetConfigForm";
 import { TracksAnalysisPanel } from "@/components/cutting-simulator/TracksAnalysisPanel";
 import { PiecesList } from "@/components/cutting-simulator/PiecesList";
 import {
-    calculateRectangularDuct,
-    calculateElbow90,
     calculateProject,
     explodePieces,
-    type DuctInput,
-    type ElbowInput,
     type CalculationResult,
 } from "@/lib/cutting-simulator/calculations";
 import type { DuctProject } from "@/lib/cutting-simulator/project-model";
 import { defaultProject, migrateProject } from "@/lib/cutting-simulator/project-model";
 import { nestPieces, type SheetConfig, type NestingResult } from "@/lib/cutting-simulator/nesting";
-import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid, List, PenTool, MousePointer2, Pin, PencilRuler, ArrowRight, LayoutTemplate } from "lucide-react";
+import { Scissors, Sparkles, RectangleHorizontal, CornerDownRight, Layers, LayoutGrid, List, PenTool, MousePointer2, Pin, PencilRuler, ArrowRight, LayoutTemplate, Image, Eye, EyeOff, RotateCcw, Maximize, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { SectionSidesSelector } from "@/components/cutting-simulator/SectionSidesSelector";
 
-type ViewMode = "single" | "project";
-type PieceType = "straight" | "elbow90" | "flatPieces";
+// Tipi non più necessari in questo componente
+// type ViewMode = "single" | "project";
+// type PieceType = "straight" | "elbow90" | "flatPieces";
 
 // Helper function for initial project state
 const createInitialProject = () => migrateProject({
@@ -41,19 +37,12 @@ const createInitialProject = () => migrateProject({
 } as DuctProject);
 
 export default function CuttingSimulatorClient() {
-    // Mode
-    const [viewMode, setViewMode] = useState<"single" | "project">("project");
-
+    const params = useParams();
     // Project workflow step
     const [projectStep, setProjectStep] = useState<"settings" | "routing" | "engineering" | "nesting">("settings");
 
     // Form states
     const [project, setProject] = useState<DuctProject>(createInitialProject());
-    const [singlePieceDimensions, setSinglePieceDimensions] = useState({
-        innerWidth: 300,
-        innerHeight: 300,
-        length: 1000
-    });
     const [calcResult, setCalcResult] = useState<CalculationResult | null>(null);
     const [nestingResult, setNestingResult] = useState<NestingResult | null>(null);
     const [sheetConfig, setSheetConfig] = useState<SheetConfig>({
@@ -61,7 +50,6 @@ export default function CuttingSimulatorClient() {
         height: 1200,
         gap: 5,
     });
-    const [pieceType, setPieceType] = useState<PieceType>("straight");
 
     const runNesting = useCallback((result: CalculationResult, config: SheetConfig) => {
         const exploded = explodePieces(result.pieces);
@@ -69,23 +57,7 @@ export default function CuttingSimulatorClient() {
         setNestingResult(nesting);
     }, []);
 
-    const handleCalculateStraight = useCallback(
-        (input: DuctInput) => {
-            const result = calculateRectangularDuct(input);
-            setCalcResult(result);
-            runNesting(result, sheetConfig);
-        },
-        [sheetConfig, runNesting]
-    );
 
-    const handleCalculateElbow = useCallback(
-        (input: ElbowInput) => {
-            const result = calculateElbow90(input);
-            setCalcResult(result);
-            runNesting(result, sheetConfig);
-        },
-        [sheetConfig, runNesting]
-    );
 
     const handleCalculateProject = useCallback(
         (project: DuctProject) => {
@@ -106,15 +78,7 @@ export default function CuttingSimulatorClient() {
         [calcResult, runNesting]
     );
 
-    const handleTypeChange = (type: PieceType) => {
-        setPieceType(type);
-        setCalcResult(null);
-        setNestingResult(null);
-    };
 
-    const handleViewModeChange = (mode: "single" | "project") => {
-        setViewMode(mode);
-    };
 
     const handleProjectPropChange = useCallback((key: keyof DuctProject, value: any) => {
         setProject(prev => ({ ...prev, [key]: value }));
@@ -127,7 +91,7 @@ export default function CuttingSimulatorClient() {
             {/* TOP BAR / HEADER COMPATTO (Sempre Visibile) */}
             <div className="h-14 border-b border-border/50 bg-background flex items-center justify-between px-4 shrink-0 shadow-sm z-10 w-full">
                 <div className="flex items-center gap-3">
-                    <a href="/disegno-taglio" className="p-2 hover:bg-slate-100 rounded-md transition-colors text-slate-500">
+                    <a href={`/disegno-taglio/${params.id}`} className="p-2 hover:bg-slate-100 rounded-md transition-colors text-slate-500">
                         <ArrowRight className="h-5 w-5 rotate-180" />
                     </a>
                     <div className="flex items-center gap-2">
@@ -135,165 +99,49 @@ export default function CuttingSimulatorClient() {
                             <Scissors className="h-4 w-4" />
                         </div>
                         <h1 className="text-lg font-semibold tracking-tight text-slate-800">
-                            {viewMode === 'project' ? project.name : "Calcolo Pezzo Singolo"}
+                            Editor Progetto: {project.name}
                         </h1>
                     </div>
                 </div>
 
-                {/* Selettore modalità: Pezzo Singolo / Progetto SEMPRE VISIBILE */}
-                <div className="flex gap-1 p-1 bg-slate-200/50 rounded-lg shadow-inner">
-                    <Button
-                        variant={viewMode === "single" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => handleViewModeChange("single")}
-                        className={cn("gap-2 transition-all h-8 text-xs font-medium", viewMode === "single" ? "shadow-sm bg-background text-primary hover:bg-background" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        <RectangleHorizontal className="h-3.5 w-3.5" />
-                        Pezzo Singolo
-                    </Button>
-                    <Button
-                        variant={viewMode === "project" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => handleViewModeChange("project")}
-                        className={cn("gap-2 transition-all h-8 text-xs font-medium", viewMode === "project" ? "shadow-sm bg-background text-primary hover:bg-background" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        <Layers className="h-3.5 w-3.5" />
-                        Progetto Continuo
-                    </Button>
+                {/* Stepper del Progetto integrato nell'header */}
+                <div className="flex bg-slate-100 p-0.5 rounded-lg gap-0.5 shadow-inner border border-slate-200">
+                    {[
+                        { id: "settings", label: "Parametri", icon: PencilRuler },
+                        { id: "routing", label: "Tracciato", icon: Pin },
+                        { id: "engineering", label: "Dettaglio", icon: Scissors },
+                        { id: "nesting", label: "Nesting", icon: LayoutTemplate }
+                    ].map(step => {
+                        const Icon = step.icon;
+                        const isActive = projectStep === step.id;
+                        return (
+                            <button
+                                key={step.id}
+                                onClick={() => setProjectStep(step.id as any)}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-tight transition-all",
+                                    isActive
+                                        ? "bg-white text-blue-600 shadow-sm ring-1 ring-slate-200"
+                                        : "text-slate-500 hover:text-slate-800"
+                                )}
+                            >
+                                <Icon className="h-3.5 w-3.5" />
+                                <span className="hidden lg:block">{step.label}</span>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
             {/* Contenuto principale */}
             <div className="flex-1 flex flex-col overflow-hidden w-full mx-auto relative px-2 sm:px-4 lg:px-6 py-4 gap-4">
 
-                {/* STEPPER PROGETTO */}
-                {viewMode === "project" && (
-                    <div className="flex bg-card p-1 rounded-xl gap-1 w-full max-w-2xl mx-auto shrink-0 shadow-sm border border-border/60">
-                        {[
-                            { id: "settings", label: "1. Parametri Canala", icon: PencilRuler },
-                            { id: "routing", label: "2. Tracciato Principale", icon: Pin },
-                            { id: "engineering", label: "3. Taglio Pezzi", icon: Scissors },
-                            { id: "nesting", label: "4. Taglio Lastra", icon: LayoutTemplate }
-                        ].map(step => {
-                            const Icon = step.icon;
-                            const isActive = projectStep === step.id;
-                            return (
-                                <button
-                                    key={step.id}
-                                    onClick={() => setProjectStep(step.id as "settings" | "routing" | "engineering" | "nesting")}
-                                    className={cn(
-                                        "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300",
-                                        isActive
-                                            ? "bg-primary text-primary-foreground shadow-md scale-[1.02]"
-                                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                    )}
-                                >
-                                    <Icon className="h-4 w-4 hidden sm:block" />
-                                    <span className="truncate">{step.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* AREA CONTENUTO CENTRALE CON SCROLL (Solo questo sckrollerà) */}
-                <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center pb-8 scrollbar-hide sm:scrollbar-default">
-                    {/* ===== VISTA PEZZO SINGOLO ===== */}
-                    {viewMode === "single" && (
-                        <div className="w-full max-w-4xl space-y-6 animate-in fade-in duration-300">
-                            <div className="flex flex-col sm:flex-row gap-6 w-full items-start">
-                                {/* Form */}
-                                <div className="w-full sm:w-1/2 space-y-4">
-                                    {/* Sub-selettore tipo pezzo singolo */}
-                                    <div className="flex flex-wrap gap-1.5 p-1 bg-card border border-border rounded-lg shadow-sm">
-                                        <button type="button"
-                                            onClick={() => handleTypeChange("straight")}
-                                            className={cn(
-                                                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-semibold rounded-md transition-all",
-                                                pieceType === "straight"
-                                                    ? "bg-muted text-foreground"
-                                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                            )}
-                                        >
-                                            <RectangleHorizontal className="h-3.5 w-3.5" />
-                                            Dritto
-                                        </button>
-                                        <button type="button"
-                                            onClick={() => handleTypeChange("elbow90")}
-                                            className={cn(
-                                                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-semibold rounded-md transition-all",
-                                                pieceType === "elbow90"
-                                                    ? "bg-muted text-foreground"
-                                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                            )}
-                                        >
-                                            <CornerDownRight className="h-3.5 w-3.5" />
-                                            Curva
-                                        </button>
-                                        <button type="button"
-                                            onClick={() => handleTypeChange("flatPieces")}
-                                            className={cn(
-                                                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-semibold rounded-md transition-all",
-                                                pieceType === "flatPieces"
-                                                    ? "bg-muted text-foreground"
-                                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                            )}
-                                        >
-                                            <LayoutGrid className="h-3.5 w-3.5" />
-                                            Piani
-                                        </button>
-                                    </div>
-
-                                    {pieceType === "straight" ? (
-                                        <DuctForm onCalculate={handleCalculateStraight} />
-                                    ) : pieceType === "elbow90" ? (
-                                        <ElbowForm onCalculate={handleCalculateElbow} />
-                                    ) : (
-                                        <FlatPiecesForm
-                                            sheetConfig={sheetConfig}
-                                            onCalculate={(result) => {
-                                                setCalcResult(result);
-                                                runNesting(result, sheetConfig);
-                                            }}
-                                        />
-                                    )}
-                                    <SheetConfigForm config={sheetConfig} onChange={handleSheetConfigChange} />
-                                </div>
-
-                                {/* Risultato */}
-                                <div className="w-full sm:w-1/2 space-y-4">
-                                    {calcResult && (
-                                        <PiecesList
-                                            pieces={calcResult.pieces}
-                                            totalArea={calcResult.totalArea}
-                                            summary={calcResult.summary}
-                                        />
-                                    )}
-                                    {nestingResult && nestingResult.sheets.length > 0 && (
-                                        <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm shadow-sm">
-                                            <Sparkles className="h-5 w-5 flex-shrink-0" />
-                                            <span>
-                                                <strong>{nestingResult.totalSheets}</strong> lastre (util. <strong>{(nestingResult.sheets.reduce((s, sh) => s + sh.utilization, 0) / nestingResult.sheets.length).toFixed(1)}%</strong>)
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {nestingResult && nestingResult.sheets.length > 0 && (
-                                <div className="w-full border border-border rounded-xl bg-card shadow-sm overflow-hidden h-[600px] flex flex-col mt-6">
-                                    <div className="p-3 bg-muted border-b border-border font-semibold text-sm text-foreground">Preview di Taglio</div>
-                                    <div className="flex-1 min-h-0 overflow-y-auto p-4">
-                                        <CutPlanViewer sheets={nestingResult?.sheets || []} sheetConfig={sheetConfig} unplacedCount={nestingResult?.unplaced.length || 0} />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+            {/* AREA CONTENUTO CENTRALE CON SCROLL (Solo questo sckrollerà) */}
+            <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center pb-8 scrollbar-hide sm:scrollbar-default">
 
 
                     {/* ===== VISTA PROGETTO ===== */}
-                    {viewMode === "project" && projectStep === "settings" && (
+                    {projectStep === "settings" && (
                         <div className="w-full max-w-2xl mt-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                             <Card className="border-border shadow-sm bg-card">
                                 <CardHeader className="pb-4 border-b border-slate-100">
@@ -347,6 +195,102 @@ export default function CuttingSimulatorClient() {
                                             />
                                         </div>
                                     </div>
+
+                                    {/* Sezione Blueprint (Fase C) */}
+                                    <div className="bg-card rounded-xl border border-border p-5 shadow-sm space-y-4">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 rounded-md bg-emerald-50 text-emerald-600">
+                                                    <Image className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-sm font-bold text-slate-800">Piantina di Riferimento (Blueprint)</Label>
+                                                    <p className="text-[10px] text-muted-foreground">Usa un'immagine come guida per il tracciato 3D</p>
+                                                </div>
+                                            </div>
+                                            <Switch 
+                                                checked={project.blueprint?.visible} 
+                                                onCheckedChange={(checked) => handleProjectPropChange('blueprint', { ...project.blueprint, visible: checked })} 
+                                            />
+                                        </div>
+
+                                        {project.blueprint?.visible && (
+                                            <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+                                                <div className="space-y-2">
+                                                    <Label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">URL Immagine Piantina</Label>
+                                                    <Input 
+                                                        placeholder="https://esempio.it/piantina.jpg"
+                                                        value={project.blueprint?.url || ''}
+                                                        onChange={(e) => handleProjectPropChange('blueprint', { ...project.blueprint, url: e.target.value })}
+                                                        className="h-9 text-sm border-slate-200"
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Opacità</Label>
+                                                            <span className="text-[10px] font-mono text-slate-500">{Math.round((project.blueprint?.opacity || 0.5) * 100)}%</span>
+                                                        </div>
+                                                        <input 
+                                                            type="range" min="0" max="1" step="0.05"
+                                                            className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                            value={project.blueprint?.opacity || 0.5}
+                                                            onChange={(e) => handleProjectPropChange('blueprint', { ...project.blueprint, opacity: Number(e.target.value) })}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Scala (mm/px)</Label>
+                                                            <span className="text-[10px] font-mono text-slate-500">{project.blueprint?.scale || 1}x</span>
+                                                        </div>
+                                                        <Input 
+                                                            type="number" step="0.1"
+                                                            className="h-8 text-xs font-mono"
+                                                            value={project.blueprint?.scale || 1}
+                                                            onChange={(e) => handleProjectPropChange('blueprint', { ...project.blueprint, scale: Number(e.target.value) })}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Rotazione (°)</Label>
+                                                        <div className="flex items-center gap-2">
+                                                            <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
+                                                            <Input 
+                                                                type="number"
+                                                                className="h-8 text-xs font-mono"
+                                                                value={project.blueprint?.rotation || 0}
+                                                                onChange={(e) => handleProjectPropChange('blueprint', { ...project.blueprint, rotation: Number(e.target.value) })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Offset X/Y (mm)</Label>
+                                                        <div className="flex items-center gap-2">
+                                                            <Move className="h-3.5 w-3.5 text-slate-400" />
+                                                            <Input 
+                                                                type="text"
+                                                                placeholder="0, 0"
+                                                                className="h-8 text-xs font-mono"
+                                                                value={`${project.blueprint?.offset.x || 0}, ${project.blueprint?.offset.y || 0}`}
+                                                                onChange={(e) => {
+                                                                    const parts = e.target.value.split(',').map(p => Number(p.trim()));
+                                                                    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                                                                        handleProjectPropChange('blueprint', { 
+                                                                            ...project.blueprint, 
+                                                                            offset: { x: parts[0], y: parts[1] } 
+                                                                        });
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </CardContent>
                                 <div className="p-4 bg-muted border-t border-border flex justify-end rounded-b-xl">
                                     <Button
@@ -361,7 +305,7 @@ export default function CuttingSimulatorClient() {
                         </div>
                     )}
 
-                    {viewMode === "project" && projectStep === "routing" && (
+                    {projectStep === "routing" && (
                         <div className="w-full h-full flex flex-col animate-in fade-in duration-300">
                             <div className="pb-4 flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div>
@@ -396,7 +340,7 @@ export default function CuttingSimulatorClient() {
                         </div>
                     )}
 
-                    {viewMode === "project" && projectStep === "engineering" && (
+                    {projectStep === "engineering" && (
                         <div className="w-full h-full min-h-0 flex flex-col xl:flex-row gap-4 animate-in fade-in duration-300">
                             {/* Colonna Editor 3D - Prende quasi tutto lo spazio */}
                             <div className="flex-1 xl:w-3/4 h-[60vh] xl:h-full min-h-[400px] bg-muted/20 rounded-xl overflow-hidden relative shadow-md ring-1 ring-border">
@@ -463,7 +407,7 @@ export default function CuttingSimulatorClient() {
                     )}
 
                     {/* VISTA TAGLIO LASTRA (Nesting) */}
-                    {viewMode === "project" && projectStep === "nesting" && (
+                    {projectStep === "nesting" && (
                         <div className="w-full h-full flex flex-col gap-4 animate-in fade-in duration-300">
                             {nestingResult && nestingResult.sheets.length > 0 ? (
                                 <div className="w-full h-full border border-border rounded-xl bg-card shadow-md flex flex-col">

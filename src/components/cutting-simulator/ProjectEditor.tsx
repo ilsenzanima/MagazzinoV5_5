@@ -1125,6 +1125,7 @@ export function ProjectEditor({ project, onProjectChange, disableInteraction, hi
                         onSelect={(idx) => { setSelectedIdx(idx >= 0 ? idx : null); }}
                         jointBands={project.jointBands}
                         jointBandWidth={project.jointBandWidth}
+                        blueprint={project.blueprint}
                     />
                 </div>
             ) : (
