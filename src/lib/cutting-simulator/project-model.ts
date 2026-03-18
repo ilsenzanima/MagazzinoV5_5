@@ -213,6 +213,17 @@ export interface DerivedPiece {
 
 // ==================== PROGETTO ====================
 
+// ==================== BLUEPRINT (PIANTINA) ====================
+
+export interface BlueprintConfig {
+    url: string;
+    opacity: number;
+    scale: number;        // mm per pixel (rapporto di scala)
+    rotation: number;     // gradi (0-360)
+    offset: { x: number; y: number }; // spostamento nel piano (mm)
+    visible: boolean;
+}
+
 export interface DuctProject {
     id: string;
     name: string;
@@ -245,6 +256,8 @@ export interface DuctProject {
     jointBands?: boolean;
     /** @deprecated */
     jointBandWidth?: number;
+    /** Configurazione della piantina di sfondo (Fase C) */
+    blueprint?: BlueprintConfig;
 }
 
 /** Contatore per ID univoci */
@@ -313,6 +326,14 @@ export function defaultProject(): DuctProject {
         siteElements: [],
         pieceRules: defaultPieceRules(),
         pieceOrder: [],
+        blueprint: {
+            url: '',
+            opacity: 0.5,
+            scale: 1,
+            rotation: 0,
+            offset: { x: 0, y: 0 },
+            visible: false
+        }
     };
 }
 
@@ -426,6 +447,14 @@ export function migrateProject(project: DuctProject): DuctProject {
         siteElements: project.siteElements || [],
         pieceRules: project.pieceRules || defaultPieceRules(),
         pieceOrder: project.pieceOrder || [],
+        blueprint: project.blueprint || {
+            url: '',
+            opacity: 0.5,
+            scale: 1,
+            rotation: 0,
+            offset: { x: 0, y: 0 },
+            visible: false
+        }
     };
 }
 
