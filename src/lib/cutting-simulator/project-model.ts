@@ -227,6 +227,10 @@ export interface BlueprintConfig {
 export interface DuctProject {
     id: string;
     name: string;
+    /** Codice commessa (es: "2026-03-APT") */
+    jobCode?: string;
+    /** Descrizione o note sul progetto */
+    description?: string;
     section: SectionProfile;
     /** Tracciato fisico (Livello 1 — immutabile dopo il rilievo) */
     segments: Segment[];
