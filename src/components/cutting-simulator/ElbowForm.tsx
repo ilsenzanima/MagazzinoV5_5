@@ -210,12 +210,12 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
                     </div>
 
                     <div className="flex gap-2 pt-2">
-                        <Button type="submit" className="flex-1 h-12 font-bold text-base shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98] bg-slate-900 hover:bg-slate-800">
+                        <Button type="submit" className="flex-1 h-12 font-bold text-base shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
                             <Plus className="mr-2 h-5 w-5" />
                             Calcola Pezzi
                         </Button>
-                        <Button type="button" variant="outline" onClick={handleReset} className="h-12 w-12 border-slate-200">
-                            <RotateCcw className="h-5 w-5 text-slate-400" />
+                        <Button type="button" variant="outline" onClick={handleReset} className="h-12 w-12">
+                            <RotateCcw className="h-5 w-5" />
                         </Button>
                     </div>
                 </form>
