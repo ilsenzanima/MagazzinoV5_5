@@ -372,9 +372,8 @@ export function calculateElbow90(input: ElbowInput): CalculationResult {
     };
 }
 
-// ==================== CALCOLO PROGETTO COMPLETO ====================
 
-import type { DuctProject, DuctSides, Segment, TrackSeparatorSegment, StraightSegment, Elbow90Segment, ContextualElementSegment } from '@/lib/cutting-simulator/project-model';
+
 
 /**
  * Filtra i pezzi in base a quali lati sono attivi.
