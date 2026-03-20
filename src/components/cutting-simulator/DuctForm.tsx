@@ -179,7 +179,7 @@ export function DuctForm({ onCalculate }: DuctFormProps) {
                     </div>
 
                     {/* Anteprima 3D Reale */}
-                    <div className="aspect-video w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-slate-900 group relative">
+                    <div className="aspect-video w-full rounded-2xl overflow-hidden border shadow-inner bg-black/80 group relative">
                         <div className="absolute top-3 left-3 z-10 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-md text-[10px] text-white font-bold uppercase tracking-wider">
                             Anteprima 3D
                         </div>

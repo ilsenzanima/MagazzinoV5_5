@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
     Box, 
@@ -9,11 +9,11 @@ import {
     Scissors, 
     ChevronRight, 
     Info, 
-    Calendar, 
     Hash, 
     LayoutTemplate,
     Map,
-    ArrowLeft
+    ArrowLeft,
+    List
 } from "lucide-react";
 import Link from "next/link";
 import type { DuctProject } from "@/lib/cutting-simulator/project-model";
@@ -29,25 +29,25 @@ export function ProjectInfoView({ project, projectId }: ProjectInfoViewProps) {
     const cutCount = project.cutMarks?.length || 0;
 
     return (
-        <div className="flex flex-col h-full bg-slate-50/50">
+        <div className="flex flex-col h-full bg-muted/30">
             {/* Header */}
-            <div className="bg-white border-b border-slate-200 px-6 py-6 flex items-center justify-between shrink-0">
+            <div className="bg-background border-b px-6 py-5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
                     <Link href="/disegno-taglio">
-                        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-500 hover:bg-slate-100">
-                            <ArrowLeft className="h-6 w-6" />
+                        <Button variant="ghost" size="icon" className="h-9 w-9">
+                            <ArrowLeft className="h-5 w-5" />
                         </Button>
                     </Link>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-blue-200">
+                            <span className="bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-primary/20">
                                 Progetto Taglio
                             </span>
                             {project.jobCode && (
-                                <span className="text-slate-400 text-xs font-mono">#{project.jobCode}</span>
+                                <span className="text-muted-foreground text-xs font-mono">#{project.jobCode}</span>
                             )}
                         </div>
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">
+                        <h1 className="text-2xl font-black text-foreground tracking-tight leading-none uppercase">
                             {project.name}
                         </h1>
                     </div>
@@ -55,14 +55,14 @@ export function ProjectInfoView({ project, projectId }: ProjectInfoViewProps) {
 
                 <div className="flex items-center gap-3">
                     <Link href={`/disegno-taglio/${projectId}/misure`}>
-                        <Button variant="outline" className="h-11 px-6 font-bold text-slate-700 bg-white border-slate-200">
-                            <Ruler className="mr-2 h-5 w-5 text-blue-500" />
+                        <Button variant="outline" className="h-10 px-5 font-bold">
+                            <Ruler className="mr-2 h-4 w-4 text-primary" />
                             Rileva Misure
                         </Button>
                     </Link>
                     <Link href={`/disegno-taglio/${projectId}/editor`}>
-                        <Button className="h-11 px-6 font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-lg">
-                            <Box className="mr-2 h-5 w-5 text-blue-400" />
+                        <Button className="h-10 px-5 font-bold">
+                            <Box className="mr-2 h-4 w-4" />
                             Apri Editor 3D
                         </Button>
                     </Link>
@@ -76,15 +76,15 @@ export function ProjectInfoView({ project, projectId }: ProjectInfoViewProps) {
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         {[
-                            { label: "Sviluppo Totale", value: `${(totalLength / 1000).toFixed(2)} m`, icon: Map, color: "text-blue-600", bg: "bg-blue-50" },
-                            { label: "Segmenti Rilevati", value: pieceCount, icon: Hash, color: "text-amber-600", bg: "bg-amber-50" },
-                            { label: "Tagli Programmati", value: cutCount, icon: Scissors, color: "text-rose-600", bg: "bg-rose-50" },
-                            { label: "Materiale", value: `${project.section.thickness} mm`, icon: LayoutTemplate, color: "text-emerald-600", bg: "bg-emerald-50" }
+                            { label: "Sviluppo Totale", value: `${(totalLength / 1000).toFixed(2)} m`, icon: Map, color: "text-blue-500", bg: "bg-blue-500/10" },
+                            { label: "Segmenti Rilevati", value: pieceCount, icon: Hash, color: "text-amber-500", bg: "bg-amber-500/10" },
+                            { label: "Tagli Programmati", value: cutCount, icon: Scissors, color: "text-rose-500", bg: "bg-rose-500/10" },
+                            { label: "Materiale", value: `${project.section.thickness} mm`, icon: LayoutTemplate, color: "text-emerald-500", bg: "bg-emerald-500/10" }
                         ].map((stat, i) => (
-                            <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div key={i} className="bg-background p-5 rounded-2xl border shadow-sm flex items-center justify-between">
                                 <div>
-                                    <p className="text-[10px] uppercase font-black tracking-wider text-slate-400 mb-1">{stat.label}</p>
-                                    <p className="text-2xl font-black text-slate-900">{stat.value}</p>
+                                    <p className="text-[10px] uppercase font-black tracking-wider text-muted-foreground mb-1">{stat.label}</p>
+                                    <p className="text-2xl font-black text-foreground">{stat.value}</p>
                                 </div>
                                 <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
                                     <stat.icon className="h-6 w-6" />
@@ -95,65 +95,65 @@ export function ProjectInfoView({ project, projectId }: ProjectInfoViewProps) {
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* List of segments */}
-                        <Card className="lg:col-span-2 border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-                            <CardHeader className="bg-slate-50/50 border-b border-slate-100">
-                                <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                    <ListIcon className="h-5 w-5 text-slate-400" />
+                        <Card className="lg:col-span-2 shadow-sm rounded-2xl overflow-hidden">
+                            <CardHeader className="bg-muted/30 border-b">
+                                <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+                                    <List className="h-5 w-5 text-muted-foreground" />
                                     Elenco Segmenti del Tracciato
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
-                                <div className="divide-y divide-slate-100">
+                                <div className="divide-y divide-border">
                                     {project.segments.map((s, idx) => (
-                                        <div key={s.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors group">
+                                        <div key={s.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors group">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:bg-slate-200 transition-colors">
+                                                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground group-hover:bg-muted/60 transition-colors">
                                                     {idx + 1}
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-slate-900 leading-none">
+                                                    <p className="font-bold text-foreground leading-none">
                                                         {s.type === 'straight' ? 'Tratto Dritto' : s.type === 'elbow90' ? 'Gomito 90°' : s.type}
                                                     </p>
-                                                    <p className="text-xs text-slate-500 mt-1 capitalize">
+                                                    <p className="text-xs text-muted-foreground mt-1 capitalize">
                                                         {s.type === 'straight' ? `${s.length} mm` : s.type === 'elbow90' ? `Direzione: ${s.direction}` : ''}
                                                     </p>
                                                 </div>
                                             </div>
-                                            <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-slate-600 transition-all group-hover:translate-x-1" />
+                                            <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-all group-hover:translate-x-1" />
                                         </div>
                                     ))}
                                     {project.segments.length === 0 && (
                                         <div className="p-12 text-center">
-                                            <Box className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-                                            <p className="text-slate-400 font-medium">Nessun segmento rilevato nel progetto.</p>
-                                            <p className="text-xs text-slate-300 mt-1">Apri l'editor per iniziare a disegnare il tracciato.</p>
+                                            <Box className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
+                                            <p className="text-muted-foreground font-medium">Nessun segmento rilevato nel progetto.</p>
+                                            <p className="text-xs text-muted-foreground/60 mt-1">Apri l&apos;editor per iniziare a disegnare il tracciato.</p>
                                         </div>
                                     )}
                                 </div>
                             </CardContent>
                         </Card>
 
-                        {/* Recent Activity or Quick Docs */}
+                        {/* Sidebar */}
                         <div className="space-y-6">
-                            <Card className="border-slate-200 shadow-sm rounded-2xl">
+                            <Card className="shadow-sm rounded-2xl">
                                 <CardHeader>
-                                    <CardTitle className="text-base font-bold text-slate-800">Note Progetto</CardTitle>
+                                    <CardTitle className="text-base font-bold text-foreground">Note Progetto</CardTitle>
                                 </CardHeader>
-                                <CardContent className="text-sm text-slate-600 leading-relaxed">
+                                <CardContent className="text-sm text-muted-foreground leading-relaxed">
                                     {project.description || "Nessuna descrizione aggiunta a questo progetto."}
                                 </CardContent>
                             </Card>
 
-                            <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl shadow-slate-200 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-                                <h4 className="font-bold text-white mb-2 relative z-10 flex items-center gap-2">
-                                    <Info className="h-4 w-4 text-blue-400" /> Supporto Tecnico
+                            <div className="bg-primary rounded-2xl p-6 text-primary-foreground relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                                <h4 className="font-bold mb-2 relative z-10 flex items-center gap-2 text-sm">
+                                    <Info className="h-4 w-4 opacity-80" /> Supporto Tecnico
                                 </h4>
-                                <p className="text-slate-400 text-xs mb-4 relative z-10">
-                                    Puoi caricare la piantina (Blueprint) direttamente dall'editor 3D per usarla come guida nel posizionamento.
+                                <p className="text-primary-foreground/70 text-xs mb-4 relative z-10">
+                                    Puoi caricare la piantina (Blueprint) direttamente dall&apos;editor 3D per usarla come guida nel posizionamento.
                                 </p>
-                                <Button className="w-full bg-slate-800 hover:bg-slate-700 text-white text-xs border-slate-700">
-                                    Guida all'uso
+                                <Button variant="secondary" size="sm" className="w-full text-xs font-bold">
+                                    Guida all&apos;uso
                                 </Button>
                             </div>
                         </div>
@@ -163,17 +163,4 @@ export function ProjectInfoView({ project, projectId }: ProjectInfoViewProps) {
             </div>
         </div>
     );
-}
-
-function ListIcon({ className }: { className?: string }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <line x1="8" y1="6" x2="21" y2="6"></line>
-            <line x1="8" y1="12" x2="21" y2="12"></line>
-            <line x1="8" y1="18" x2="21" y2="18"></line>
-            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-        </svg>
-    )
 }
