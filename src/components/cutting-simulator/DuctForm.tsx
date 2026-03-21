@@ -6,8 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Ruler, Plus, RotateCcw, Info } from "lucide-react";
-import { SinglePiece3DView } from "@/components/cutting-simulator/SinglePiece3DView";
-import { PreviewPopup } from "@/components/cutting-simulator/PreviewPopup";
 import type { DuctInput } from "@/lib/cutting-simulator/calculations";
 
 interface DuctFormProps {
@@ -178,29 +176,13 @@ export function DuctForm({ onCalculate }: DuctFormProps) {
                         </div>
                     </div>
 
-                    {/* Anteprima 3D Reale */}
-                    <div className="aspect-video w-full rounded-2xl overflow-hidden border shadow-inner bg-black/80 group relative">
-                        <div className="absolute top-3 left-3 z-10 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-md text-[10px] text-white font-bold uppercase tracking-wider">
-                            Anteprima 3D
-                        </div>
-                        <SinglePiece3DView 
-                            type="straight"
-                            dimensions={{
-                                innerWidth: w,
-                                innerHeight: h,
-                                thickness: t,
-                                length: parseFloat(length) || 0
-                            }}
-                        />
-                    </div>
-
                     <div className="flex gap-2 pt-2">
-                        <Button type="submit" className="flex-1 h-12 font-bold text-base shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                        <Button type="submit" className="flex-1 h-12 font-bold text-base shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
                             <Plus className="mr-2 h-5 w-5" />
                             Calcola Pezzi
                         </Button>
-                        <Button type="button" variant="outline" onClick={handleReset} className="h-12 w-12 border-slate-200">
-                            <RotateCcw className="h-5 w-5 text-slate-400" />
+                        <Button type="button" variant="outline" onClick={handleReset} className="h-12 w-12">
+                            <RotateCcw className="h-5 w-5" />
                         </Button>
                     </div>
                 </form>
