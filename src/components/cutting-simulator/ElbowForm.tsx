@@ -7,9 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CornerDownRight, Plus, RotateCcw, Info } from "lucide-react";
-import { PreviewPopup } from "@/components/cutting-simulator/PreviewPopup";
-import { SinglePiece3DView } from "@/components/cutting-simulator/SinglePiece3DView";
 import type { ElbowInput } from "@/lib/cutting-simulator/calculations";
+
 
 interface ElbowFormProps {
     onCalculate: (input: ElbowInput) => void;
@@ -193,21 +192,6 @@ export function ElbowForm({ onCalculate }: ElbowFormProps) {
                         </div>
                     </div>
 
-                    {/* Anteprima 3D Reale */}
-                    <div className="aspect-video w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-slate-900 group relative">
-                        <div className="absolute top-3 left-3 z-10 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-md text-[10px] text-white font-bold uppercase tracking-wider">
-                            Anteprima 3D
-                        </div>
-                        <SinglePiece3DView 
-                            type="elbow90"
-                            dimensions={{
-                                innerWidth: w,
-                                innerHeight: h,
-                                thickness: t,
-                                direction: "right" // Default preview direction
-                            }}
-                        />
-                    </div>
 
                     <div className="flex gap-2 pt-2">
                         <Button type="submit" className="flex-1 h-12 font-bold text-base shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
