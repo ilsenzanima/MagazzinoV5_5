@@ -286,7 +286,8 @@ export default function EditLoadNotePage() {
     };
 
     const handleEditPiecesChange = (piecesStr: string, coefficient: number) => {
-        const pieces = parseFloat(piecesStr);
+        const cleanStr = piecesStr.replace(',', '.');
+        const pieces = parseFloat(cleanStr);
         let quantityStr = editValues.quantity;
 
         if (!isNaN(pieces)) {
@@ -294,13 +295,14 @@ export default function EditLoadNotePage() {
         }
 
         setEditValues({
-            pieces: piecesStr,
+            pieces: cleanStr,
             quantity: quantityStr
         });
     };
 
     const handleEditQuantityChange = (quantityStr: string, coefficient: number) => {
-        const quantity = parseFloat(quantityStr);
+        const cleanStr = quantityStr.replace(',', '.');
+        const quantity = parseFloat(cleanStr);
         let piecesStr = editValues.pieces;
 
         if (!isNaN(quantity)) {
@@ -313,7 +315,7 @@ export default function EditLoadNotePage() {
 
         setEditValues({
             pieces: piecesStr,
-            quantity: quantityStr
+            quantity: cleanStr
         });
     };
 

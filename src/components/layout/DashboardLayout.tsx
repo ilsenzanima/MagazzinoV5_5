@@ -116,16 +116,6 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
         },
       ]
     },
-    {
-      items: [
-        {
-          label: "Disegno e Taglio",
-          icon: Scissors,
-          href: "/disegno-taglio",
-          active: pathname === "/disegno-taglio" || pathname.startsWith("/disegno-taglio/"),
-        },
-      ]
-    }
   ];
 
   return (
