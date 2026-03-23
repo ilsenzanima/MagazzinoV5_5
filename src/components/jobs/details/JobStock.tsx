@@ -135,10 +135,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
 
             if (!m.itemCode) return
 
-            let price = 0
-            if (!m.isFictitious) {
-                price = m.itemPrice || 0
-            }
+            const price = m.itemPrice || 0
 
             const current = map.get(groupKey)
 
@@ -235,6 +232,10 @@ export function JobStock({ movements, jobId }: JobStockProps) {
     const totalValue = useMemo(() => {
         return groupedStock.reduce((sum, item) => {
             if (item.isFictitious) {
+                // Use batch-computed value if available, fallback to manual price
+                if (item.totalValue > 0) {
+                    return sum + item.totalValue
+                }
                 const price = fictitiousPrices[item.itemId] ?? 0
                 return sum + (item.totalQty * price)
             } else {
@@ -463,20 +464,27 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                             {userRole === 'user' ? (
                                                                 <span className="text-slate-400 italic text-xs">Riservato</span>
                                                             ) : item.isFictitious ? (
-                                                                <div className="flex items-center justify-end gap-1">
-                                                                    <span className="text-xs">€</span>
-                                                                    <Input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        step="0.00001"
-                                                                        className="w-20 h-7 text-right text-sm"
-                                                                        value={fictitiousPrices[item.itemId] ?? 0}
-                                                                        onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        placeholder="0.00"
-                                                                        disabled={loadingPrices}
-                                                                    />
-                                                                </div>
+                                                                item.totalValue > 0 ? (
+                                                                    <span className="text-slate-600 dark:text-slate-400 flex items-center justify-end gap-1">
+                                                                        € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                        <span className="text-xs text-amber-500 ml-1" title="Valore dal lotto di origine">auto</span>
+                                                                    </span>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-end gap-1">
+                                                                        <span className="text-xs">€</span>
+                                                                        <Input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            step="0.00001"
+                                                                            className="w-20 h-7 text-right text-sm"
+                                                                            value={fictitiousPrices[item.itemId] ?? 0}
+                                                                            onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            placeholder="0.00"
+                                                                            disabled={loadingPrices}
+                                                                        />
+                                                                    </div>
+                                                                )
                                                             ) : (
                                                                 <span className="text-slate-600 dark:text-slate-400 flex items-center justify-end gap-1">
                                                                     {item.hasMissingPrice && (
