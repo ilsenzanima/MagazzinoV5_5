@@ -26,8 +26,8 @@ const nextConfig: NextConfig = {
     // Content Security Policy - adjust domains as needed
     const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://docs.opencv.org https://cdn.jsdelivr.net", // Required for Next.js + OpenCV.js for document scanner
-      "script-src-elem 'self' 'unsafe-inline' https://vercel.live https://docs.opencv.org https://cdn.jsdelivr.net", // For Chrome's stricter CSP + OpenCV.js
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://vercel.live https://docs.opencv.org https://cdn.jsdelivr.net", // Required for Next.js + OpenCV.js + Three.js workers
+      "script-src-elem 'self' 'unsafe-inline' blob: https://vercel.live https://docs.opencv.org https://cdn.jsdelivr.net", // For Chrome's stricter CSP + Three.js workers
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://vercel.live",
       "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://vercel.live",
       "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.openstreetmap.org https://*.tile.openstreetmap.org https://vercel.live",

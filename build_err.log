@@ -1,0 +1,70 @@
+
+> temp_app@0.1.0 build
+> next build
+
+Ôû▓ Next.js 16.1.0 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  ┬À optimizePackageImports
+
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 34.1s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/33) ...
+  Generating static pages using 7 workers (8/33) 
+  Generating static pages using 7 workers (16/33) 
+  Generating static pages using 7 workers (24/33) 
+Ô£ô Generating static pages using 7 workers (33/33) in 1893.9ms
+  Finalizing page optimization ...
+
+Route (app)
+Ôöî ãÆ /
+Ôö£ Ôùï /_not-found
+Ôö£ ãÆ /api/health
+Ôö£ ãÆ /attendance
+Ôö£ ãÆ /attendance/request
+Ôö£ ãÆ /auth/callback
+Ôö£ Ôùï /clients
+Ôö£ Ôùï /clients/new
+Ôö£ ãÆ /dashboard
+Ôö£ Ôùï /disegno-taglio
+Ôö£ ãÆ /disegno-taglio/[id]
+Ôö£ ãÆ /inventory
+Ôö£ ãÆ /inventory/[id]
+Ôö£ Ôùï /inventory/new
+Ôö£ ãÆ /jobs
+Ôö£ ãÆ /jobs/[id]
+Ôö£ Ôùï /jobs/new
+Ôö£ Ôùï /load-notes
+Ôö£ ãÆ /load-notes/[id]
+Ôö£ ãÆ /load-notes/[id]/edit
+Ôö£ Ôùï /load-notes/new
+Ôö£ Ôùï /login
+Ôö£ ãÆ /movements
+Ôö£ ãÆ /movements/[id]
+Ôö£ ãÆ /movements/[id]/edit
+Ôö£ ãÆ /movements/new
+Ôö£ ãÆ /print/delivery-note/[id]
+Ôö£ Ôùï /purchases
+Ôö£ ãÆ /purchases/[id]
+Ôö£ Ôùï /purchases/new
+Ôö£ Ôùï /register
+Ôö£ Ôùï /reports
+Ôö£ Ôùï /settings
+Ôö£ Ôùï /settings/admin
+Ôö£ Ôùï /settings/backup
+Ôö£ Ôùï /settings/data
+Ôö£ Ôùï /settings/notifications
+Ôö£ Ôùï /settings/profile
+Ôö£ Ôùï /suppliers
+Ôö£ ãÆ /suppliers/[id]
+Ôö£ Ôùï /suppliers/new
+Ôöö ãÆ /workers
+
+
+ãÆ Proxy (Middleware)
+
+Ôùï  (Static)   prerendered as static content
+ãÆ  (Dynamic)  server-rendered on demand
+

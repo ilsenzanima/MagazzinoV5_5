@@ -10,6 +10,7 @@ export interface LoadNoteInput {
         inventoryId: string;
         pieces?: number;
         quantity: number;
+        coefficient?: number;
     }[];
 }
 
@@ -51,13 +52,15 @@ export const loadNotesService = {
                         inventory_id,
                         pieces,
                         quantity,
+                        coefficient,
                         is_checked,
                         inventory:inventory_id (
                             code,
                             name,
                             unit,
                             brand,
-                            model
+                            model,
+                            coefficient
                         )
                     `)
                     .eq('load_note_id', note.id);
@@ -76,6 +79,7 @@ export const loadNotesService = {
                     inventoryModel: item.inventory?.model || '',
                     pieces: item.pieces,
                     quantity: item.quantity,
+                    coefficient: item.coefficient || item.inventory?.coefficient || 1,
                     isChecked: item.is_checked
                 }));
 
@@ -120,13 +124,15 @@ export const loadNotesService = {
                 inventory_id,
                 pieces,
                 quantity,
+                coefficient,
                 is_checked,
                 inventory:inventory_id (
                     code,
                     name,
                     unit,
                     brand,
-                    model
+                    model,
+                    coefficient
                 )
             `)
             .eq('load_note_id', id);
@@ -145,6 +151,7 @@ export const loadNotesService = {
             inventoryModel: item.inventory?.model || '',
             pieces: item.pieces,
             quantity: item.quantity,
+            coefficient: item.coefficient || item.inventory?.coefficient || 1,
             isChecked: item.is_checked
         }));
 
@@ -192,7 +199,8 @@ export const loadNotesService = {
                 load_note_id: note.id,
                 inventory_id: item.inventoryId,
                 pieces: item.pieces || null,
-                quantity: item.quantity
+                quantity: item.quantity,
+                coefficient: item.coefficient || 1
             }));
 
             const { error: itemsError } = await supabase
@@ -240,7 +248,8 @@ export const loadNotesService = {
                     load_note_id: id,
                     inventory_id: item.inventoryId,
                     pieces: item.pieces || null,
-                    quantity: item.quantity
+                    quantity: item.quantity,
+                    coefficient: item.coefficient || 1
                 }));
 
                 const { error: itemsError } = await supabase
