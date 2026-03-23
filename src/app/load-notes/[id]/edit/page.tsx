@@ -336,7 +336,8 @@ export default function EditLoadNotePage() {
                 items: lines.map(l => ({
                     inventoryId: l.itemId,
                     quantity: l.quantity,
-                    pieces: l.pieces
+                    pieces: l.pieces,
+                    coefficient: l.coefficient
                 }))
             });
 
