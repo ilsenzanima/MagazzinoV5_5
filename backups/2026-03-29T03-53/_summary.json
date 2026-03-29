@@ -1,50 +1,50 @@
 {
-  "timestamp": "2026-01-14T19:45:51.669Z",
+  "timestamp": "2026-03-29T03:53:26.004Z",
   "tables": [
     {
       "name": "profiles",
-      "records": 0
+      "records": 9
     },
     {
       "name": "clients",
-      "records": 0
+      "records": 18
     },
     {
       "name": "suppliers",
-      "records": 0
+      "records": 38
     },
     {
       "name": "inventory",
-      "records": 0
+      "records": 558
     },
     {
       "name": "jobs",
-      "records": 0
+      "records": 16
     },
     {
       "name": "purchases",
-      "records": 0
+      "records": 514
     },
     {
       "name": "purchase_items",
-      "records": 0
+      "records": 1000
     },
     {
       "name": "delivery_notes",
-      "records": 0
+      "records": 34
     },
     {
       "name": "delivery_note_items",
-      "records": 0
+      "records": 235
     },
     {
       "name": "workers",
-      "records": 0
+      "records": 9
     },
     {
       "name": "attendance",
-      "records": 0
+      "records": 762
     }
   ],
-  "totalRecords": 0
+  "totalRecords": 3193
 }
