@@ -243,6 +243,7 @@ export interface DeliveryNoteItem {
     coefficient?: number;
     price?: number;
     purchaseItemId?: string;
+    purchaseId?: string;
     isFictitious?: boolean;
     purchaseNumber?: string;
     purchaseDate?: string;

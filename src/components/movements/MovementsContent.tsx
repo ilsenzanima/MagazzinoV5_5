@@ -231,19 +231,24 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                             <span className="text-slate-500 dark:text-slate-400">Causale</span>
                             <span className="font-medium truncate max-w-[120px] sm:max-w-[150px]">{movement.causal}</span>
                           </div>
-                          {(movement.jobCode || movement.jobDescription) && (
+                          {(movement.jobCode || movement.jobName || movement.jobDescription) && (
                             <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-700">
                               <span className="text-slate-500 dark:text-slate-400">Commessa</span>
-                              <span 
-                                className="font-medium text-blue-600 dark:text-blue-400 text-right truncate max-w-[150px] sm:max-w-[200px]"
-                                title={movement.jobDescription 
-                                  ? `${movement.jobDescription}${movement.jobClientName ? ` - ${movement.jobClientName}` : ''}` 
-                                  : movement.jobCode}
-                              >
-                                {movement.jobDescription 
-                                  ? `${movement.jobDescription}${movement.jobClientName ? ` - ${movement.jobClientName}` : ''}` 
-                                  : movement.jobCode}
-                              </span>
+                              {(() => {
+                                const displayName = movement.jobName || movement.jobDescription;
+                                const clientName = movement.jobClientName;
+                                const label = displayName
+                                  ? `${displayName}${clientName ? ` - ${clientName}` : ''}`
+                                  : movement.jobCode;
+                                return (
+                                  <span 
+                                    className="font-medium text-blue-600 dark:text-blue-400 text-right truncate max-w-[150px] sm:max-w-[200px]"
+                                    title={label}
+                                  >
+                                    {label}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           )}
                           <div className="flex justify-between py-1">
