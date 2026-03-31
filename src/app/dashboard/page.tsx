@@ -34,7 +34,7 @@ export default async function DashboardPage() {
         number,
         date,
         created_at,
-        jobs(code, description),
+        jobs(code, description, site_address, job_name:name, client_id, clients(id, name)),
         delivery_note_items(
           quantity,
           inventory(name, model, unit)
