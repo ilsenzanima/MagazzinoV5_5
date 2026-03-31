@@ -35,6 +35,7 @@ export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
         inventoryCategory: i.inventory?.category,
         inventoryDescription: i.inventory?.description,
         price: i.price || i.purchase_items?.price || i.inventory?.price || 0,
+        purchaseId: i.purchase_items?.purchases?.id,
         purchaseNumber: i.purchase_items?.purchases?.delivery_note_number,
         purchaseDate: i.purchase_items?.purchases?.delivery_note_date,
         purchaseSupplier: i.purchase_items?.purchases?.suppliers?.name

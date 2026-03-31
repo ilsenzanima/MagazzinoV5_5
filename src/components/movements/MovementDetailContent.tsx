@@ -421,9 +421,17 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                             <TableCell>
                                                 {item.purchaseNumber ? (
                                                     <div className="text-xs">
-                                                        <span className="block font-medium text-blue-600 dark:text-blue-400">
-                                                            Bolla {item.purchaseNumber}
-                                                        </span>
+                                                        {item.purchaseId ? (
+                                                            <Link href={`/purchases/${item.purchaseId}`} onClick={(e) => e.stopPropagation()}>
+                                                                <span className="block font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+                                                                    Bolla {item.purchaseNumber}
+                                                                </span>
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="block font-medium text-blue-600 dark:text-blue-400">
+                                                                Bolla {item.purchaseNumber}
+                                                            </span>
+                                                        )}
                                                         <span className="text-slate-500 dark:text-slate-400">
                                                             {item.purchaseDate ? format(new Date(item.purchaseDate), 'dd/MM/yyyy') : '-'}
                                                         </span>
@@ -489,9 +497,17 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                                 <span className="text-xs font-mono text-slate-500">{item.inventoryCode}</span>
                                                 {item.purchaseNumber && (
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
-                                                        Bolla {item.purchaseNumber}
-                                                    </span>
+                                                    item.purchaseId ? (
+                                                        <Link href={`/purchases/${item.purchaseId}`} onClick={(e) => e.stopPropagation()}>
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium hover:underline cursor-pointer">
+                                                                Bolla {item.purchaseNumber}
+                                                            </span>
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+                                                            Bolla {item.purchaseNumber}
+                                                        </span>
+                                                    )
                                                 )}
                                             </div>
                                             {item.inventoryDescription && (
