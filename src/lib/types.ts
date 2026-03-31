@@ -257,6 +257,7 @@ export interface DeliveryNote {
     jobId?: string;
     jobCode?: string;
     jobName?: string;
+    jobClientName?: string;
     jobDescription?: string;
     jobAddress?: string;
     causal: string;
