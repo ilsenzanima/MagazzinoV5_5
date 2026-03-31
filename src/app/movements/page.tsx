@@ -20,7 +20,7 @@ export default async function MovementsPage() {
   // Fetch initial data (Page 1, Limit 12)
   const { data: dbMovements, error, count } = await supabase
     .from('delivery_notes')
-    .select('*, jobs(code, description), delivery_note_items(quantity)', { count: 'estimated' })
+    .select('*, jobs(code, description, site_address, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity)', { count: 'estimated' })
     .order('date', { ascending: false })
     .order('number_int', { ascending: false })
     .range(0, 11);
