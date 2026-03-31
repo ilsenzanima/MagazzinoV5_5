@@ -73,7 +73,7 @@ export const deliveryNotesApi = {
             const { data, error } = await fetchWithTimeout<any>(
                 supabase
                     .from('delivery_notes')
-                    .select('*, jobs(code, description, site_address, name, clients(name)), delivery_note_items(quantity)')
+                    .select('*, jobs(code, description, site_address, name, client_id, clients(id, name)), delivery_note_items(quantity)')
                     .order('date', { ascending: false })
                     .order('number_int', { ascending: false })
             );
@@ -99,7 +99,7 @@ export const deliveryNotesApi = {
 
         let query = supabase
             .from('delivery_notes')
-            .select('*, jobs(code, description, name, clients(name)), delivery_note_items(quantity)', { count: 'estimated' });
+            .select('*, jobs(code, description, name, client_id, clients(id, name)), delivery_note_items(quantity)', { count: 'estimated' });
 
         if (search) {
             // Split search into words for fuzzy matching
@@ -154,7 +154,7 @@ export const deliveryNotesApi = {
             .from('delivery_notes')
             .select(`
         *,
-        jobs(code, description, site_address, name, clients(name)),
+        jobs(code, description, site_address, name, client_id, clients(id, name)),
         delivery_note_items(
           *,
           inventory(name, code, unit, brand, category, description, price, model),
