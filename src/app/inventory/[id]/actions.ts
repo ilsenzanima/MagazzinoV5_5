@@ -1,6 +1,6 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -13,6 +13,15 @@ export async function reassignLotToEntries(
     quantityToAssign: number
 ) {
     try {
+        const supabase = await createClient();
+
+        // 0. Verify user is authenticated
+        const { data: authData, error: userError } = await supabase.auth.getUser();
+        if (userError || !authData.user) {
+            console.error('Auth error in reassignLotToEntries:', userError);
+            return { success: false, error: 'Non sei autenticato. Effettua il login e riprova.' };
+        }
+
         // Find entry delivery note items without lot assignment for this item
         const { data: entries, error: fetchError } = await supabase
             .from('delivery_note_items')
