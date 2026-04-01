@@ -78,9 +78,8 @@ export default function AttendanceMonthGrid({
                                 const assignments = attendanceMap[worker.id]?.[dateKey] || [];
                                 const isWknd = isWeekend(day);
 
-                                // Tooltip content
                                 const tooltipText = assignments.map(a => {
-                                    const jobCode = a.jobCode || (a.status === 'presence' ? 'Presenza' : a.status);
+                                    const jobCode = a.jobName || a.jobDescription || a.jobCode || (a.status === 'presence' ? 'Presenza' : a.status);
                                     return `${jobCode}: ${a.hours}h`;
                                 }).join('\n');
 
