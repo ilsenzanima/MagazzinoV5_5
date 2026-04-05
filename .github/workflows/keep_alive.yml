@@ -2,8 +2,8 @@ name: Keep Alive Database
 
 on:
   schedule:
-    # Esegue ogni 15 minuti per ridurre il carico e i log
-    - cron: '*/15 * * * *'
+    # Esegue ogni 10 minuti per prevenire il cold start di Vercel
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Permette di eseguirlo manualmente dal tab Actions
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
           # Se hai impostato il segreto, usa ${{ secrets.APP_URL }}
           # Altrimenti modifica direttamente qui sotto
           
-          URL="${{ secrets.APP_URL || 'https://magazzino-v5-5.vercel.app' }}/api/health"
+          URL="${{ secrets.APP_URL || 'https://fire-block.org' }}/api/health"
           
           echo "Pinging $URL..."
           http_code=$(curl -s -o response.txt -w "%{http_code}" "$URL")
