@@ -358,5 +358,25 @@
     "address": null,
     "created_at": "2026-01-05T04:56:42.942967+00:00",
     "updated_at": "2026-01-05T04:56:42.942967+00:00"
+  },
+  {
+    "id": "4a3ad96c-c215-45d9-8355-1b5189af2b36",
+    "name": "BAUSTIK",
+    "vat_number": null,
+    "email": null,
+    "phone": null,
+    "address": null,
+    "created_at": "2026-01-30T16:46:36.731193+00:00",
+    "updated_at": "2026-01-30T16:46:36.731193+00:00"
+  },
+  {
+    "id": "323ad6f0-4c9a-4b08-b8bf-4121664345dd",
+    "name": "RICAMBITERMOTECNICI.it",
+    "vat_number": null,
+    "email": null,
+    "phone": null,
+    "address": null,
+    "created_at": "2026-02-09T10:40:37.330342+00:00",
+    "updated_at": "2026-02-09T10:40:37.330342+00:00"
   }
 ]
