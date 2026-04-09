@@ -1,7 +1,11 @@
 "use client"
 
 import { notify } from "@/lib/notify";;
-import { ImageCropper } from "@/components/ui/image-cropper";
+import dynamic from "next/dynamic";
+const ImageCropper = dynamic(
+  () => import("@/components/ui/image-cropper").then((m) => ({ default: m.ImageCropper })),
+  { ssr: false, loading: () => null }
+);
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";

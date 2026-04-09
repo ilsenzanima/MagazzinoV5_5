@@ -61,7 +61,11 @@ import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
-import { ImageCropper } from "@/components/ui/image-cropper";
+import dynamic from "next/dynamic";
+const ImageCropper = dynamic(
+  () => import("@/components/ui/image-cropper").then((m) => ({ default: m.ImageCropper })),
+  { ssr: false, loading: () => null }
+);
 
 export default function InventoryDetailPage() {
   const params = useParams();
