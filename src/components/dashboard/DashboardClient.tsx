@@ -1,82 +1,53 @@
 "use client";
 
-import { useState, memo } from "react";
+import { memo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { StatsCards } from "@/components/dashboard/StatsCards";
-import { CalendarView } from "@/components/dashboard/CalendarView";
-import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
+import { QuickStats } from "@/components/dashboard/QuickStats";
 import { RecentMovements } from "@/components/dashboard/RecentMovements";
-import { ActiveJobsWidget } from "@/components/dashboard/ActiveJobs";
-import { ExpiringCoursesCard } from "@/components/dashboard/ExpiringCoursesCard";
-import { ExpiringMedicalExamsCard } from "@/components/dashboard/ExpiringMedicalExamsCard";
+import { RecentPurchasesCard } from "@/components/dashboard/RecentPurchasesCard";
+import { ActiveJobsGrid } from "@/components/dashboard/ActiveJobsGrid";
 
-// Definiamo il tipo dei dati che ci aspettiamo dal Server
 interface DashboardStats {
-  totalValue: number;
+  activeJobsCount: number;
+  monthDDTCount: number;
+  monthPurchasesCount: number;
+  monthPurchasesTotal: number;
   lowStockCount: number;
-  totalItems: number;
+}
+
+interface DashboardClientProps {
+  stats: DashboardStats;
+  activeJobs: any[];
+  recentDDT: any[];
+  recentPurchases: any[];
 }
 
 export const DashboardClient = memo(function DashboardClient({
-  initialStats,
-  recentMovements,
-  jobStats,
-  activeJobHours
-}: {
-  initialStats: DashboardStats,
-  recentMovements: any[], // Definito meglio nel componente figlio, ma qui passiamo i dati
-  jobStats: any, // Idem
-  activeJobHours: any[] // Nuovi dati per il grafico ore
-}) {
-  const [activeTab, setActiveTab] = useState("overview");
-
+  stats,
+  activeJobs,
+  recentDDT,
+  recentPurchases,
+}: DashboardClientProps) {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white hidden md:block">Dashboard</h1>
+      <div className="space-y-6 pb-8">
+        {/* KPI */}
+        <QuickStats
+          activeJobsCount={stats.activeJobsCount}
+          monthDDTCount={stats.monthDDTCount}
+          monthPurchasesCount={stats.monthPurchasesCount}
+          monthPurchasesTotal={stats.monthPurchasesTotal}
+          lowStockCount={stats.lowStockCount}
+        />
+
+        {/* DDT + Acquisti */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <RecentMovements data={recentDDT} />
+          <RecentPurchasesCard data={recentPurchases} />
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Panoramica</TabsTrigger>
-            <TabsTrigger value="calendar">Calendario Presenze</TabsTrigger>
-            <TabsTrigger value="analytics">Analisi</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-4">
-            {/* Passiamo i dati calcolati dal server ai componenti */}
-            <StatsCards
-              totalValue={initialStats.totalValue}
-              lowStockCount={initialStats.lowStockCount}
-              totalItems={initialStats.totalItems}
-            />
-
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-7">
-              <div className="md:col-span-1 lg:col-span-4">
-                <RecentMovements data={recentMovements} />
-              </div>
-              <div className="md:col-span-1 lg:col-span-3">
-                <ActiveJobsWidget stats={jobStats} activeJobHours={activeJobHours} />
-              </div>
-            </div>
-
-            {/* Scadenze Corsi e Visite Mediche */}
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              <ExpiringCoursesCard />
-              <ExpiringMedicalExamsCard />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="calendar" className="space-y-4">
-            {activeTab === 'calendar' && <CalendarView />}
-          </TabsContent>
-
-          <TabsContent value="analytics" className="space-y-4">
-            {activeTab === 'analytics' && <AttendanceChart />}
-          </TabsContent>
-        </Tabs>
+        {/* Commesse attive */}
+        <ActiveJobsGrid jobs={activeJobs} />
       </div>
     </DashboardLayout>
   );
