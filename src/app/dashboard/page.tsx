@@ -1,96 +1,133 @@
-import { createClient } from "@/lib/supabase/server"; // Importante: usa la versione SERVER
+import { createClient } from "@/lib/supabase/server";
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
-import { attendanceApi } from "@/lib/api";
-import { Suspense } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-
-// Componente di caricamento mentre il server recupera i dati
-function DashboardSkeleton() {
-  return (
-    <div className="p-8 pt-6 space-y-6">
-      <div className="flex justify-between items-center mb-6">
-        <Skeleton className="h-8 w-48" />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-      </div>
-    </div>
-  );
-}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  // Fetch all data in parallel for performance
-  const [statsResult, movementsResult, jobsResult, hoursResult] = await Promise.allSettled([
-    supabase.rpc('get_dashboard_stats'),
+  const startOfMonth = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    1
+  ).toISOString();
+
+  const [
+    activeJobsResult,
+    recentDDTResult,
+    monthDDTCountResult,
+    recentPurchasesResult,
+    monthPurchasesResult,
+    lowStockResult,
+  ] = await Promise.allSettled([
+    // Commesse attive (top 8 più recenti)
     supabase
-      .from('delivery_notes')
-      .select(`
-        id,
-        type,
-        number,
-        date,
-        created_at,
-        jobs(code, description, site_address, job_name:name, client_id, clients(id, name)),
-        delivery_note_items(
-          quantity,
-          inventory(name, model, unit)
-        )
-      `)
-      .order('created_at', { ascending: false })
+      .from("jobs")
+      .select("id, code, name, status, site_address, clients(name)")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(8),
+
+    // Ultimi 5 DDT
+    supabase
+      .from("delivery_notes")
+      .select(
+        "id, type, number, date, created_at, jobs(code, name), delivery_note_items(quantity, inventory(name, unit))"
+      )
+      .order("created_at", { ascending: false })
       .limit(5),
-    supabase.from('jobs').select('status'),
-    attendanceApi.getActiveJobHours(supabase)
+
+    // Conteggio DDT del mese corrente
+    supabase
+      .from("delivery_notes")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", startOfMonth),
+
+    // Ultimi 5 acquisti
+    supabase
+      .from("purchases")
+      .select(
+        "id, delivery_note_number, delivery_note_date, created_at, suppliers(name), purchase_items(price, quantity)"
+      )
+      .order("created_at", { ascending: false })
+      .limit(5),
+
+    // Acquisti del mese (count + totale valore)
+    supabase
+      .from("purchases")
+      .select("id, purchase_items(price, quantity)")
+      .gte("created_at", startOfMonth),
+
+    // Articoli in scorta minima (via RPC già esistente)
+    supabase.rpc("get_dashboard_stats"),
   ]);
 
-  // Process Stats
-  const statsData = statsResult.status === 'fulfilled' ? statsResult.value.data : null;
-  if (statsResult.status === 'rejected') console.error("Error fetching stats:", statsResult.reason);
+  // Commesse attive
+  const activeJobs =
+    activeJobsResult.status === "fulfilled"
+      ? (activeJobsResult.value.data ?? [])
+      : [];
+
+  // DDT recenti
+  const recentDDT =
+    recentDDTResult.status === "fulfilled"
+      ? (recentDDTResult.value.data ?? [])
+      : [];
+
+  // Conteggio DDT del mese
+  const monthDDTCount =
+    monthDDTCountResult.status === "fulfilled"
+      ? (monthDDTCountResult.value.count ?? 0)
+      : 0;
+
+  // Acquisti recenti (arricchiti con totale)
+  const recentPurchases =
+    recentPurchasesResult.status === "fulfilled"
+      ? (recentPurchasesResult.value.data ?? []).map((p: any) => ({
+          ...p,
+          totalAmount: (p.purchase_items ?? []).reduce(
+            (sum: number, item: any) =>
+              sum + (item.price || 0) * (item.quantity || 1),
+            0
+          ),
+        }))
+      : [];
+
+  // Statistiche acquisti del mese
+  const monthPurchasesRaw =
+    monthPurchasesResult.status === "fulfilled"
+      ? (monthPurchasesResult.value.data ?? [])
+      : [];
+  const monthPurchasesCount = monthPurchasesRaw.length;
+  const monthPurchasesTotal = monthPurchasesRaw.reduce(
+    (sum: number, p: any) =>
+      sum +
+      (p.purchase_items ?? []).reduce(
+        (s: number, item: any) =>
+          s + (item.price || 0) * (item.quantity || 1),
+        0
+      ),
+    0
+  );
+
+  // Scorta minima dalla RPC esistente
+  const lowStockCount =
+    lowStockResult.status === "fulfilled"
+      ? Number(lowStockResult.value.data?.lowStockCount ?? 0)
+      : 0;
 
   const stats = {
-    totalValue: Number(statsData?.totalValue) || 0,
-    lowStockCount: Number(statsData?.lowStockCount) || 0,
-    totalItems: Number(statsData?.totalItems) || 0
+    activeJobsCount: activeJobs.length,
+    monthDDTCount,
+    monthPurchasesCount,
+    monthPurchasesTotal,
+    lowStockCount,
   };
-
-  // Process Movements
-  const recentMovements = movementsResult.status === 'fulfilled' && movementsResult.value.data
-    ? movementsResult.value.data
-    : [];
-  if (movementsResult.status === 'rejected') console.error("Error fetching movements:", movementsResult.reason);
-
-  // Process Jobs Stats
-  const jobsData = jobsResult.status === 'fulfilled' ? jobsResult.value.data : [];
-  if (jobsResult.status === 'rejected') console.error("Error fetching jobs:", jobsResult.reason);
-
-  const jobStats = (jobsData || []).reduce((acc, job) => {
-    const status = job.status as 'active' | 'completed' | 'suspended';
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, { active: 0, completed: 0, suspended: 0, total: (jobsData?.length || 0) });
-
-  const finalJobStats = {
-    active: jobStats.active || 0,
-    completed: jobStats.completed || 0,
-    suspended: jobStats.suspended || 0,
-    total: jobsData?.length || 0
-  };
-
-  // Process Job Hours
-  const activeJobHours = hoursResult.status === 'fulfilled' ? hoursResult.value : [];
-  if (hoursResult.status === 'rejected') console.error("Error fetching job hours:", hoursResult.reason);
 
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardClient
-        initialStats={stats}
-        recentMovements={recentMovements}
-        jobStats={finalJobStats}
-        activeJobHours={activeJobHours}
-      />
-    </Suspense>
+    <DashboardClient
+      stats={stats}
+      activeJobs={activeJobs}
+      recentDDT={recentDDT}
+      recentPurchases={recentPurchases}
+    />
   );
 }

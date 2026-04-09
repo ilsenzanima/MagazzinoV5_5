@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowDownRight, ArrowUpRight, ShoppingBag, Clock, FileText } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ShoppingBag, Clock, FileText, Truck, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import Link from "next/link";
@@ -52,8 +52,19 @@ export const RecentMovements = memo(function RecentMovements({ data }: RecentMov
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Ultimi Movimenti</CardTitle>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Truck className="h-4 w-4 text-amber-500" />
+            Ultimi DDT
+          </CardTitle>
+          <Link
+            href="/movements"
+            className="text-xs text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-0.5 transition-colors"
+          >
+            Vedi tutti <ChevronRight className="h-3 w-3" />
+          </Link>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
