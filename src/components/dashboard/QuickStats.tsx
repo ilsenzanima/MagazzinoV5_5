@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Briefcase, Truck, ShoppingCart, AlertTriangle } from "lucide-react";
+import { Briefcase, Truck, ShoppingCart, AlertTriangle, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 interface QuickStatsProps {
@@ -22,7 +22,7 @@ function StatCard({
   sub,
 }: {
   href: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   iconColor: string;
   iconBg: string;
   label: string;
