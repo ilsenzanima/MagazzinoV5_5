@@ -27,15 +27,14 @@ type CorrectionMap = Map<string, number>;
 export default function RettificaClient({ initialWorkers }: RettificaClientProps) {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedWorkerId, setSelectedWorkerId] = useState<string>(initialWorkers[0]?.id || '');
-    const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
+    // All workers' attendance for the month → used to build columns
+    const [allMonthAttendance, setAllMonthAttendance] = useState<Attendance[]>([]);
     const [corrections, setCorrections] = useState<AttendanceCorrection[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    // Pending edits before save: key -> draft value string
+    const [isLoadingMonth, setIsLoadingMonth] = useState(false);
+    const [isLoadingCorr, setIsLoadingCorr] = useState(false);
     const [draftMap, setDraftMap] = useState<Map<string, string>>(new Map());
-    // Saving state per key
     const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
 
-    // useMemo ensures monthStart is a stable reference unless currentDate actually changes
     const monthStart = useMemo(() => startOfMonth(currentDate), [currentDate]);
     const days = useMemo(
         () => eachDayOfInterval({ start: monthStart, end: endOfMonth(currentDate) }),
@@ -47,42 +46,61 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
         [initialWorkers, selectedWorkerId]
     );
 
-    const loadData = useCallback(async () => {
+    // Effect 1: load ALL workers' attendance when month changes
+    const loadMonthAttendance = useCallback(async () => {
+        setIsLoadingMonth(true);
+        try {
+            const year = monthStart.getFullYear();
+            const month = monthStart.getMonth() + 1;
+            const data = await attendanceApi.getByMonth(year, month);
+            setAllMonthAttendance(data);
+        } catch {
+            toast.error("Errore nel caricamento delle presenze");
+        } finally {
+            setIsLoadingMonth(false);
+        }
+    }, [monthStart]);
+
+    // Effect 2: load corrections for selected worker when worker or month changes
+    const loadCorrections = useCallback(async () => {
         if (!selectedWorkerId) return;
-        setIsLoading(true);
+        setIsLoadingCorr(true);
         setDraftMap(new Map());
         try {
             const year = monthStart.getFullYear();
             const month = monthStart.getMonth() + 1;
-            const [att, corr] = await Promise.all([
-                attendanceApi.getByMonth(year, month),
-                correctionsApi.getByWorkerMonth(selectedWorkerId, year, month),
-            ]);
-            setAttendanceList(att.filter(a => a.workerId === selectedWorkerId));
+            const corr = await correctionsApi.getByWorkerMonth(selectedWorkerId, year, month);
             setCorrections(corr);
         } catch {
-            toast.error("Errore nel caricamento dei dati");
+            toast.error("Errore nel caricamento delle rettifiche");
         } finally {
-            setIsLoading(false);
+            setIsLoadingCorr(false);
         }
     }, [selectedWorkerId, monthStart]);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
+    useEffect(() => { loadMonthAttendance(); }, [loadMonthAttendance]);
+    useEffect(() => { loadCorrections(); }, [loadCorrections]);
 
-    // Build columns: jobs first (sorted by code), then warehouses - only where worker has presenze OR corrections
+    // Worker's attendance derived from all-month data (instant on worker switch, no re-fetch)
+    const workerAttendance = useMemo(
+        () => allMonthAttendance.filter(a => a.workerId === selectedWorkerId),
+        [allMonthAttendance, selectedWorkerId]
+    );
+
+    // Columns: built from ALL workers' presenze in the month + this worker's corrections
+    // Jobs first (sorted alphabetically), warehouses last
     const columns = useMemo<Column[]>(() => {
         const jobMap = new Map<string, string>();
         const warehouseMap = new Map<string, string>();
 
-        attendanceList.forEach(a => {
+        allMonthAttendance.forEach(a => {
             if (a.status === 'presence' || a.status === 'transfer') {
                 if (a.jobId) jobMap.set(a.jobId, a.jobName || a.jobDescription || a.jobCode || a.jobId);
                 if (a.warehouseId) warehouseMap.set(a.warehouseId, a.warehouseName || 'Magazzino');
             }
         });
 
+        // Also include cantieri from this worker's corrections (in case they added one)
         corrections.forEach(c => {
             if (c.jobId) jobMap.set(c.jobId, c.jobName || c.jobCode || c.jobId);
             if (c.warehouseId) warehouseMap.set(c.warehouseId, c.warehouseName || 'Magazzino');
@@ -96,12 +114,12 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
             .map(([id, label]) => ({ id, label, type: 'warehouse' as const }));
 
         return [...jobCols, ...whCols];
-    }, [attendanceList, corrections]);
+    }, [allMonthAttendance, corrections]);
 
-    // Base hours map: date -> columnId -> hours
+    // Base hours: only from selected worker's attendance
     const baseHoursMap = useMemo(() => {
         const map = new Map<string, Map<string, number>>();
-        attendanceList.forEach(a => {
+        workerAttendance.forEach(a => {
             if (a.status !== 'presence' && a.status !== 'transfer') return;
             const colId = a.jobId || a.warehouseId;
             if (!colId) return;
@@ -110,7 +128,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
             map.get(a.date)!.set(colId, existing + a.hours);
         });
         return map;
-    }, [attendanceList]);
+    }, [workerAttendance]);
 
     // Saved corrections map: date -> columnId -> hoursDelta
     const savedCorrMap = useMemo<CorrectionMap>(() => {
@@ -158,13 +176,12 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                 col.type === 'job' ? col.id : undefined,
                 col.type === 'warehouse' ? col.id : undefined
             );
-            // Remove draft after save
             setDraftMap(prev => {
                 const next = new Map(prev);
                 next.delete(key);
                 return next;
             });
-            await loadData();
+            await loadCorrections();
         } catch {
             toast.error("Errore nel salvataggio della rettifica");
         } finally {
@@ -200,7 +217,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+                    {(isLoadingMonth || isLoadingCorr) && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
                     <span className="text-sm text-slate-600 dark:text-slate-400">Operaio:</span>
                     <Select value={selectedWorkerId} onValueChange={setSelectedWorkerId}>
                         <SelectTrigger className="w-[220px]">
@@ -233,11 +250,9 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                 </span>
             </div>
 
-            {columns.length === 0 && !isLoading ? (
+            {columns.length === 0 && !isLoadingMonth ? (
                 <div className="bg-white dark:bg-card rounded-lg border p-8 text-center text-slate-500">
-                    {selectedWorker
-                        ? `Nessuna presenza trovata per ${selectedWorker.lastName} ${selectedWorker.firstName} nel mese selezionato.`
-                        : 'Seleziona un operaio per visualizzare le presenze.'}
+                    Nessun cantiere con presenze registrate nel mese selezionato.
                 </div>
             ) : (
                 <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border overflow-x-auto">
