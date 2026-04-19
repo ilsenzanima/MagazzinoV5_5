@@ -1,7 +1,7 @@
 'use client';
 
 import { Worker, Attendance, AttendanceCorrection, attendanceApi, correctionsApi } from "@/lib/api";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isWeekend } from "date-fns";
 import { it } from "date-fns/locale";
 import { isItalianHoliday } from "@/lib/utils";
@@ -35,8 +35,12 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
     // Saving state per key
     const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
 
-    const monthStart = startOfMonth(currentDate);
-    const days = eachDayOfInterval({ start: monthStart, end: endOfMonth(currentDate) });
+    // useMemo ensures monthStart is a stable reference unless currentDate actually changes
+    const monthStart = useMemo(() => startOfMonth(currentDate), [currentDate]);
+    const days = useMemo(
+        () => eachDayOfInterval({ start: monthStart, end: endOfMonth(currentDate) }),
+        [monthStart, currentDate]
+    );
 
     const selectedWorker = useMemo(
         () => initialWorkers.find(w => w.id === selectedWorkerId) || null,
@@ -265,14 +269,14 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                             <tr>
                                 <th className="sticky left-0 z-20 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 p-1" />
                                 {columns.map(col => (
-                                    <>
-                                        <th key={`${col.id}-ore`} className="border dark:border-slate-700 p-1 text-center text-slate-500 font-normal bg-slate-50 dark:bg-slate-800 w-[55px]">
+                                    <React.Fragment key={col.id}>
+                                        <th className="border dark:border-slate-700 p-1 text-center text-slate-500 font-normal bg-slate-50 dark:bg-slate-800 w-[55px]">
                                             Ore
                                         </th>
-                                        <th key={`${col.id}-rett`} className="border dark:border-slate-700 p-1 text-center text-orange-600 font-normal bg-orange-50/50 dark:bg-orange-900/10 w-[65px]">
+                                        <th className="border dark:border-slate-700 p-1 text-center text-orange-600 font-normal bg-orange-50/50 dark:bg-orange-900/10 w-[65px]">
                                             Rettifica
                                         </th>
-                                    </>
+                                    </React.Fragment>
                                 ))}
                             </tr>
                         </thead>
@@ -316,10 +320,9 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                             const hasDraft = draftMap.has(getCorrKey(dateStr, col.id));
 
                                             return (
-                                                <>
+                                                <React.Fragment key={col.id}>
                                                     {/* Base hours cell (readonly) */}
                                                     <td
-                                                        key={`${col.id}-ore`}
                                                         className={cn(
                                                             "border dark:border-slate-700 p-1 text-center text-slate-600 dark:text-slate-400",
                                                             "bg-slate-100/60 dark:bg-slate-800/40 w-[55px]",
@@ -332,7 +335,6 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
 
                                                     {/* Correction input cell */}
                                                     <td
-                                                        key={`${col.id}-rett`}
                                                         className={cn(
                                                             "border dark:border-slate-700 p-0.5 text-center w-[65px]",
                                                             savedDelta !== 0 && "bg-orange-50 dark:bg-orange-900/10",
@@ -359,14 +361,13 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                                             />
                                                             {isSaving && <Loader2 className="h-3 w-3 animate-spin text-orange-500 shrink-0" />}
                                                         </div>
-                                                        {/* Totale sotto */}
                                                         {total !== baseHours && total !== 0 && (
                                                             <div className="text-orange-600 font-semibold text-[10px] mt-0.5">
                                                                 = {total}
                                                             </div>
                                                         )}
                                                     </td>
-                                                </>
+                                                </React.Fragment>
                                             );
                                         })}
                                     </tr>
@@ -390,17 +391,17 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                             totalCorr += savedCorrMap.get(getCorrKey(dateStr, col.id)) || 0;
                                         });
                                         return (
-                                            <>
-                                                <td key={`${col.id}-tot-base`} className="border dark:border-slate-700 p-2 text-center text-slate-700 dark:text-slate-300">
+                                            <React.Fragment key={col.id}>
+                                                <td className="border dark:border-slate-700 p-2 text-center text-slate-700 dark:text-slate-300">
                                                     {totalBase > 0 ? totalBase : ''}
                                                 </td>
-                                                <td key={`${col.id}-tot-corr`} className={cn(
+                                                <td className={cn(
                                                     "border dark:border-slate-700 p-2 text-center",
                                                     totalCorr !== 0 ? "text-orange-700 dark:text-orange-400" : "text-slate-400"
                                                 )}>
                                                     {totalCorr !== 0 ? (totalCorr > 0 ? `+${totalCorr}` : totalCorr) : ''}
                                                 </td>
-                                            </>
+                                            </React.Fragment>
                                         );
                                     })}
                                 </tr>
