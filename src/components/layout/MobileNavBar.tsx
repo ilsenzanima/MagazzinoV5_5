@@ -93,18 +93,18 @@ export function MobileNavBar({ onOpenMenu }: MobileNavBarProps) {
                 </DropdownMenu>
             </div>
 
-            {/* 4. Inventario */}
+            {/* 4. Note di Carico */}
             <Link
-                href="/inventory"
+                href="/load-notes"
                 className={cn(
                     "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors",
-                    isActive("/inventory")
+                    isActive("/load-notes")
                         ? "text-blue-600 dark:text-blue-400"
                         : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
                 )}
             >
-                <Package className="h-5 w-5" />
-                <span className="text-[10px] font-medium">Inventario</span>
+                <FileText className="h-5 w-5" />
+                <span className="text-[10px] font-medium">Note Carico</span>
             </Link>
 
             {/* 5. Menu Altro */}
