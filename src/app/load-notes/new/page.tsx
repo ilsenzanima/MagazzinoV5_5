@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Plus, Trash, Save, Search, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowLeft, Save, Search, Loader2, ArrowUpRight, ArrowDownRight, Trash } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,6 @@ import { loadNotesService } from "@/lib/services/load-notes";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { inventoryApi, jobsApi, InventoryItem, Job } from "@/lib/api";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface NoteLine {
     tempId: string;
@@ -24,13 +23,31 @@ interface NoteLine {
     itemName: string;
     itemModel?: string;
     itemCode?: string;
-    pieces: number;
-    quantity: number;
+    pieces: string;
+    quantity: string;
     coefficient: number;
     unit: string;
     isChecked?: boolean;
-    availableStock?: number;
 }
+
+const emptyLine = (): NoteLine => ({
+    tempId: Math.random().toString(36).substr(2, 9),
+    itemId: "",
+    itemName: "",
+    pieces: "",
+    quantity: "",
+    coefficient: 1,
+    unit: "PZ",
+    isChecked: false,
+});
+
+const ensureTrailingEmpty = (lines: NoteLine[]): NoteLine[] => {
+    const last = lines[lines.length - 1];
+    if (!last || last.itemId || last.pieces || last.quantity) {
+        return [...lines, emptyLine()];
+    }
+    return lines;
+};
 
 export default function NewLoadNotePage() {
     const router = useRouter();
@@ -39,33 +56,20 @@ export default function NewLoadNotePage() {
     const [itemsLoading, setItemsLoading] = useState(false);
     const [jobsLoading, setJobsLoading] = useState(false);
 
-    // Data Sources
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
 
-    // Form State - Header
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [noteType, setNoteType] = useState<'uscita' | 'reso'>('uscita');
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [notes, setNotes] = useState("");
 
-    // Form State - Current Line
-    const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
-    const [currentLine, setCurrentLine] = useState({
-        pieces: "",
-        quantity: "",
-        coefficient: 1,
-        unit: "PZ"
-    });
+    const [lines, setLines] = useState<NoteLine[]>([emptyLine()]);
 
-    // Items List State
-    const [lines, setLines] = useState<NoteLine[]>([]);
-
-    // Dialog States
     const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
     const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
+    const [openItemSelectorForRowId, setOpenItemSelectorForRowId] = useState<string | null>(null);
 
-    // Validation: Job OR Notes required
     const isValid = selectedJob || notes.trim().length > 0;
 
     useEffect(() => {
@@ -91,11 +95,7 @@ export default function NewLoadNotePage() {
     const handleItemSearch = useCallback(async (term: string) => {
         setItemsLoading(true);
         try {
-            const { items } = await inventoryApi.getPaginated({
-                page: 1,
-                limit: 50,
-                search: term
-            });
+            const { items } = await inventoryApi.getPaginated({ page: 1, limit: 50, search: term });
             setInventory(items);
         } catch (error) {
             console.error("Failed to search items", error);
@@ -107,12 +107,7 @@ export default function NewLoadNotePage() {
     const handleJobSearch = useCallback(async (term: string) => {
         setJobsLoading(true);
         try {
-            const { data } = await jobsApi.getPaginated({
-                page: 1,
-                limit: 50,
-                search: term,
-                status: 'active'
-            });
+            const { data } = await jobsApi.getPaginated({ page: 1, limit: 50, search: term, status: 'active' });
             setJobs(data);
         } catch (error) {
             console.error("Failed to search jobs", error);
@@ -121,14 +116,31 @@ export default function NewLoadNotePage() {
         }
     }, []);
 
+    const openItemSelector = (rowId: string) => {
+        setOpenItemSelectorForRowId(rowId);
+        setIsItemSelectorOpen(true);
+    };
+
     const handleItemSelect = (item: InventoryItem) => {
-        setSelectedItemForLine(item);
-        setCurrentLine({
-            pieces: "",
-            quantity: "",
-            coefficient: item.coefficient ? Number(item.coefficient) : 1,
-            unit: item.unit || 'PZ'
+        if (!openItemSelectorForRowId) return;
+        setLines(prev => {
+            const updated = prev.map(line => {
+                if (line.tempId !== openItemSelectorForRowId) return line;
+                return {
+                    ...line,
+                    itemId: item.id,
+                    itemName: item.name,
+                    itemModel: item.model,
+                    itemCode: item.code,
+                    coefficient: item.coefficient ? Number(item.coefficient) : 1,
+                    unit: item.unit || 'PZ',
+                    pieces: "",
+                    quantity: "",
+                };
+            });
+            return ensureTrailingEmpty(updated);
         });
+        setOpenItemSelectorForRowId(null);
         setIsItemSelectorOpen(false);
     };
 
@@ -137,68 +149,43 @@ export default function NewLoadNotePage() {
         setIsJobSelectorOpen(false);
     };
 
-    const handleCurrentLinePiecesChange = (piecesStr: string) => {
-        const pieces = parseFloat(piecesStr);
-        if (isNaN(pieces)) {
-            setCurrentLine(prev => ({ ...prev, pieces: piecesStr, quantity: "" }));
-            return;
-        }
-        const quantity = (pieces * currentLine.coefficient).toFixed(2);
-        setCurrentLine(prev => ({
-            ...prev,
-            pieces: piecesStr,
-            quantity: quantity
-        }));
+    const handleLinePiecesChange = (tempId: string, piecesStr: string) => {
+        setLines(prev => {
+            const updated = prev.map(line => {
+                if (line.tempId !== tempId) return line;
+                const pieces = parseFloat(piecesStr);
+                const quantity = !isNaN(pieces)
+                    ? (pieces * line.coefficient).toFixed(2)
+                    : line.quantity;
+                return { ...line, pieces: piecesStr, quantity };
+            });
+            return ensureTrailingEmpty(updated);
+        });
     };
 
-    const handleCurrentLineQuantityChange = (quantityStr: string) => {
-        const quantity = parseFloat(quantityStr);
-        if (isNaN(quantity)) {
-            setCurrentLine(prev => ({ ...prev, quantity: quantityStr, pieces: "" }));
-            return;
-        }
-        let piecesStr = currentLine.pieces;
-        if (currentLine.coefficient && currentLine.coefficient !== 1) {
-            piecesStr = (quantity / currentLine.coefficient).toFixed(2);
-        } else {
-            piecesStr = quantity.toString();
-        }
-        setCurrentLine(prev => ({
-            ...prev,
-            quantity: quantityStr,
-            pieces: piecesStr
-        }));
-    };
-
-    const handleAddLine = () => {
-        if (!selectedItemForLine || !currentLine.quantity) {
-            toast.warning("Seleziona un articolo e inserisci la quantità");
-            return;
-        }
-
-        const newLine: NoteLine = {
-            tempId: Math.random().toString(36).substr(2, 9),
-            itemId: selectedItemForLine.id,
-            itemName: selectedItemForLine.name,
-            itemModel: selectedItemForLine.model,
-            itemCode: selectedItemForLine.code,
-            pieces: parseFloat(currentLine.pieces) || parseFloat(currentLine.quantity),
-            quantity: parseFloat(currentLine.quantity),
-            coefficient: currentLine.coefficient,
-            unit: currentLine.unit,
-            isChecked: false,
-            availableStock: selectedItemForLine.quantity
-        };
-
-        setLines([...lines, newLine]);
-
-        // Reset current line
-        setCurrentLine({ pieces: "", quantity: "", coefficient: 1, unit: "PZ" });
-        setSelectedItemForLine(null);
+    const handleLineQuantityChange = (tempId: string, quantityStr: string) => {
+        setLines(prev => {
+            const updated = prev.map(line => {
+                if (line.tempId !== tempId) return line;
+                const quantity = parseFloat(quantityStr);
+                let piecesStr = line.pieces;
+                if (!isNaN(quantity)) {
+                    piecesStr = line.coefficient !== 1
+                        ? (quantity / line.coefficient).toFixed(2)
+                        : quantity.toString();
+                }
+                return { ...line, quantity: quantityStr, pieces: piecesStr };
+            });
+            return ensureTrailingEmpty(updated);
+        });
     };
 
     const removeLine = (tempId: string) => {
-        setLines(lines.filter(l => l.tempId !== tempId));
+        setLines(prev => {
+            if (prev.length === 1) return [emptyLine()];
+            const updated = prev.filter(l => l.tempId !== tempId);
+            return ensureTrailingEmpty(updated);
+        });
     };
 
     const handleSave = async () => {
@@ -207,6 +194,7 @@ export default function NewLoadNotePage() {
             return;
         }
 
+        const validLines = lines.filter(l => l.itemId && l.quantity);
         setIsLoading(true);
         try {
             await loadNotesService.create({
@@ -214,10 +202,10 @@ export default function NewLoadNotePage() {
                 noteType,
                 jobId: selectedJob?.id,
                 notes,
-                items: lines.map(l => ({
+                items: validLines.map(l => ({
                     inventoryId: l.itemId,
-                    quantity: l.quantity,
-                    pieces: l.pieces,
+                    quantity: parseFloat(l.quantity),
+                    pieces: parseFloat(l.pieces) || parseFloat(l.quantity),
                     coefficient: l.coefficient
                 }))
             });
@@ -245,7 +233,6 @@ export default function NewLoadNotePage() {
     return (
         <DashboardLayout>
             <div className="max-w-4xl mx-auto pb-10 overflow-hidden">
-                {/* Header */}
                 <div className="mb-6">
                     <Link href="/load-notes" className="flex items-center text-muted-foreground hover:text-foreground mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
@@ -258,7 +245,7 @@ export default function NewLoadNotePage() {
                 </div>
 
                 <div className="space-y-6">
-                    {/* Header Data */}
+                    {/* Dettagli generali */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Dettagli Generali</CardTitle>
@@ -334,143 +321,97 @@ export default function NewLoadNotePage() {
                         </CardContent>
                     </Card>
 
-                    {/* Add Items Section */}
+                    {/* Lista Materiali */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Lista Materiali</CardTitle>
-                            <CardDescription>Cerca materiali e aggiungi quantità</CardDescription>
+                            <CardDescription>Clicca su una riga per selezionare il materiale, poi inserisci pezzi o quantità</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6">
-                            {/* Add Line Form */}
-                            <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                    <div className="md:col-span-5 space-y-2">
-                                        <Label>Materiale</Label>
-                                        <div
-                                            className="flex items-center justify-between bg-background border rounded-md px-3 py-2 cursor-pointer hover:bg-muted h-10"
-                                            onClick={() => setIsItemSelectorOpen(true)}
-                                        >
-                                            {selectedItemForLine ? (
-                                                <div className="flex items-center gap-2 overflow-hidden">
-                                                    <span className="font-mono text-xs font-bold bg-muted px-1 rounded">{selectedItemForLine.code}</span>
-                                                    <span className="text-sm truncate">{selectedItemForLine.name}</span>
-                                                    {selectedItemForLine.model && <span className="text-xs text-muted-foreground">({selectedItemForLine.model})</span>}
-                                                </div>
-                                            ) : (
-                                                <span className="text-sm text-muted-foreground">Cerca articolo...</span>
-                                            )}
-                                            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                        </div>
-                                        {selectedItemForLine && (
-                                            <p className="text-xs text-muted-foreground">
-                                                Giacenza: <span className={selectedItemForLine.quantity <= 0 ? 'text-destructive font-bold' : 'font-medium'}>{selectedItemForLine.quantity} {selectedItemForLine.unit}</span>
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="md:col-span-2 space-y-2">
-                                        <Label>Pezzi <span className="text-xs text-muted-foreground font-normal">(Coeff: {currentLine.coefficient})</span></Label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={currentLine.pieces}
-                                            onChange={(e) => handleCurrentLinePiecesChange(e.target.value)}
-                                            placeholder="Pezzi"
-                                        />
-                                    </div>
-
-                                    <div className="md:col-span-2 space-y-2">
-                                        <Label>Quantità ({currentLine.unit})</Label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={currentLine.quantity}
-                                            onChange={(e) => handleCurrentLineQuantityChange(e.target.value)}
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-
-                                    <div className="md:col-span-3 flex items-end pb-px">
-                                        <Button type="button" onClick={handleAddLine} className="w-full">
-                                            <Plus className="mr-2 h-4 w-4" /> Aggiungi
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Lines Table */}
-                            <div className="rounded-md border overflow-x-auto">
+                        <CardContent className="p-0 sm:p-6 sm:pt-0">
+                            <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Materiale</TableHead>
-                                            <TableHead className="text-center w-[60px]">Pezzi</TableHead>
-                                            <TableHead className="text-right w-[80px]">Q.tà</TableHead>
-                                            {noteType === 'uscita' && (
-                                                <>
-                                                    <TableHead className="hidden sm:table-cell text-right w-[70px]">Giacenza</TableHead>
-                                                    <TableHead className="hidden sm:table-cell text-right w-[80px]">Da Ord.</TableHead>
-                                                </>
-                                            )}
-                                            <TableHead className="w-[40px]"></TableHead>
+                                            <TableHead className="w-[90px] text-center">Pezzi</TableHead>
+                                            <TableHead className="w-[110px] text-center">Quantità</TableHead>
+                                            <TableHead className="w-[44px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {lines.length === 0 ? (
-                                            <TableRow>
-                                                <TableCell colSpan={noteType === 'uscita' ? 6 : 4} className="text-center py-8 text-muted-foreground">
-                                                    Nessun materiale aggiunto
-                                                </TableCell>
-                                            </TableRow>
-                                        ) : (
-                                            lines.map((line) => {
-                                                const shortage = line.availableStock !== undefined
-                                                    ? Math.max(0, line.quantity - line.availableStock)
-                                                    : 0;
-                                                return (
-                                                    <TableRow key={line.tempId}>
-                                                        <TableCell>
-                                                            <div className="font-medium text-sm truncate max-w-[150px] sm:max-w-none">
-                                                                {line.itemName}
+                                        {lines.map((line, index) => {
+                                            const isLast = index === lines.length - 1;
+                                            return (
+                                                <TableRow key={line.tempId} className="group">
+                                                    {/* Materiale */}
+                                                    <TableCell
+                                                        className="cursor-pointer select-none py-2"
+                                                        onClick={() => openItemSelector(line.tempId)}
+                                                    >
+                                                        {line.itemId ? (
+                                                            <div className="space-y-0.5">
+                                                                <div className="font-mono text-[10px] text-muted-foreground leading-none">{line.itemCode}</div>
+                                                                <div className="font-medium text-sm leading-tight">{line.itemName}</div>
+                                                                {line.itemModel && (
+                                                                    <div className="text-xs text-muted-foreground leading-none">{line.itemModel}</div>
+                                                                )}
                                                             </div>
-                                                            <div className="text-xs text-muted-foreground font-mono truncate">{line.itemCode}</div>
-                                                        </TableCell>
-                                                        <TableCell className="text-center font-medium">
-                                                            {line.pieces}
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-bold text-sm">
-                                                            {line.quantity} <span className="text-muted-foreground text-xs font-normal">{line.unit}</span>
-                                                        </TableCell>
-                                                        {noteType === 'uscita' && (
-                                                            <>
-                                                                <TableCell className={`hidden sm:table-cell text-right ${line.availableStock !== undefined && line.availableStock < line.quantity ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                                                                    {line.availableStock !== undefined ? line.availableStock : '-'}
-                                                                </TableCell>
-                                                                <TableCell className="hidden sm:table-cell text-right">
-                                                                    {shortage > 0 ? (
-                                                                        <span className="text-destructive font-bold">+{shortage}</span>
-                                                                    ) : (
-                                                                        <span className="text-green-600">✓</span>
-                                                                    )}
-                                                                </TableCell>
-                                                            </>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2 text-muted-foreground py-1">
+                                                                <Search className="h-4 w-4 shrink-0" />
+                                                                <span className="text-sm">Cerca materiale...</span>
+                                                            </div>
                                                         )}
-                                                        <TableCell>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => removeLine(line.tempId)}
-                                                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                                                            >
-                                                                <Trash className="h-4 w-4" />
-                                                            </Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })
-                                        )}
+                                                    </TableCell>
+
+                                                    {/* Pezzi */}
+                                                    <TableCell className="py-2 px-1">
+                                                        <Input
+                                                            type="number"
+                                                            inputMode="decimal"
+                                                            min="0"
+                                                            step="0.01"
+                                                            value={line.pieces}
+                                                            onChange={e => handleLinePiecesChange(line.tempId, e.target.value)}
+                                                            placeholder="0"
+                                                            className="h-9 text-center px-1"
+                                                            disabled={!line.itemId}
+                                                        />
+                                                    </TableCell>
+
+                                                    {/* Quantità */}
+                                                    <TableCell className="py-2 px-1">
+                                                        <div className="flex items-center gap-1">
+                                                            <Input
+                                                                type="number"
+                                                                inputMode="decimal"
+                                                                min="0"
+                                                                step="0.01"
+                                                                value={line.quantity}
+                                                                onChange={e => handleLineQuantityChange(line.tempId, e.target.value)}
+                                                                placeholder="0.00"
+                                                                className="h-9 text-center px-1"
+                                                                disabled={!line.itemId}
+                                                            />
+                                                            <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:block">{line.unit}</span>
+                                                        </div>
+                                                    </TableCell>
+
+                                                    {/* Elimina */}
+                                                    <TableCell className="py-2 px-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => removeLine(line.tempId)}
+                                                            className={`h-8 w-8 transition-opacity ${isLast && !line.itemId ? 'opacity-0 pointer-events-none' : 'text-destructive hover:bg-destructive/10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100'}`}
+                                                            tabIndex={-1}
+                                                        >
+                                                            <Trash className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>
