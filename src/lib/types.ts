@@ -340,6 +340,19 @@ export interface Attendance {
 }
 
 
+export interface AttendanceCorrection {
+    id: string;
+    workerId: string;
+    jobId?: string;
+    jobName?: string;
+    jobCode?: string;
+    warehouseId?: string;
+    warehouseName?: string;
+    date: string;
+    hoursDelta: number;
+    createdAt?: string;
+}
+
 // Load Notes (Note di Carico)
 export interface LoadNoteItem {
     id: string; // generated client-side for list management
