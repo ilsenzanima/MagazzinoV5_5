@@ -403,7 +403,7 @@ export default function NewLoadNotePage() {
                                                             variant="ghost"
                                                             size="icon"
                                                             onClick={() => removeLine(line.tempId)}
-                                                            className={`h-8 w-8 transition-opacity ${isLast && !line.itemId ? 'opacity-0 pointer-events-none' : 'text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100'}`}
+                                                            className={`h-8 w-8 transition-opacity ${isLast && !line.itemId ? 'opacity-0 pointer-events-none' : 'text-destructive hover:bg-destructive/10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100'}`}
                                                             tabIndex={-1}
                                                         >
                                                             <Trash className="h-4 w-4" />
