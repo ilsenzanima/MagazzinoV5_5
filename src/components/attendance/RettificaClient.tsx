@@ -87,6 +87,35 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
         [allMonthAttendance, selectedWorkerId]
     );
 
+    // Absence label map for display
+    const absenceLabel = (status: string, hours: number): string => {
+        const labels: Record<string, string> = {
+            holiday: 'Ferie',
+            permit: 'Permesso',
+            sick: 'Malattia',
+            injury: 'Infortunio',
+            course: 'Corso',
+            strike: 'Sciopero',
+            absence: 'Ass. Ing.',
+            medical_exam: 'Visita Med.',
+        };
+        const label = labels[status];
+        return label ? `${hours}h ${label}` : '';
+    };
+
+    // Absences per day for selected worker: date -> label string
+    const absenceMap = useMemo(() => {
+        const map = new Map<string, string[]>();
+        workerAttendance.forEach(a => {
+            if (a.status === 'presence' || a.status === 'transfer') return;
+            const label = absenceLabel(a.status, a.hours);
+            if (!label) return;
+            if (!map.has(a.date)) map.set(a.date, []);
+            map.get(a.date)!.push(label);
+        });
+        return map;
+    }, [workerAttendance]);
+
     // Columns: built from ALL workers' presenze in the month + this worker's corrections
     // Jobs first (sorted alphabetically), warehouses last
     const columns = useMemo<Column[]>(() => {
@@ -280,6 +309,9 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                         )}
                                     </th>
                                 ))}
+                                <th className="border dark:border-slate-700 p-2 text-center font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 min-w-[110px]">
+                                    Assenze
+                                </th>
                             </tr>
                             <tr>
                                 <th className="sticky left-0 z-20 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 p-1" />
@@ -293,6 +325,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                         </th>
                                     </React.Fragment>
                                 ))}
+                                <th className="border dark:border-slate-700 p-1 bg-slate-50 dark:bg-slate-800" />
                             </tr>
                         </thead>
                         <tbody>
@@ -329,6 +362,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                         {columns.map(col => {
                                             const baseHours = baseHoursMap.get(dateStr)?.get(col.id) || 0;
                                             const savedDelta = savedCorrMap.get(getCorrKey(dateStr, col.id)) || 0;
+
                                             const total = baseHours + savedDelta;
                                             const draftVal = getDraftValue(dateStr, col.id);
                                             const isSaving = savingKeys.has(getCorrKey(dateStr, col.id));
@@ -385,6 +419,27 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                                 </React.Fragment>
                                             );
                                         })}
+
+                                        {/* Absences column */}
+                                        {(() => {
+                                            const absences = absenceMap.get(dateStr);
+                                            return (
+                                                <td className={cn(
+                                                    "border dark:border-slate-700 p-1 text-center text-[10px]",
+                                                    isHoliday ? "bg-red-50/30" : isWknd ? "bg-slate-50/50" : "bg-white dark:bg-card"
+                                                )}>
+                                                    {absences && absences.length > 0 ? (
+                                                        <div className="flex flex-col gap-0.5">
+                                                            {absences.map((label, i) => (
+                                                                <span key={i} className="inline-block px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[9px] whitespace-nowrap">
+                                                                    {label}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : null}
+                                                </td>
+                                            );
+                                        })()}
                                     </tr>
                                 );
                             })}
@@ -419,6 +474,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                             </React.Fragment>
                                         );
                                     })}
+                                    <td className="border dark:border-slate-700 p-2" />
                                 </tr>
                             </tfoot>
                         )}

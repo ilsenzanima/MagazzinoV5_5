@@ -88,10 +88,11 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             const colId = corr.jobId || corr.warehouseId;
             if (!colId) return;
 
+            // Use explicit job/warehouse matching to avoid undefined === undefined false matches
             const idx = result.findIndex(a =>
                 a.workerId === corr.workerId &&
                 a.date === corr.date &&
-                (a.jobId === corr.jobId || a.warehouseId === corr.warehouseId) &&
+                (corr.jobId ? a.jobId === corr.jobId : a.warehouseId === corr.warehouseId) &&
                 (a.status === 'presence' || a.status === 'transfer')
             );
 
