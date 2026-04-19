@@ -40,9 +40,9 @@
     "first_name": "Matteo",
     "last_name": "Bertolin",
     "email": "",
-    "is_active": true,
+    "is_active": false,
     "created_at": "2026-01-01T08:04:41.0915+00:00",
-    "updated_at": "2026-01-01T08:04:41.0915+00:00"
+    "updated_at": "2026-04-15T15:34:15.513429+00:00"
   },
   {
     "id": "7c555418-0fcf-4f35-ab6d-bca5ce18e522",
@@ -51,7 +51,7 @@
     "email": "",
     "is_active": true,
     "created_at": "2026-01-01T08:05:11.494465+00:00",
-    "updated_at": "2026-01-01T08:05:11.494465+00:00"
+    "updated_at": "2026-04-17T15:27:30.769339+00:00"
   },
   {
     "id": "cab86718-6bfe-45e0-9b2b-8958ec846277",
