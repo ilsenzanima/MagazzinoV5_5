@@ -284,12 +284,12 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                     Nessun cantiere con presenze registrate nel mese selezionato.
                 </div>
             ) : (
-                <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border overflow-x-auto">
+                <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border overflow-auto max-h-[calc(100vh-260px)]">
                     <table className="text-xs border-collapse min-w-full">
                         <thead>
+                            {/* Row 1: cantiere names — sticky top-0 */}
                             <tr>
-                                {/* Day column */}
-                                <th className="sticky left-0 z-20 bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 p-2 text-left font-semibold min-w-[90px] whitespace-nowrap">
+                                <th className="sticky top-0 left-0 z-30 bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 p-2 text-left font-semibold min-w-[90px] whitespace-nowrap">
                                     Giorno
                                 </th>
                                 {columns.map(col => (
@@ -297,7 +297,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                         key={col.id}
                                         colSpan={2}
                                         className={cn(
-                                            "border dark:border-slate-700 p-2 text-center font-semibold min-w-[120px]",
+                                            "sticky top-0 z-20 border dark:border-slate-700 p-2 text-center font-semibold min-w-[120px]",
                                             col.type === 'warehouse'
                                                 ? "bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300"
                                                 : "bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300"
@@ -309,23 +309,24 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                         )}
                                     </th>
                                 ))}
-                                <th className="border dark:border-slate-700 p-2 text-center font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 min-w-[110px]">
+                                <th className="sticky top-0 z-20 border dark:border-slate-700 p-2 text-center font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 min-w-[110px]">
                                     Assenze
                                 </th>
                             </tr>
+                            {/* Row 2: Ore/Rettifica sub-labels — sticky top-[41px] */}
                             <tr>
-                                <th className="sticky left-0 z-20 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 p-1" />
+                                <th className="sticky top-[41px] left-0 z-30 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 p-1" />
                                 {columns.map(col => (
                                     <React.Fragment key={col.id}>
-                                        <th className="border dark:border-slate-700 p-1 text-center text-slate-500 font-normal bg-slate-50 dark:bg-slate-800 w-[55px]">
+                                        <th className="sticky top-[41px] z-20 border dark:border-slate-700 p-1 text-center text-slate-500 font-normal bg-slate-50 dark:bg-slate-800 w-[55px]">
                                             Ore
                                         </th>
-                                        <th className="border dark:border-slate-700 p-1 text-center text-orange-600 font-normal bg-orange-50/50 dark:bg-orange-900/10 w-[65px]">
+                                        <th className="sticky top-[41px] z-20 border dark:border-slate-700 p-1 text-center text-orange-600 font-normal bg-orange-50/50 dark:bg-orange-900/10 w-[65px]">
                                             Rettifica
                                         </th>
                                     </React.Fragment>
                                 ))}
-                                <th className="border dark:border-slate-700 p-1 bg-slate-50 dark:bg-slate-800" />
+                                <th className="sticky top-[41px] z-20 border dark:border-slate-700 p-1 bg-slate-50 dark:bg-slate-800" />
                             </tr>
                         </thead>
                         <tbody>
