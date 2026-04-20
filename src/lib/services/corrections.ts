@@ -4,6 +4,7 @@ import { AttendanceCorrection } from '@/lib/types';
 const mapDbToCorrection = (db: any): AttendanceCorrection => ({
     id: db.id,
     workerId: db.worker_id,
+    workerName: db.workers ? `${db.workers.first_name} ${db.workers.last_name || ''}`.trim() : undefined,
     jobId: db.job_id,
     jobName: db.jobs?.name,
     jobCode: db.jobs?.code,
@@ -22,7 +23,7 @@ export const correctionsApi = {
 
         const { data, error } = await supabase
             .from('attendance_corrections')
-            .select('*, jobs(code, name), warehouses(name)')
+            .select('*, workers(first_name, last_name), jobs(code, name), warehouses(name)')
             .gte('date', startDate)
             .lte('date', endDate)
             .order('date', { ascending: true });
@@ -38,7 +39,7 @@ export const correctionsApi = {
 
         const { data, error } = await supabase
             .from('attendance_corrections')
-            .select('*, jobs(code, name), warehouses(name)')
+            .select('*, workers(first_name, last_name), jobs(code, name), warehouses(name)')
             .eq('worker_id', workerId)
             .gte('date', startDate)
             .lte('date', endDate)
@@ -51,7 +52,7 @@ export const correctionsApi = {
     getByJobId: async (jobId: string): Promise<AttendanceCorrection[]> => {
         const { data, error } = await supabase
             .from('attendance_corrections')
-            .select('*, jobs(code, name), warehouses(name)')
+            .select('*, workers(first_name, last_name), jobs(code, name), warehouses(name)')
             .eq('job_id', jobId)
             .order('date', { ascending: true });
 

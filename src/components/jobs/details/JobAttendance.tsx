@@ -69,7 +69,7 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
                 result.push({
                     id: `virtual_${corr.id}`,
                     workerId: corr.workerId,
-                    workerName: undefined,
+                    workerName: corr.workerName,
                     jobId: corr.jobId,
                     date: corr.date,
                     hours: corr.hoursDelta,
@@ -81,14 +81,17 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
         return result.filter(a => a.hours > 0);
     }, [attendanceData, corrections]);
 
-    // Worker names: from attendance (has workerName) + from corrections (need lookup)
+    // Worker names: from attendance + from corrections (which now include workerName via join)
     const workerNameMap = useMemo(() => {
         const map = new Map<string, string>();
         attendanceData.forEach(a => {
             if (a.workerId && a.workerName) map.set(a.workerId, a.workerName);
         });
+        corrections.forEach(c => {
+            if (c.workerId && c.workerName) map.set(c.workerId, c.workerName);
+        });
         return map;
-    }, [attendanceData]);
+    }, [attendanceData, corrections]);
 
     // Filter data for current month
     const monthData = mergedData.filter(att => {

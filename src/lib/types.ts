@@ -343,6 +343,7 @@ export interface Attendance {
 export interface AttendanceCorrection {
     id: string;
     workerId: string;
+    workerName?: string;
     jobId?: string;
     jobName?: string;
     jobCode?: string;
