@@ -43,12 +43,14 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function LoadNotesPage() {
     const router = useRouter();
     const [notes, setNotes] = useState<LoadNote[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const fetchNotes = async () => {
         setLoading(true);
@@ -94,6 +96,20 @@ export default function LoadNotesPage() {
             fetchNotes();
         } catch (error) {
             toast.error("Impossibile aggiornare lo stato");
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`Sei sicuro di voler eliminare ${selectedIds.size} nota${selectedIds.size > 1 ? 'e' : ''}?`)) return;
+
+        try {
+            await Promise.all([...selectedIds].map(id => loadNotesService.delete(id)));
+            toast.success(`${selectedIds.size} nota${selectedIds.size > 1 ? 'e eliminate' : ' eliminata'}`);
+            setSelectedIds(new Set());
+            fetchNotes();
+        } catch (error) {
+            toast.error("Errore durante l'eliminazione");
         }
     };
 
@@ -168,10 +184,25 @@ export default function LoadNotesPage() {
                     <TabsContent value="completed">
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle>Archivio Completate</CardTitle>
-                                <CardDescription>
-                                    Storico delle note già processate.
-                                </CardDescription>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <CardTitle>Archivio Completate</CardTitle>
+                                        <CardDescription>
+                                            Storico delle note già processate.
+                                        </CardDescription>
+                                    </div>
+                                    {selectedIds.size > 0 && (
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={handleBulkDelete}
+                                            className="shrink-0"
+                                        >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Elimina selezionate ({selectedIds.size})
+                                        </Button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <NotesTable
@@ -180,6 +211,9 @@ export default function LoadNotesPage() {
                                     onDelete={handleDelete}
                                     onToggle={handleToggleStatus}
                                     router={router}
+                                    selectable
+                                    selectedIds={selectedIds}
+                                    onSelectionChange={setSelectedIds}
                                 />
                             </CardContent>
                         </Card>
@@ -195,14 +229,46 @@ function NotesTable({
     loading,
     onDelete,
     onToggle,
-    router
+    router,
+    selectable = false,
+    selectedIds = new Set(),
+    onSelectionChange,
 }: {
     notes: LoadNote[],
     loading: boolean,
     onDelete: (id: string, e: React.MouseEvent) => void,
     onToggle: (id: string, status: string, e: React.MouseEvent) => void,
-    router: any
+    router: any,
+    selectable?: boolean,
+    selectedIds?: Set<string>,
+    onSelectionChange?: (ids: Set<string>) => void,
 }) {
+    const allSelected = notes.length > 0 && notes.every(n => selectedIds.has(n.id));
+    const someSelected = notes.some(n => selectedIds.has(n.id));
+
+    const toggleOne = (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        onSelectionChange?.(next);
+    };
+
+    const toggleAll = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (allSelected) {
+            const next = new Set(selectedIds);
+            notes.forEach(n => next.delete(n.id));
+            onSelectionChange?.(next);
+        } else {
+            const next = new Set(selectedIds);
+            notes.forEach(n => next.add(n.id));
+            onSelectionChange?.(next);
+        }
+    };
+
     if (loading) {
         return <div className="text-center py-8 text-muted-foreground">Caricamento...</div>;
     }
@@ -220,6 +286,15 @@ function NotesTable({
             <Table>
                 <TableHeader>
                     <TableRow>
+                        {selectable && (
+                            <TableHead className="w-[40px]" onClick={toggleAll}>
+                                <Checkbox
+                                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                                    aria-label="Seleziona tutte"
+                                    className="cursor-pointer"
+                                />
+                            </TableHead>
+                        )}
                         <TableHead className="w-[40px] sm:w-[100px]">Stato</TableHead>
                         <TableHead className="hidden sm:table-cell w-[100px]">Data</TableHead>
                         <TableHead>Commessa / Note</TableHead>
@@ -231,9 +306,18 @@ function NotesTable({
                     {notes.map((note) => (
                         <TableRow
                             key={note.id}
-                            className="group cursor-pointer hover:bg-muted/50"
+                            className={`group cursor-pointer hover:bg-muted/50 ${selectable && selectedIds.has(note.id) ? 'bg-muted/30' : ''}`}
                             onClick={() => router.push(`/load-notes/${note.id}`)}
                         >
+                            {selectable && (
+                                <TableCell onClick={(e) => toggleOne(note.id, e)}>
+                                    <Checkbox
+                                        checked={selectedIds.has(note.id)}
+                                        aria-label="Seleziona nota"
+                                        className="cursor-pointer"
+                                    />
+                                </TableCell>
+                            )}
                             <TableCell>
                                 {note.status === 'pending' ? (
                                     <>

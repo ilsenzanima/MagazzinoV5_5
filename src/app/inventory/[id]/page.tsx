@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText, AlertTriangle, Copy, RotateCcw } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Upload, QrCode, Plus, Minus, FileText, AlertTriangle, Copy, RotateCcw, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import {
   InventoryItem
 } from "@/lib/mock-data";
@@ -62,6 +62,7 @@ import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
 import dynamic from "next/dynamic";
+import { loadNotesService } from "@/lib/services/load-notes";
 const ImageCropper = dynamic(
   () => import("@/components/ui/image-cropper").then((m) => ({ default: m.ImageCropper })),
   { ssr: false, loading: () => null }
@@ -109,6 +110,9 @@ export default function InventoryDetailPage() {
   // Lots State
   const [lotsData, setLotsData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("lots");
+
+  // Pending notes for this item
+  const [pendingQty, setPendingQty] = useState<{ uscita: number; reso: number }>({ uscita: 0, reso: 0 });
 
   // Helper to handle pieces/quantity change
   const handleMovementPiecesChange = (val: string) => {
@@ -204,6 +208,20 @@ export default function InventoryDetailPage() {
 
         // Load lots data
         loadLots();
+
+        // Load pending notes quantities for this item
+        loadNotesService.getAll({ status: 'pending' }).then(notes => {
+          let uscita = 0, reso = 0;
+          notes.forEach(note => {
+            note.items.forEach(noteItem => {
+              if (noteItem.inventoryId === id) {
+                if (note.noteType === 'uscita') uscita += noteItem.quantity;
+                else reso += noteItem.quantity;
+              }
+            });
+          });
+          setPendingQty({ uscita, reso });
+        }).catch(console.error);
 
         // Load auxiliary data for forms in background
         const [jobsData, brandsData, typesData, unitsData, supplierCodesData, suppliersData] = await Promise.all([
@@ -651,6 +669,33 @@ export default function InventoryDetailPage() {
                           {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
                         </div>
                         <div className="text-xs text-blue-400 dark:text-blue-500 font-medium">Quantità Totale</div>
+                      </div>
+
+                      {/* Da Processare (note di carico pending) */}
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-md">
+                        <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold mb-2">Da processare</div>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                              <ArrowUpRight className="h-3.5 w-3.5" /> Uscita
+                            </span>
+                            <span className={`font-bold ${pendingQty.uscita > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                              {pendingQty.uscita > 0
+                                ? `${pendingQty.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit}`
+                                : '—'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-1 text-green-700 dark:text-green-300">
+                              <ArrowDownRight className="h-3.5 w-3.5" /> Entrata
+                            </span>
+                            <span className={`font-bold ${pendingQty.reso > 0 ? 'text-green-700 dark:text-green-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                              {pendingQty.reso > 0
+                                ? `${pendingQty.reso.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit}`
+                                : '—'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Stock Value - Hidden for regular users */}

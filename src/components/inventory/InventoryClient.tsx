@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/select";
 import { brandsApi, Brand } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
+import { loadNotesService } from "@/lib/services/load-notes";
 
 interface InventoryClientProps {
   initialItems: InventoryItem[];
@@ -74,6 +75,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(false); // Initial loading is false because we have props
   const [error, setError] = useState<string | null>(null);
+  const [pendingMap, setPendingMap] = useState<Map<string, { uscita: number; reso: number }>>(new Map());
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -102,6 +104,22 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   // Load brands
   useEffect(() => {
     brandsApi.getAll().then(setBrands).catch(console.error);
+  }, []);
+
+  // Load pending notes and build per-item map
+  useEffect(() => {
+    loadNotesService.getAll({ status: 'pending' }).then(notes => {
+      const map = new Map<string, { uscita: number; reso: number }>();
+      notes.forEach(note => {
+        note.items.forEach(noteItem => {
+          const existing = map.get(noteItem.inventoryId) || { uscita: 0, reso: 0 };
+          if (note.noteType === 'uscita') existing.uscita += noteItem.quantity;
+          else existing.reso += noteItem.quantity;
+          map.set(noteItem.inventoryId, existing);
+        });
+      });
+      setPendingMap(map);
+    }).catch(console.error);
   }, []);
 
   const resetFilters = () => {
@@ -405,10 +423,10 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           <Badge variant="secondary" className="text-[10px] font-normal text-slate-600 dark:text-slate-400">
                             {item.type}
                           </Badge>
-                          <div className="ml-auto text-right flex flex-col items-end">
+                          <div className="ml-auto text-right flex flex-col items-end gap-1">
                             {item.coefficient !== 1 ? (
                               <>
-                                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1 mr-1">
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mr-1">
                                   {(item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz =
                                 </span>
                                 <Badge variant="outline" className={
@@ -428,6 +446,24 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                                 {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
                               </Badge>
                             )}
+                            {(() => {
+                              const pending = pendingMap.get(item.id);
+                              if (!pending || (pending.uscita === 0 && pending.reso === 0)) return null;
+                              return (
+                                <>
+                                  {pending.uscita > 0 && (
+                                    <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                                      ↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 })} uscita
+                                    </Badge>
+                                  )}
+                                  {pending.reso > 0 && (
+                                    <Badge variant="outline" className="text-[10px] text-green-600 border-green-300 bg-green-50 dark:bg-green-900/20">
+                                      ↓ {pending.reso.toLocaleString('it-IT', { maximumFractionDigits: 2 })} entrata
+                                    </Badge>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>

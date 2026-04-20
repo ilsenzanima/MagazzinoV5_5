@@ -1,6 +1,6 @@
 'use client';
 
-import { Worker, Job, Attendance, attendanceApi, workerCoursesApi, workerMedicalExamsApi } from "@/lib/api";
+import { Worker, Job, Attendance, AttendanceCorrection, attendanceApi, workerCoursesApi, workerMedicalExamsApi, correctionsApi } from "@/lib/api";
 import { useState, useEffect, useMemo } from "react";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from "date-fns";
 import { it } from "date-fns/locale";
@@ -12,7 +12,7 @@ import AttendanceInfoPopup from "./AttendanceInfoPopup";
 import { CourseQuickSelectDialog } from "./CourseQuickSelectDialog";
 import { generateMonthlyReport } from "./report-generator";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Users, FileDown, Filter, X, FilePlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Users, FileDown, Filter, X, FilePlus, PenLine } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
@@ -30,6 +30,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     // State
     const [currentDate, setCurrentDate] = useState(new Date());
     const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
+    const [corrections, setCorrections] = useState<AttendanceCorrection[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedTool, setSelectedTool] = useState<AttendanceStatus | 'delete' | null>(null);
 
@@ -58,13 +59,13 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         setIsLoading(true);
         try {
             const year = monthStart.getFullYear();
-            const month = monthStart.getMonth() + 1; // getMonth() is 0-indexed
-            console.log('🔄 Loading data for:', year, 'month', month);
-            const data = await attendanceApi.getByMonth(year, month);
-            console.log('📊 Loaded attendance data:', data);
-            const transfers = data.filter(a => a.status === 'transfer');
-            console.log('🚗 Transfer entries:', transfers);
+            const month = monthStart.getMonth() + 1;
+            const [data, corr] = await Promise.all([
+                attendanceApi.getByMonth(year, month),
+                correctionsApi.getByMonth(year, month),
+            ]);
             setAttendanceList(data);
+            setCorrections(corr);
         } catch (error) {
             console.error("Failed to load attendance:", error);
             toast.error("Errore nel caricamento delle presenze");
@@ -77,10 +78,50 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         loadData();
     }, [currentDate]);
 
+    // Merge corrections into attendance list: adjust hours or create virtual entries
+    const mergedAttendanceList = useMemo(() => {
+        if (corrections.length === 0) return attendanceList;
+
+        const result = attendanceList.map(a => ({ ...a }));
+
+        corrections.forEach(corr => {
+            const colId = corr.jobId || corr.warehouseId;
+            if (!colId) return;
+
+            // Use explicit job/warehouse matching to avoid undefined === undefined false matches
+            const idx = result.findIndex(a =>
+                a.workerId === corr.workerId &&
+                a.date === corr.date &&
+                (corr.jobId ? a.jobId === corr.jobId : a.warehouseId === corr.warehouseId) &&
+                (a.status === 'presence' || a.status === 'transfer')
+            );
+
+            if (idx >= 0) {
+                result[idx] = { ...result[idx], hours: result[idx].hours + corr.hoursDelta };
+            } else if (corr.hoursDelta !== 0) {
+                // Virtual entry: rettifica su cantiere/magazzino senza presenza base
+                result.push({
+                    id: `virtual_${corr.id}`,
+                    workerId: corr.workerId,
+                    jobId: corr.jobId,
+                    jobCode: corr.jobCode,
+                    jobName: corr.jobName,
+                    warehouseId: corr.warehouseId,
+                    warehouseName: corr.warehouseName,
+                    date: corr.date,
+                    hours: corr.hoursDelta,
+                    status: 'presence',
+                });
+            }
+        });
+
+        return result.filter(a => a.hours > 0);
+    }, [attendanceList, corrections]);
+
     // Transform Data for Grid: Map<WorkerId, Map<DateStr, Attendance[]>>
     const attendanceMap = useMemo(() => {
         const map: Record<string, Record<string, Attendance[]>> = {};
-        attendanceList.forEach(att => {
+        mergedAttendanceList.forEach(att => {
             if (!map[att.workerId]) {
                 map[att.workerId] = {};
             }
@@ -90,12 +131,12 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             map[att.workerId][att.date].push(att);
         });
         return map;
-    }, [attendanceList]);
+    }, [mergedAttendanceList]);
 
     // Get unique jobs that have attendance records this month
     const jobsInMonth = useMemo(() => {
         const jobMap = new Map<string, { id: string; code: string; name: string; description: string }>();
-        attendanceList.forEach(att => {
+        mergedAttendanceList.forEach(att => {
             if (att.jobId && att.jobCode) {
                 jobMap.set(att.jobId, {
                     id: att.jobId,
@@ -106,7 +147,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             }
         });
         return Array.from(jobMap.values()).sort((a, b) => a.code.localeCompare(b.code));
-    }, [attendanceList]);
+    }, [mergedAttendanceList]);
 
     // Filtered attendance map when job filter is active
     const filteredAttendanceMap = useMemo(() => {
@@ -347,7 +388,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
                     <Button
                         variant="outline"
-                        onClick={() => generateMonthlyReport(currentDate, initialWorkers, attendanceList)}
+                        onClick={() => generateMonthlyReport(currentDate, initialWorkers, mergedAttendanceList)}
                         className="gap-2"
                     >
                         <FileDown className="h-4 w-4" />
@@ -360,6 +401,15 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                             Richiesta Permesso
                         </Button>
                     </Link>
+
+                    {canEdit && (
+                        <Link href="/attendance/rettifica">
+                            <Button className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
+                                <PenLine className="h-4 w-4" />
+                                Rettifica Ore
+                            </Button>
+                        </Link>
+                    )}
 
                     {canEdit && (
                         <Button onClick={() => setIsBulkModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { attendanceApi, Attendance } from "@/lib/api";
-import { format, startOfMonth, endOfMonth, eachWeekOfInterval, startOfWeek, endOfWeek, addMonths, subMonths } from "date-fns";
+import { attendanceApi, correctionsApi, Attendance, AttendanceCorrection } from "@/lib/api";
+import { format, startOfMonth, endOfMonth, eachWeekOfInterval, endOfWeek, addMonths, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
 interface JobAttendanceProps {
@@ -22,14 +22,19 @@ interface WeeklyData {
 export function JobAttendance({ jobId }: JobAttendanceProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
+    const [corrections, setCorrections] = useState<AttendanceCorrection[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadData = async () => {
             try {
                 setLoading(true);
-                const data = await attendanceApi.getByJobId(jobId);
+                const [data, corr] = await Promise.all([
+                    attendanceApi.getByJobId(jobId),
+                    correctionsApi.getByJobId(jobId),
+                ]);
                 setAttendanceData(data);
+                setCorrections(corr);
             } catch (error) {
                 console.error("Error loading job attendance:", error);
             } finally {
@@ -40,29 +45,66 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
         loadData();
     }, [jobId]);
 
-    const handlePrevMonth = () => {
-        setCurrentMonth(subMonths(currentMonth, 1));
-    };
+    const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+    const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
 
-    const handleNextMonth = () => {
-        setCurrentMonth(addMonths(currentMonth, 1));
-    };
-
-    // Filter data for current month
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
 
-    const monthData = attendanceData.filter(att => {
+    // Merge corrections into attendance: adjust hours or add virtual entries
+    const mergedData = useMemo(() => {
+        const result = attendanceData.map(a => ({ ...a }));
+
+        corrections.forEach(corr => {
+            const idx = result.findIndex(a =>
+                a.workerId === corr.workerId &&
+                a.date === corr.date &&
+                (a.status === 'presence' || a.status === 'transfer')
+            );
+
+            if (idx >= 0) {
+                result[idx] = { ...result[idx], hours: Math.max(0, result[idx].hours + corr.hoursDelta) };
+            } else if (corr.hoursDelta > 0) {
+                // Virtual entry: correction for this job with no base attendance
+                result.push({
+                    id: `virtual_${corr.id}`,
+                    workerId: corr.workerId,
+                    workerName: corr.workerName,
+                    jobId: corr.jobId,
+                    date: corr.date,
+                    hours: corr.hoursDelta,
+                    status: 'presence',
+                });
+            }
+        });
+
+        return result.filter(a => a.hours > 0);
+    }, [attendanceData, corrections]);
+
+    // Worker names: from attendance + from corrections (which now include workerName via join)
+    const workerNameMap = useMemo(() => {
+        const map = new Map<string, string>();
+        attendanceData.forEach(a => {
+            if (a.workerId && a.workerName) map.set(a.workerId, a.workerName);
+        });
+        corrections.forEach(c => {
+            if (c.workerId && c.workerName) map.set(c.workerId, c.workerName);
+        });
+        return map;
+    }, [attendanceData, corrections]);
+
+    // Filter data for current month
+    const monthData = mergedData.filter(att => {
         const attDate = new Date(att.date);
         return attDate >= monthStart && attDate <= monthEnd;
     });
 
-    // Get unique workers
+    // Get unique workers (from merged data in this month)
     const workers = Array.from(
         new Map(
             monthData
-                .filter(att => att.workerId && att.workerName)
-                .map(att => [att.workerId, att.workerName!])
+                .filter(att => att.workerId)
+                .map(att => [att.workerId, att.workerName || workerNameMap.get(att.workerId) || att.workerId])
         ).entries()
     ).map(([id, name]) => ({ id, name }));
 
