@@ -2,71 +2,49 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Loader2, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Recycle } from "lucide-react";
+import {
+    ArrowLeft,
+    Save,
+    Loader2,
+    ArrowDownRight,
+    ArrowUpRight,
+    ShoppingBag,
+    Recycle,
+} from "lucide-react";
 import Link from "next/link";
 import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { useMovementForm } from "@/hooks/useMovementForm";
 
-// Sub-components
 import { MovementHeader } from "./form/MovementHeader";
 import { MovementJobSelector } from "./form/MovementJobSelector";
-import { MovementLinesInput } from "./form/MovementLinesInput";
-import { MovementLinesList } from "./form/MovementLinesList";
 import { MovementFooter } from "./form/MovementFooter";
-import { MovementJobInventory } from "./form/MovementJobInventory";
-import { NotesAssistant } from "@/components/load-notes/NotesAssistant";
-import { LoadNoteItem } from "@/lib/types";
-import { useState } from "react";
+import { MovementInlineTable } from "./form/MovementInlineTable";
 
 interface NewMovementContentProps {
     initialInventory: InventoryItem[];
     initialJobs: Job[];
-    initialNote?: DeliveryNote; // Optional: if provided, we're in edit mode
+    initialNote?: DeliveryNote;
 }
 
-export default function NewMovementContent({ initialInventory, initialJobs, initialNote }: NewMovementContentProps) {
+export default function NewMovementContent({
+    initialInventory,
+    initialJobs,
+    initialNote,
+}: NewMovementContentProps) {
     const { userRole } = useAuth();
-    const [isNotesAssistantOpen, setIsNotesAssistantOpen] = useState(false);
-
     const form = useMovementForm({ initialInventory, initialJobs, initialNote });
 
-    // Handler when user selects an item from Notes Assistant
-    const handleUseNoteItem = async (item: LoadNoteItem) => {
-        // First try to find the item in local inventory cache
-        let inventoryItem = form.inventory.find(inv => inv.id === item.inventoryId);
-
-        // If not found locally, fetch from API
-        if (!inventoryItem && item.inventoryId) {
-            try {
-                const { inventoryApi } = await import("@/lib/api");
-                const fetchedItem = await inventoryApi.getById(item.inventoryId);
-                if (fetchedItem) {
-                    inventoryItem = fetchedItem;
-                }
-            } catch (error) {
-                console.error("Failed to fetch inventory item", error);
-            }
-        }
-
-        if (inventoryItem) {
-            form.handleItemSelect(inventoryItem);
-            // Pre-fill quantity from note
-            form.setCurrentLine(prev => ({
-                ...prev,
-                pieces: item.pieces?.toString() || '',
-                quantity: item.quantity?.toString() || ''
-            }));
-        } else {
-            console.warn("Could not find inventory item for", item.inventoryId);
-        }
-    };
-
-    if (userRole === 'user') {
+    if (userRole === "user") {
         return (
             <div className="flex flex-col items-center justify-center h-full py-20">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Accesso Negato</h2>
-                <p className="text-slate-500 dark:text-slate-400 mb-6">Non hai i permessi necessari per {form.isEditing ? 'modificare' : 'creare nuovi'} movimenti.</p>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                    Accesso Negato
+                </h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">
+                    Non hai i permessi necessari per{" "}
+                    {form.isEditing ? "modificare" : "creare nuovi"} movimenti.
+                </p>
                 <Link href="/movements">
                     <Button variant="outline">
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -77,9 +55,13 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
         );
     }
 
+    const completedLines = form.lines.filter((l) => l.itemId && l.quantity);
+    const totalPieces = completedLines.reduce((acc, l) => acc + (parseFloat(l.pieces) || 0), 0);
+    const totalQty = completedLines.reduce((acc, l) => acc + (parseFloat(l.quantity) || 0), 0);
+
     return (
         <div className="space-y-6 pb-20 max-w-5xl mx-auto">
-            {/* Header / Actions */}
+            {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                     <Link href="/movements">
@@ -88,41 +70,63 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                         </Button>
                     </Link>
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        {form.isEditing ? 'Modifica Movimento' : 'Nuovo Movimento'}
+                        {form.isEditing ? "Modifica Movimento" : "Nuovo Movimento"}
                     </h1>
                 </div>
-                <Button onClick={form.handleSubmit} disabled={form.loading} className="bg-[#003366] hover:bg-[#002244]">
-                    {form.loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    {form.isEditing ? 'Salva Modifiche' : 'Salva Documento'}
+                <Button
+                    onClick={form.handleSubmit}
+                    disabled={form.loading}
+                    className="bg-[#003366] hover:bg-[#002244]"
+                >
+                    {form.loading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                    )}
+                    {form.isEditing ? "Salva Modifiche" : "Salva Documento"}
                 </Button>
             </div>
 
-            {/* Tabs - Type Selection */}
-            <Tabs value={form.activeTab} onValueChange={(v: any) => form.setActiveTab(v)} className="w-full">
+            {/* Type Tabs */}
+            <Tabs
+                value={form.activeTab}
+                onValueChange={(v: any) => form.setActiveTab(v)}
+                className="w-full"
+            >
                 <TabsList className="grid w-full grid-cols-4 mb-6">
-                    <TabsTrigger value="entry" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800">
+                    <TabsTrigger
+                        value="entry"
+                        className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
+                    >
                         <ArrowDownRight className="mr-2 h-4 w-4" />
                         Entrata / Reso
                     </TabsTrigger>
-                    <TabsTrigger value="exit" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800">
+                    <TabsTrigger
+                        value="exit"
+                        className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800"
+                    >
                         <ArrowUpRight className="mr-2 h-4 w-4" />
                         Uscita
                     </TabsTrigger>
-                    <TabsTrigger value="sale" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800">
+                    <TabsTrigger
+                        value="sale"
+                        className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800"
+                    >
                         <ShoppingBag className="mr-2 h-4 w-4" />
                         Vendita
                     </TabsTrigger>
-                    <TabsTrigger value="waste" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800">
+                    <TabsTrigger
+                        value="waste"
+                        className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800"
+                    >
                         <Recycle className="mr-2 h-4 w-4" />
                         Immondizie
                     </TabsTrigger>
                 </TabsList>
 
-                {/* Main Form */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column: Header Info */}
+                    {/* Left Column */}
                     <div className="lg:col-span-2 space-y-6">
-
                         <MovementHeader
                             numberPart={form.numberPart}
                             setNumberPart={form.setNumberPart}
@@ -148,47 +152,20 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                             />
                         </MovementHeader>
 
-                        {/* Entry Mode: Return from Job Specifics */}
-                        {form.activeTab === 'entry' && form.selectedJob && (
-                            <MovementJobInventory
-                                jobBatchAvailability={form.jobBatchAvailability}
-                                onSelectBatch={form.handleSelectReturnBatch}
-                            />
-                        )}
-
-                        <MovementLinesInput
-                            currentLine={form.currentLine}
-                            setCurrentLine={form.setCurrentLine}
-                            selectedItem={form.selectedItemForLine}
-                            onItemSelect={form.handleItemSelect}
-                            onAddLine={form.handleAddLine}
-                            availableBatches={form.availableBatches}
-                            activeTab={form.activeTab}
-                            isItemSelectorOpen={form.isItemSelectorOpen}
-                            setIsItemSelectorOpen={form.setIsItemSelectorOpen}
-                            inventory={form.inventory}
-                            onItemSearch={form.handleItemSearch}
-                            itemsLoading={form.itemsLoading}
-                            headerActions={
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                                    onClick={() => setIsNotesAssistantOpen(true)}
-                                >
-                                    <FileText className="h-3 w-3 mr-1" />
-                                    Assistente Note
-                                </Button>
-                            }
-                        />
-
-                        {/* Lines List */}
-                        <MovementLinesList
+                        <MovementInlineTable
                             lines={form.lines}
-                            onRemove={form.removeLine}
+                            activeTab={form.activeTab}
+                            selectedJob={form.selectedJob}
+                            jobBatchAvailability={form.jobBatchAvailability}
+                            inventory={form.inventory}
+                            itemsLoading={form.itemsLoading}
+                            onItemSearch={form.handleItemSearch}
+                            onItemSelect={form.handleInlineItemSelect}
+                            onReturnBatchSelect={form.handleInlineReturnBatchSelect}
+                            onLineChange={form.handleInlineLineChange}
+                            onRemove={form.handleInlineLineRemove}
                         />
 
-                        {/* Footer Fields */}
                         <MovementFooter
                             transportMean={form.transportMean}
                             setTransportMean={form.setTransportMean}
@@ -200,44 +177,23 @@ export default function NewMovementContent({ initialInventory, initialJobs, init
                             setPackagesCount={form.setPackagesCount}
                             notes={form.notes}
                             setNotes={form.setNotes}
-                            linesCount={form.lines.length}
+                            linesCount={completedLines.length}
                         />
-
                     </div>
 
-                    {/* Right Column: Calculations / Summary (Optional - maybe move footer here later?) */}
-                    {/* Currently empty or could have summaries. For now keeping structure as before where right column was part of grid but effectively empty or layout purposes? 
-                       Wait, original had grid-cols-1 lg:grid-cols-3. 
-                       Left column was lg:col-span-2. 
-                       What was in the right column? 
-                       Nothing! 
-                       Ah check line 501: `grid grid-cols-1 lg:grid-cols-3 gap-6`.
-                       Line 503: `lg:col-span-2 space-y-6`.
-                       Then all cards were inside this div.
-                       Where is the 3rd column?
-                       It seems it was empty in the original code too? Or maybe I missed it.
-                       Let's check the original file again if unsure. 
-                       I will stick to the same layout.
-                    */}
+                    {/* Right Column - Summary */}
                     <div className="space-y-6">
-                        {/* Riepilogo */}
                         <div className="bg-slate-50 dark:bg-muted p-4 rounded-lg border dark:border-border text-sm text-slate-500 dark:text-slate-400">
-                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Riepilogo</h4>
-                            <p>Righe inserite: {form.lines.length}</p>
-                            <p>Pezzi totali: {form.lines.reduce((acc, l) => acc + (l.pieces || 0), 0)}</p>
-                            <p>Quantità totale: {form.lines.reduce((acc, l) => acc + l.quantity, 0)}</p>
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">
+                                Riepilogo
+                            </h4>
+                            <p>Righe inserite: {completedLines.length}</p>
+                            <p>Pezzi totali: {totalPieces.toFixed(2)}</p>
+                            <p>Quantità totale: {totalQty.toFixed(2)}</p>
                         </div>
                     </div>
                 </div>
             </Tabs>
-
-            {/* Notes Assistant Sheet */}
-            <NotesAssistant
-                isOpen={isNotesAssistantOpen}
-                onClose={() => setIsNotesAssistantOpen(false)}
-                currentJobId={form.selectedJob?.id}
-                onUseItem={handleUseNoteItem}
-            />
         </div>
     );
 }

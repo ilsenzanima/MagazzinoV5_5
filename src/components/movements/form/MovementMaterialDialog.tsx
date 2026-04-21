@@ -1,0 +1,594 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+    Search,
+    Loader2,
+    Package,
+    FileText,
+    ArrowUpRight,
+    ArrowDownRight,
+    PlusCircle,
+    ChevronDown,
+    ChevronRight,
+} from "lucide-react";
+import { InventoryItem, Job, LoadNote, LoadNoteItem } from "@/lib/types";
+import { loadNotesService } from "@/lib/services/load-notes";
+import { inventoryApi } from "@/lib/services/inventory";
+import { format } from "date-fns";
+import { it } from "date-fns/locale";
+
+interface MovementMaterialDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    rowId: string;
+    activeTab: "entry" | "exit" | "sale" | "waste";
+    selectedJob?: Job | null;
+    jobBatchAvailability: any[];
+    inventory: InventoryItem[];
+    itemsLoading: boolean;
+    onItemSearch: (term: string) => Promise<void>;
+    onItemSelect: (
+        rowId: string,
+        item: InventoryItem,
+        prefill?: { pieces?: string; quantity?: string }
+    ) => void;
+    onReturnBatchSelect: (
+        rowId: string,
+        batch: any,
+        prefill?: { pieces?: string; quantity?: string }
+    ) => void;
+}
+
+export function MovementMaterialDialog({
+    open,
+    onOpenChange,
+    rowId,
+    activeTab,
+    selectedJob,
+    jobBatchAvailability,
+    inventory,
+    itemsLoading,
+    onItemSearch,
+    onItemSelect,
+    onReturnBatchSelect,
+}: MovementMaterialDialogProps) {
+    const isEntryWithJob = activeTab === "entry" && !!selectedJob;
+    const defaultDialogTab = isEntryWithJob ? "cantiere" : "magazzino";
+
+    const [dialogTab, setDialogTab] = useState(defaultDialogTab);
+    const [searchTerm, setSearchTerm] = useState("");
+
+    const [notes, setNotes] = useState<LoadNote[]>([]);
+    const [notesLoading, setNotesLoading] = useState(false);
+    const [expandedNoteIds, setExpandedNoteIds] = useState<Set<string>>(new Set());
+    const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+    const [noteItemLoading, setNoteItemLoading] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (open) {
+            setDialogTab(isEntryWithJob ? "cantiere" : "magazzino");
+            setSearchTerm("");
+        }
+    }, [open, isEntryWithJob]);
+
+    useEffect(() => {
+        if (open && dialogTab === "note") {
+            fetchNotes();
+        }
+    }, [open, dialogTab, selectedJob?.id]);
+
+    // Debounced search for Magazzino tab
+    useEffect(() => {
+        if (dialogTab !== "magazzino") return;
+        const handler = setTimeout(() => {
+            onItemSearch(searchTerm);
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm, dialogTab, onItemSearch]);
+
+    const fetchNotes = async () => {
+        setNotesLoading(true);
+        try {
+            const allNotes = await loadNotesService.getAll({
+                status: "pending",
+                jobId: selectedJob?.id,
+            });
+            setNotes(
+                allNotes.sort((a, b) => {
+                    const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+                    if (dateDiff !== 0) return dateDiff;
+                    return (a.jobDescription || "").localeCompare(b.jobDescription || "");
+                })
+            );
+        } catch (error) {
+            console.error("Failed to fetch notes", error);
+        } finally {
+            setNotesLoading(false);
+        }
+    };
+
+    const filteredBatches = useMemo(() => {
+        const sorted = [...jobBatchAvailability].sort((a, b) =>
+            a.itemName.localeCompare(b.itemName)
+        );
+        if (!searchTerm.trim()) return sorted;
+        const words = searchTerm.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
+        return sorted.filter((b) => {
+            const target = `${b.itemName} ${b.itemCode} ${b.itemModel || ""}`.toLowerCase();
+            return words.every((w) => target.includes(w));
+        });
+    }, [jobBatchAvailability, searchTerm]);
+
+    const handleSelectBatch = (batch: any) => {
+        onReturnBatchSelect(rowId, batch);
+        onOpenChange(false);
+    };
+
+    const handleSelectItem = (item: InventoryItem) => {
+        onItemSelect(rowId, item);
+        onOpenChange(false);
+    };
+
+    const handleUseNoteItem = async (noteItem: LoadNoteItem) => {
+        setNoteItemLoading(noteItem.id);
+        try {
+            let inventoryItem = inventory.find((inv) => inv.id === noteItem.inventoryId);
+            if (!inventoryItem && noteItem.inventoryId) {
+                inventoryItem = await inventoryApi.getById(noteItem.inventoryId);
+            }
+            if (!inventoryItem) return;
+
+            const prefill = {
+                pieces: noteItem.pieces?.toString(),
+                quantity: noteItem.quantity?.toString(),
+            };
+
+            if (isEntryWithJob) {
+                const matchingBatch = jobBatchAvailability.find(
+                    (b) => b.itemId === inventoryItem!.id
+                );
+                if (matchingBatch) {
+                    onReturnBatchSelect(rowId, matchingBatch, prefill);
+                    onOpenChange(false);
+                    return;
+                }
+            }
+
+            onItemSelect(rowId, inventoryItem, prefill);
+            onOpenChange(false);
+        } catch (error) {
+            console.error("Failed to use note item", error);
+        } finally {
+            setNoteItemLoading(null);
+        }
+    };
+
+    const toggleCheck = async (noteId: string, itemId: string) => {
+        const isChecked = checkedItems.has(itemId);
+        const next = new Set(checkedItems);
+        isChecked ? next.delete(itemId) : next.add(itemId);
+        setCheckedItems(next);
+        try {
+            await loadNotesService.toggleItemCheck(noteId, itemId, !isChecked);
+        } catch (error) {
+            console.error("Failed to toggle item check", error);
+        }
+    };
+
+    const toggleExpanded = (noteId: string) => {
+        const next = new Set(expandedNoteIds);
+        next.has(noteId) ? next.delete(noteId) : next.add(noteId);
+        setExpandedNoteIds(next);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
+                    <DialogTitle>Seleziona Materiale</DialogTitle>
+                </DialogHeader>
+
+                <Tabs
+                    value={dialogTab}
+                    onValueChange={setDialogTab}
+                    className="flex flex-col flex-1 overflow-hidden"
+                >
+                    <div className="px-6 pt-4 shrink-0">
+                        <TabsList className="w-full">
+                            {isEntryWithJob ? (
+                                <>
+                                    <TabsTrigger value="cantiere" className="flex-1">
+                                        <Package className="h-4 w-4 mr-2" />
+                                        In Cantiere
+                                    </TabsTrigger>
+                                    <TabsTrigger value="note" className="flex-1">
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Note di Carico
+                                    </TabsTrigger>
+                                </>
+                            ) : (
+                                <>
+                                    <TabsTrigger value="magazzino" className="flex-1">
+                                        <Search className="h-4 w-4 mr-2" />
+                                        Magazzino
+                                    </TabsTrigger>
+                                    <TabsTrigger value="note" className="flex-1">
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Note di Carico
+                                    </TabsTrigger>
+                                </>
+                            )}
+                        </TabsList>
+                    </div>
+
+                    {/* ---- IN CANTIERE (entry + job) ---- */}
+                    {isEntryWithJob && (
+                        <TabsContent
+                            value="cantiere"
+                            className="flex-1 overflow-hidden flex flex-col px-6 pb-6 mt-4"
+                        >
+                            <Input
+                                placeholder="Cerca per nome o codice..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                autoFocus
+                                className="mb-3 shrink-0"
+                            />
+                            <div className="flex-1 overflow-y-auto border rounded-md">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Articolo</TableHead>
+                                            <TableHead>Rif. Acquisto</TableHead>
+                                            <TableHead className="text-right">In Cantiere</TableHead>
+                                            <TableHead className="w-[90px]"></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredBatches.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={4}
+                                                    className="text-center py-8 text-muted-foreground"
+                                                >
+                                                    <Package className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                                                    <p className="text-sm">Nessun articolo trovato</p>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            filteredBatches.map((batch, idx) => (
+                                                <TableRow
+                                                    key={idx}
+                                                    className="cursor-pointer hover:bg-muted/50"
+                                                    onClick={() => handleSelectBatch(batch)}
+                                                >
+                                                    <TableCell className="py-2">
+                                                        <div className="text-sm font-medium">
+                                                            {batch.itemName}
+                                                            {batch.itemModel && (
+                                                                <span className="text-muted-foreground font-normal ml-1">
+                                                                    ({batch.itemModel})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[10px] text-muted-foreground font-mono">
+                                                            {batch.itemCode}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="py-2 text-xs text-muted-foreground">
+                                                        <div>{batch.purchaseRef || "-"}</div>
+                                                        {batch.purchaseDate && (
+                                                            <div className="text-[10px]">
+                                                                (
+                                                                {new Date(batch.purchaseDate).toLocaleDateString(
+                                                                    "it-IT"
+                                                                )}
+                                                                )
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="py-2 text-right">
+                                                        <div className="text-sm font-bold">
+                                                            {batch.quantity} {batch.itemUnit}
+                                                        </div>
+                                                        {batch.pieces != null && (
+                                                            <div className="text-[10px] text-muted-foreground">
+                                                                {batch.pieces} pz
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="py-2 text-center">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="secondary"
+                                                            className="h-7 text-xs"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSelectBatch(batch);
+                                                            }}
+                                                        >
+                                                            Seleziona
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </TabsContent>
+                    )}
+
+                    {/* ---- MAGAZZINO (non-entry) ---- */}
+                    {!isEntryWithJob && (
+                        <TabsContent
+                            value="magazzino"
+                            className="flex-1 overflow-hidden flex flex-col px-6 pb-6 mt-4"
+                        >
+                            <div className="relative mb-3 shrink-0">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Cerca per codice, nome, variante, marca..."
+                                    className="pl-9"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex-1 overflow-y-auto border rounded-md">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Codice</TableHead>
+                                            <TableHead>Descrizione</TableHead>
+                                            <TableHead className="text-right">Giacenza</TableHead>
+                                            <TableHead className="w-[50px]"></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {itemsLoading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="text-center py-8">
+                                                    <Loader2 className="h-6 w-6 mx-auto animate-spin text-muted-foreground" />
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : inventory.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={4}
+                                                    className="text-center py-8 text-muted-foreground"
+                                                >
+                                                    <Package className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                                                    <p className="text-sm">Nessun articolo trovato</p>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            inventory.map((item) => (
+                                                <TableRow
+                                                    key={item.id}
+                                                    className="cursor-pointer hover:bg-muted/50"
+                                                    onClick={() => handleSelectItem(item)}
+                                                >
+                                                    <TableCell className="font-mono text-xs py-2">
+                                                        {item.code}
+                                                    </TableCell>
+                                                    <TableCell className="py-2">
+                                                        <div className="font-medium text-sm">
+                                                            {item.name}
+                                                            {item.model && (
+                                                                <span className="text-muted-foreground font-normal ml-1">
+                                                                    ({item.model})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {item.brand}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right py-2">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                item.quantity <= 0
+                                                                    ? "text-red-600 border-red-200"
+                                                                    : item.quantity <= item.minStock
+                                                                    ? "text-amber-600 border-amber-200"
+                                                                    : ""
+                                                            }
+                                                        >
+                                                            {item.quantity} {item.unit}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="py-2 text-center">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-7 w-7 p-0"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSelectItem(item);
+                                                            }}
+                                                        >
+                                                            <PlusCircle className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </TabsContent>
+                    )}
+
+                    {/* ---- NOTE DI CARICO ---- */}
+                    <TabsContent
+                        value="note"
+                        className="flex-1 overflow-hidden flex flex-col px-6 pb-6 mt-4"
+                    >
+                        {notesLoading ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : notes.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                                <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                                <p className="text-sm">Nessuna nota attiva trovata</p>
+                                {selectedJob && (
+                                    <p className="text-xs mt-1 text-muted-foreground">
+                                        Filtrate per commessa selezionata
+                                    </p>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {notes.map((note) => {
+                                    const isExpanded = expandedNoteIds.has(note.id);
+                                    const uncheckedCount = note.items.filter(
+                                        (i) => !checkedItems.has(i.id) && !i.isChecked
+                                    ).length;
+
+                                    return (
+                                        <Collapsible
+                                            key={note.id}
+                                            open={isExpanded}
+                                            onOpenChange={() => toggleExpanded(note.id)}
+                                        >
+                                            <CollapsibleTrigger asChild>
+                                                <div className="flex items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors">
+                                                    <div
+                                                        className={`flex-shrink-0 p-1.5 rounded ${
+                                                            note.noteType === "uscita"
+                                                                ? "bg-amber-500/10 text-amber-600"
+                                                                : "bg-green-500/10 text-green-600"
+                                                        }`}
+                                                    >
+                                                        {note.noteType === "uscita" ? (
+                                                            <ArrowUpRight className="h-4 w-4" />
+                                                        ) : (
+                                                            <ArrowDownRight className="h-4 w-4" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {format(new Date(note.date), "d MMM", {
+                                                                    locale: it,
+                                                                })}
+                                                            </span>
+                                                            {uncheckedCount > 0 && (
+                                                                <Badge
+                                                                    variant="secondary"
+                                                                    className="text-[10px] px-1.5 py-0"
+                                                                >
+                                                                    {uncheckedCount}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="font-medium text-sm truncate">
+                                                            {note.jobDescription ||
+                                                                note.notes ||
+                                                                "Appunto generico"}
+                                                        </div>
+                                                    </div>
+                                                    {isExpanded ? (
+                                                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                    ) : (
+                                                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                    )}
+                                                </div>
+                                            </CollapsibleTrigger>
+
+                                            <CollapsibleContent>
+                                                <div className="ml-4 pl-4 border-l-2 border-muted mt-1 space-y-1">
+                                                    {note.notes && (
+                                                        <div className="text-xs italic text-muted-foreground py-1 px-2">
+                                                            "{note.notes}"
+                                                        </div>
+                                                    )}
+                                                    {note.items.map((item) => {
+                                                        const isChecked =
+                                                            checkedItems.has(item.id) || item.isChecked;
+                                                        const isLoading = noteItemLoading === item.id;
+                                                        return (
+                                                            <div
+                                                                key={item.id}
+                                                                className={`flex items-center gap-2 p-2 rounded border text-sm transition-colors ${
+                                                                    isChecked
+                                                                        ? "bg-muted/30 border-transparent opacity-60"
+                                                                        : "bg-background hover:border-primary/50"
+                                                                }`}
+                                                            >
+                                                                <Checkbox
+                                                                    checked={isChecked}
+                                                                    onCheckedChange={() =>
+                                                                        toggleCheck(note.id, item.id)
+                                                                    }
+                                                                />
+                                                                <div
+                                                                    className={`flex-1 min-w-0 ${
+                                                                        isChecked
+                                                                            ? "line-through text-muted-foreground"
+                                                                            : ""
+                                                                    }`}
+                                                                >
+                                                                    <span className="font-medium">
+                                                                        {item.inventoryName}
+                                                                    </span>
+                                                                    {item.inventoryModel && (
+                                                                        <span className="text-xs text-muted-foreground ml-1">
+                                                                            ({item.inventoryModel})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div
+                                                                    className={`text-xs font-semibold whitespace-nowrap ${
+                                                                        isChecked ? "text-muted-foreground" : ""
+                                                                    }`}
+                                                                >
+                                                                    {item.quantity} {item.inventoryUnit}
+                                                                </div>
+                                                                {!isChecked && (
+                                                                    <Button
+                                                                        size="icon"
+                                                                        variant="ghost"
+                                                                        className="h-7 w-7 text-primary flex-shrink-0"
+                                                                        title="Usa in DDT"
+                                                                        disabled={isLoading}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleUseNoteItem(item);
+                                                                        }}
+                                                                    >
+                                                                        {isLoading ? (
+                                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                                        ) : (
+                                                                            <PlusCircle className="h-4 w-4" />
+                                                                        )}
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </CollapsibleContent>
+                                        </Collapsible>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </TabsContent>
+                </Tabs>
+            </DialogContent>
+        </Dialog>
+    );
+}
