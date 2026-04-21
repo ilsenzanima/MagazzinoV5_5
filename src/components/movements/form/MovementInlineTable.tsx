@@ -193,25 +193,65 @@ export function MovementInlineTable({
                                                                 </SelectContent>
                                                             </Select>
                                                         )
-                                                    ) : activeTab === "entry" && line.purchaseRef ? (
-                                                        <div className="space-y-0.5">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="text-[10px] font-mono"
+                                                    ) : activeTab === "entry" && line.itemId ? (
+                                                        line.availableBatches.length > 1 ? (
+                                                            <Select
+                                                                value={line.purchaseItemId || ""}
+                                                                onValueChange={(v) =>
+                                                                    onLineChange(
+                                                                        line.tempId,
+                                                                        "purchaseItemId",
+                                                                        v
+                                                                    )
+                                                                }
                                                             >
-                                                                {line.purchaseRef}
-                                                            </Badge>
-                                                            {cantiereBatch && (
-                                                                <div className="text-[10px] text-muted-foreground leading-none">
-                                                                    {cantiereBatch.remainingPieces != null
-                                                                        ? `${cantiereBatch.remainingPieces} pz`
-                                                                        : ""}{" "}
-                                                                    {cantiereBatch.remainingQty != null
-                                                                        ? `/ ${cantiereBatch.remainingQty} ${line.itemUnit}`
-                                                                        : ""}
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                                <SelectTrigger className="h-8 text-xs">
+                                                                    <SelectValue placeholder="Seleziona lotto..." />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {line.availableBatches.map((batch) => (
+                                                                        <SelectItem
+                                                                            key={batch.id}
+                                                                            value={batch.id}
+                                                                        >
+                                                                            <span className="font-medium">
+                                                                                {batch.purchaseRef || "Nessun Rif."}
+                                                                            </span>
+                                                                            <span className="text-muted-foreground ml-1 text-xs">
+                                                                                {" "}—{" "}
+                                                                                {batch.remainingPieces != null
+                                                                                    ? `${batch.remainingPieces} pz / `
+                                                                                    : ""}
+                                                                                {batch.remainingQty != null
+                                                                                    ? `${batch.remainingQty} ${line.itemUnit}`
+                                                                                    : ""}
+                                                                            </span>
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        ) : line.purchaseRef ? (
+                                                            <div className="space-y-0.5">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="text-[10px] font-mono"
+                                                                >
+                                                                    {line.purchaseRef}
+                                                                </Badge>
+                                                                {cantiereBatch && (
+                                                                    <div className="text-[10px] text-muted-foreground leading-none">
+                                                                        {cantiereBatch.remainingPieces != null
+                                                                            ? `${cantiereBatch.remainingPieces} pz`
+                                                                            : ""}{" "}
+                                                                        {cantiereBatch.remainingQty != null
+                                                                            ? `/ ${cantiereBatch.remainingQty} ${line.itemUnit}`
+                                                                            : ""}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground text-xs">—</span>
+                                                        )
                                                     ) : (
                                                         <span className="text-muted-foreground text-xs">—</span>
                                                     )}
