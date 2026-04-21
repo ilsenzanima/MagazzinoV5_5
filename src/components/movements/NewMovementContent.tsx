@@ -164,6 +164,7 @@ export default function NewMovementContent({
                             onReturnBatchSelect={form.handleInlineReturnBatchSelect}
                             onLineChange={form.handleInlineLineChange}
                             onRemove={form.handleInlineLineRemove}
+                            onDuplicate={form.handleInlineLineDuplicate}
                         />
 
                         <MovementFooter

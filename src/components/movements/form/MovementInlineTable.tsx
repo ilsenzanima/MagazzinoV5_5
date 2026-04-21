@@ -21,7 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Search, Loader2, Trash2, Package } from "lucide-react";
+import { Search, Loader2, Trash2, Package, Copy } from "lucide-react";
 import { format } from "date-fns";
 import { MovementLine } from "@/hooks/useMovementForm";
 import { InventoryItem, Job } from "@/lib/types";
@@ -47,6 +47,7 @@ interface MovementInlineTableProps {
     ) => void;
     onLineChange: (rowId: string, field: string, value: any) => void;
     onRemove: (rowId: string) => void;
+    onDuplicate: (rowId: string) => void;
 }
 
 export function MovementInlineTable({
@@ -61,6 +62,7 @@ export function MovementInlineTable({
     onReturnBatchSelect,
     onLineChange,
     onRemove,
+    onDuplicate,
 }: MovementInlineTableProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [activeRowId, setActiveRowId] = useState<string>("");
@@ -82,7 +84,7 @@ export function MovementInlineTable({
                         <Package className="h-4 w-4" />
                         Righe Documento
                         <span className="text-xs font-normal text-muted-foreground ml-1">
-                            — clicca sulla riga materiale per cercare
+                            — clicca sulla cella materiale per cercare
                         </span>
                     </CardTitle>
                 </CardHeader>
@@ -93,7 +95,7 @@ export function MovementInlineTable({
                                 <TableRow>
                                     <TableHead className="min-w-[160px]">Materiale</TableHead>
                                     {showLotto && (
-                                        <TableHead className="min-w-[150px]">Lotto</TableHead>
+                                        <TableHead className="min-w-[160px]">Lotto</TableHead>
                                     )}
                                     {showFittizio && (
                                         <TableHead className="w-[72px] text-center">Fittizio</TableHead>
@@ -101,13 +103,17 @@ export function MovementInlineTable({
                                     <TableHead className="w-[88px] text-center">Pezzi</TableHead>
                                     <TableHead className="w-[100px] text-center">Quantità</TableHead>
                                     <TableHead className="w-[44px] text-center">U.M.</TableHead>
-                                    <TableHead className="w-[44px]"></TableHead>
+                                    {/* Actions: dividi + elimina */}
+                                    <TableHead className="w-[72px]"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {lines.map((line, index) => {
                                     const isLast = index === lines.length - 1;
                                     const isEmpty = !line.itemId;
+
+                                    // Cantiere batch info for entry lotto badge
+                                    const cantiereBatch = line.availableBatches[0];
 
                                     return (
                                         <TableRow key={line.tempId} className="group">
@@ -144,60 +150,70 @@ export function MovementInlineTable({
                                                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                                     ) : (activeTab === "exit" || activeTab === "sale") &&
                                                       line.itemId ? (
-                                                        <div className="space-y-1">
-                                                            {line.availableBatches.length === 0 ? (
-                                                                <span className="text-xs text-amber-600">
-                                                                    Nessun lotto — usa Fittizio
-                                                                </span>
-                                                            ) : (
-                                                                <Select
-                                                                    value={line.purchaseItemId || ""}
-                                                                    onValueChange={(v) =>
-                                                                        onLineChange(
-                                                                            line.tempId,
-                                                                            "purchaseItemId",
-                                                                            v
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <SelectTrigger className="h-8 text-xs">
-                                                                        <SelectValue placeholder="Seleziona lotto..." />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent>
-                                                                        {line.availableBatches.map((batch) => (
-                                                                            <SelectItem
-                                                                                key={batch.id}
-                                                                                value={batch.id}
-                                                                            >
-                                                                                <span className="font-medium">
-                                                                                    {batch.purchaseRef ||
-                                                                                        "Nessun Rif."}
-                                                                                </span>
-                                                                                <span className="text-muted-foreground ml-1">
-                                                                                    — Pz:{" "}
-                                                                                    {batch.remainingPieces ??
-                                                                                        batch.remainingQty}{" "}
-                                                                                    / {batch.remainingQty}
-                                                                                    {batch.date &&
-                                                                                        ` (${format(new Date(batch.date), "dd/MM/yy")})`}
-                                                                                </span>
-                                                                            </SelectItem>
-                                                                        ))}
-                                                                    </SelectContent>
-                                                                </Select>
+                                                        line.availableBatches.length === 0 ? (
+                                                            <span className="text-xs text-amber-600">
+                                                                Nessun lotto — usa Fittizio
+                                                            </span>
+                                                        ) : (
+                                                            <Select
+                                                                value={line.purchaseItemId || ""}
+                                                                onValueChange={(v) =>
+                                                                    onLineChange(
+                                                                        line.tempId,
+                                                                        "purchaseItemId",
+                                                                        v
+                                                                    )
+                                                                }
+                                                            >
+                                                                <SelectTrigger className="h-8 text-xs">
+                                                                    <SelectValue placeholder="Seleziona lotto..." />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {line.availableBatches.map((batch) => (
+                                                                        <SelectItem
+                                                                            key={batch.id}
+                                                                            value={batch.id}
+                                                                        >
+                                                                            <span className="font-medium">
+                                                                                {batch.purchaseRef || "Nessun Rif."}
+                                                                            </span>
+                                                                            <span className="text-muted-foreground ml-1 text-xs">
+                                                                                {" "}— Pz:{" "}
+                                                                                {batch.remainingPieces ??
+                                                                                    batch.remainingQty}
+                                                                                {" "}/ {batch.remainingQty}
+                                                                                {batch.date &&
+                                                                                    ` (${format(
+                                                                                        new Date(batch.date),
+                                                                                        "dd/MM/yy"
+                                                                                    )})`}
+                                                                            </span>
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        )
+                                                    ) : activeTab === "entry" && line.purchaseRef ? (
+                                                        <div className="space-y-0.5">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[10px] font-mono"
+                                                            >
+                                                                {line.purchaseRef}
+                                                            </Badge>
+                                                            {cantiereBatch && (
+                                                                <div className="text-[10px] text-muted-foreground leading-none">
+                                                                    {cantiereBatch.remainingPieces != null
+                                                                        ? `${cantiereBatch.remainingPieces} pz`
+                                                                        : ""}{" "}
+                                                                    {cantiereBatch.remainingQty != null
+                                                                        ? `/ ${cantiereBatch.remainingQty} ${line.itemUnit}`
+                                                                        : ""}
+                                                                </div>
                                                             )}
                                                         </div>
-                                                    ) : activeTab === "entry" && line.purchaseRef ? (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-[10px] font-mono"
-                                                        >
-                                                            {line.purchaseRef}
-                                                        </Badge>
                                                     ) : (
-                                                        <span className="text-muted-foreground text-xs">
-                                                            —
-                                                        </span>
+                                                        <span className="text-muted-foreground text-xs">—</span>
                                                     )}
                                                 </TableCell>
                                             )}
@@ -265,21 +281,40 @@ export function MovementInlineTable({
                                                 </span>
                                             </TableCell>
 
-                                            {/* Delete */}
+                                            {/* Actions: Dividi + Elimina */}
                                             <TableCell className="py-1 px-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => onRemove(line.tempId)}
-                                                    className={`h-7 w-7 transition-opacity ${
-                                                        isLast && isEmpty
-                                                            ? "opacity-0 pointer-events-none"
-                                                            : "text-destructive hover:bg-destructive/10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                                                    }`}
-                                                    tabIndex={-1}
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
+                                                <div className="flex items-center gap-0.5">
+                                                    {/* Dividi */}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title="Dividi riga"
+                                                        onClick={() => onDuplicate(line.tempId)}
+                                                        className={`h-7 w-7 transition-opacity ${
+                                                            isEmpty
+                                                                ? "opacity-0 pointer-events-none"
+                                                                : "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                                        }`}
+                                                        tabIndex={-1}
+                                                    >
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    {/* Elimina */}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title="Elimina riga"
+                                                        onClick={() => onRemove(line.tempId)}
+                                                        className={`h-7 w-7 transition-opacity ${
+                                                            isLast && isEmpty
+                                                                ? "opacity-0 pointer-events-none"
+                                                                : "text-destructive hover:bg-destructive/10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                                        }`}
+                                                        tabIndex={-1}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     );

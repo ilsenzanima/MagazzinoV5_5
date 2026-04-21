@@ -380,6 +380,33 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         });
     }, []);
 
+    const handleInlineLineDuplicate = useCallback((rowId: string) => {
+        setLines((prev) => {
+            const rowIndex = prev.findIndex((l) => l.tempId === rowId);
+            if (rowIndex === -1) return prev;
+            const row = prev[rowIndex];
+            if (!row.itemId) return prev;
+
+            const newRow: MovementLine = {
+                ...row,
+                id: undefined,
+                tempId: Math.random().toString(36).substr(2, 9),
+                quantity: "",
+                pieces: "",
+                purchaseItemId: undefined,
+                purchaseRef: undefined,
+            };
+
+            const newLines = [...prev];
+            newLines.splice(rowIndex + 1, 0, newRow);
+            const last = newLines[newLines.length - 1];
+            if (last.itemId || last.quantity || last.pieces) {
+                newLines.push(emptyLine());
+            }
+            return newLines;
+        });
+    }, []);
+
     const handleSubmit = async () => {
         if (!numberPart) {
             notify.warning("Inserisci il numero del documento");
@@ -531,6 +558,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         handleInlineReturnBatchSelect,
         handleInlineLineChange,
         handleInlineLineRemove,
+        handleInlineLineDuplicate,
         handleSubmit,
     };
 }
