@@ -304,6 +304,29 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
 
     const handleInlineReturnBatchSelect = useCallback(
         (rowId: string, batch: any, prefill?: { pieces?: string; quantity?: string }) => {
+            const allItemBatches = jobBatchAvailability
+                .filter((b) => b.itemId === batch.itemId)
+                .map((b) => ({
+                    id: b.purchaseItemId,
+                    purchaseRef: b.purchaseRef,
+                    remainingQty: b.quantity,
+                    remainingPieces: b.pieces,
+                    date: b.date,
+                }));
+
+            const batchesForLine =
+                allItemBatches.length > 0
+                    ? allItemBatches
+                    : [
+                          {
+                              id: batch.purchaseItemId,
+                              purchaseRef: batch.purchaseRef,
+                              remainingQty: batch.quantity,
+                              remainingPieces: batch.pieces,
+                              date: undefined,
+                          },
+                      ];
+
             setLines((prev) => {
                 const updated = prev.map((line) => {
                     if (line.tempId !== rowId) return line;
@@ -320,22 +343,14 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                         purchaseItemId: batch.purchaseItemId,
                         purchaseRef: batch.purchaseRef,
                         isFictitious: false,
-                        availableBatches: [
-                            {
-                                id: batch.purchaseItemId,
-                                purchaseRef: batch.purchaseRef,
-                                remainingQty: batch.quantity,
-                                remainingPieces: batch.pieces,
-                                date: new Date().toISOString(),
-                            },
-                        ],
+                        availableBatches: batchesForLine,
                         batchesLoading: false,
                     };
                 });
                 return ensureTrailingEmpty(updated);
             });
         },
-        []
+        [jobBatchAvailability]
     );
 
     const handleInlineLineChange = useCallback((rowId: string, field: string, value: any) => {
