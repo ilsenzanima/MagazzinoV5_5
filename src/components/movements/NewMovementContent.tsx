@@ -56,11 +56,9 @@ export default function NewMovementContent({
     }
 
     const completedLines = form.lines.filter((l) => l.itemId && l.quantity);
-    const totalPieces = completedLines.reduce((acc, l) => acc + (parseFloat(l.pieces) || 0), 0);
-    const totalQty = completedLines.reduce((acc, l) => acc + (parseFloat(l.quantity) || 0), 0);
 
     return (
-        <div className="space-y-6 pb-20 max-w-5xl mx-auto">
+        <div className="space-y-6 pb-20 max-w-6xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
@@ -124,75 +122,60 @@ export default function NewMovementContent({
                     </TabsTrigger>
                 </TabsList>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <MovementHeader
-                            numberPart={form.numberPart}
-                            setNumberPart={form.setNumberPart}
-                            yearSuffix={form.yearSuffix}
-                            date={form.date}
-                            setDate={form.setDate}
-                            causal={form.causal}
-                            setCausal={form.setCausal}
-                            pickupLocation={form.pickupLocation}
-                            setPickupLocation={form.setPickupLocation}
-                            deliveryLocation={form.deliveryLocation}
-                            setDeliveryLocation={form.setDeliveryLocation}
-                        >
-                            <MovementJobSelector
-                                selectedJob={form.selectedJob}
-                                onSelect={form.handleJobSelect}
-                                onClear={() => form.setSelectedJob(null)}
-                                isOpen={form.isJobSelectorOpen}
-                                setIsOpen={form.setIsJobSelectorOpen}
-                                jobs={form.jobs}
-                                onSearch={form.handleJobSearch}
-                                loading={form.jobsLoading}
-                            />
-                        </MovementHeader>
-
-                        <MovementInlineTable
-                            lines={form.lines}
-                            activeTab={form.activeTab}
+                <div className="space-y-6">
+                    <MovementHeader
+                        numberPart={form.numberPart}
+                        setNumberPart={form.setNumberPart}
+                        yearSuffix={form.yearSuffix}
+                        date={form.date}
+                        setDate={form.setDate}
+                        causal={form.causal}
+                        setCausal={form.setCausal}
+                        pickupLocation={form.pickupLocation}
+                        setPickupLocation={form.setPickupLocation}
+                        deliveryLocation={form.deliveryLocation}
+                        setDeliveryLocation={form.setDeliveryLocation}
+                    >
+                        <MovementJobSelector
                             selectedJob={form.selectedJob}
-                            jobBatchAvailability={form.jobBatchAvailability}
-                            inventory={form.inventory}
-                            itemsLoading={form.itemsLoading}
-                            onItemSearch={form.handleItemSearch}
-                            onItemSelect={form.handleInlineItemSelect}
-                            onReturnBatchSelect={form.handleInlineReturnBatchSelect}
-                            onLineChange={form.handleInlineLineChange}
-                            onRemove={form.handleInlineLineRemove}
-                            onDuplicate={form.handleInlineLineDuplicate}
+                            onSelect={form.handleJobSelect}
+                            onClear={() => form.setSelectedJob(null)}
+                            isOpen={form.isJobSelectorOpen}
+                            setIsOpen={form.setIsJobSelectorOpen}
+                            jobs={form.jobs}
+                            onSearch={form.handleJobSearch}
+                            loading={form.jobsLoading}
                         />
+                    </MovementHeader>
 
-                        <MovementFooter
-                            transportMean={form.transportMean}
-                            setTransportMean={form.setTransportMean}
-                            transportTime={form.transportTime}
-                            setTransportTime={form.setTransportTime}
-                            appearance={form.appearance}
-                            setAppearance={form.setAppearance}
-                            packagesCount={form.packagesCount}
-                            setPackagesCount={form.setPackagesCount}
-                            notes={form.notes}
-                            setNotes={form.setNotes}
-                            linesCount={completedLines.length}
-                        />
-                    </div>
+                    <MovementInlineTable
+                        lines={form.lines}
+                        activeTab={form.activeTab}
+                        selectedJob={form.selectedJob}
+                        jobBatchAvailability={form.jobBatchAvailability}
+                        inventory={form.inventory}
+                        itemsLoading={form.itemsLoading}
+                        onItemSearch={form.handleItemSearch}
+                        onItemSelect={form.handleInlineItemSelect}
+                        onReturnBatchSelect={form.handleInlineReturnBatchSelect}
+                        onLineChange={form.handleInlineLineChange}
+                        onRemove={form.handleInlineLineRemove}
+                        onDuplicate={form.handleInlineLineDuplicate}
+                    />
 
-                    {/* Right Column - Summary */}
-                    <div className="space-y-6">
-                        <div className="bg-slate-50 dark:bg-muted p-4 rounded-lg border dark:border-border text-sm text-slate-500 dark:text-slate-400">
-                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">
-                                Riepilogo
-                            </h4>
-                            <p>Righe inserite: {completedLines.length}</p>
-                            <p>Pezzi totali: {totalPieces.toFixed(2)}</p>
-                            <p>Quantità totale: {totalQty.toFixed(2)}</p>
-                        </div>
-                    </div>
+                    <MovementFooter
+                        transportMean={form.transportMean}
+                        setTransportMean={form.setTransportMean}
+                        transportTime={form.transportTime}
+                        setTransportTime={form.setTransportTime}
+                        appearance={form.appearance}
+                        setAppearance={form.setAppearance}
+                        packagesCount={form.packagesCount}
+                        setPackagesCount={form.setPackagesCount}
+                        notes={form.notes}
+                        setNotes={form.setNotes}
+                        linesCount={completedLines.length}
+                    />
                 </div>
             </Tabs>
         </div>
