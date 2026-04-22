@@ -109,7 +109,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                     quantity: item.quantity.toString(),
                     pieces: item.pieces?.toString() || "",
                     purchaseItemId: item.purchaseItemId,
-                    purchaseRef: item.purchaseNumber || (item.purchaseItemId ? "Lotto" : undefined),
+                    purchaseRef: item.purchaseNumber || undefined,
                     isFictitious: item.isFictitious || false,
                     availableBatches: [],
                     batchesLoading: false,
@@ -272,14 +272,25 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 // Ensure the currently-selected batch is always present even if exhausted
                 if (line.purchaseItemId && !validBatches.find((b) => b.id === line.purchaseItemId)) {
                     const found = adjustedBatches.find((b) => b.id === line.purchaseItemId);
-                    if (found) validBatches.unshift(found);
-                    else if (line.purchaseRef) {
-                        validBatches.unshift({
-                            id: line.purchaseItemId,
-                            purchaseRef: line.purchaseRef,
-                            remainingQty: 0,
-                            remainingPieces: 0,
-                        });
+                    if (found) {
+                        validBatches.unshift(found);
+                    } else {
+                        // Batch not returned by API at all (fully exhausted server-side):
+                        // reconstruct from initialNote items which have the real purchaseNumber
+                        const originalItems = (initialNote?.items ?? []).filter(
+                            (item) => item.purchaseItemId === line.purchaseItemId
+                        );
+                        const totalQty = originalItems.reduce((s, i) => s + (i.quantity ?? 0), 0);
+                        const totalPieces = originalItems.reduce((s, i) => s + (i.pieces ?? 0), 0);
+                        const realRef = originalItems[0]?.purchaseNumber ?? line.purchaseRef;
+                        if (realRef) {
+                            validBatches.unshift({
+                                id: line.purchaseItemId,
+                                purchaseRef: realRef,
+                                remainingQty: totalQty,
+                                remainingPieces: totalPieces > 0 ? totalPieces : undefined,
+                            });
+                        }
                     }
                 }
                 setLines((prev) =>
