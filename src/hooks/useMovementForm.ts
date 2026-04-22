@@ -202,13 +202,21 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                                 if (!line.itemId || line.availableBatches.length > 0) return line;
                                 const itemBatches = batches
                                     .filter((b: any) => b.itemId === line.itemId)
-                                    .map((b: any) => ({
-                                        id: b.purchaseItemId,
-                                        purchaseRef: b.purchaseRef,
-                                        remainingQty: b.quantity,
-                                        remainingPieces: b.pieces,
-                                        date: b.date,
-                                    }));
+                                    .map((b: any) => {
+                                        const totalQty = (initialNote?.items ?? [])
+                                            .filter((item) => item.purchaseItemId === b.purchaseItemId)
+                                            .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+                                        const totalPieces = (initialNote?.items ?? [])
+                                            .filter((item) => item.purchaseItemId === b.purchaseItemId)
+                                            .reduce((sum, item) => sum + (item.pieces ?? 0), 0);
+                                        return {
+                                            id: b.purchaseItemId,
+                                            purchaseRef: b.purchaseRef,
+                                            remainingQty: (b.quantity ?? 0) + totalQty,
+                                            remainingPieces: b.pieces != null ? b.pieces + totalPieces : b.pieces,
+                                            date: b.date,
+                                        };
+                                    });
                                 return itemBatches.length > 0 ? { ...line, availableBatches: itemBatches } : line;
                             })
                         );
@@ -241,15 +249,30 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         itemLines.forEach(async (line) => {
             try {
                 const batches: any[] = await inventoryApi.getAvailableBatches(line.itemId);
-                const validBatches = batches.filter((b) => {
+                // Add back quantities that this bolla originally consumed from each lot
+                const adjustedBatches = batches.map((b) => {
+                    const totalQty = (initialNote?.items ?? [])
+                        .filter((item) => item.purchaseItemId === b.id)
+                        .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+                    const totalPieces = (initialNote?.items ?? [])
+                        .filter((item) => item.purchaseItemId === b.id)
+                        .reduce((sum, item) => sum + (item.pieces ?? 0), 0);
+                    if (totalQty === 0 && totalPieces === 0) return b;
+                    return {
+                        ...b,
+                        remainingQty: (b.remainingQty ?? 0) + totalQty,
+                        remainingPieces: b.remainingPieces != null ? b.remainingPieces + totalPieces : b.remainingPieces,
+                    };
+                });
+                const validBatches = adjustedBatches.filter((b) => {
                     if (b.remainingPieces !== undefined && b.remainingPieces !== null)
                         return b.remainingPieces > 0.001;
                     return b.remainingQty > 0.001;
                 });
                 // Ensure the currently-selected batch is always present even if exhausted
                 if (line.purchaseItemId && !validBatches.find((b) => b.id === line.purchaseItemId)) {
-                    const original = batches.find((b) => b.id === line.purchaseItemId);
-                    if (original) validBatches.unshift(original);
+                    const found = adjustedBatches.find((b) => b.id === line.purchaseItemId);
+                    if (found) validBatches.unshift(found);
                     else if (line.purchaseRef) {
                         validBatches.unshift({
                             id: line.purchaseItemId,
@@ -533,12 +556,12 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 }
             }
             if (activeTab === "entry" && selectedJob && line.purchaseItemId && !line.isFictitious) {
-                const batch = jobBatchAvailability.find((b) => b.purchaseItemId === line.purchaseItemId);
+                const batch = line.availableBatches.find((b: any) => b.id === line.purchaseItemId);
                 if (batch) {
                     const qty = parseFloat(line.quantity);
-                    if (!isNaN(qty) && qty > batch.quantity) {
+                    if (!isNaN(qty) && qty > batch.remainingQty) {
                         notify.warning(
-                            `Quantità eccessiva per il reso di "${line.itemName}". In carico: ${batch.quantity}`
+                            `Quantità eccessiva per il reso di "${line.itemName}". In carico: ${batch.remainingQty}`
                         );
                         return;
                     }
