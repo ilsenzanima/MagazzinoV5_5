@@ -115,6 +115,14 @@ export function MovementInlineTable({
                                     // Cantiere batch info for entry lotto badge
                                     const cantiereBatch = line.availableBatches[0];
 
+                                    // Lock fittizio when all lots are exhausted (exit/sale only)
+                                    const allBatchesExhausted =
+                                        (activeTab === "exit" || activeTab === "sale") &&
+                                        line.availableBatches.length > 0 &&
+                                        line.availableBatches.every((b) =>
+                                            (b.remainingPieces ?? b.remainingQty ?? 0) <= 0.001
+                                        );
+
                                     return (
                                         <TableRow key={line.tempId} className="group">
                                             {/* Materiale */}
@@ -264,6 +272,7 @@ export function MovementInlineTable({
                                                     {line.itemId ? (
                                                         <Checkbox
                                                             checked={line.isFictitious}
+                                                            disabled={allBatchesExhausted}
                                                             onCheckedChange={(v) =>
                                                                 onLineChange(
                                                                     line.tempId,
