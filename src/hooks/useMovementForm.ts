@@ -351,15 +351,19 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                             return b.remainingPieces > 0.001;
                         return b.remainingQty > 0.001;
                     });
+                    // All lots exhausted: show them anyway and auto-flag as fittizio
+                    const allExhausted = validBatches.length === 0 && batches.length > 0;
+                    const batchesToShow = allExhausted ? batches : validBatches;
                     setLines((prev) =>
                         prev.map((line) => {
                             if (line.tempId !== rowId) return line;
                             return {
                                 ...line,
                                 batchesLoading: false,
-                                availableBatches: validBatches,
-                                purchaseItemId: validBatches.length > 0 ? validBatches[0].id : undefined,
-                                purchaseRef: validBatches.length > 0 ? validBatches[0].purchaseRef : undefined,
+                                availableBatches: batchesToShow,
+                                purchaseItemId: batchesToShow.length > 0 ? batchesToShow[0].id : undefined,
+                                purchaseRef: batchesToShow.length > 0 ? batchesToShow[0].purchaseRef : undefined,
+                                isFictitious: allExhausted ? true : line.isFictitious,
                             };
                         })
                     );
