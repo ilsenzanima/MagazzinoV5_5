@@ -275,22 +275,19 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                     if (found) {
                         validBatches.unshift(found);
                     } else {
-                        // Batch not returned by API at all (fully exhausted server-side):
-                        // reconstruct from initialNote items which have the real purchaseNumber
+                        // Batch not returned by API (fully exhausted server-side):
+                        // reconstruct from initialNote items — always add even if purchaseRef is null
                         const originalItems = (initialNote?.items ?? []).filter(
                             (item) => item.purchaseItemId === line.purchaseItemId
                         );
                         const totalQty = originalItems.reduce((s, i) => s + (i.quantity ?? 0), 0);
                         const totalPieces = originalItems.reduce((s, i) => s + (i.pieces ?? 0), 0);
-                        const realRef = originalItems[0]?.purchaseNumber ?? line.purchaseRef;
-                        if (realRef) {
-                            validBatches.unshift({
-                                id: line.purchaseItemId,
-                                purchaseRef: realRef,
-                                remainingQty: totalQty,
-                                remainingPieces: totalPieces > 0 ? totalPieces : undefined,
-                            });
-                        }
+                        validBatches.unshift({
+                            id: line.purchaseItemId,
+                            purchaseRef: originalItems[0]?.purchaseNumber ?? null,
+                            remainingQty: totalQty,
+                            remainingPieces: totalPieces > 0 ? totalPieces : null,
+                        });
                     }
                 }
                 setLines((prev) =>
