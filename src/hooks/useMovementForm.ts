@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { inventoryApi } from "@/lib/services/inventory";
 import { jobsApi } from "@/lib/services/jobs";
@@ -193,14 +193,89 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 inventoryApi.getJobBatchAvailability(selectedJob.id),
                 inventoryApi.getJobInventory(selectedJob.id),
             ]).then(([batchResult, inventoryResult]) => {
-                if (batchResult.status === "fulfilled") setJobBatchAvailability(batchResult.value || []);
+                if (batchResult.status === "fulfilled") {
+                    const batches = batchResult.value || [];
+                    setJobBatchAvailability(batches);
+                    if (isEditing && batches.length > 0) {
+                        setLines((prev) =>
+                            prev.map((line) => {
+                                if (!line.itemId || line.availableBatches.length > 0) return line;
+                                const itemBatches = batches
+                                    .filter((b: any) => b.itemId === line.itemId)
+                                    .map((b: any) => ({
+                                        id: b.purchaseItemId,
+                                        purchaseRef: b.purchaseRef,
+                                        remainingQty: b.quantity,
+                                        remainingPieces: b.pieces,
+                                        date: b.date,
+                                    }));
+                                return itemBatches.length > 0 ? { ...line, availableBatches: itemBatches } : line;
+                            })
+                        );
+                    }
+                }
                 if (inventoryResult.status === "fulfilled") setJobInventory(inventoryResult.value || []);
             });
         } else {
             setJobInventory([]);
             setJobBatchAvailability([]);
         }
-    }, [activeTab, selectedJob]);
+    }, [activeTab, selectedJob, isEditing]);
+
+    // When editing exit/sale: load available batches for each existing line
+    const exitSaleBatchesLoaded = useRef(false);
+    useEffect(() => {
+        if (!isEditing || exitSaleBatchesLoaded.current) return;
+        if (activeTab !== "exit" && activeTab !== "sale") return;
+        exitSaleBatchesLoaded.current = true;
+
+        const itemLines = lines.filter((l) => l.itemId && l.availableBatches.length === 0);
+        if (itemLines.length === 0) return;
+
+        setLines((prev) =>
+            prev.map((l) =>
+                l.itemId && l.availableBatches.length === 0 ? { ...l, batchesLoading: true } : l
+            )
+        );
+
+        itemLines.forEach(async (line) => {
+            try {
+                const batches: any[] = await inventoryApi.getAvailableBatches(line.itemId);
+                const validBatches = batches.filter((b) => {
+                    if (b.remainingPieces !== undefined && b.remainingPieces !== null)
+                        return b.remainingPieces > 0.001;
+                    return b.remainingQty > 0.001;
+                });
+                // Ensure the currently-selected batch is always present even if exhausted
+                if (line.purchaseItemId && !validBatches.find((b) => b.id === line.purchaseItemId)) {
+                    const original = batches.find((b) => b.id === line.purchaseItemId);
+                    if (original) validBatches.unshift(original);
+                    else if (line.purchaseRef) {
+                        validBatches.unshift({
+                            id: line.purchaseItemId,
+                            purchaseRef: line.purchaseRef,
+                            remainingQty: 0,
+                            remainingPieces: 0,
+                        });
+                    }
+                }
+                setLines((prev) =>
+                    prev.map((l) =>
+                        l.tempId === line.tempId
+                            ? { ...l, batchesLoading: false, availableBatches: validBatches }
+                            : l
+                    )
+                );
+            } catch {
+                setLines((prev) =>
+                    prev.map((l) =>
+                        l.tempId === line.tempId ? { ...l, batchesLoading: false } : l
+                    )
+                );
+            }
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEditing, activeTab]);
 
     useEffect(() => {
         const completedCount = lines.filter((l) => l.itemId && l.quantity).length;
