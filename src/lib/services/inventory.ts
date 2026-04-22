@@ -293,6 +293,25 @@ export const inventoryApi = {
         }));
     },
 
+    // Get purchase item info by ID (for edit mode, when batch is exhausted and not in view)
+    getPurchaseItemRef: async (purchaseItemId: string) => {
+        const { data, error } = await supabase
+            .from('purchase_items')
+            .select(`id, quantity, pieces, price, purchases(delivery_note_number, delivery_note_date, suppliers(name))`)
+            .eq('id', purchaseItemId)
+            .single();
+        if (error || !data) return null;
+        const p = (data as any).purchases;
+        return {
+            purchaseRef: p?.delivery_note_number ?? null,
+            purchaseDate: p?.delivery_note_date ?? null,
+            supplierName: p?.suppliers?.name ?? null,
+            originalQty: (data as any).quantity ?? 0,
+            originalPieces: (data as any).pieces ?? 0,
+            price: (data as any).price ?? 0,
+        };
+    },
+
     // Get all lots for an item (for Lots tab in item detail)
     // Includes ALL lots - even exhausted ones (remaining = 0)
     getLotsForItem: async (itemId: string) => {

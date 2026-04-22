@@ -276,15 +276,20 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                         validBatches.unshift(found);
                     } else {
                         // Batch not returned by API (fully exhausted server-side):
-                        // reconstruct from initialNote items — always add even if purchaseRef is null
+                        // reconstruct from initialNote items, then fallback to direct DB query
                         const originalItems = (initialNote?.items ?? []).filter(
                             (item) => item.purchaseItemId === line.purchaseItemId
                         );
                         const totalQty = originalItems.reduce((s, i) => s + (i.quantity ?? 0), 0);
                         const totalPieces = originalItems.reduce((s, i) => s + (i.pieces ?? 0), 0);
+                        let purchaseRef = originalItems[0]?.purchaseNumber ?? null;
+                        if (!purchaseRef && line.purchaseItemId) {
+                            const info = await inventoryApi.getPurchaseItemRef(line.purchaseItemId);
+                            purchaseRef = info?.purchaseRef ?? null;
+                        }
                         validBatches.unshift({
                             id: line.purchaseItemId,
-                            purchaseRef: originalItems[0]?.purchaseNumber ?? null,
+                            purchaseRef,
                             remainingQty: totalQty,
                             remainingPieces: totalPieces > 0 ? totalPieces : null,
                         });
