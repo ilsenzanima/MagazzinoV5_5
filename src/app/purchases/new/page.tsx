@@ -510,6 +510,7 @@ export default function NewPurchasePage() {
                                         <TableRow>
                                             <TableHead>Materiale</TableHead>
                                             <TableHead className="w-[90px] text-center">Pezzi</TableHead>
+                                            <TableHead className="w-[70px] text-center">Coeff.</TableHead>
                                             <TableHead className="w-[110px] text-center">Quantità</TableHead>
                                             <TableHead className="w-[120px] text-right">Prezzo Unit.</TableHead>
                                             <TableHead className="w-[120px] text-right">Totale Riga</TableHead>
@@ -548,22 +549,24 @@ export default function NewPurchasePage() {
 
                                                     {/* Pezzi */}
                                                     <TableCell className="py-2 px-1">
-                                                        <div className="flex flex-col items-center gap-0.5">
-                                                            <Input
-                                                                type="number"
-                                                                inputMode="decimal"
-                                                                min="0"
-                                                                step="0.01"
-                                                                value={line.pieces}
-                                                                onChange={e => handleLinePiecesChange(line.tempId, e.target.value)}
-                                                                placeholder="0"
-                                                                className="h-9 text-center px-1"
-                                                                disabled={!line.itemId}
-                                                            />
-                                                            {line.coefficient !== 1 && (
-                                                                <span className="text-[9px] text-muted-foreground">×{line.coefficient}</span>
-                                                            )}
-                                                        </div>
+                                                        <Input
+                                                            type="number"
+                                                            inputMode="decimal"
+                                                            min="0"
+                                                            step="0.01"
+                                                            value={line.pieces}
+                                                            onChange={e => handleLinePiecesChange(line.tempId, e.target.value)}
+                                                            placeholder="0"
+                                                            className="h-9 text-center px-1"
+                                                            disabled={!line.itemId}
+                                                        />
+                                                    </TableCell>
+
+                                                    {/* Coefficiente */}
+                                                    <TableCell className="py-2 px-1 text-center">
+                                                        <span className="text-sm text-muted-foreground">
+                                                            {line.itemId ? line.coefficient : "—"}
+                                                        </span>
                                                     </TableCell>
 
                                                     {/* Quantità */}
@@ -616,7 +619,7 @@ export default function NewPurchasePage() {
                                                                 onBlur={() => handleLineTotalBlur(line.tempId)}
                                                                 placeholder="0.00"
                                                                 className="h-9 text-right px-1 w-24"
-                                                                disabled={!line.itemId || !line.quantity}
+                                                                disabled={!line.itemId}
                                                             />
                                                         </div>
                                                     </TableCell>
@@ -674,7 +677,7 @@ export default function NewPurchasePage() {
                                         {/* Totale Bolla */}
                                         {lines.some(l => l.itemId) && (
                                             <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold border-t-2">
-                                                <TableCell colSpan={4} className="text-right pr-4 text-base dark:text-white py-3">
+                                                <TableCell colSpan={5} className="text-right pr-4 text-base dark:text-white py-3">
                                                     TOTALE BOLLA
                                                 </TableCell>
                                                 <TableCell className="text-right text-base dark:text-white py-3 pr-2">
