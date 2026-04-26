@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-01T03:46:44.428Z",
+  "timestamp": "2026-04-26T04:21:05.962Z",
   "tables": [
     {
       "name": "profiles",
@@ -7,35 +7,35 @@
     },
     {
       "name": "clients",
-      "records": 11
+      "records": 24
     },
     {
       "name": "suppliers",
-      "records": 37
+      "records": 39
     },
     {
       "name": "inventory",
-      "records": 495
+      "records": 566
     },
     {
       "name": "jobs",
-      "records": 5
+      "records": 23
     },
     {
       "name": "purchases",
-      "records": 474
+      "records": 528
     },
     {
       "name": "purchase_items",
-      "records": 895
+      "records": 1000
     },
     {
       "name": "delivery_notes",
-      "records": 9
+      "records": 61
     },
     {
       "name": "delivery_note_items",
-      "records": 100
+      "records": 395
     },
     {
       "name": "workers",
@@ -43,8 +43,8 @@
     },
     {
       "name": "attendance",
-      "records": 404
+      "records": 892
     }
   ],
-  "totalRecords": 2447
+  "totalRecords": 3545
 }
