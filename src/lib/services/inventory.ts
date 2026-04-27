@@ -293,6 +293,15 @@ export const inventoryApi = {
         }));
     },
 
+    // Get ALL purchase batches for an item including exhausted ones.
+    // Used when isFictitious is checked so the user can pick a lot for price attribution.
+    // Sorted: available lots first, then most recent first (same order as getLotsForItem).
+    getAllBatchesForItem: async (itemId: string) => {
+        const result = await inventoryApi.getLotsForItem(itemId);
+        // getLotsForItem already applies: available first, then date desc
+        return result.lots;
+    },
+
     // Get purchase item info by ID (for edit mode, when batch is exhausted and not in view)
     getPurchaseItemRef: async (purchaseItemId: string) => {
         const { data, error } = await supabase

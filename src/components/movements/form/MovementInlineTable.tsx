@@ -177,27 +177,39 @@ export function MovementInlineTable({
                                                                     <SelectValue placeholder="Seleziona lotto..." />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    {line.availableBatches.map((batch) => (
-                                                                        <SelectItem
-                                                                            key={batch.id}
-                                                                            value={batch.id}
-                                                                        >
-                                                                            <span className="font-medium">
-                                                                                {batch.purchaseRef || "Nessun Rif."}
-                                                                            </span>
-                                                                            <span className="text-muted-foreground ml-1 text-xs">
-                                                                                {" "}— Pz:{" "}
-                                                                                {batch.remainingPieces ??
-                                                                                    batch.remainingQty}
-                                                                                {" "}/ {batch.remainingQty}
-                                                                                {batch.date &&
-                                                                                    ` (${format(
-                                                                                        new Date(batch.date),
-                                                                                        "dd/MM/yy"
-                                                                                    )})`}
-                                                                            </span>
-                                                                        </SelectItem>
-                                                                    ))}
+                                                                    {line.availableBatches.map((batch) => {
+                                                                        const isExhausted =
+                                                                            (batch.remainingPieces ??
+                                                                                batch.remainingQty ??
+                                                                                0) <= 0.001;
+                                                                        return (
+                                                                            <SelectItem
+                                                                                key={batch.id}
+                                                                                value={batch.id}
+                                                                                className={
+                                                                                    isExhausted
+                                                                                        ? "opacity-60"
+                                                                                        : ""
+                                                                                }
+                                                                            >
+                                                                                <span className="font-medium">
+                                                                                    {batch.purchaseRef ||
+                                                                                        "Nessun Rif."}
+                                                                                </span>
+                                                                                <span className="text-muted-foreground ml-1 text-xs">
+                                                                                    {" "}
+                                                                                    {isExhausted
+                                                                                        ? "— Esaurito"
+                                                                                        : `— Pz: ${batch.remainingPieces ?? batch.remainingQty} / ${batch.remainingQty}`}
+                                                                                    {batch.date &&
+                                                                                        ` (${format(
+                                                                                            new Date(batch.date),
+                                                                                            "dd/MM/yy"
+                                                                                        )})`}
+                                                                                </span>
+                                                                            </SelectItem>
+                                                                        );
+                                                                    })}
                                                                 </SelectContent>
                                                             </Select>
                                                         )
