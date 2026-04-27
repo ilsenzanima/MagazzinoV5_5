@@ -469,6 +469,9 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     );
 
     const handleInlineLineChange = useCallback((rowId: string, field: string, value: any) => {
+        // Capture item info for async batch reload (needed for isFictitious toggle)
+        let itemIdForBatchReload: string | undefined;
+
         setLines((prev) => {
             const updated = prev.map((line) => {
                 if (line.tempId !== rowId) return line;
@@ -494,13 +497,88 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 } else if (field === "purchaseItemId") {
                     const batch = line.availableBatches.find((b: any) => b.id === value);
                     updates.purchaseRef = batch?.purchaseRef;
+                } else if (
+                    field === "isFictitious" &&
+                    (activeTab === "exit" || activeTab === "sale") &&
+                    line.itemId
+                ) {
+                    // Mark as loading — batch list will be refreshed after state update
+                    itemIdForBatchReload = line.itemId;
+                    updates.batchesLoading = true;
                 }
 
                 return { ...line, ...updates };
             });
             return ensureTrailingEmpty(updated);
         });
-    }, []);
+
+        // Async batch reload when the fittizio flag is toggled on exit/sale lines
+        if (itemIdForBatchReload) {
+            const itemId = itemIdForBatchReload;
+
+            if (value === true) {
+                // Show ALL lots (including exhausted) so the user can pick one for price attribution.
+                // Sorted: available first, then most recent first.
+                inventoryApi
+                    .getAllBatchesForItem(itemId)
+                    .then((allBatches) => {
+                        setLines((prev) =>
+                            prev.map((l) => {
+                                if (l.tempId !== rowId) return l;
+                                // Keep the existing selection if it's still in the list
+                                const keepExisting = allBatches.find((b) => b.id === l.purchaseItemId);
+                                const preferred = keepExisting ?? allBatches[0];
+                                return {
+                                    ...l,
+                                    batchesLoading: false,
+                                    availableBatches: allBatches,
+                                    purchaseItemId: preferred?.id,
+                                    purchaseRef: preferred?.purchaseRef,
+                                };
+                            })
+                        );
+                    })
+                    .catch(() => {
+                        setLines((prev) =>
+                            prev.map((l) =>
+                                l.tempId === rowId ? { ...l, batchesLoading: false } : l
+                            )
+                        );
+                    });
+            } else {
+                // Restore to available-only lots (FIFO order)
+                inventoryApi
+                    .getAvailableBatches(itemId)
+                    .then((batches) => {
+                        const validBatches = batches.filter((b: any) => {
+                            if (b.remainingPieces !== undefined && b.remainingPieces !== null)
+                                return b.remainingPieces > 0.001;
+                            return b.remainingQty > 0.001;
+                        });
+                        setLines((prev) =>
+                            prev.map((l) => {
+                                if (l.tempId !== rowId) return l;
+                                const preferred = validBatches[0];
+                                return {
+                                    ...l,
+                                    batchesLoading: false,
+                                    availableBatches: validBatches,
+                                    purchaseItemId: preferred?.id,
+                                    purchaseRef: preferred?.purchaseRef,
+                                };
+                            })
+                        );
+                    })
+                    .catch(() => {
+                        setLines((prev) =>
+                            prev.map((l) =>
+                                l.tempId === rowId ? { ...l, batchesLoading: false } : l
+                            )
+                        );
+                    });
+            }
+        }
+    }, [activeTab]);
 
     const handleInlineLineRemove = useCallback((rowId: string) => {
         setLines((prev) => {
