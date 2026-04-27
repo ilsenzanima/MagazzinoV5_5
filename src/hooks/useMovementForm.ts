@@ -551,6 +551,13 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
 
         for (const line of validLines) {
             if ((activeTab === "exit" || activeTab === "sale") && !line.isFictitious) {
+                // Validazione: il lotto deve essere selezionato per movimenti di uscita/vendita non fittizi
+                if (!line.purchaseItemId) {
+                    notify.warning(
+                        `Seleziona un lotto di riferimento per "${line.itemName || 'articolo'}"`
+                    );
+                    return;
+                }
                 const batch = line.availableBatches.find((b: any) => b.id === line.purchaseItemId);
                 if (line.purchaseItemId && batch) {
                     const pieces = parseFloat(line.pieces);
