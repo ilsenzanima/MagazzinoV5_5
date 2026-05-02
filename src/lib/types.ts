@@ -293,6 +293,7 @@ export interface Worker {
     lastName: string;
     email: string;
     isActive: boolean;
+    hourlyRate: number;
     createdAt: string;
 }
 
