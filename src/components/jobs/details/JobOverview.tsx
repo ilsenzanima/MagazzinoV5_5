@@ -30,7 +30,6 @@ import {
 import { useAuth } from "@/components/auth-provider"
 import { JobMap } from "./JobMap"
 import { JobWeatherWidget } from "./JobWeatherWidget"
-import { JobWorkerCosts } from "./JobWorkerCosts"
 
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -283,11 +282,6 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
             <JobWeatherWidget address={job.siteAddress} />
           </div>
         </div>
-      )}
-
-      {/* Costi operai e complessivo - solo admin/operativo */}
-      {(userRole === 'admin' || userRole === 'operativo') && (
-        <JobWorkerCosts jobId={job.id} materialCost={totalCost} />
       )}
 
       {/* Edit Dialog */}

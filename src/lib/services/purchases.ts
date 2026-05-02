@@ -115,6 +115,18 @@ export const purchasesApi = {
             total: count || 0
         };
     },
+    getByJobId: async (jobId: string) => {
+        const { data, error } = await fetchWithTimeout(
+            supabase
+                .from('purchases')
+                .select('*, suppliers(name), purchase_items(price, quantity), profiles(full_name)')
+                .eq('job_id', jobId)
+                .order('delivery_note_date', { ascending: false })
+        );
+        if (error) throw error;
+        return (data || []).map(mapDbToPurchase);
+    },
+
     getById: async (id: string) => {
         const { data, error } = await fetchWithTimeout(
             supabase

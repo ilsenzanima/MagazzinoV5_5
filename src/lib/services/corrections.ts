@@ -60,6 +60,19 @@ export const correctionsApi = {
         return (data || []).map(mapDbToCorrection);
     },
 
+    getByJobIdAndDateRange: async (jobId: string, dateFrom: string, dateTo: string): Promise<AttendanceCorrection[]> => {
+        const { data, error } = await supabase
+            .from('attendance_corrections')
+            .select('*, workers(first_name, last_name)')
+            .eq('job_id', jobId)
+            .gte('date', dateFrom)
+            .lte('date', dateTo)
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        return (data || []).map(mapDbToCorrection);
+    },
+
     upsert: async (
         workerId: string,
         date: string,

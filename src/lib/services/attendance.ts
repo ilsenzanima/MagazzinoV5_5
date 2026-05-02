@@ -6,6 +6,8 @@ export const mapDbToAttendance = (db: any): Attendance => ({
     id: db.id,
     workerId: db.worker_id,
     workerName: db.workers?.first_name ? `${db.workers.first_name} ${db.workers.last_name || ''}` : undefined,
+    hourlyRate: db.workers?.hourly_rate !== undefined ? Number(db.workers.hourly_rate) : undefined,
+    trasfertaRate: db.workers?.trasferta_rate !== undefined ? Number(db.workers.trasferta_rate) : undefined,
     jobId: db.job_id,
     jobCode: db.jobs?.code,
     jobName: db.jobs?.name,
@@ -120,6 +122,20 @@ export const attendanceApi = {
 
         if (error) throw error;
         return (data || []).reduce((sum, record) => sum + (Number(record.hours) || 0), 0);
+    },
+
+    // Get attendance for a job within a date range (for SAL worker hours)
+    getByJobIdAndDateRange: async (jobId: string, dateFrom: string, dateTo: string): Promise<Attendance[]> => {
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('*, workers(first_name, last_name, hourly_rate, trasferta_rate)')
+            .eq('job_id', jobId)
+            .gte('date', dateFrom)
+            .lte('date', dateTo)
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        return (data || []).map(mapDbToAttendance);
     },
 
     // Get aggregated statistics for the last N months (for dashboard chart)
