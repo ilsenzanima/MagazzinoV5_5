@@ -49,7 +49,7 @@ interface YearlyStats {
 }
 
 function StatCard({ icon: Icon, label, value, colorClass }: {
-    icon: React.ElementType;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
     value: string | number;
     colorClass?: string;
