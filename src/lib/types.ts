@@ -121,6 +121,7 @@ export interface JobLog {
     userName?: string;
     date: string;
     content: string;
+    isCompleted: boolean;
     weatherInfo?: {
         condition: string;
         tempMax: string;

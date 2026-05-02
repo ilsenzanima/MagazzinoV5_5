@@ -247,6 +247,71 @@ export const attendanceApi = {
         return stats;
     },
 
+    getWorkerCostsByJobId: async (jobId: string): Promise<{
+        rows: { workerId: string; workerName: string; normalHours: number; transferHours: number; normalCost: number; trasfertaCost: number; total: number }[];
+        totalCost: number;
+    }> => {
+        const [attResult, corrResult] = await Promise.all([
+            supabase
+                .from('attendance')
+                .select('worker_id, hours, status, workers(first_name, last_name, hourly_rate, trasferta_rate)')
+                .eq('job_id', jobId),
+            supabase
+                .from('attendance_corrections')
+                .select('worker_id, hours_delta')
+                .eq('job_id', jobId),
+        ]);
+
+        if (attResult.error) throw attResult.error;
+        if (corrResult.error) throw corrResult.error;
+
+        // Aggregate per worker
+        const map = new Map<string, {
+            workerName: string; hourlyRate: number; trasfertaRate: number;
+            normalHours: number; transferHours: number;
+        }>();
+
+        (attResult.data || []).forEach((r: any) => {
+            const wid = r.worker_id;
+            if (!map.has(wid)) {
+                const w = r.workers;
+                map.set(wid, {
+                    workerName: w ? `${w.first_name} ${w.last_name || ''}`.trim() : wid,
+                    hourlyRate: Number(w?.hourly_rate ?? 25),
+                    trasfertaRate: Number(w?.trasferta_rate ?? 50),
+                    normalHours: 0,
+                    transferHours: 0,
+                });
+            }
+            const entry = map.get(wid)!;
+            const h = Number(r.hours) || 0;
+            if (r.status === 'transfer') {
+                entry.transferHours += h;
+            } else {
+                entry.normalHours += h;
+            }
+        });
+
+        // Apply corrections to normal hours
+        (corrResult.data || []).forEach((r: any) => {
+            const wid = r.worker_id;
+            if (map.has(wid)) {
+                map.get(wid)!.normalHours += Number(r.hours_delta) || 0;
+            }
+        });
+
+        let totalCost = 0;
+        const rows = Array.from(map.entries()).map(([workerId, e]) => {
+            const normalCost = Math.max(0, e.normalHours) * e.hourlyRate;
+            const trasfertaCost = e.transferHours * e.trasfertaRate;
+            const total = normalCost + trasfertaCost;
+            totalCost += total;
+            return { workerId, workerName: e.workerName, normalHours: e.normalHours, transferHours: e.transferHours, normalCost, trasfertaCost, total };
+        }).sort((a, b) => b.total - a.total);
+
+        return { rows, totalCost };
+    },
+
     // New: Get total hours for all ACTIVE jobs (for dashboard)
     getActiveJobHours: async (client?: any): Promise<{ jobId: string; jobName: string; jobCode: string; totalHours: number }[]> => {
         const supabaseClient = client || supabase;
