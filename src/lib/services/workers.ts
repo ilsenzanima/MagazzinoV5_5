@@ -9,6 +9,7 @@ export const mapDbToWorker = (db: any): Worker => ({
     email: db.email,
     isActive: db.is_active,
     hourlyRate: Number(db.hourly_rate ?? 25),
+    trasfertaRate: Number(db.trasferta_rate ?? 50),
     createdAt: db.created_at
 });
 
@@ -18,6 +19,7 @@ const mapWorkerToDb = (worker: Partial<Worker>) => ({
     email: worker.email,
     is_active: worker.isActive,
     ...(worker.hourlyRate !== undefined && { hourly_rate: worker.hourlyRate }),
+    ...(worker.trasfertaRate !== undefined && { trasferta_rate: worker.trasfertaRate }),
 });
 
 export const workersApi = {
