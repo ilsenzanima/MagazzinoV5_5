@@ -294,6 +294,7 @@ export interface Worker {
     email: string;
     isActive: boolean;
     hourlyRate: number;
+    trasfertaRate: number;
     createdAt: string;
 }
 

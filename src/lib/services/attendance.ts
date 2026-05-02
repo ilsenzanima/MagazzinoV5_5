@@ -189,17 +189,29 @@ export const attendanceApi = {
         ferie: number; permessi: number;
         corsi: number; visiteMediche: number;
         trasferimenti: number; assenze: number;
-        oreTotali: number;
+        oreRettifica: number; oreTotali: number;
     }> => {
         const y = year ?? new Date().getFullYear();
-        const { data, error } = await supabase
-            .from('attendance')
-            .select('status, hours')
-            .eq('worker_id', workerId)
-            .gte('date', `${y}-01-01`)
-            .lte('date', `${y}-12-31`);
+        const start = `${y}-01-01`;
+        const end   = `${y}-12-31`;
 
-        if (error) throw error;
+        const [attResult, rettResult] = await Promise.all([
+            supabase
+                .from('attendance')
+                .select('status, hours')
+                .eq('worker_id', workerId)
+                .gte('date', start)
+                .lte('date', end),
+            supabase
+                .from('attendance_corrections')
+                .select('hours_delta')
+                .eq('worker_id', workerId)
+                .gte('date', start)
+                .lte('date', end),
+        ]);
+
+        if (attResult.error) throw attResult.error;
+        if (rettResult.error) throw rettResult.error;
 
         const stats = {
             presenze: 0, orePresenza: 0,
@@ -207,10 +219,10 @@ export const attendanceApi = {
             ferie: 0, permessi: 0,
             corsi: 0, visiteMediche: 0,
             trasferimenti: 0, assenze: 0,
-            oreTotali: 0,
+            oreRettifica: 0, oreTotali: 0,
         };
 
-        (data || []).forEach((r: any) => {
+        (attResult.data || []).forEach((r: any) => {
             const h = Number(r.hours) || 0;
             stats.oreTotali += h;
             switch (r.status) {
@@ -224,6 +236,12 @@ export const attendanceApi = {
                 case 'transfer':     stats.trasferimenti++;  break;
                 case 'absence':      stats.assenze++;        break;
             }
+        });
+
+        (rettResult.data || []).forEach((r: any) => {
+            const delta = Number(r.hours_delta) || 0;
+            stats.oreRettifica += delta;
+            stats.oreTotali += delta;
         });
 
         return stats;

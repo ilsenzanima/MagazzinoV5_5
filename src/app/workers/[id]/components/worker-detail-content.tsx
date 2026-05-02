@@ -45,7 +45,7 @@ interface YearlyStats {
     ferie: number; permessi: number;
     corsi: number; visiteMediche: number;
     trasferimenti: number; assenze: number;
-    oreTotali: number;
+    oreRettifica: number; oreTotali: number;
 }
 
 function StatCard({ icon: Icon, label, value, colorClass }: {
@@ -86,6 +86,11 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
     const [rateValue, setRateValue] = useState(String(initialWorker.hourlyRate ?? 25));
     const [savingRate, setSavingRate] = useState(false);
 
+    // Trasferta rate edit state
+    const [editingTrasferta, setEditingTrasferta] = useState(false);
+    const [trasfertaValue, setTrasfertaValue] = useState(String(initialWorker.trasfertaRate ?? 50));
+    const [savingTrasferta, setSavingTrasferta] = useState(false);
+
     const isAdmin = userRole === 'admin';
     const canEdit = userRole === 'admin' || userRole === 'operativo';
     const currentYear = new Date().getFullYear();
@@ -123,6 +128,25 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
             toast({ variant: "destructive", title: "Errore", description: "Impossibile salvare il costo orario." });
         } finally {
             setSavingRate(false);
+        }
+    };
+
+    const handleSaveTrasferta = async () => {
+        const rate = parseFloat(trasfertaValue.replace(',', '.'));
+        if (isNaN(rate) || rate < 0) {
+            toast({ variant: "destructive", title: "Valore non valido", description: "Inserisci un costo trasferta valido." });
+            return;
+        }
+        try {
+            setSavingTrasferta(true);
+            const updated = await workersApi.update(worker.id, { trasfertaRate: rate });
+            setWorker(updated);
+            setEditingTrasferta(false);
+            toast({ title: "Costo trasferta aggiornato" });
+        } catch {
+            toast({ variant: "destructive", title: "Errore", description: "Impossibile salvare il costo trasferta." });
+        } finally {
+            setSavingTrasferta(false);
         }
     };
 
@@ -232,15 +256,16 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                             </div>
                         ) : stats ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                <StatCard icon={Activity}    label="Presenze"       value={`${stats.presenze} gg`}        colorClass="bg-blue-100 text-blue-700 dark:bg-blue-900/30" />
-                                <StatCard icon={Clock}       label="Ore lavorate"   value={`${stats.orePresenza} h`}      colorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30" />
-                                <StatCard icon={Stethoscope} label="Malattie"       value={`${stats.malattie} gg`}        colorClass="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30" />
-                                <StatCard icon={AlertTriangle} label="Infortuni"    value={`${stats.infortuni} gg`}       colorClass="bg-red-100 text-red-700 dark:bg-red-900/30" />
-                                <StatCard icon={Umbrella}    label="Ferie"          value={`${stats.ferie} gg`}           colorClass="bg-green-100 text-green-700 dark:bg-green-900/30" />
-                                <StatCard icon={CalendarOff} label="Permessi"       value={`${stats.permessi} gg`}        colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/30" />
-                                <StatCard icon={BookOpen}    label="Corsi"          value={`${stats.corsi} gg`}           colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/30" />
-                                <StatCard icon={Building2}   label="Trasferimenti"  value={`${stats.trasferimenti} gg`}   colorClass="bg-orange-100 text-orange-700 dark:bg-orange-900/30" />
-                                <StatCard icon={UserX}       label="Assenze"        value={`${stats.assenze} gg`}         colorClass="bg-slate-100 text-slate-700 dark:bg-slate-800" />
+                                <StatCard icon={Activity}      label="Presenze"       value={`${stats.presenze} gg`}                                       colorClass="bg-blue-100 text-blue-700 dark:bg-blue-900/30" />
+                                <StatCard icon={Clock}         label="Ore lavorate"   value={`${stats.orePresenza} h`}                                     colorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30" />
+                                <StatCard icon={Clock}         label="Ore rettifica"  value={`${stats.oreRettifica >= 0 ? '+' : ''}${stats.oreRettifica} h`} colorClass="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30" />
+                                <StatCard icon={Stethoscope}   label="Malattie"       value={`${stats.malattie} gg`}                                       colorClass="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30" />
+                                <StatCard icon={AlertTriangle} label="Infortuni"      value={`${stats.infortuni} gg`}                                      colorClass="bg-red-100 text-red-700 dark:bg-red-900/30" />
+                                <StatCard icon={Umbrella}      label="Ferie"          value={`${stats.ferie} gg`}                                          colorClass="bg-green-100 text-green-700 dark:bg-green-900/30" />
+                                <StatCard icon={CalendarOff}   label="Permessi"       value={`${stats.permessi} gg`}                                       colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/30" />
+                                <StatCard icon={BookOpen}      label="Corsi"          value={`${stats.corsi} gg`}                                          colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/30" />
+                                <StatCard icon={Building2}     label="Trasferimenti"  value={`${stats.trasferimenti} gg`}                                  colorClass="bg-orange-100 text-orange-700 dark:bg-orange-900/30" />
+                                <StatCard icon={UserX}         label="Assenze"        value={`${stats.assenze} gg`}                                        colorClass="bg-slate-100 text-slate-700 dark:bg-slate-800" />
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground text-center py-4">Nessun dato disponibile.</p>
@@ -300,6 +325,48 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                                             € {worker.hourlyRate.toFixed(2)}/h
                                         </span>
                                         <Button variant="ghost" size="icon" onClick={() => { setEditingRate(true); setRateValue(String(worker.hourlyRate)); }}>
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Costo trasferta */}
+                        <div className="bg-white dark:bg-card p-6 rounded-lg border dark:border-border space-y-4">
+                            <h2 className="font-semibold text-slate-900 dark:text-white">Costo Trasferta</h2>
+                            <div className="flex items-center justify-between p-4 border rounded-lg">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base">Costo trasferta (€/h)</Label>
+                                    <div className="text-sm text-muted-foreground">
+                                        Tariffa oraria applicata durante le trasferte.
+                                    </div>
+                                </div>
+                                {editingTrasferta ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <Euro className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                            <Input
+                                                className="pl-8 w-28 text-right"
+                                                value={trasfertaValue}
+                                                onChange={(e) => setTrasfertaValue(e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTrasferta(); if (e.key === 'Escape') setEditingTrasferta(false); }}
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <Button size="sm" onClick={handleSaveTrasferta} disabled={savingTrasferta}>
+                                            {savingTrasferta ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                        </Button>
+                                        <Button size="sm" variant="ghost" onClick={() => { setEditingTrasferta(false); setTrasfertaValue(String(worker.trasfertaRate)); }}>
+                                            Annulla
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-lg font-bold text-slate-900 dark:text-white">
+                                            € {worker.trasfertaRate.toFixed(2)}/h
+                                        </span>
+                                        <Button variant="ghost" size="icon" onClick={() => { setEditingTrasferta(true); setTrasfertaValue(String(worker.trasfertaRate)); }}>
                                             <Pencil className="h-4 w-4" />
                                         </Button>
                                     </div>
