@@ -210,6 +210,15 @@ export default function JobDetailsPage() {
                                 <Info className="h-4 w-4 md:mr-1" />
                                 <span className="hidden md:inline">Dettagli</span>
                             </TabsTrigger>
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                <TabsTrigger
+                                    value="costi-sal"
+                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                                >
+                                    <Euro className="h-4 w-4 md:mr-1" />
+                                    <span className="hidden md:inline">Costi e SAL</span>
+                                </TabsTrigger>
+                            )}
                             <TabsTrigger
                                 value="stock"
                                 className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
@@ -238,15 +247,6 @@ export default function JobDetailsPage() {
                                 <Clock className="h-4 w-4 md:mr-1" />
                                 <span className="hidden md:inline">Ore</span>
                             </TabsTrigger>
-                            {(userRole === 'admin' || userRole === 'operativo') && (
-                                <TabsTrigger
-                                    value="costi-sal"
-                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                                >
-                                    <Euro className="h-4 w-4 md:mr-1" />
-                                    <span className="hidden md:inline">Costi e SAL</span>
-                                </TabsTrigger>
-                            )}
                         </TabsList>
 
                         <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">

@@ -97,12 +97,13 @@ export function JobSAL({ jobId }: JobSALProps) {
         const rows: SalRow[] = []
 
         movements.forEach(m => {
+            const movType = m.type === 'exit' ? 'Uscita' : m.type === 'entry' ? 'Rientro' : m.type
             rows.push({
                 id: m.id,
                 type: 'movement',
                 date: m.date,
-                description: m.itemName ? `${m.itemCode ? `[${m.itemCode}] ` : ''}${m.itemName}${m.itemModel ? ` (${m.itemModel})` : ''}` : 'Articolo',
-                detail: `${m.type === 'exit' ? 'Uscita' : m.type === 'entry' ? 'Rientro' : m.type} — ${m.quantity} ${m.itemUnit || ''}`,
+                description: m.reference ? `${movType} — Bolla ${m.reference}` : movType,
+                detail: m.notes || undefined,
                 amount: (m.quantity || 0) * (m.itemPrice || 0),
                 salNames: salTagMap.get(`movement:${m.id}`) || [],
                 url: `/jobs/${jobId}?tab=stock`,
@@ -305,17 +306,20 @@ export function JobSAL({ jobId }: JobSALProps) {
             {/* Actions bar */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="text-sm text-slate-500">
-                    {selectedIds.size > 0
-                        ? `${selectedIds.size} voci selezionate`
-                        : `${filteredRows.length} voci`}
+                    {filteredRows.length} voci
                 </div>
                 <div className="flex gap-2">
-                    {selectedIds.size > 0 && (
-                        <Button size="sm" onClick={handleOpenAddSal} className="bg-blue-600 hover:bg-blue-700">
-                            <Tag className="h-4 w-4 mr-1" />
-                            Aggiungi SAL
-                        </Button>
-                    )}
+                    <Button
+                        size="sm"
+                        onClick={handleOpenAddSal}
+                        disabled={selectedIds.size === 0}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40"
+                        title={selectedIds.size === 0 ? "Seleziona prima alcune voci" : ""}
+                    >
+                        <Tag className="h-4 w-4 mr-1" />
+                        Aggiungi al SAL
+                        {selectedIds.size > 0 && <span className="ml-1 text-xs opacity-80">({selectedIds.size})</span>}
+                    </Button>
                     <Button
                         size="sm"
                         variant="outline"
