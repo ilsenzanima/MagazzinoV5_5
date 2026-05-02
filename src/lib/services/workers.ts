@@ -19,6 +19,16 @@ const mapWorkerToDb = (worker: Partial<Worker>) => ({
 });
 
 export const workersApi = {
+    getById: async (id: string) => {
+        const { data, error } = await supabase
+            .from('workers')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (error) throw error;
+        return mapDbToWorker(data);
+    },
+
     getAll: async () => {
         const { data, error } = await fetchWithTimeout(
             supabase
