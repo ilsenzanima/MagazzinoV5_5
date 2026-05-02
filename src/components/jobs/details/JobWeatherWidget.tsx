@@ -66,9 +66,21 @@ export function JobWeatherWidget({ address }: JobWeatherWidgetProps) {
     return <Wind className="h-6 w-6 text-slate-600" />
   }
 
-  if (loading) return <div className="h-32 animate-pulse bg-slate-100 rounded-lg" />
-  
-  if (error || !weather) return null;
+  if (loading) return <div className="h-32 animate-pulse bg-slate-100 dark:bg-slate-800 rounded-lg" />
+
+  if (error || !weather) return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+          <Cloud className="h-4 w-4" />
+          Meteo Cantiere
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-slate-400">Impossibile caricare il meteo per questo indirizzo.</p>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Card>

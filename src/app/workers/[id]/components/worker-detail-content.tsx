@@ -256,16 +256,15 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                             </div>
                         ) : stats ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                <StatCard icon={Activity}      label="Presenze"       value={`${stats.presenze} gg`}                                       colorClass="bg-blue-100 text-blue-700 dark:bg-blue-900/30" />
-                                <StatCard icon={Clock}         label="Ore lavorate"   value={`${stats.orePresenza} h`}                                     colorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30" />
-                                <StatCard icon={Clock}         label="Ore rettifica"  value={`${stats.oreRettifica >= 0 ? '+' : ''}${stats.oreRettifica} h`} colorClass="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30" />
-                                <StatCard icon={Stethoscope}   label="Malattie"       value={`${stats.malattie} gg`}                                       colorClass="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30" />
-                                <StatCard icon={AlertTriangle} label="Infortuni"      value={`${stats.infortuni} gg`}                                      colorClass="bg-red-100 text-red-700 dark:bg-red-900/30" />
-                                <StatCard icon={Umbrella}      label="Ferie"          value={`${stats.ferie} gg`}                                          colorClass="bg-green-100 text-green-700 dark:bg-green-900/30" />
-                                <StatCard icon={CalendarOff}   label="Permessi"       value={`${stats.permessi} gg`}                                       colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/30" />
-                                <StatCard icon={BookOpen}      label="Corsi"          value={`${stats.corsi} gg`}                                          colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/30" />
-                                <StatCard icon={Building2}     label="Trasferimenti"  value={`${stats.trasferimenti} gg`}                                  colorClass="bg-orange-100 text-orange-700 dark:bg-orange-900/30" />
-                                <StatCard icon={UserX}         label="Assenze"        value={`${stats.assenze} gg`}                                        colorClass="bg-slate-100 text-slate-700 dark:bg-slate-800" />
+                                <StatCard icon={Activity}      label="Presenze"      value={`${stats.presenze} gg`}                                             colorClass="bg-blue-100 text-blue-700 dark:bg-blue-900/30" />
+                                <StatCard icon={Clock}         label="Ore lavorate"  value={`${(stats.orePresenza + stats.oreRettifica).toFixed(1)} h`}          colorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30" />
+                                <StatCard icon={Stethoscope}   label="Malattie"      value={`${stats.malattie} gg`}                                             colorClass="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30" />
+                                <StatCard icon={AlertTriangle} label="Infortuni"     value={`${stats.infortuni} gg`}                                            colorClass="bg-red-100 text-red-700 dark:bg-red-900/30" />
+                                <StatCard icon={Umbrella}      label="Ferie"         value={`${stats.ferie} gg`}                                               colorClass="bg-green-100 text-green-700 dark:bg-green-900/30" />
+                                <StatCard icon={CalendarOff}   label="Permessi"      value={`${stats.permessi} gg`}                                             colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/30" />
+                                <StatCard icon={BookOpen}      label="Corsi"         value={`${stats.corsi} gg`}                                               colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/30" />
+                                <StatCard icon={Building2}     label="Trasferimenti" value={`${stats.trasferimenti} gg`}                                        colorClass="bg-orange-100 text-orange-700 dark:bg-orange-900/30" />
+                                <StatCard icon={UserX}         label="Assenze"       value={`${stats.assenze} gg`}                                             colorClass="bg-slate-100 text-slate-700 dark:bg-slate-800" />
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground text-center py-4">Nessun dato disponibile.</p>
