@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock, Euro } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import jsPDF from 'jspdf';
@@ -20,6 +20,7 @@ import { JobStock } from "@/components/jobs/details/JobStock";
 import { JobJournal } from "@/components/jobs/details/JobJournal";
 import { JobDocuments } from "@/components/jobs/details/JobDocuments";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
+import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
 
 export default function JobDetailsPage() {
     const { id } = useParams<{ id: string }>();
@@ -237,6 +238,15 @@ export default function JobDetailsPage() {
                                 <Clock className="h-4 w-4 md:mr-1" />
                                 <span className="hidden md:inline">Ore</span>
                             </TabsTrigger>
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                <TabsTrigger
+                                    value="costi-sal"
+                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                                >
+                                    <Euro className="h-4 w-4 md:mr-1" />
+                                    <span className="hidden md:inline">Costi e SAL</span>
+                                </TabsTrigger>
+                            )}
                         </TabsList>
 
                         <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">
@@ -257,6 +267,10 @@ export default function JobDetailsPage() {
 
                         <TabsContent value="attendance" className="space-y-6 focus-visible:outline-none">
                             <JobAttendance jobId={job.id} />
+                        </TabsContent>
+
+                        <TabsContent value="costi-sal" className="space-y-6 focus-visible:outline-none">
+                            <JobCostiSAL jobId={job.id} materialCost={totalCost} />
                         </TabsContent>
                     </Tabs>
                 </div>

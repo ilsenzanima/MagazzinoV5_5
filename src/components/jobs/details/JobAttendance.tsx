@@ -12,11 +12,16 @@ interface JobAttendanceProps {
     jobId: string;
 }
 
+interface WorkerHours {
+    normal: number;
+    transfer: number;
+}
+
 interface WeeklyData {
     weekLabel: string;
     weekStart: Date;
     weekEnd: Date;
-    workerHours: Map<string, number>; // workerId -> hours
+    workerHours: Map<string, WorkerHours>;
 }
 
 export function JobAttendance({ jobId }: JobAttendanceProps) {
@@ -117,13 +122,18 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
     // Calculate weekly data
     const weeklyData: WeeklyData[] = weeks.map(weekStartDate => {
         const weekEndDate = endOfWeek(weekStartDate, { weekStartsOn: 1, locale: it });
-        const workerHours = new Map<string, number>();
+        const workerHours = new Map<string, WorkerHours>();
 
         monthData.forEach(att => {
             const attDate = new Date(att.date);
-            if (attDate >= weekStartDate && attDate <= weekEndDate && att.status === 'presence') {
-                const current = workerHours.get(att.workerId) || 0;
-                workerHours.set(att.workerId, current + (att.hours || 0));
+            if (attDate >= weekStartDate && attDate <= weekEndDate &&
+                (att.status === 'presence' || att.status === 'transfer')) {
+                const current = workerHours.get(att.workerId) || { normal: 0, transfer: 0 };
+                if (att.status === 'transfer') {
+                    workerHours.set(att.workerId, { ...current, transfer: current.transfer + (att.hours || 0) });
+                } else {
+                    workerHours.set(att.workerId, { ...current, normal: current.normal + (att.hours || 0) });
+                }
             }
         });
 
@@ -136,18 +146,19 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
     });
 
     // Calculate totals
-    const workerTotals = new Map<string, number>();
+    const workerTotals = new Map<string, WorkerHours>();
     const weekTotals = weeklyData.map(week => {
         let weekTotal = 0;
         week.workerHours.forEach((hours, workerId) => {
-            weekTotal += hours;
-            const current = workerTotals.get(workerId) || 0;
-            workerTotals.set(workerId, current + hours);
+            const total = hours.normal + hours.transfer;
+            weekTotal += total;
+            const current = workerTotals.get(workerId) || { normal: 0, transfer: 0 };
+            workerTotals.set(workerId, { normal: current.normal + hours.normal, transfer: current.transfer + hours.transfer });
         });
         return weekTotal;
     });
 
-    const grandTotal = Array.from(workerTotals.values()).reduce((sum, hours) => sum + hours, 0);
+    const grandTotal = Array.from(workerTotals.values()).reduce((sum, h) => sum + h.normal + h.transfer, 0);
 
     if (loading) {
         return (
@@ -205,15 +216,34 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
                                             {worker.name}
                                         </td>
                                         {weeklyData.map((week, idx) => {
-                                            const hours = week.workerHours.get(worker.id) || 0;
+                                            const h = week.workerHours.get(worker.id);
+                                            const total = h ? h.normal + h.transfer : 0;
                                             return (
                                                 <td key={idx} className="text-center p-3 text-slate-700 dark:text-slate-300">
-                                                    {hours > 0 ? `${hours}h` : '-'}
+                                                    {total > 0 ? (
+                                                        <div>
+                                                            <div>{total}h</div>
+                                                            {h && h.transfer > 0 && (
+                                                                <div className="text-xs text-slate-400">{h.normal}h + {h.transfer}h (T)</div>
+                                                            )}
+                                                        </div>
+                                                    ) : '-'}
                                                 </td>
                                             );
                                         })}
                                         <td className="text-center p-3 font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20">
-                                            {workerTotals.get(worker.id) || 0}h
+                                            {(() => {
+                                                const t = workerTotals.get(worker.id);
+                                                const tot = t ? t.normal + t.transfer : 0;
+                                                return (
+                                                    <div>
+                                                        <div>{tot}h</div>
+                                                        {t && t.transfer > 0 && (
+                                                            <div className="text-xs text-blue-400">{t.normal}h + {t.transfer}h (T)</div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                     </tr>
                                 ))}
