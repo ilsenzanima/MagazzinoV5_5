@@ -183,6 +183,52 @@ export const attendanceApi = {
         return result;
     },
 
+    getYearlyStatsByWorker: async (workerId: string, year?: number): Promise<{
+        presenze: number; orePresenza: number;
+        malattie: number; infortuni: number;
+        ferie: number; permessi: number;
+        corsi: number; visiteMediche: number;
+        trasferimenti: number; assenze: number;
+        oreTotali: number;
+    }> => {
+        const y = year ?? new Date().getFullYear();
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('status, hours')
+            .eq('worker_id', workerId)
+            .gte('date', `${y}-01-01`)
+            .lte('date', `${y}-12-31`);
+
+        if (error) throw error;
+
+        const stats = {
+            presenze: 0, orePresenza: 0,
+            malattie: 0, infortuni: 0,
+            ferie: 0, permessi: 0,
+            corsi: 0, visiteMediche: 0,
+            trasferimenti: 0, assenze: 0,
+            oreTotali: 0,
+        };
+
+        (data || []).forEach((r: any) => {
+            const h = Number(r.hours) || 0;
+            stats.oreTotali += h;
+            switch (r.status) {
+                case 'presence':     stats.presenze++;       stats.orePresenza += h; break;
+                case 'sick':         stats.malattie++;       break;
+                case 'injury':       stats.infortuni++;      break;
+                case 'holiday':      stats.ferie++;          break;
+                case 'permit':       stats.permessi++;       break;
+                case 'course':       stats.corsi++;          break;
+                case 'medical_exam': stats.visiteMediche++;  break;
+                case 'transfer':     stats.trasferimenti++;  break;
+                case 'absence':      stats.assenze++;        break;
+            }
+        });
+
+        return stats;
+    },
+
     // New: Get total hours for all ACTIVE jobs (for dashboard)
     getActiveJobHours: async (client?: any): Promise<{ jobId: string; jobName: string; jobCode: string; totalHours: number }[]> => {
         const supabaseClient = client || supabase;
