@@ -124,6 +124,20 @@ export const attendanceApi = {
         return (data || []).reduce((sum, record) => sum + (Number(record.hours) || 0), 0);
     },
 
+    // Get first and last presence date for a job (for SAL worker hours date suggestion)
+    getJobPresenceDateRange: async (jobId: string): Promise<{ first: string | null; last: string | null }> => {
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('date')
+            .eq('job_id', jobId)
+            .in('status', ['presence', 'transfer'])
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        if (!data || data.length === 0) return { first: null, last: null };
+        return { first: data[0].date, last: data[data.length - 1].date };
+    },
+
     // Get attendance for a job within a date range (for SAL worker hours)
     getByJobIdAndDateRange: async (jobId: string, dateFrom: string, dateTo: string): Promise<Attendance[]> => {
         const { data, error } = await supabase
