@@ -20,13 +20,16 @@ interface JobCostiSALProps {
     movements: Movement[]
 }
 
+type SalRowKind = 'exit' | 'entry' | 'ddt'
+
 interface SalRow {
     id: string
-    type: 'movement' | 'purchase'
+    type: 'movement' | 'purchase'   // used for SAL tagging API
+    kind: SalRowKind                 // used for badge display
     date: string
     description: string
     detail?: string
-    pieces?: number   // signed: positive = uscita, negative = reso
+    pieces?: number   // signed: positive = uscita, negative = reso/rientro
     unit?: string
     amount: number
     salNames: string[]
@@ -236,27 +239,37 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
     // ── Derived: all material rows ────────────────────────────────────────────
     const allMaterialRows: SalRow[] = useMemo(() => {
         const rows: SalRow[] = []
-        movements.forEach(m => {
-            const movType = m.type === 'exit' ? 'Uscita' : m.type === 'entry' ? 'Rientro' : m.type
-            const sign = m.type === 'entry' ? -1 : 1
-            const itemLabel = [m.itemName, m.itemModel].filter(Boolean).join(' — ')
-            rows.push({
-                id: m.id,
-                type: 'movement',
-                date: m.date,
-                description: m.reference ? `${movType} — Bolla ${m.reference}` : movType,
-                detail: itemLabel || undefined,
-                // pieces: already quantity×coefficient in stock_movements_view (negative for exits)
-                pieces: sign * Math.abs(m.pieces ?? (Math.abs(m.quantity || 0) * (m.coefficient || 1))),
-                unit: m.itemUnit,
-                amount: sign * Math.abs(m.quantity || 0) * (m.itemPrice || 0),
-                salNames: salTagMap.get(`movement:${m.id}`) || [],
+
+        // Only exit/entry movements — type='purchase' is covered by DDT rows below
+        movements
+            .filter(m => m.type === 'exit' || m.type === 'entry')
+            .forEach(m => {
+                const kind: SalRowKind = m.type === 'entry' ? 'entry' : 'exit'
+                // entry (rientro/reso) = negative; exit (uscita) = positive
+                const sign = kind === 'entry' ? -1 : 1
+                const itemLabel = [m.itemName, m.itemModel].filter(Boolean).join(' — ')
+                // pieces: view stores exit as negative; we normalise with sign
+                const rawPieces = m.pieces ?? (Math.abs(m.quantity || 0) * (m.coefficient || 1))
+                rows.push({
+                    id: m.id,
+                    type: 'movement',
+                    kind,
+                    date: m.date,
+                    description: m.reference ? `Bolla ${m.reference}` : (kind === 'entry' ? 'Rientro' : 'Uscita'),
+                    detail: itemLabel || undefined,
+                    pieces: sign * Math.abs(rawPieces),
+                    unit: m.itemUnit,
+                    amount: sign * Math.abs(m.quantity || 0) * (m.itemPrice || 0),
+                    salNames: salTagMap.get(`movement:${m.id}`) || [],
+                })
             })
-        })
+
+        // DDT / purchase documents
         purchases.forEach(p => {
             rows.push({
                 id: p.id,
                 type: 'purchase',
+                kind: 'ddt',
                 date: p.deliveryNoteDate || p.createdAt,
                 description: `DDT ${p.deliveryNoteNumber || p.id.slice(0, 8)}`,
                 detail: p.supplierName,
@@ -264,6 +277,7 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                 salNames: salTagMap.get(`purchase:${p.id}`) || [],
             })
         })
+
         return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     }, [movements, purchases, salTagMap])
 
@@ -668,9 +682,15 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                                             {new Date(row.date).toLocaleDateString('it-IT')}
                                         </td>
                                         <td className="p-2">
-                                            <Badge variant="outline" className={row.type === 'purchase' ? 'border-purple-300 text-purple-700' : 'border-blue-300 text-blue-700'}>
-                                                {row.type === 'purchase' ? 'Acquisto' : 'Movimento'}
-                                            </Badge>
+                                            {row.kind === 'exit' && (
+                                                <Badge variant="outline" className="border-blue-300 text-blue-700">Uscita</Badge>
+                                            )}
+                                            {row.kind === 'entry' && (
+                                                <Badge variant="outline" className="border-orange-300 text-orange-700">Rientro</Badge>
+                                            )}
+                                            {row.kind === 'ddt' && (
+                                                <Badge variant="outline" className="border-purple-300 text-purple-700">Acquisto</Badge>
+                                            )}
                                         </td>
                                         <td className="p-2">
                                             <div className="font-medium text-slate-800 dark:text-slate-200">{row.description}</div>
