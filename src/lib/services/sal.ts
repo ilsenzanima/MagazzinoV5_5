@@ -1,5 +1,14 @@
 import { supabase } from '@/lib/supabase';
 
+export interface SalCost {
+    id: string;
+    jobId: string;
+    salName: string | null;
+    description: string;
+    amount: number;
+    createdAt: string;
+}
+
 export interface SalItem {
     id: string;
     jobId: string;
@@ -154,6 +163,59 @@ export const salApi = {
             .delete()
             .eq('job_id', jobId)
             .eq('sal_name', salName);
+        if (error) throw error;
+    },
+};
+
+const mapCostDb = (db: any): SalCost => ({
+    id: db.id,
+    jobId: db.job_id,
+    salName: db.sal_name,
+    description: db.description,
+    amount: Number(db.amount),
+    createdAt: db.created_at,
+});
+
+export const salCostsApi = {
+    getByJobId: async (jobId: string): Promise<SalCost[]> => {
+        const { data, error } = await supabase
+            .from('job_sal_costs')
+            .select('*')
+            .eq('job_id', jobId)
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        return (data || []).map(mapCostDb);
+    },
+
+    add: async (jobId: string, description: string, amount: number, salName?: string | null): Promise<SalCost> => {
+        const { data, error } = await supabase
+            .from('job_sal_costs')
+            .insert({ job_id: jobId, description, amount, sal_name: salName || null })
+            .select()
+            .single();
+        if (error) throw error;
+        return mapCostDb(data);
+    },
+
+    updateSal: async (id: string, salName: string | null): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_costs')
+            .update({ sal_name: salName })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    delete: async (id: string): Promise<void> => {
+        const { error } = await supabase.from('job_sal_costs').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    renameSalInCosts: async (jobId: string, oldName: string, newName: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_costs')
+            .update({ sal_name: newName })
+            .eq('job_id', jobId)
+            .eq('sal_name', oldName);
         if (error) throw error;
     },
 };
