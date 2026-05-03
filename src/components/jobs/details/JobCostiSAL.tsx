@@ -3,13 +3,15 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { JobWorkerCosts } from "./JobWorkerCosts"
 import { JobSAL } from "./JobSAL"
+import { Movement } from "@/lib/api"
 
 interface JobCostiSALProps {
     jobId: string
     materialCost: number
+    movements: Movement[]
 }
 
-export function JobCostiSAL({ jobId, materialCost }: JobCostiSALProps) {
+export function JobCostiSAL({ jobId, materialCost, movements }: JobCostiSALProps) {
     return (
         <Tabs defaultValue="costi" className="space-y-4">
             <TabsList>
@@ -22,7 +24,7 @@ export function JobCostiSAL({ jobId, materialCost }: JobCostiSALProps) {
             </TabsContent>
 
             <TabsContent value="sal" className="focus-visible:outline-none">
-                <JobSAL jobId={jobId} />
+                <JobSAL jobId={jobId} movements={movements} />
             </TabsContent>
         </Tabs>
     )

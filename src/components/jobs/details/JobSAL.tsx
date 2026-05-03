@@ -10,12 +10,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Plus, Users, Tag, ExternalLink, X, Clock } from "lucide-react"
-import { movementsApi, purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
+import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, SalItem, WorkerHoursSalData } from "@/lib/services/sal"
 import { notify } from "@/lib/notify"
 
 interface JobSALProps {
     jobId: string
+    movements: Movement[]
 }
 
 interface SalRow {
@@ -29,8 +30,7 @@ interface SalRow {
     url: string
 }
 
-export function JobSAL({ jobId }: JobSALProps) {
-    const [movements, setMovements] = useState<Movement[]>([])
+export function JobSAL({ jobId, movements }: JobSALProps) {
     const [purchases, setPurchases] = useState<Purchase[]>([])
     const [salItems, setSalItems] = useState<SalItem[]>([])
     const [loading, setLoading] = useState(true)
@@ -56,12 +56,10 @@ export function JobSAL({ jobId }: JobSALProps) {
     const loadData = async () => {
         try {
             setLoading(true)
-            const [movData, purData, salData] = await Promise.all([
-                movementsApi.getByJobId(jobId),
+            const [purData, salData] = await Promise.all([
                 purchasesApi.getByJobId(jobId),
                 salApi.getByJobId(jobId),
             ])
-            setMovements(movData)
             setPurchases(purData)
             setSalItems(salData)
         } catch (e) {
@@ -98,13 +96,14 @@ export function JobSAL({ jobId }: JobSALProps) {
 
         movements.forEach(m => {
             const movType = m.type === 'exit' ? 'Uscita' : m.type === 'entry' ? 'Rientro' : m.type
+            const sign = m.type === 'entry' ? -1 : 1
             rows.push({
                 id: m.id,
                 type: 'movement',
                 date: m.date,
                 description: m.reference ? `${movType} — Bolla ${m.reference}` : movType,
                 detail: m.notes || undefined,
-                amount: (m.quantity || 0) * (m.itemPrice || 0),
+                amount: sign * (m.quantity || 0) * (m.itemPrice || 0),
                 salNames: salTagMap.get(`movement:${m.id}`) || [],
                 url: `/jobs/${jobId}?tab=stock`,
             })
@@ -392,8 +391,8 @@ export function JobSAL({ jobId }: JobSALProps) {
                                                 <div className="font-medium text-slate-800 dark:text-slate-200">{row.description}</div>
                                                 {row.detail && <div className="text-xs text-slate-400">{row.detail}</div>}
                                             </td>
-                                            <td className="p-3 text-right font-mono text-slate-700 dark:text-slate-300">
-                                                {row.amount > 0 ? `€ ${fmt(row.amount)}` : '—'}
+                                            <td className={`p-3 text-right font-mono ${row.amount < 0 ? 'text-red-600' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                {row.amount !== 0 ? `€ ${fmt(row.amount)}` : '—'}
                                             </td>
                                             <td className="p-3" onClick={e => e.stopPropagation()}>
                                                 <div className="flex flex-wrap gap-1">
