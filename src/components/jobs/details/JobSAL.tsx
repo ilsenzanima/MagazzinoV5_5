@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Plus, Users, Tag, ExternalLink, X, Clock } from "lucide-react"
+import { Loader2, Users, Tag, ExternalLink, X, Clock } from "lucide-react"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, SalItem, WorkerHoursSalData } from "@/lib/services/sal"
 import { notify } from "@/lib/notify"
@@ -50,8 +50,13 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
     const [whPreview, setWhPreview] = useState<WorkerHoursSalData | null>(null)
     const [whLoading, setWhLoading] = useState(false)
     const [whSaving, setWhSaving] = useState(false)
+    const [whDateHint, setWhDateHint] = useState<{ first: string | null; last: string | null } | null>(null)
 
     const [viewingWH, setViewingWH] = useState<WorkerHoursSalData | null>(null)
+
+    const [isManageSalOpen, setIsManageSalOpen] = useState(false)
+    const [editingNames, setEditingNames] = useState<Record<string, string>>({})
+    const [manageSaving, setManageSaving] = useState<string | null>(null)
 
     const loadData = async () => {
         try {
@@ -96,14 +101,17 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
 
         movements.forEach(m => {
             const movType = m.type === 'exit' ? 'Uscita' : m.type === 'entry' ? 'Rientro' : m.type
+            // Use Math.abs because stock_movements_view stores exit quantities as negative
+            // Only 'entry' (rientro/reso) reduces job cost → negative
             const sign = m.type === 'entry' ? -1 : 1
+            const itemLabel = [m.itemName, m.itemModel].filter(Boolean).join(' — ')
             rows.push({
                 id: m.id,
                 type: 'movement',
                 date: m.date,
                 description: m.reference ? `${movType} — Bolla ${m.reference}` : movType,
-                detail: m.notes || undefined,
-                amount: sign * (m.quantity || 0) * (m.itemPrice || 0),
+                detail: itemLabel || m.notes || undefined,
+                amount: sign * Math.abs(m.quantity || 0) * (m.itemPrice || 0),
                 salNames: salTagMap.get(`movement:${m.id}`) || [],
                 url: `/jobs/${jobId}?tab=stock`,
             })
@@ -277,6 +285,51 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
         }
     }
 
+    const handleOpenWorkerHours = async () => {
+        setWhDateFrom('')
+        setWhDateTo('')
+        setWhSalName(salNames[0] || '')
+        setWhPreview(null)
+        setWhDateHint(null)
+        setIsWorkerHoursOpen(true)
+        try {
+            const range = await attendanceApi.getJobPresenceDateRange(jobId)
+            setWhDateHint(range)
+        } catch { /* non bloccante */ }
+    }
+
+    const handleRenameSal = async (oldName: string) => {
+        const newName = (editingNames[oldName] || '').trim()
+        if (!newName || newName === oldName) return
+        try {
+            setManageSaving(oldName)
+            await salApi.renameSal(jobId, oldName, newName)
+            await loadData()
+            setEditingNames(prev => { const n = { ...prev }; delete n[oldName]; return n })
+            if (activeFilter === oldName) setActiveFilter(newName)
+        } catch (e) {
+            console.error(e)
+            notify.error("Errore durante la rinomina del SAL")
+        } finally {
+            setManageSaving(null)
+        }
+    }
+
+    const handleDeleteSal = async (name: string) => {
+        if (!confirm(`Eliminare il SAL "${name}" e tutte le sue voci?`)) return
+        try {
+            setManageSaving(name)
+            await salApi.deleteSal(jobId, name)
+            await loadData()
+            if (activeFilter === name) setActiveFilter('all')
+        } catch (e) {
+            console.error(e)
+            notify.error("Errore durante l'eliminazione del SAL")
+        } finally {
+            setManageSaving(null)
+        }
+    }
+
     const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
 
     if (loading) return (
@@ -307,7 +360,7 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
                 <div className="text-sm text-slate-500">
                     {filteredRows.length} voci
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     <Button
                         size="sm"
                         onClick={handleOpenAddSal}
@@ -322,19 +375,25 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
                     <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                            setWhDateFrom('')
-                            setWhDateTo('')
-                            setWhSalName(salNames[0] || '')
-                            setWhPreview(null)
-                            setIsWorkerHoursOpen(true)
-                        }}
+                        onClick={handleOpenWorkerHours}
                         disabled={salNames.length === 0}
                         title={salNames.length === 0 ? "Crea prima un SAL aggiungendo voci materiali" : ""}
                     >
                         <Users className="h-4 w-4 mr-1" />
-                        Aggiungi ore operai al SAL
+                        Ore operai al SAL
                     </Button>
+                    {salNames.length > 0 && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                setEditingNames(Object.fromEntries(salNames.map(n => [n, n])))
+                                setIsManageSalOpen(true)
+                            }}
+                        >
+                            Gestisci SAL
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -543,6 +602,31 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
+                        {whDateHint?.first && (
+                            <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 rounded p-2">
+                                <span>Prima presenza registrata:</span>
+                                <button
+                                    className="font-semibold text-blue-600 hover:underline"
+                                    onClick={() => { setWhDateFrom(whDateHint.first!); setWhPreview(null) }}
+                                >
+                                    {new Date(whDateHint.first).toLocaleDateString('it-IT')}
+                                </button>
+                                <span className="mx-1">—</span>
+                                <span>Ultima:</span>
+                                <button
+                                    className="font-semibold text-blue-600 hover:underline"
+                                    onClick={() => { setWhDateTo(whDateHint.last!); setWhPreview(null) }}
+                                >
+                                    {new Date(whDateHint.last!).toLocaleDateString('it-IT')}
+                                </button>
+                                <button
+                                    className="ml-auto text-blue-600 hover:underline font-medium"
+                                    onClick={() => { setWhDateFrom(whDateHint.first!); setWhDateTo(whDateHint.last!); setWhPreview(null) }}
+                                >
+                                    Usa entrambe
+                                </button>
+                            </div>
+                        )}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Data inizio</Label>
@@ -588,6 +672,50 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
                             {whSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             Salva nel SAL
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Gestisci SAL Dialog */}
+            <Dialog open={isManageSalOpen} onOpenChange={setIsManageSalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Gestisci SAL</DialogTitle>
+                        <DialogDescription>Rinomina o elimina i SAL esistenti.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                        {salNames.length === 0 ? (
+                            <p className="text-sm text-slate-400 text-center py-4">Nessun SAL creato.</p>
+                        ) : (
+                            salNames.map(name => (
+                                <div key={name} className="flex items-center gap-2">
+                                    <Input
+                                        value={editingNames[name] ?? name}
+                                        onChange={e => setEditingNames(prev => ({ ...prev, [name]: e.target.value }))}
+                                        className="flex-1"
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={manageSaving === name || (editingNames[name] || '').trim() === name || !(editingNames[name] || '').trim()}
+                                        onClick={() => handleRenameSal(name)}
+                                    >
+                                        {manageSaving === name ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rinomina'}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        disabled={manageSaving === name}
+                                        onClick={() => handleDeleteSal(name)}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsManageSalOpen(false)}>Chiudi</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

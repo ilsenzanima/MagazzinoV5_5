@@ -138,4 +138,22 @@ export const salApi = {
             .eq('item_id', itemId);
         if (error) throw error;
     },
+
+    renameSal: async (jobId: string, oldName: string, newName: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_items')
+            .update({ sal_name: newName })
+            .eq('job_id', jobId)
+            .eq('sal_name', oldName);
+        if (error) throw error;
+    },
+
+    deleteSal: async (jobId: string, salName: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_items')
+            .delete()
+            .eq('job_id', jobId)
+            .eq('sal_name', salName);
+        if (error) throw error;
+    },
 };
