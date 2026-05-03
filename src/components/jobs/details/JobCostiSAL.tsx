@@ -26,6 +26,8 @@ interface SalRow {
     date: string
     description: string
     detail?: string
+    pieces?: number   // signed: positive = uscita, negative = reso
+    unit?: string
     amount: number
     salNames: string[]
 }
@@ -244,6 +246,9 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                 date: m.date,
                 description: m.reference ? `${movType} — Bolla ${m.reference}` : movType,
                 detail: itemLabel || undefined,
+                // pieces: already quantity×coefficient in stock_movements_view (negative for exits)
+                pieces: sign * Math.abs(m.pieces ?? (Math.abs(m.quantity || 0) * (m.coefficient || 1))),
+                unit: m.itemUnit,
                 amount: sign * Math.abs(m.quantity || 0) * (m.itemPrice || 0),
                 salNames: salTagMap.get(`movement:${m.id}`) || [],
             })
@@ -648,6 +653,7 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                                     <th className="text-left p-2 font-medium text-slate-500">Data</th>
                                     <th className="text-left p-2 font-medium text-slate-500">Tipo</th>
                                     <th className="text-left p-2 font-medium text-slate-500">Descrizione</th>
+                                    <th className="text-right p-2 font-medium text-slate-500">Pezzi</th>
                                     <th className="text-right p-2 font-medium text-slate-500">Importo</th>
                                     <th className="text-left p-2 font-medium text-slate-500">SAL</th>
                                 </tr>
@@ -670,6 +676,11 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                                             <div className="font-medium text-slate-800 dark:text-slate-200">{row.description}</div>
                                             {row.detail && <div className="text-xs text-slate-400">{row.detail}</div>}
                                         </td>
+                                        <td className={`p-2 text-right font-mono whitespace-nowrap ${row.pieces !== undefined && row.pieces < 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                                            {row.pieces !== undefined
+                                                ? `${row.pieces > 0 ? '' : ''}${row.pieces.toLocaleString('it-IT', { maximumFractionDigits: 3 })}${row.unit ? ' ' + row.unit : ''}`
+                                                : '—'}
+                                        </td>
                                         <td className={`p-2 text-right font-mono ${row.amount < 0 ? 'text-red-600' : 'text-slate-700 dark:text-slate-300'}`}>
                                             {row.amount !== 0 ? `€ ${fmt(row.amount)}` : '—'}
                                         </td>
@@ -688,6 +699,20 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                                     </tr>
                                 ))}
                             </tbody>
+                            <tfoot>
+                                <tr className="border-t-2 border-slate-200 bg-slate-50 dark:bg-slate-800/50 font-semibold text-sm">
+                                    <td colSpan={4} className="p-2 text-slate-600">Totale</td>
+                                    <td className={`p-2 text-right font-mono ${filteredMaterialRows.filter(r => r.pieces !== undefined).reduce((s, r) => s + (r.pieces ?? 0), 0) < 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                        {filteredMaterialRows.some(r => r.pieces !== undefined)
+                                            ? `${filteredMaterialRows.filter(r => r.pieces !== undefined).reduce((s, r) => s + (r.pieces ?? 0), 0).toLocaleString('it-IT', { maximumFractionDigits: 3 })}`
+                                            : '—'}
+                                    </td>
+                                    <td className={`p-2 text-right font-mono ${materialTotal < 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                        € {fmt(materialTotal)}
+                                    </td>
+                                    <td className="p-2"></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 )}
