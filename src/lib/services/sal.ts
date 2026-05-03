@@ -66,14 +66,17 @@ export const salApi = {
     },
 
     tagItem: async (jobId: string, salName: string, itemType: 'movement' | 'purchase', itemId: string): Promise<SalItem> => {
+        // Delete existing entry first to avoid unique conflict, then insert
+        await supabase.from('job_sal_items')
+            .delete()
+            .eq('job_id', jobId)
+            .eq('sal_name', salName)
+            .eq('item_type', itemType)
+            .eq('item_id', itemId);
+
         const { data, error } = await supabase
             .from('job_sal_items')
-            .upsert({
-                job_id: jobId,
-                sal_name: salName,
-                item_type: itemType,
-                item_id: itemId,
-            }, { onConflict: 'job_id,sal_name,item_type,item_id' })
+            .insert({ job_id: jobId, sal_name: salName, item_type: itemType, item_id: itemId })
             .select()
             .single();
         if (error) throw error;
@@ -81,15 +84,25 @@ export const salApi = {
     },
 
     tagItems: async (jobId: string, salName: string, items: { itemType: 'movement' | 'purchase'; itemId: string }[]): Promise<void> => {
+        if (items.length === 0) return;
+
+        // Delete existing entries for these items+SAL, then re-insert
+        for (const item of items) {
+            await supabase.from('job_sal_items')
+                .delete()
+                .eq('job_id', jobId)
+                .eq('sal_name', salName)
+                .eq('item_type', item.itemType)
+                .eq('item_id', item.itemId);
+        }
+
         const rows = items.map(item => ({
             job_id: jobId,
             sal_name: salName,
             item_type: item.itemType,
             item_id: item.itemId,
         }));
-        const { error } = await supabase
-            .from('job_sal_items')
-            .upsert(rows, { onConflict: 'job_id,sal_name,item_type,item_id' });
+        const { error } = await supabase.from('job_sal_items').insert(rows);
         if (error) throw error;
     },
 
