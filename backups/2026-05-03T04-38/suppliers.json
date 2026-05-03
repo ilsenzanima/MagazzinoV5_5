@@ -368,5 +368,25 @@
     "address": null,
     "created_at": "2026-01-30T16:46:36.731193+00:00",
     "updated_at": "2026-01-30T16:46:36.731193+00:00"
+  },
+  {
+    "id": "323ad6f0-4c9a-4b08-b8bf-4121664345dd",
+    "name": "RICAMBITERMOTECNICI.it",
+    "vat_number": null,
+    "email": null,
+    "phone": null,
+    "address": null,
+    "created_at": "2026-02-09T10:40:37.330342+00:00",
+    "updated_at": "2026-02-09T10:40:37.330342+00:00"
+  },
+  {
+    "id": "24929cea-f18c-4060-8c0f-e5890938eeb8",
+    "name": "TECNOMAT",
+    "vat_number": null,
+    "email": null,
+    "phone": null,
+    "address": null,
+    "created_at": "2026-04-17T16:16:25.085341+00:00",
+    "updated_at": "2026-04-17T16:16:25.085341+00:00"
   }
 ]
