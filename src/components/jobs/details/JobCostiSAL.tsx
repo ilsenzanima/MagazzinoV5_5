@@ -35,6 +35,17 @@ interface SalRow {
     salNames: string[]
 }
 
+interface MaterialGroup {
+    groupId: string
+    kind: SalRowKind
+    date: string
+    description: string
+    detail?: string
+    totalAmount: number
+    totalPieces?: number
+    children: SalRow[]
+}
+
 interface WorkerCostRow {
     workerId: string
     workerName: string
@@ -165,6 +176,10 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
 
     // ── Materials section ─────────────────────────────────────────────────────
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+    const toggleGroupExpanded = (groupId: string) => setExpandedGroups(prev => {
+        const next = new Set(prev); next.has(groupId) ? next.delete(groupId) : next.add(groupId); return next
+    })
     const [isAddSalOpen, setIsAddSalOpen] = useState(false)
     const [addSalName, setAddSalName] = useState('')
     const [addSalMode, setAddSalMode] = useState<'new' | 'existing'>('new')
@@ -236,56 +251,92 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
         return map
     }, [salItems])
 
-    // ── Derived: all material rows ────────────────────────────────────────────
-    const allMaterialRows: SalRow[] = useMemo(() => {
-        const rows: SalRow[] = []
+    // ── Derived: grouped material rows ───────────────────────────────────────
+    const allMaterialGroups: MaterialGroup[] = useMemo(() => {
+        const groups: MaterialGroup[] = []
 
-        // Only exit/entry movements — type='purchase' is covered by DDT rows below
+        // ── 1. Exit / Entry movements grouped by delivery note ────────────────
+        const movMap = new Map<string, { kind: SalRowKind; date: string; ref: string; children: SalRow[] }>()
         movements
             .filter(m => m.type === 'exit' || m.type === 'entry')
             .forEach(m => {
+                const gk = m.deliveryNoteId || `ref:${m.reference}`
                 const kind: SalRowKind = m.type === 'entry' ? 'entry' : 'exit'
-                // entry (rientro/reso) = negative; exit (uscita) = positive
+                if (!movMap.has(gk)) movMap.set(gk, { kind, date: m.date, ref: m.reference, children: [] })
+                const g = movMap.get(gk)!
                 const sign = kind === 'entry' ? -1 : 1
-                const itemLabel = [m.itemName, m.itemModel].filter(Boolean).join(' — ')
-                // pieces: view stores exit as negative; we normalise with sign
                 const rawPieces = m.pieces ?? (Math.abs(m.quantity || 0) * (m.coefficient || 1))
-                rows.push({
-                    id: m.id,
-                    type: 'movement',
-                    kind,
+                g.children.push({
+                    id: m.id, type: 'movement', kind,
                     date: m.date,
-                    description: m.reference ? `Bolla ${m.reference}` : (kind === 'entry' ? 'Rientro' : 'Uscita'),
-                    detail: itemLabel || undefined,
+                    description: [m.itemName, m.itemModel].filter(Boolean).join(' — ') || m.itemCode || '—',
                     pieces: sign * Math.abs(rawPieces),
                     unit: m.itemUnit,
                     amount: sign * Math.abs(m.quantity || 0) * (m.itemPrice || 0),
                     salNames: salTagMap.get(`movement:${m.id}`) || [],
                 })
             })
+        movMap.forEach((g, gk) => {
+            groups.push({
+                groupId: gk,
+                kind: g.kind,
+                date: g.date,
+                description: `Bolla ${g.ref}`,
+                totalAmount: g.children.reduce((s, c) => s + c.amount, 0),
+                totalPieces: g.children.reduce((s, c) => s + (c.pieces ?? 0), 0),
+                children: g.children,
+            })
+        })
 
-        // DDT / purchase documents
+        // ── 2. DDT (purchases) with individual items from stock_movements_view ─
         purchases.forEach(p => {
-            rows.push({
-                id: p.id,
-                type: 'purchase',
+            const items = movements.filter(m => m.type === 'purchase' && m.purchaseId === p.id)
+            const children: SalRow[] = items.map(m => ({
+                id: m.id, type: 'movement' as const, kind: 'ddt' as SalRowKind,
+                date: m.date,
+                description: [m.itemName, m.itemModel].filter(Boolean).join(' — ') || m.itemCode || '—',
+                pieces: m.pieces ?? (Math.abs(m.quantity || 0) * (m.coefficient || 1)),
+                unit: m.itemUnit,
+                amount: Math.abs(m.quantity || 0) * (m.itemPrice || 0),
+                salNames: salTagMap.get(`movement:${m.id}`) || [],
+            }))
+            const childTotal = children.reduce((s, c) => s + c.amount, 0)
+            groups.push({
+                groupId: p.id,
                 kind: 'ddt',
                 date: p.deliveryNoteDate || p.createdAt,
                 description: `DDT ${p.deliveryNoteNumber || p.id.slice(0, 8)}`,
                 detail: p.supplierName,
-                amount: p.totalAmount || 0,
-                salNames: salTagMap.get(`purchase:${p.id}`) || [],
+                totalAmount: childTotal || p.totalAmount || 0,
+                totalPieces: children.reduce((s, c) => s + (c.pieces ?? 0), 0),
+                children,
             })
         })
 
-        return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        return groups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     }, [movements, purchases, salTagMap])
 
-    // ── Derived: filtered material rows ──────────────────────────────────────
-    const filteredMaterialRows = useMemo(() => {
-        if (activeFilter === 'all') return allMaterialRows
-        return allMaterialRows.filter(r => r.salNames.includes(activeFilter))
-    }, [allMaterialRows, activeFilter])
+    // ── Derived: filtered groups (children filtered when SAL is active) ───────
+    const filteredMaterialGroups: MaterialGroup[] = useMemo(() => {
+        if (activeFilter === 'all') return allMaterialGroups
+        return allMaterialGroups
+            .map(g => {
+                const children = g.children.filter(c => c.salNames.includes(activeFilter))
+                return {
+                    ...g,
+                    children,
+                    totalAmount: children.reduce((s, c) => s + c.amount, 0),
+                    totalPieces: children.reduce((s, c) => s + (c.pieces ?? 0), 0),
+                }
+            })
+            .filter(g => g.children.length > 0)
+    }, [allMaterialGroups, activeFilter])
+
+    // flat list of all visible child rows (for selection helpers)
+    const allVisibleChildRows = useMemo(
+        () => filteredMaterialGroups.flatMap(g => g.children),
+        [filteredMaterialGroups]
+    )
 
     // ── Derived: filtered worker rows ─────────────────────────────────────────
     const filteredWorkerRows = useMemo(() => {
@@ -326,8 +377,8 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
 
     // ── Derived: totals ───────────────────────────────────────────────────────
     const materialTotal = useMemo(
-        () => filteredMaterialRows.reduce((s, r) => s + r.amount, 0),
-        [filteredMaterialRows]
+        () => filteredMaterialGroups.reduce((s, g) => s + g.totalAmount, 0),
+        [filteredMaterialGroups]
     )
     const workerTotal = useMemo(
         () => filteredWorkerRows.reduce((s, r) => s + r.total, 0),
@@ -344,15 +395,22 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
     // ── Materials: toggle selection ───────────────────────────────────────────
     const toggleSelect = (id: string) => {
         setSelectedIds(prev => {
+            const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
+        })
+    }
+    const toggleGroupSelection = (group: MaterialGroup) => {
+        const ids = group.children.map(c => c.id)
+        const allSel = ids.every(id => selectedIds.has(id))
+        setSelectedIds(prev => {
             const next = new Set(prev)
-            next.has(id) ? next.delete(id) : next.add(id)
+            allSel ? ids.forEach(id => next.delete(id)) : ids.forEach(id => next.add(id))
             return next
         })
     }
     const toggleSelectAll = () => {
-        setSelectedIds(selectedIds.size === filteredMaterialRows.length
-            ? new Set()
-            : new Set(filteredMaterialRows.map(r => r.id)))
+        const allIds = allVisibleChildRows.map(r => r.id)
+        const allSel = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
+        setSelectedIds(allSel ? new Set() : new Set(allIds))
     }
 
     // ── Materials: add to SAL ─────────────────────────────────────────────────
@@ -366,7 +424,7 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
         if (!name) return
         try {
             setIsSaving(true)
-            const items = allMaterialRows.filter(r => selectedIds.has(r.id)).map(r => ({ itemType: r.type, itemId: r.id }))
+            const items = allVisibleChildRows.filter(r => selectedIds.has(r.id)).map(r => ({ itemType: r.type, itemId: r.id }))
             await salApi.tagItems(jobId, name, items)
             setIsAddSalOpen(false)
             setSelectedIds(new Set())
@@ -649,93 +707,148 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                     </div>
                 }
             >
-                {filteredMaterialRows.length === 0 ? (
+                {filteredMaterialGroups.length === 0 ? (
                     <p className="text-sm text-slate-400 text-center py-6">
                         {activeFilter === 'all' ? 'Nessun materiale trovato.' : `Nessun materiale per il SAL "${activeFilter}".`}
                     </p>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-slate-50 dark:bg-slate-800/50">
-                                    <th className="p-2 w-8">
-                                        <Checkbox
-                                            checked={filteredMaterialRows.length > 0 && selectedIds.size === filteredMaterialRows.length}
-                                            onCheckedChange={toggleSelectAll}
-                                        />
-                                    </th>
-                                    <th className="text-left p-2 font-medium text-slate-500">Data</th>
-                                    <th className="text-left p-2 font-medium text-slate-500">Tipo</th>
-                                    <th className="text-left p-2 font-medium text-slate-500">Descrizione</th>
-                                    <th className="text-right p-2 font-medium text-slate-500">Pezzi</th>
-                                    <th className="text-right p-2 font-medium text-slate-500">Importo</th>
-                                    <th className="text-left p-2 font-medium text-slate-500">SAL</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredMaterialRows.map(row => (
-                                    <tr key={row.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                                        <td className="p-2">
-                                            <Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelect(row.id)} />
-                                        </td>
-                                        <td className="p-2 text-slate-500 whitespace-nowrap">
-                                            {new Date(row.date).toLocaleDateString('it-IT')}
-                                        </td>
-                                        <td className="p-2">
-                                            {row.kind === 'exit' && (
-                                                <Badge variant="outline" className="border-blue-300 text-blue-700">Uscita</Badge>
-                                            )}
-                                            {row.kind === 'entry' && (
-                                                <Badge variant="outline" className="border-orange-300 text-orange-700">Rientro</Badge>
-                                            )}
-                                            {row.kind === 'ddt' && (
-                                                <Badge variant="outline" className="border-purple-300 text-purple-700">Acquisto</Badge>
-                                            )}
-                                        </td>
-                                        <td className="p-2">
-                                            <div className="font-medium text-slate-800 dark:text-slate-200">{row.description}</div>
-                                            {row.detail && <div className="text-xs text-slate-400">{row.detail}</div>}
-                                        </td>
-                                        <td className={`p-2 text-right font-mono whitespace-nowrap ${row.pieces !== undefined && row.pieces < 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                                            {row.pieces !== undefined
-                                                ? `${row.pieces > 0 ? '' : ''}${row.pieces.toLocaleString('it-IT', { maximumFractionDigits: 3 })}${row.unit ? ' ' + row.unit : ''}`
-                                                : '—'}
-                                        </td>
-                                        <td className={`p-2 text-right font-mono ${row.amount < 0 ? 'text-red-600' : 'text-slate-700 dark:text-slate-300'}`}>
-                                            {row.amount !== 0 ? `€ ${fmt(row.amount)}` : '—'}
-                                        </td>
-                                        <td className="p-2">
-                                            <div className="flex flex-wrap gap-1">
-                                                {row.salNames.map(name => (
-                                                    <span key={name} className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded px-1.5 py-0.5">
-                                                        {name}
-                                                        <button onClick={() => handleRemoveFromSal(row, name)} className="hover:text-red-500">
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </td>
+                ) : (() => {
+                    const allIds = allVisibleChildRows.map(r => r.id)
+                    const allSel = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
+                    const someSel = !allSel && allIds.some(id => selectedIds.has(id))
+                    const totalPieces = filteredMaterialGroups.reduce((s, g) => s + (g.totalPieces ?? 0), 0)
+                    return (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-slate-50 dark:bg-slate-800/50">
+                                        <th className="p-2 w-6"></th>
+                                        <th className="p-2 w-8">
+                                            <Checkbox
+                                                checked={allSel ? true : someSel ? 'indeterminate' : false}
+                                                onCheckedChange={toggleSelectAll}
+                                            />
+                                        </th>
+                                        <th className="text-left p-2 font-medium text-slate-500">Data</th>
+                                        <th className="text-left p-2 font-medium text-slate-500">Tipo</th>
+                                        <th className="text-left p-2 font-medium text-slate-500">Descrizione</th>
+                                        <th className="text-right p-2 font-medium text-slate-500">Pezzi</th>
+                                        <th className="text-right p-2 font-medium text-slate-500">Importo</th>
+                                        <th className="text-left p-2 font-medium text-slate-500">SAL</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                <tr className="border-t-2 border-slate-200 bg-slate-50 dark:bg-slate-800/50 font-semibold text-sm">
-                                    <td colSpan={4} className="p-2 text-slate-600">Totale</td>
-                                    <td className={`p-2 text-right font-mono ${filteredMaterialRows.filter(r => r.pieces !== undefined).reduce((s, r) => s + (r.pieces ?? 0), 0) < 0 ? 'text-red-600' : 'text-slate-700'}`}>
-                                        {filteredMaterialRows.some(r => r.pieces !== undefined)
-                                            ? `${filteredMaterialRows.filter(r => r.pieces !== undefined).reduce((s, r) => s + (r.pieces ?? 0), 0).toLocaleString('it-IT', { maximumFractionDigits: 3 })}`
-                                            : '—'}
-                                    </td>
-                                    <td className={`p-2 text-right font-mono ${materialTotal < 0 ? 'text-red-600' : 'text-slate-700'}`}>
-                                        € {fmt(materialTotal)}
-                                    </td>
-                                    <td className="p-2"></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                )}
+                                </thead>
+                                <tbody>
+                                    {filteredMaterialGroups.map(group => {
+                                        const isOpen = expandedGroups.has(group.groupId)
+                                        const gIds = group.children.map(c => c.id)
+                                        const gAllSel = gIds.every(id => selectedIds.has(id))
+                                        const gSomeSel = !gAllSel && gIds.some(id => selectedIds.has(id))
+                                        // aggregate SAL names from children
+                                        const groupSalNames = [...new Set(group.children.flatMap(c => c.salNames))]
+                                        return (
+                                            <>
+                                                {/* ── Parent row ── */}
+                                                <tr key={group.groupId} className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/20 hover:bg-slate-100 dark:hover:bg-slate-800/40">
+                                                    <td className="p-2">
+                                                        {group.children.length > 0 ? (
+                                                            <button onClick={() => toggleGroupExpanded(group.groupId)} className="text-slate-400 hover:text-slate-700">
+                                                                {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                                            </button>
+                                                        ) : <span className="w-4 inline-block" />}
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <Checkbox
+                                                            checked={gAllSel ? true : gSomeSel ? 'indeterminate' : false}
+                                                            onCheckedChange={() => toggleGroupSelection(group)}
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 text-slate-500 whitespace-nowrap text-xs">
+                                                        {new Date(group.date).toLocaleDateString('it-IT')}
+                                                    </td>
+                                                    <td className="p-2">
+                                                        {group.kind === 'exit' && <Badge variant="outline" className="border-blue-300 text-blue-700 text-xs">Uscita</Badge>}
+                                                        {group.kind === 'entry' && <Badge variant="outline" className="border-orange-300 text-orange-700 text-xs">Rientro</Badge>}
+                                                        {group.kind === 'ddt' && <Badge variant="outline" className="border-purple-300 text-purple-700 text-xs">Acquisto</Badge>}
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <div className="font-semibold text-slate-800 dark:text-slate-200">{group.description}</div>
+                                                        {group.detail && <div className="text-xs text-slate-400">{group.detail}</div>}
+                                                        {group.children.length > 0 && (
+                                                            <div className="text-xs text-slate-400">{group.children.length} {group.children.length === 1 ? 'articolo' : 'articoli'}</div>
+                                                        )}
+                                                    </td>
+                                                    <td className={`p-2 text-right font-mono whitespace-nowrap text-xs ${(group.totalPieces ?? 0) < 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                                                        {group.totalPieces !== undefined
+                                                            ? group.totalPieces.toLocaleString('it-IT', { maximumFractionDigits: 3 })
+                                                            : '—'}
+                                                    </td>
+                                                    <td className={`p-2 text-right font-mono font-medium ${group.totalAmount < 0 ? 'text-red-600' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                        {group.totalAmount !== 0 ? `€ ${fmt(group.totalAmount)}` : '—'}
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {groupSalNames.map(name => (
+                                                                <span key={name} className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded px-1.5 py-0.5">{name}</span>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+
+                                                {/* ── Child rows ── */}
+                                                {isOpen && group.children.map(child => (
+                                                    <tr key={child.id} className="border-b border-slate-100 dark:border-slate-800/60 bg-white dark:bg-slate-900/20 hover:bg-slate-50/80">
+                                                        <td className="p-2"></td>
+                                                        <td className="p-2 pl-4">
+                                                            <Checkbox checked={selectedIds.has(child.id)} onCheckedChange={() => toggleSelect(child.id)} />
+                                                        </td>
+                                                        <td className="p-2 text-slate-400 whitespace-nowrap text-xs">
+                                                            {new Date(child.date).toLocaleDateString('it-IT')}
+                                                        </td>
+                                                        <td className="p-2"></td>
+                                                        <td className="p-2 pl-4">
+                                                            <div className="text-slate-700 dark:text-slate-300">{child.description}</div>
+                                                        </td>
+                                                        <td className={`p-2 text-right font-mono text-xs whitespace-nowrap ${(child.pieces ?? 0) < 0 ? 'text-red-500' : 'text-slate-500'}`}>
+                                                            {child.pieces !== undefined
+                                                                ? `${child.pieces.toLocaleString('it-IT', { maximumFractionDigits: 3 })}${child.unit ? ' ' + child.unit : ''}`
+                                                                : '—'}
+                                                        </td>
+                                                        <td className={`p-2 text-right font-mono text-xs ${child.amount < 0 ? 'text-red-500' : 'text-slate-600'}`}>
+                                                            {child.amount !== 0 ? `€ ${fmt(child.amount)}` : '—'}
+                                                        </td>
+                                                        <td className="p-2">
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {child.salNames.map(name => (
+                                                                    <span key={name} className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded px-1.5 py-0.5">
+                                                                        {name}
+                                                                        <button onClick={() => handleRemoveFromSal(child, name)} className="hover:text-red-500">
+                                                                            <X className="h-3 w-3" />
+                                                                        </button>
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </>
+                                        )
+                                    })}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t-2 border-slate-200 bg-slate-50 dark:bg-slate-800/50 font-semibold text-sm">
+                                        <td colSpan={5} className="p-2 text-slate-600">Totale</td>
+                                        <td className={`p-2 text-right font-mono ${totalPieces < 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                            {totalPieces.toLocaleString('it-IT', { maximumFractionDigits: 3 })}
+                                        </td>
+                                        <td className={`p-2 text-right font-mono ${materialTotal < 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                            € {fmt(materialTotal)}
+                                        </td>
+                                        <td className="p-2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    )
+                })()}
             </Section>
 
             {/* ── 2. Ore Operai ─────────────────────────────────────────── */}
