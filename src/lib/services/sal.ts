@@ -167,6 +167,45 @@ export const salApi = {
     },
 };
 
+// ── SAL Names (standalone, no items required) ────────────────────────────────
+export const salNamesApi = {
+    getByJobId: async (jobId: string): Promise<string[]> => {
+        const { data, error } = await supabase
+            .from('job_sal_names')
+            .select('sal_name')
+            .eq('job_id', jobId)
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        return (data || []).map((r: any) => r.sal_name as string);
+    },
+
+    create: async (jobId: string, salName: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_names')
+            .insert({ job_id: jobId, sal_name: salName });
+        // ignore unique violation (already exists)
+        if (error && error.code !== '23505') throw error;
+    },
+
+    rename: async (jobId: string, oldName: string, newName: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_names')
+            .update({ sal_name: newName })
+            .eq('job_id', jobId)
+            .eq('sal_name', oldName);
+        if (error) throw error;
+    },
+
+    delete: async (jobId: string, salName: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_names')
+            .delete()
+            .eq('job_id', jobId)
+            .eq('sal_name', salName);
+        if (error) throw error;
+    },
+};
+
 const mapCostDb = (db: any): SalCost => ({
     id: db.id,
     jobId: db.job_id,

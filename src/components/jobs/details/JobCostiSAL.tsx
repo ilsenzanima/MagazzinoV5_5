@@ -9,10 +9,11 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText } from "lucide-react"
+import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download } from "lucide-react"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
-import { salApi, salCostsApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
+import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
 import { notify } from "@/lib/notify"
+import * as XLSX from "xlsx"
 
 interface JobCostiSALProps {
     jobId: string
@@ -165,6 +166,7 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
     const [salItems, setSalItems] = useState<SalItem[]>([])
     const [salCosts, setSalCosts] = useState<SalCost[]>([])
     const [workerCosts, setWorkerCosts] = useState<WorkerCostRow[]>([])
+    const [salNamesData, setSalNamesData] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
 
     // ── Layout ────────────────────────────────────────────────────────────────
@@ -210,21 +212,25 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
     const [isManageSalOpen, setIsManageSalOpen] = useState(false)
     const [editingNames, setEditingNames] = useState<Record<string, string>>({})
     const [manageSaving, setManageSaving] = useState<string | null>(null)
+    const [newSalInput, setNewSalInput] = useState('')
+    const [newSalSaving, setNewSalSaving] = useState(false)
 
     // ── Load data ──────────────────────────────────────────────────────────────
     const loadData = async () => {
         try {
             setLoading(true)
-            const [purData, salData, costData, wcData] = await Promise.all([
+            const [purData, salData, costData, wcData, namesData] = await Promise.all([
                 purchasesApi.getByJobId(jobId),
                 salApi.getByJobId(jobId),
                 salCostsApi.getByJobId(jobId),
                 attendanceApi.getWorkerCostsByJobId(jobId),
+                salNamesApi.getByJobId(jobId),
             ])
             setPurchases(purData)
             setSalItems(salData)
             setSalCosts(costData)
             setWorkerCosts(wcData.rows)
+            setSalNamesData(namesData)
         } catch (e) {
             console.error('Failed to load SAL data', e)
         } finally {
@@ -234,11 +240,12 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
 
     useEffect(() => { loadData() }, [jobId])
 
-    // ── Derived: SAL names ─────────────────────────────────────────────────────
+    // ── Derived: SAL names (union of items + standalone names) ────────────────
     const salNames = useMemo(() => {
-        const names = [...new Set(salItems.map(s => s.salName))].sort()
-        return names
-    }, [salItems])
+        const fromItems = salItems.map(s => s.salName)
+        const all = [...new Set([...salNamesData, ...fromItems])]
+        return all.sort()
+    }, [salItems, salNamesData])
 
     // ── Derived: tag map (itemType:itemId → salNames[]) ───────────────────────
     const salTagMap = useMemo(() => {
@@ -391,6 +398,63 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
     const grandTotal = materialTotal + workerTotal + otherCostsTotal
 
     const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+
+    // ── Excel export ──────────────────────────────────────────────────────────
+    const handleExport = () => {
+        const wb = XLSX.utils.book_new()
+        const label = activeFilter === 'all' ? 'Tutti' : activeFilter
+        const fmtN = (n: number) => Math.round(n * 100) / 100
+
+        // Sheet 1 — Riepilogo
+        const ws1 = XLSX.utils.aoa_to_sheet([
+            ['Riepilogo Costi', label],
+            [],
+            ['Categoria', 'Importo (€)'],
+            ['Materiali', fmtN(materialTotal)],
+            ['Ore Operai', fmtN(workerTotal)],
+            ['Altri Costi', fmtN(otherCostsTotal)],
+            [],
+            ['TOTALE', fmtN(grandTotal)],
+        ])
+        ws1['!cols'] = [{ wch: 20 }, { wch: 18 }]
+        XLSX.utils.book_append_sheet(wb, ws1, 'Riepilogo')
+
+        // Sheet 2 — Materiali (una riga per articolo)
+        const matRows: any[][] = [['Documento', 'Tipo', 'Data', 'Articolo', 'Pezzi', 'Unità', 'Importo (€)', 'SAL']]
+        filteredMaterialGroups.forEach(g => {
+            const tipo = g.kind === 'ddt' ? 'Acquisto' : g.kind === 'exit' ? 'Uscita' : 'Rientro'
+            if (g.children.length === 0) {
+                matRows.push([g.description, tipo, g.date, '', fmtN(g.totalPieces ?? 0), '', fmtN(g.totalAmount), ''])
+            } else {
+                g.children.forEach(c => {
+                    matRows.push([g.description, tipo, c.date, c.description, fmtN(c.pieces ?? 0), c.unit || '', fmtN(c.amount), c.salNames.join(', ')])
+                })
+            }
+        })
+        const ws2 = XLSX.utils.aoa_to_sheet(matRows)
+        ws2['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 6 }, { wch: 14 }, { wch: 16 }]
+        XLSX.utils.book_append_sheet(wb, ws2, 'Materiali')
+
+        // Sheet 3 — Ore Operai
+        const oreRows: any[][] = [['Operaio', 'Ore Normali', 'Ore Trasf.', 'Costo Norm. (€)', 'Costo Trasf. (€)', 'Totale (€)']]
+        filteredWorkerRows.forEach(r => {
+            oreRows.push([r.workerName, fmtN(r.normalHours), fmtN(r.transferHours), fmtN(r.normalCost), fmtN(r.trasfertaCost), fmtN(r.total)])
+        })
+        oreRows.push(['', '', '', '', 'TOTALE', fmtN(workerTotal)])
+        const ws3 = XLSX.utils.aoa_to_sheet(oreRows)
+        ws3['!cols'] = [{ wch: 25 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 14 }]
+        XLSX.utils.book_append_sheet(wb, ws3, 'Ore Operai')
+
+        // Sheet 4 — Altri Costi
+        const costiRows: any[][] = [['Descrizione', 'SAL', 'Importo (€)']]
+        filteredCosts.forEach(c => { costiRows.push([c.description, c.salName || '', fmtN(c.amount)]) })
+        costiRows.push(['', 'TOTALE', fmtN(otherCostsTotal)])
+        const ws4 = XLSX.utils.aoa_to_sheet(costiRows)
+        ws4['!cols'] = [{ wch: 35 }, { wch: 18 }, { wch: 14 }]
+        XLSX.utils.book_append_sheet(wb, ws4, 'Altri Costi')
+
+        XLSX.writeFile(wb, `Costi_${label.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    }
 
     // ── Materials: toggle selection ───────────────────────────────────────────
     const toggleSelect = (id: string) => {
@@ -604,13 +668,32 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
     }
 
     // ── Manage SAL ────────────────────────────────────────────────────────────
+    const handleCreateSal = async () => {
+        const name = newSalInput.trim()
+        if (!name || salNames.includes(name)) return
+        try {
+            setNewSalSaving(true)
+            await salNamesApi.create(jobId, name)
+            setNewSalInput('')
+            await loadData()
+            notify.success(`SAL "${name}" creato`)
+        } catch (e) {
+            console.error(e)
+            notify.error("Errore durante la creazione del SAL")
+        } finally {
+            setNewSalSaving(false)
+        }
+    }
     const handleRenameSal = async (oldName: string) => {
         const newName = (editingNames[oldName] || '').trim()
         if (!newName || newName === oldName) return
         try {
             setManageSaving(oldName)
-            await salApi.renameSal(jobId, oldName, newName)
-            await salCostsApi.renameSalInCosts(jobId, oldName, newName)
+            await Promise.all([
+                salApi.renameSal(jobId, oldName, newName),
+                salCostsApi.renameSalInCosts(jobId, oldName, newName),
+                salNamesApi.rename(jobId, oldName, newName),
+            ])
             await loadData()
             setEditingNames(prev => { const n = { ...prev }; delete n[oldName]; return n })
             if (activeFilter === oldName) setActiveFilter(newName)
@@ -625,7 +708,10 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
         if (!confirm(`Eliminare il SAL "${name}" e tutte le sue voci?`)) return
         try {
             setManageSaving(name)
-            await salApi.deleteSal(jobId, name)
+            await Promise.all([
+                salApi.deleteSal(jobId, name),
+                salNamesApi.delete(jobId, name),
+            ])
             await loadData()
             if (activeFilter === name) setActiveFilter('all')
         } catch (e) {
@@ -669,20 +755,29 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                         {f}
                     </Button>
                 ))}
-                {salNames.length > 0 && (
+                <div className="flex items-center gap-2 ml-auto">
                     <Button
                         size="sm"
-                        variant="ghost"
-                        className="text-slate-400 hover:text-slate-700 ml-auto"
+                        variant="outline"
                         onClick={() => {
                             setEditingNames(Object.fromEntries(salNames.map(n => [n, n])))
+                            setNewSalInput('')
                             setIsManageSalOpen(true)
                         }}
                     >
                         <Settings className="h-4 w-4 mr-1" />
                         Gestisci SAL
                     </Button>
-                )}
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleExport}
+                        title="Esporta in Excel"
+                    >
+                        <Download className="h-4 w-4 mr-1" />
+                        Excel
+                    </Button>
+                </div>
             </div>
 
             {/* ── 1. Materiali ──────────────────────────────────────────── */}
@@ -1227,29 +1322,61 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Gestisci SAL</DialogTitle>
-                        <DialogDescription>Rinomina o elimina i SAL esistenti.</DialogDescription>
+                        <DialogDescription>Crea, rinomina o elimina i SAL.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 py-2">
-                        {salNames.length === 0 ? (
-                            <p className="text-sm text-slate-400 text-center py-4">Nessun SAL creato.</p>
-                        ) : salNames.map(name => (
-                            <div key={name} className="flex items-center gap-2">
+                    <div className="space-y-4 py-2">
+                        {/* Crea nuovo SAL */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Crea nuovo SAL</Label>
+                            <div className="flex gap-2">
                                 <Input
-                                    value={editingNames[name] ?? name}
-                                    onChange={e => setEditingNames(prev => ({ ...prev, [name]: e.target.value }))}
+                                    placeholder="Es. SAL 1, SAL Luglio…"
+                                    value={newSalInput}
+                                    onChange={e => setNewSalInput(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleCreateSal()}
                                     className="flex-1"
                                 />
-                                <Button size="sm" variant="outline"
-                                    disabled={manageSaving === name || (editingNames[name] || '').trim() === name || !(editingNames[name] || '').trim()}
-                                    onClick={() => handleRenameSal(name)}
+                                <Button
+                                    size="sm"
+                                    onClick={handleCreateSal}
+                                    disabled={!newSalInput.trim() || salNames.includes(newSalInput.trim()) || newSalSaving}
+                                    className="bg-blue-600 hover:bg-blue-700"
                                 >
-                                    {manageSaving === name ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rinomina'}
-                                </Button>
-                                <Button size="sm" variant="destructive" disabled={manageSaving === name} onClick={() => handleDeleteSal(name)}>
-                                    <X className="h-4 w-4" />
+                                    {newSalSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
                                 </Button>
                             </div>
-                        ))}
+                            {newSalInput.trim() && salNames.includes(newSalInput.trim()) && (
+                                <p className="text-xs text-red-500">Nome già esistente</p>
+                            )}
+                        </div>
+
+                        {/* Elenco SAL esistenti */}
+                        {salNames.length > 0 && (
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">SAL esistenti</Label>
+                                {salNames.map(name => (
+                                    <div key={name} className="flex items-center gap-2">
+                                        <Input
+                                            value={editingNames[name] ?? name}
+                                            onChange={e => setEditingNames(prev => ({ ...prev, [name]: e.target.value }))}
+                                            className="flex-1"
+                                        />
+                                        <Button size="sm" variant="outline"
+                                            disabled={manageSaving === name || (editingNames[name] || '').trim() === name || !(editingNames[name] || '').trim()}
+                                            onClick={() => handleRenameSal(name)}
+                                        >
+                                            {manageSaving === name ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rinomina'}
+                                        </Button>
+                                        <Button size="sm" variant="destructive" disabled={manageSaving === name} onClick={() => handleDeleteSal(name)}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {salNames.length === 0 && (
+                            <p className="text-sm text-slate-400 text-center py-2">Nessun SAL creato.</p>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsManageSalOpen(false)}>Chiudi</Button>

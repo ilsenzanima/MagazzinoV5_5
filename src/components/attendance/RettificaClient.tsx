@@ -285,11 +285,11 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                 </div>
             ) : (
                 <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border overflow-auto max-h-[calc(100vh-260px)]">
-                    <table className="text-xs border-collapse min-w-full">
+                    <table className="text-xs border-separate border-spacing-0 min-w-full">
                         <thead>
                             {/* Row 1: cantiere names — sticky top-0 */}
                             <tr>
-                                <th className="sticky top-0 left-0 z-30 bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 p-2 text-left font-semibold min-w-[90px] whitespace-nowrap">
+                                <th className="sticky top-0 left-0 z-30 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 p-2 text-left font-semibold min-w-[90px] whitespace-nowrap">
                                     Giorno
                                 </th>
                                 {columns.map(col => (
@@ -297,10 +297,10 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                         key={col.id}
                                         colSpan={2}
                                         className={cn(
-                                            "sticky top-0 z-20 border dark:border-slate-700 p-2 text-center font-semibold min-w-[120px]",
+                                            "sticky top-0 z-20 border border-slate-300 dark:border-slate-600 p-2 text-center font-semibold min-w-[120px]",
                                             col.type === 'warehouse'
-                                                ? "bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300"
-                                                : "bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300"
+                                                ? "bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300"
+                                                : "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300"
                                         )}
                                     >
                                         {col.label}
@@ -309,24 +309,24 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                         )}
                                     </th>
                                 ))}
-                                <th className="sticky top-0 z-20 border dark:border-slate-700 p-2 text-center font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 min-w-[110px]">
+                                <th className="sticky top-0 z-20 border border-slate-300 dark:border-slate-600 p-2 text-center font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 min-w-[110px]">
                                     Assenze
                                 </th>
                             </tr>
-                            {/* Row 2: Ore/Rettifica sub-labels — sticky top-[41px] */}
+                            {/* Row 2: Ore/Rettifica sub-labels — sticky below row 1 */}
                             <tr>
-                                <th className="sticky top-[41px] left-0 z-30 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 p-1" />
+                                <th className="sticky top-[41px] left-0 z-30 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 p-1" />
                                 {columns.map(col => (
                                     <React.Fragment key={col.id}>
-                                        <th className="sticky top-[41px] z-20 border dark:border-slate-700 p-1 text-center text-slate-500 font-normal bg-slate-50 dark:bg-slate-800 w-[55px]">
+                                        <th className="sticky top-[41px] z-20 border border-slate-300 dark:border-slate-600 p-1 text-center text-slate-600 dark:text-slate-400 font-medium bg-slate-50 dark:bg-slate-800 w-[55px]">
                                             Ore
                                         </th>
-                                        <th className="sticky top-[41px] z-20 border dark:border-slate-700 p-1 text-center text-orange-600 font-normal bg-orange-50/50 dark:bg-orange-900/10 w-[65px]">
+                                        <th className="sticky top-[41px] z-20 border border-slate-300 dark:border-slate-600 p-1 text-center text-orange-700 dark:text-orange-400 font-medium bg-orange-50 dark:bg-orange-900/20 w-[65px]">
                                             Rettifica
                                         </th>
                                     </React.Fragment>
                                 ))}
-                                <th className="sticky top-[41px] z-20 border dark:border-slate-700 p-1 bg-slate-50 dark:bg-slate-800" />
+                                <th className="sticky top-[41px] z-20 border border-slate-300 dark:border-slate-600 p-1 bg-slate-50 dark:bg-slate-800" />
                             </tr>
                         </thead>
                         <tbody>
@@ -352,9 +352,9 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                 return (
                                     <tr key={dateStr} className={rowBg}>
                                         <td className={cn(
-                                            "sticky left-0 z-10 border dark:border-slate-700 p-2 font-medium whitespace-nowrap",
+                                            "sticky left-0 z-10 border border-slate-300 dark:border-slate-600 p-2 font-medium whitespace-nowrap",
                                             rowBg, textColor,
-                                            "shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]"
+                                            "shadow-[2px_0_8px_-2px_rgba(0,0,0,0.15)]"
                                         )}>
                                             {dayLabel} {dayName}
                                             {isHoliday && <span className="ml-1 text-xs">(F)</span>}
@@ -374,8 +374,8 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                                     {/* Base hours cell (readonly) */}
                                                     <td
                                                         className={cn(
-                                                            "border dark:border-slate-700 p-1 text-center text-slate-600 dark:text-slate-400",
-                                                            "bg-slate-100/60 dark:bg-slate-800/40 w-[55px]",
+                                                            "border border-slate-300 dark:border-slate-600 p-1 text-center text-slate-600 dark:text-slate-400",
+                                                            "bg-slate-100/80 dark:bg-slate-800/60 w-[55px]",
                                                             isHoliday && "bg-red-50/50",
                                                             isWknd && "bg-slate-100/80"
                                                         )}
@@ -386,7 +386,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                                     {/* Correction input cell */}
                                                     <td
                                                         className={cn(
-                                                            "border dark:border-slate-700 p-0.5 text-center w-[65px]",
+                                                            "border border-slate-300 dark:border-slate-600 p-0.5 text-center w-[65px]",
                                                             savedDelta !== 0 && "bg-orange-50 dark:bg-orange-900/10",
                                                             hasDraft && "bg-yellow-50 dark:bg-yellow-900/10"
                                                         )}
@@ -426,7 +426,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                             const absences = absenceMap.get(dateStr);
                                             return (
                                                 <td className={cn(
-                                                    "border dark:border-slate-700 p-1 text-center text-[10px]",
+                                                    "border border-slate-300 dark:border-slate-600 p-1 text-center text-[10px]",
                                                     isHoliday ? "bg-red-50/30" : isWknd ? "bg-slate-50/50" : "bg-white dark:bg-card"
                                                 )}>
                                                     {absences && absences.length > 0 ? (
@@ -450,7 +450,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                         {columns.length > 0 && (
                             <tfoot>
                                 <tr className="bg-slate-100 dark:bg-slate-800 font-semibold">
-                                    <td className="sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 p-2 text-slate-700 dark:text-slate-300">
+                                    <td className="sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 p-2 text-slate-700 dark:text-slate-300">
                                         TOTALE
                                     </td>
                                     {columns.map(col => {
@@ -463,11 +463,11 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                         });
                                         return (
                                             <React.Fragment key={col.id}>
-                                                <td className="border dark:border-slate-700 p-2 text-center text-slate-700 dark:text-slate-300">
+                                                <td className="border border-slate-300 dark:border-slate-600 p-2 text-center text-slate-700 dark:text-slate-300">
                                                     {totalBase > 0 ? totalBase : ''}
                                                 </td>
                                                 <td className={cn(
-                                                    "border dark:border-slate-700 p-2 text-center",
+                                                    "border border-slate-300 dark:border-slate-600 p-2 text-center",
                                                     totalCorr !== 0 ? "text-orange-700 dark:text-orange-400" : "text-slate-400"
                                                 )}>
                                                     {totalCorr !== 0 ? (totalCorr > 0 ? `+${totalCorr}` : totalCorr) : ''}
@@ -475,7 +475,7 @@ export default function RettificaClient({ initialWorkers }: RettificaClientProps
                                             </React.Fragment>
                                         );
                                     })}
-                                    <td className="border dark:border-slate-700 p-2" />
+                                    <td className="border border-slate-300 dark:border-slate-600 p-2" />
                                 </tr>
                             </tfoot>
                         )}
