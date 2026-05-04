@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download } from "lucide-react"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
@@ -400,60 +401,174 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
     const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
 
     // ── Excel export ──────────────────────────────────────────────────────────
-    const handleExport = () => {
+    const handleExport = (scope: 'all' | string) => {
         const wb = XLSX.utils.book_new()
-        const label = activeFilter === 'all' ? 'Tutti' : activeFilter
         const fmtN = (n: number) => Math.round(n * 100) / 100
+        const isAll = scope === 'all'
+        const today = new Date().toISOString().slice(0, 10)
+        const fileLabel = isAll ? 'Completo' : scope.replace(/\s+/g, '_')
 
-        // Sheet 1 — Riepilogo
-        const ws1 = XLSX.utils.aoa_to_sheet([
-            ['Riepilogo Costi', label],
-            [],
-            ['Categoria', 'Importo (€)'],
-            ['Materiali', fmtN(materialTotal)],
-            ['Ore Operai', fmtN(workerTotal)],
-            ['Altri Costi', fmtN(otherCostsTotal)],
-            [],
-            ['TOTALE', fmtN(grandTotal)],
-        ])
-        ws1['!cols'] = [{ wch: 20 }, { wch: 18 }]
+        // ── helper: material groups for a given scope ─────────────────────────
+        const groupsForScope = (sal: string | 'all') => {
+            if (sal === 'all') return allMaterialGroups
+            return allMaterialGroups.map(g => {
+                const children = g.children.filter(c => c.salNames.includes(sal))
+                const totalAmount = children.reduce((s, c) => s + c.amount, 0)
+                const totalPieces = children.reduce((s, c) => s + (c.pieces ?? 0), 0)
+                return { ...g, children, totalAmount, totalPieces }
+            }).filter(g => g.children.length > 0)
+        }
+
+        // ── helper: worker rows for a given scope ─────────────────────────────
+        const workerRowsForScope = (sal: string | 'all') => {
+            if (sal === 'all') return workerCosts
+            const whItems = salItems.filter(s => s.itemType === 'worker_hours' && s.salName === sal)
+            const wMap = new Map<string, WorkerCostRow>()
+            for (const item of whItems) {
+                if (!item.workerHoursData) continue
+                for (const w of item.workerHoursData.workers) {
+                    const prev = wMap.get(w.workerId) ?? { workerId: w.workerId, workerName: w.workerName, normalHours: 0, transferHours: 0, normalCost: 0, trasfertaCost: 0, total: 0 }
+                    wMap.set(w.workerId, {
+                        ...prev,
+                        normalHours: prev.normalHours + w.totalNormal,
+                        transferHours: prev.transferHours + w.totalTransfer,
+                        normalCost: prev.normalCost + w.totalNormal * w.hourlyRate,
+                        trasfertaCost: prev.trasfertaCost + w.totalTransfer * w.trasfertaRate,
+                        total: prev.total + w.totalCost,
+                    })
+                }
+            }
+            return [...wMap.values()]
+        }
+
+        // ── scoped data ───────────────────────────────────────────────────────
+        const expGroups = groupsForScope(scope)
+        const expWorkerRows = workerRowsForScope(scope)
+        const expCosts = isAll ? salCosts : salCosts.filter(c => c.salName === scope)
+
+        const expMatTotal = expGroups.reduce((s, g) => s + g.totalAmount, 0)
+        const expWorkerTotal = expWorkerRows.reduce((s, r) => s + r.total, 0)
+        const expCostsTotal = expCosts.reduce((s, c) => s + c.amount, 0)
+        const expGrandTotal = expMatTotal + expWorkerTotal + expCostsTotal
+
+        // ── Sheet 1 — Riepilogo ───────────────────────────────────────────────
+        const ws1Rows: any[][] = []
+        ws1Rows.push([isAll ? 'Riepilogo Completo' : `Riepilogo SAL: ${scope}`, today])
+        ws1Rows.push([])
+        ws1Rows.push(['Categoria', 'Importo (€)'])
+        ws1Rows.push(['Materiali', fmtN(expMatTotal)])
+        ws1Rows.push(['Ore Operai', fmtN(expWorkerTotal)])
+        ws1Rows.push(['Altri Costi', fmtN(expCostsTotal)])
+        ws1Rows.push([])
+        ws1Rows.push(['TOTALE', fmtN(expGrandTotal)])
+
+        if (isAll && salNames.length > 0) {
+            ws1Rows.push([])
+            ws1Rows.push([])
+            ws1Rows.push(['Riepilogo per SAL'])
+            ws1Rows.push(['SAL', 'Materiali (€)', 'Ore Operai (€)', 'Altri Costi (€)', 'Totale (€)'])
+
+            for (const salName of salNames) {
+                const salMat = groupsForScope(salName).reduce((s, g) => s + g.totalAmount, 0)
+                const salWorker = workerRowsForScope(salName).reduce((s, r) => s + r.total, 0)
+                const salOther = salCosts.filter(c => c.salName === salName).reduce((s, c) => s + c.amount, 0)
+                ws1Rows.push([salName, fmtN(salMat), fmtN(salWorker), fmtN(salOther), fmtN(salMat + salWorker + salOther)])
+            }
+
+            // Items with no SAL
+            const noSalMat = allMaterialGroups.map(g => {
+                const children = g.children.filter(c => c.salNames.length === 0)
+                return children.reduce((s, c) => s + c.amount, 0)
+            }).reduce((s, v) => s + v, 0)
+            const noSalWorker = workerCosts.reduce((s, r) => s + r.total, 0) - salNames.reduce((sum, n) => sum + workerRowsForScope(n).reduce((s, r) => s + r.total, 0), 0)
+            const noSalOther = salCosts.filter(c => !c.salName).reduce((s, c) => s + c.amount, 0)
+            if (noSalMat + noSalOther > 0) {
+                ws1Rows.push(['(senza SAL)', fmtN(noSalMat), fmtN(Math.max(0, noSalWorker)), fmtN(noSalOther), fmtN(noSalMat + Math.max(0, noSalWorker) + noSalOther)])
+            }
+        }
+
+        const ws1 = XLSX.utils.aoa_to_sheet(ws1Rows)
+        ws1['!cols'] = [{ wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }]
         XLSX.utils.book_append_sheet(wb, ws1, 'Riepilogo')
 
-        // Sheet 2 — Materiali (una riga per articolo)
+        // ── Sheet 2 — Materiali ───────────────────────────────────────────────
         const matRows: any[][] = [['Documento', 'Tipo', 'Data', 'Articolo', 'Pezzi', 'Unità', 'Importo (€)', 'SAL']]
-        filteredMaterialGroups.forEach(g => {
+        expGroups.forEach(g => {
             const tipo = g.kind === 'ddt' ? 'Acquisto' : g.kind === 'exit' ? 'Uscita' : 'Rientro'
-            if (g.children.length === 0) {
-                matRows.push([g.description, tipo, g.date, '', fmtN(g.totalPieces ?? 0), '', fmtN(g.totalAmount), ''])
-            } else {
-                g.children.forEach(c => {
-                    matRows.push([g.description, tipo, c.date, c.description, fmtN(c.pieces ?? 0), c.unit || '', fmtN(c.amount), c.salNames.join(', ')])
-                })
-            }
+            g.children.forEach(c => {
+                matRows.push([g.description, tipo, c.date, c.description, fmtN(c.pieces ?? 0), c.unit || '', fmtN(c.amount), c.salNames.join(', ')])
+            })
         })
+        matRows.push(['', '', '', '', '', 'TOTALE', fmtN(expMatTotal), ''])
         const ws2 = XLSX.utils.aoa_to_sheet(matRows)
-        ws2['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 6 }, { wch: 14 }, { wch: 16 }]
+        ws2['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 6 }, { wch: 14 }, { wch: 18 }]
         XLSX.utils.book_append_sheet(wb, ws2, 'Materiali')
 
-        // Sheet 3 — Ore Operai
-        const oreRows: any[][] = [['Operaio', 'Ore Normali', 'Ore Trasf.', 'Costo Norm. (€)', 'Costo Trasf. (€)', 'Totale (€)']]
-        filteredWorkerRows.forEach(r => {
+        // ── Sheet 3 — Ore Operai ──────────────────────────────────────────────
+        // Part A: summary by worker
+        const oreRows: any[][] = [['Operaio', 'Ore Normali', 'Ore Trasferta', 'Costo Norm. (€)', 'Costo Trasf. (€)', 'Totale (€)']]
+        expWorkerRows.forEach(r => {
             oreRows.push([r.workerName, fmtN(r.normalHours), fmtN(r.transferHours), fmtN(r.normalCost), fmtN(r.trasfertaCost), fmtN(r.total)])
         })
-        oreRows.push(['', '', '', '', 'TOTALE', fmtN(workerTotal)])
+        oreRows.push(['', '', '', '', 'TOTALE', fmtN(expWorkerTotal)])
+
+        // Part B: cross-tables per SAL entry (giorni × operai × ore)
+        const whSalItems = salItems.filter(s =>
+            s.itemType === 'worker_hours' && (isAll || s.salName === scope)
+        )
+        if (whSalItems.length > 0) {
+            oreRows.push([])
+            oreRows.push([])
+            oreRows.push(['── Dettaglio presenze per operaio e giorno ──'])
+
+            for (const whi of whSalItems) {
+                if (!whi.workerHoursData) continue
+                const d = whi.workerHoursData
+
+                oreRows.push([])
+                oreRows.push([`SAL: ${whi.salName || '(nessun SAL)'}`, `Periodo: ${d.dateFrom} → ${d.dateTo}`])
+
+                // Collect all unique dates across all workers, sorted
+                const allDates = [...new Set(d.workers.flatMap(w => w.days.map(day => day.date)))].sort()
+
+                // Header: Operaio | date1 | date2 | ... | Tot.Norm | Tot.Trasf | Costo
+                const hdr: any[] = ['Operaio / Giorno', ...allDates, 'Tot. Normali', 'Tot. Trasferta', 'Costo (€)']
+                oreRows.push(hdr)
+
+                for (const worker of d.workers) {
+                    const row: any[] = [worker.workerName]
+                    for (const dateStr of allDates) {
+                        const day = worker.days.find(day => day.date === dateStr)
+                        if (day && (day.normalHours > 0 || day.transferHours > 0)) {
+                            const parts = []
+                            if (day.normalHours > 0) parts.push(`${day.normalHours}h norm.`)
+                            if (day.transferHours > 0) parts.push(`${day.transferHours}h trasf.`)
+                            row.push(parts.join(' + '))
+                        } else {
+                            row.push('')
+                        }
+                    }
+                    row.push(fmtN(worker.totalNormal), fmtN(worker.totalTransfer), fmtN(worker.totalCost))
+                    oreRows.push(row)
+                }
+
+                oreRows.push(['', ...allDates.map(() => ''), 'TOTALE', '', fmtN(d.grandTotal)])
+            }
+        }
+
         const ws3 = XLSX.utils.aoa_to_sheet(oreRows)
-        ws3['!cols'] = [{ wch: 25 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 14 }]
+        ws3['!cols'] = [{ wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }]
         XLSX.utils.book_append_sheet(wb, ws3, 'Ore Operai')
 
-        // Sheet 4 — Altri Costi
+        // ── Sheet 4 — Altri Costi ─────────────────────────────────────────────
         const costiRows: any[][] = [['Descrizione', 'SAL', 'Importo (€)']]
-        filteredCosts.forEach(c => { costiRows.push([c.description, c.salName || '', fmtN(c.amount)]) })
-        costiRows.push(['', 'TOTALE', fmtN(otherCostsTotal)])
+        expCosts.forEach(c => { costiRows.push([c.description, c.salName || '', fmtN(c.amount)]) })
+        costiRows.push(['', 'TOTALE', fmtN(expCostsTotal)])
         const ws4 = XLSX.utils.aoa_to_sheet(costiRows)
         ws4['!cols'] = [{ wch: 35 }, { wch: 18 }, { wch: 14 }]
         XLSX.utils.book_append_sheet(wb, ws4, 'Altri Costi')
 
-        XLSX.writeFile(wb, `Costi_${label.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+        XLSX.writeFile(wb, `Costi_${fileLabel}_${today}.xlsx`)
     }
 
     // ── Materials: toggle selection ───────────────────────────────────────────
@@ -768,15 +883,26 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                         <Settings className="h-4 w-4 mr-1" />
                         Gestisci SAL
                     </Button>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleExport}
-                        title="Esporta in Excel"
-                    >
-                        <Download className="h-4 w-4 mr-1" />
-                        Excel
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" title="Esporta in Excel">
+                                <Download className="h-4 w-4 mr-1" />
+                                Excel
+                                <ChevronDown className="h-3 w-3 ml-1" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleExport('all')}>
+                                Tutti i dati
+                            </DropdownMenuItem>
+                            {salNames.length > 0 && <DropdownMenuSeparator />}
+                            {salNames.map(name => (
+                                <DropdownMenuItem key={name} onClick={() => handleExport(name)}>
+                                    Solo SAL: {name}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 
