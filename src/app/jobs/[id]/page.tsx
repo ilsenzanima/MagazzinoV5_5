@@ -270,7 +270,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="costi-sal" className="space-y-6 focus-visible:outline-none">
-                            <JobCostiSAL jobId={job.id} materialCost={totalCost} movements={movements} />
+                            <JobCostiSAL jobId={job.id} jobCode={job.code} jobName={job.description} materialCost={totalCost} movements={movements} />
                         </TabsContent>
                     </Tabs>
                 </div>
