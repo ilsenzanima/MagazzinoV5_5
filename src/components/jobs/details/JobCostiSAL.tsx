@@ -18,6 +18,8 @@ import * as XLSX from "xlsx-js-style"
 
 interface JobCostiSALProps {
     jobId: string
+    jobCode?: string
+    jobName?: string
     materialCost: number
     movements: Movement[]
 }
@@ -166,7 +168,7 @@ function WorkerHoursTable({ data }: { data: WorkerHoursSalData }) {
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
-export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
+export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALProps) {
     // ── Data ──────────────────────────────────────────────────────────────────
     const [purchases, setPurchases] = useState<Purchase[]>([])
     const [salItems, setSalItems] = useState<SalItem[]>([])
@@ -428,9 +430,8 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
         const today = new Date().toISOString().slice(0, 10)
         const fileLabel = isAll ? 'Completo' : scope.replace(/\s+/g, '_')
 
-        // Nome cantiere dal primo movimento disponibile
-        const firstMov = movements[0]
-        const jobSlug = [firstMov?.jobCode, firstMov?.jobDescription]
+        // Nome cantiere dalle prop
+        const jobSlug = [jobCode, jobName]
             .filter(Boolean)
             .join('_')
             .replace(/[^a-zA-Z0-9_\-àáèéìíòóùú]/g, '_')
