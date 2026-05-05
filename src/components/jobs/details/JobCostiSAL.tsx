@@ -14,7 +14,7 @@ import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
 import { notify } from "@/lib/notify"
-import * as XLSX from "xlsx"
+import * as XLSX from "xlsx-js-style"
 
 interface JobCostiSALProps {
     jobId: string
@@ -428,171 +428,207 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
         const today = new Date().toISOString().slice(0, 10)
         const fileLabel = isAll ? 'Completo' : scope.replace(/\s+/g, '_')
 
-        // ── helper: material groups for a given scope ─────────────────────────
+        // ── Palette colori SAL (ARGB, 8 char) ────────────────────────────────
+        const SAL_LIGHT  = ['FFD6E4FF','FFD4EDDA','FFFFF3CD','FFFFD6CC','FFE8D5FC','FFFCE4D6','FFD9F2F7','FFE2EFDA']
+        const SAL_MID    = ['FF9DC3F0','FF9CD4B4','FFFFD966','FFFFB3A0','FFC5A8E8','FFFAB588','FF8EC8D5','FFA8C88E']
+        const salColorMap = new Map<string, { light: string; mid: string }>()
+        salNames.forEach((n, i) => salColorMap.set(n, { light: SAL_LIGHT[i % 8], mid: SAL_MID[i % 8] }))
+        const getSalColor = (names: string[]) => names.length > 0 ? salColorMap.get(names[0]) : undefined
+
+        // ── Cell builder helpers ──────────────────────────────────────────────
+        type XS = Record<string, any>
+        const xc = (v: any, s: XS = {}) => ({ v, t: typeof v === 'number' ? 'n' : 's', s })
+        const hdrCell = (v: string, bgRgb = 'FF334155') => xc(v, {
+            fill: { patternType: 'solid', fgColor: { rgb: bgRgb } },
+            font: { bold: true, color: { rgb: 'FFFFFFFF' } },
+        })
+        const titleCell = (v: string) => xc(v, {
+            fill: { patternType: 'solid', fgColor: { rgb: 'FF1E3A5F' } },
+            font: { bold: true, sz: 13, color: { rgb: 'FFFFFFFF' } },
+        })
+        const totalCell = (v: any) => xc(v, {
+            fill: { patternType: 'solid', fgColor: { rgb: 'FF1E3A5F' } },
+            font: { bold: true, color: { rgb: 'FFFFFFFF' } },
+        })
+        const grayCell = (v: any) => xc(v, {
+            fill: { patternType: 'solid', fgColor: { rgb: 'FFF1F5F9' } },
+        })
+        const salHdrCell = (v: string, mid: string) => xc(v, {
+            fill: { patternType: 'solid', fgColor: { rgb: mid } },
+            font: { bold: true },
+        })
+        const salDataCell = (v: any, light: string) => xc(v, {
+            fill: { patternType: 'solid', fgColor: { rgb: light } },
+        })
+
+        // ── Helper: scoped groups/workers/costs ───────────────────────────────
         const groupsForScope = (sal: string | 'all') => {
             if (sal === 'all') return allMaterialGroups
             return allMaterialGroups.map(g => {
                 const children = g.children.filter(c => c.salNames.includes(sal))
-                const totalAmount = children.reduce((s, c) => s + c.amount, 0)
-                const totalPieces = children.reduce((s, c) => s + (c.pieces ?? 0), 0)
-                return { ...g, children, totalAmount, totalPieces }
+                return { ...g, children, totalAmount: children.reduce((s, c) => s + c.amount, 0), totalPieces: children.reduce((s, c) => s + (c.pieces ?? 0), 0) }
             }).filter(g => g.children.length > 0)
         }
-
-        // ── helper: worker rows for a given scope ─────────────────────────────
         const workerRowsForScope = (sal: string | 'all') => {
             if (sal === 'all') return workerCosts
-            const whItems = salItems.filter(s => s.itemType === 'worker_hours' && s.salName === sal)
             const wMap = new Map<string, WorkerCostRow>()
-            for (const item of whItems) {
+            for (const item of salItems.filter(s => s.itemType === 'worker_hours' && s.salName === sal)) {
                 if (!item.workerHoursData) continue
                 for (const w of item.workerHoursData.workers) {
-                    const prev = wMap.get(w.workerId) ?? { workerId: w.workerId, workerName: w.workerName, normalHours: 0, transferHours: 0, normalCost: 0, trasfertaCost: 0, total: 0 }
-                    wMap.set(w.workerId, {
-                        ...prev,
-                        normalHours: prev.normalHours + w.totalNormal,
-                        transferHours: prev.transferHours + w.totalTransfer,
-                        normalCost: prev.normalCost + w.totalNormal * w.hourlyRate,
-                        trasfertaCost: prev.trasfertaCost + w.totalTransfer * w.trasfertaRate,
-                        total: prev.total + w.totalCost,
-                    })
+                    const p = wMap.get(w.workerId) ?? { workerId: w.workerId, workerName: w.workerName, normalHours: 0, transferHours: 0, normalCost: 0, trasfertaCost: 0, total: 0 }
+                    wMap.set(w.workerId, { ...p, normalHours: p.normalHours + w.totalNormal, transferHours: p.transferHours + w.totalTransfer, normalCost: p.normalCost + w.totalNormal * w.hourlyRate, trasfertaCost: p.trasfertaCost + w.totalTransfer * w.trasfertaRate, total: p.total + w.totalCost })
                 }
             }
             return [...wMap.values()]
         }
 
-        // ── scoped data ───────────────────────────────────────────────────────
-        const expGroups = groupsForScope(scope)
-        const expWorkerRows = workerRowsForScope(scope)
-        const expCosts = isAll ? salCosts : salCosts.filter(c => c.salName === scope)
-
-        const expMatTotal = expGroups.reduce((s, g) => s + g.totalAmount, 0)
+        const expGroups      = groupsForScope(scope)
+        const expWorkerRows  = workerRowsForScope(scope)
+        const expCosts       = isAll ? salCosts : salCosts.filter(c => c.salName === scope)
+        const expMatTotal    = expGroups.reduce((s, g) => s + g.totalAmount, 0)
         const expWorkerTotal = expWorkerRows.reduce((s, r) => s + r.total, 0)
-        const expCostsTotal = expCosts.reduce((s, c) => s + c.amount, 0)
-        const expGrandTotal = expMatTotal + expWorkerTotal + expCostsTotal
+        const expCostsTotal  = expCosts.reduce((s, c) => s + c.amount, 0)
+        const expGrandTotal  = expMatTotal + expWorkerTotal + expCostsTotal
 
         // ── Sheet 1 — Riepilogo ───────────────────────────────────────────────
-        const ws1Rows: any[][] = []
-        ws1Rows.push([isAll ? 'Riepilogo Completo' : `Riepilogo SAL: ${scope}`, today])
-        ws1Rows.push([])
-        ws1Rows.push(['Categoria', 'Importo (€)'])
-        ws1Rows.push(['Materiali', fmtN(expMatTotal)])
-        ws1Rows.push(['Ore Operai', fmtN(expWorkerTotal)])
-        ws1Rows.push(['Altri Costi', fmtN(expCostsTotal)])
-        ws1Rows.push([])
-        ws1Rows.push(['TOTALE', fmtN(expGrandTotal)])
+        const ws1: any[][] = []
+        ws1.push([titleCell(isAll ? 'Riepilogo Completo' : `Riepilogo SAL: ${scope}`), xc(today)])
+        ws1.push([])
+        ws1.push([hdrCell('Categoria'), hdrCell('Importo (€)')])
+        ws1.push([xc('Materiali'), xc(fmtN(expMatTotal))])
+        ws1.push([xc('Ore Operai'), xc(fmtN(expWorkerTotal))])
+        ws1.push([xc('Altri Costi'), xc(fmtN(expCostsTotal))])
+        ws1.push([])
+        ws1.push([totalCell('TOTALE'), totalCell(fmtN(expGrandTotal))])
 
         if (isAll && salNames.length > 0) {
-            ws1Rows.push([])
-            ws1Rows.push([])
-            ws1Rows.push(['Riepilogo per SAL'])
-            ws1Rows.push(['SAL', 'Materiali (€)', 'Ore Operai (€)', 'Altri Costi (€)', 'Totale (€)'])
+            ws1.push([])
+            ws1.push([])
+            ws1.push([hdrCell('Riepilogo per SAL')])
+            ws1.push([hdrCell('SAL'), hdrCell('Materiali (€)'), hdrCell('Ore Operai (€)'), hdrCell('Altri Costi (€)'), hdrCell('Totale (€)')])
 
             for (const salName of salNames) {
-                const salMat = groupsForScope(salName).reduce((s, g) => s + g.totalAmount, 0)
+                const col = salColorMap.get(salName)
+                const salMat    = groupsForScope(salName).reduce((s, g) => s + g.totalAmount, 0)
                 const salWorker = workerRowsForScope(salName).reduce((s, r) => s + r.total, 0)
-                const salOther = salCosts.filter(c => c.salName === salName).reduce((s, c) => s + c.amount, 0)
-                ws1Rows.push([salName, fmtN(salMat), fmtN(salWorker), fmtN(salOther), fmtN(salMat + salWorker + salOther)])
+                const salOther  = salCosts.filter(c => c.salName === salName).reduce((s, c) => s + c.amount, 0)
+                const cells = [salName, fmtN(salMat), fmtN(salWorker), fmtN(salOther), fmtN(salMat + salWorker + salOther)]
+                ws1.push(col ? cells.map(v => salDataCell(v, col.light)) : cells.map(v => xc(v)))
             }
 
-            // Items with no SAL
-            const noSalMat = allMaterialGroups.map(g => {
-                const children = g.children.filter(c => c.salNames.length === 0)
-                return children.reduce((s, c) => s + c.amount, 0)
-            }).reduce((s, v) => s + v, 0)
-            const noSalWorker = workerCosts.reduce((s, r) => s + r.total, 0) - salNames.reduce((sum, n) => sum + workerRowsForScope(n).reduce((s, r) => s + r.total, 0), 0)
-            const noSalOther = salCosts.filter(c => !c.salName).reduce((s, c) => s + c.amount, 0)
-            if (noSalMat + noSalOther > 0) {
-                ws1Rows.push(['(senza SAL)', fmtN(noSalMat), fmtN(Math.max(0, noSalWorker)), fmtN(noSalOther), fmtN(noSalMat + Math.max(0, noSalWorker) + noSalOther)])
-            }
+            // Senza SAL (sempre incluso: materiali + ore + altri costi non assegnati)
+            const noSalMat    = allMaterialGroups.flatMap(g => g.children.filter(c => c.salNames.length === 0)).reduce((s, c) => s + c.amount, 0)
+            const noSalWorker = Math.max(0, workerCosts.reduce((s, r) => s + r.total, 0) - salNames.reduce((sum, n) => sum + workerRowsForScope(n).reduce((s, r) => s + r.total, 0), 0))
+            const noSalOther  = salCosts.filter(c => !c.salName).reduce((s, c) => s + c.amount, 0)
+            const noSalTotal  = noSalMat + noSalWorker + noSalOther
+            ws1.push([grayCell('(senza SAL)'), grayCell(fmtN(noSalMat)), grayCell(fmtN(noSalWorker)), grayCell(fmtN(noSalOther)), grayCell(fmtN(noSalTotal))])
         }
 
-        const ws1 = XLSX.utils.aoa_to_sheet(ws1Rows)
-        ws1['!cols'] = [{ wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }]
-        XLSX.utils.book_append_sheet(wb, ws1, 'Riepilogo')
+        const sheet1 = XLSX.utils.aoa_to_sheet(ws1)
+        sheet1['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }]
+        XLSX.utils.book_append_sheet(wb, sheet1, 'Riepilogo')
 
         // ── Sheet 2 — Materiali ───────────────────────────────────────────────
-        const matRows: any[][] = [['Documento', 'Tipo', 'Data', 'Articolo', 'Pezzi', 'Unità', 'Importo (€)', 'SAL']]
+        const hdrMat = ['Documento','Tipo','Data','Articolo','Acquisto origine','Pezzi','Unità','Importo (€)','SAL']
+        const mat: any[][] = [hdrMat.map(h => hdrCell(h))]
+
         expGroups.forEach(g => {
             const tipo = g.kind === 'ddt' ? 'Acquisto' : g.kind === 'exit' ? 'Uscita' : 'Rientro'
             g.children.forEach(c => {
-                matRows.push([g.description, tipo, c.date, c.description, fmtN(c.pieces ?? 0), c.unit || '', fmtN(c.amount), c.salNames.join(', ')])
+                const col = getSalColor(c.salNames)
+                // Acquisto origine: DDT provenienza per le uscite, il DDT stesso per gli acquisti
+                let origine = ''
+                if (c.kind === 'exit') {
+                    const parts = [c.purchaseRef && `DDT ${c.purchaseRef}`, c.supplierName].filter(Boolean)
+                    origine = parts.join(' · ') || '—'
+                } else if (c.kind === 'ddt') {
+                    origine = [g.description, g.detail].filter(Boolean).join(' · ')
+                } else {
+                    origine = '—'
+                }
+                const row = [g.description, tipo, c.date, c.description, origine, fmtN(c.pieces ?? 0), c.unit || '', fmtN(c.amount), c.salNames.join(', ')]
+                mat.push(col ? row.map(v => salDataCell(v, col.light)) : row.map(v => xc(v)))
             })
         })
-        matRows.push(['', '', '', '', '', 'TOTALE', fmtN(expMatTotal), ''])
-        const ws2 = XLSX.utils.aoa_to_sheet(matRows)
-        ws2['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 6 }, { wch: 14 }, { wch: 18 }]
-        XLSX.utils.book_append_sheet(wb, ws2, 'Materiali')
+        mat.push(['','','','','', xc(''), totalCell('TOTALE'), totalCell(fmtN(expMatTotal)), xc('')])
+
+        const sheet2 = XLSX.utils.aoa_to_sheet(mat)
+        sheet2['!cols'] = [{ wch: 22 },{ wch: 10 },{ wch: 12 },{ wch: 32 },{ wch: 28 },{ wch: 9 },{ wch: 6 },{ wch: 14 },{ wch: 18 }]
+        XLSX.utils.book_append_sheet(wb, sheet2, 'Materiali')
 
         // ── Sheet 3 — Ore Operai ──────────────────────────────────────────────
-        // Part A: summary by worker
-        const oreRows: any[][] = [['Operaio', 'Ore Normali', 'Ore Trasferta', 'Costo Norm. (€)', 'Costo Trasf. (€)', 'Totale (€)']]
+        const hdrOre = ['Operaio','Ore Normali','Ore Trasferta','Costo Norm. (€)','Costo Trasf. (€)','Totale (€)']
+        const ore: any[][] = [hdrOre.map(h => hdrCell(h))]
         expWorkerRows.forEach(r => {
-            oreRows.push([r.workerName, fmtN(r.normalHours), fmtN(r.transferHours), fmtN(r.normalCost), fmtN(r.trasfertaCost), fmtN(r.total)])
+            ore.push([r.workerName, fmtN(r.normalHours), fmtN(r.transferHours), fmtN(r.normalCost), fmtN(r.trasfertaCost), fmtN(r.total)].map(v => xc(v)))
         })
-        oreRows.push(['', '', '', '', 'TOTALE', fmtN(expWorkerTotal)])
+        ore.push([xc(''), xc(''), xc(''), xc(''), totalCell('TOTALE'), totalCell(fmtN(expWorkerTotal))])
 
-        // Part B: cross-tables per SAL entry (giorni × operai × ore)
-        const whSalItems = salItems.filter(s =>
-            s.itemType === 'worker_hours' && (isAll || s.salName === scope)
-        )
+        // Cross-table per SAL entry
+        const whSalItems = salItems.filter(s => s.itemType === 'worker_hours' && (isAll || s.salName === scope))
         if (whSalItems.length > 0) {
-            oreRows.push([])
-            oreRows.push([])
-            oreRows.push(['── Dettaglio presenze per operaio e giorno ──'])
+            ore.push([])
+            ore.push([hdrCell('── Dettaglio presenze per operaio e giorno ──')])
 
             for (const whi of whSalItems) {
                 if (!whi.workerHoursData) continue
                 const d = whi.workerHoursData
+                const col = whi.salName ? salColorMap.get(whi.salName) : undefined
 
-                oreRows.push([])
-                oreRows.push([`SAL: ${whi.salName || '(nessun SAL)'}`, `Periodo: ${d.dateFrom} → ${d.dateTo}`])
+                ore.push([])
+                ore.push([
+                    col ? salHdrCell(`SAL: ${whi.salName || '(nessun SAL)'}`, col.mid) : hdrCell(`SAL: ${whi.salName || '(nessun SAL)'}`),
+                    xc(`Periodo: ${d.dateFrom} → ${d.dateTo}`),
+                ])
 
-                // Collect all unique dates, sorted
                 const allDates = [...new Set(d.workers.flatMap(w => w.days.map(day => day.date)))].sort()
+                ore.push([
+                    col ? salHdrCell('Giorno', col.mid) : hdrCell('Giorno'),
+                    ...d.workers.map(w => col ? salHdrCell(w.workerName, col.mid) : hdrCell(w.workerName)),
+                ])
 
-                // Header: Giorno | worker1 | worker2 | ... (workers as columns)
-                const hdr: any[] = ['Giorno', ...d.workers.map(w => w.workerName)]
-                oreRows.push(hdr)
-
-                // One row per date
                 for (const dateStr of allDates) {
                     const label = new Date(dateStr + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' })
-                    const row: any[] = [label]
+                    const row: any[] = [col ? salDataCell(label, col.light) : xc(label)]
                     for (const worker of d.workers) {
                         const day = worker.days.find(day => day.date === dateStr)
+                        let cell = ''
                         if (day && (day.normalHours > 0 || day.transferHours > 0)) {
                             const parts = []
                             if (day.normalHours > 0) parts.push(`${day.normalHours}N`)
                             if (day.transferHours > 0) parts.push(`${day.transferHours}T`)
-                            row.push(parts.join('+'))
-                        } else {
-                            row.push('')
+                            cell = parts.join('+')
                         }
+                        row.push(col ? salDataCell(cell, col.light) : xc(cell))
                     }
-                    oreRows.push(row)
+                    ore.push(row)
                 }
 
-                // Totals row per worker
-                const totRow: any[] = ['TOTALE']
+                const totRow: any[] = [totalCell('TOTALE')]
                 for (const worker of d.workers) {
-                    totRow.push(`${fmtN(worker.totalNormal)}N + ${fmtN(worker.totalTransfer)}T = €${fmtN(worker.totalCost)}`)
+                    totRow.push(totalCell(`${fmtN(worker.totalNormal)}N+${fmtN(worker.totalTransfer)}T = €${fmtN(worker.totalCost)}`))
                 }
-                oreRows.push(totRow)
+                ore.push(totRow)
             }
         }
 
-        const ws3 = XLSX.utils.aoa_to_sheet(oreRows)
-        ws3['!cols'] = [{ wch: 25 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }]
-        XLSX.utils.book_append_sheet(wb, ws3, 'Ore Operai')
+        const sheet3 = XLSX.utils.aoa_to_sheet(ore)
+        sheet3['!cols'] = [{ wch: 16 },{ wch: 14 },{ wch: 14 },{ wch: 16 },{ wch: 16 },{ wch: 14 }]
+        XLSX.utils.book_append_sheet(wb, sheet3, 'Ore Operai')
 
         // ── Sheet 4 — Altri Costi ─────────────────────────────────────────────
-        const costiRows: any[][] = [['Descrizione', 'SAL', 'Importo (€)']]
-        expCosts.forEach(c => { costiRows.push([c.description, c.salName || '', fmtN(c.amount)]) })
-        costiRows.push(['', 'TOTALE', fmtN(expCostsTotal)])
-        const ws4 = XLSX.utils.aoa_to_sheet(costiRows)
-        ws4['!cols'] = [{ wch: 35 }, { wch: 18 }, { wch: 14 }]
-        XLSX.utils.book_append_sheet(wb, ws4, 'Altri Costi')
+        const hdrCosti = ['Descrizione','SAL','Importo (€)']
+        const costi: any[][] = [hdrCosti.map(h => hdrCell(h))]
+        expCosts.forEach(c => {
+            const col = c.salName ? salColorMap.get(c.salName) : undefined
+            const row = [c.description, c.salName || '', fmtN(c.amount)]
+            costi.push(col ? row.map(v => salDataCell(v, col.light)) : row.map(v => xc(v)))
+        })
+        costi.push([xc(''), totalCell('TOTALE'), totalCell(fmtN(expCostsTotal))])
+
+        const sheet4 = XLSX.utils.aoa_to_sheet(costi)
+        sheet4['!cols'] = [{ wch: 35 },{ wch: 18 },{ wch: 14 }]
+        XLSX.utils.book_append_sheet(wb, sheet4, 'Altri Costi')
 
         XLSX.writeFile(wb, `Costi_${fileLabel}_${today}.xlsx`)
     }
