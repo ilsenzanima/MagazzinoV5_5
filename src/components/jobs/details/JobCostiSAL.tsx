@@ -35,6 +35,10 @@ interface SalRow {
     unit?: string
     amount: number
     salNames: string[]
+    // For exit child rows: DDT/fornitore di provenienza del materiale
+    purchaseId?: string
+    purchaseRef?: string    // DDT number (e.g. "DDT-123")
+    supplierName?: string
 }
 
 interface MaterialGroup {
@@ -46,6 +50,7 @@ interface MaterialGroup {
     totalAmount: number
     totalPieces?: number
     children: SalRow[]
+    linkHref?: string    // URL to open in new tab (load-note or purchase)
 }
 
 interface WorkerCostRow {
@@ -264,13 +269,13 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
         const groups: MaterialGroup[] = []
 
         // ── 1. Exit / Entry movements grouped by delivery note ────────────────
-        const movMap = new Map<string, { kind: SalRowKind; date: string; ref: string; children: SalRow[] }>()
+        const movMap = new Map<string, { kind: SalRowKind; date: string; ref: string; deliveryNoteId?: string; children: SalRow[] }>()
         movements
             .filter(m => m.type === 'exit' || m.type === 'entry')
             .forEach(m => {
                 const gk = m.deliveryNoteId || `ref:${m.reference}`
                 const kind: SalRowKind = m.type === 'entry' ? 'entry' : 'exit'
-                if (!movMap.has(gk)) movMap.set(gk, { kind, date: m.date, ref: m.reference, children: [] })
+                if (!movMap.has(gk)) movMap.set(gk, { kind, date: m.date, ref: m.reference, deliveryNoteId: m.deliveryNoteId, children: [] })
                 const g = movMap.get(gk)!
                 const sign = kind === 'entry' ? -1 : 1
                 const rawPieces = m.pieces ?? (Math.abs(m.quantity || 0) * (m.coefficient || 1))
@@ -282,9 +287,16 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                     unit: m.itemUnit,
                     amount: sign * Math.abs(m.quantity || 0) * (m.itemPrice || 0),
                     salNames: salTagMap.get(`movement:${m.id}`) || [],
+                    // For exit rows: provenance info from the original purchase
+                    ...(kind === 'exit' && {
+                        purchaseId: m.purchaseId,
+                        purchaseRef: m.purchaseNumber,
+                        supplierName: m.supplierName,
+                    }),
                 })
             })
         movMap.forEach((g, gk) => {
+            const isRealNote = !gk.startsWith('ref:')
             groups.push({
                 groupId: gk,
                 kind: g.kind,
@@ -293,6 +305,7 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                 totalAmount: g.children.reduce((s, c) => s + c.amount, 0),
                 totalPieces: g.children.reduce((s, c) => s + (c.pieces ?? 0), 0),
                 children: g.children,
+                linkHref: isRealNote ? `/load-notes/${gk}` : undefined,
             })
         })
 
@@ -318,6 +331,7 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                 totalAmount: childTotal || p.totalAmount || 0,
                 totalPieces: children.reduce((s, c) => s + (c.pieces ?? 0), 0),
                 children,
+                linkHref: `/purchases/${p.id}`,
             })
         })
 
@@ -991,7 +1005,20 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                                                         {group.kind === 'ddt' && <Badge variant="outline" className="border-purple-300 text-purple-700 text-xs">Acquisto</Badge>}
                                                     </td>
                                                     <td className="p-2">
-                                                        <div className="font-semibold text-slate-800 dark:text-slate-200">{group.description}</div>
+                                                        {group.linkHref ? (
+                                                            <a
+                                                                href={group.linkHref}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="font-semibold text-blue-700 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                                                                onClick={e => e.stopPropagation()}
+                                                            >
+                                                                {group.description}
+                                                                <svg className="h-3 w-3 opacity-60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                            </a>
+                                                        ) : (
+                                                            <div className="font-semibold text-slate-800 dark:text-slate-200">{group.description}</div>
+                                                        )}
                                                         {group.detail && <div className="text-xs text-slate-400">{group.detail}</div>}
                                                         {group.children.length > 0 && (
                                                             <div className="text-xs text-slate-400">{group.children.length} {group.children.length === 1 ? 'articolo' : 'articoli'}</div>
@@ -1026,7 +1053,17 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                                                         </td>
                                                         <td className="p-2"></td>
                                                         <td className="p-2 pl-4">
-                                                            <div className="text-slate-700 dark:text-slate-300">{child.description}</div>
+                                                            <div className="text-slate-700 dark:text-slate-300">
+                                                                {child.description}
+                                                                {child.kind === 'exit' && (child.supplierName || child.purchaseRef) && (
+                                                                    <span className="text-xs text-slate-400 ml-1.5">
+                                                                        ({[
+                                                                            child.purchaseRef && `DDT ${child.purchaseRef}`,
+                                                                            child.supplierName,
+                                                                        ].filter(Boolean).join(' · ')})
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td className={`p-2 text-right font-mono text-xs whitespace-nowrap ${(child.pieces ?? 0) < 0 ? 'text-red-500' : 'text-slate-500'}`}>
                                                             {child.pieces !== undefined
