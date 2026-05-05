@@ -12,3 +12,4 @@ export * from './attendance';
 export * from './worker-courses';
 export * from './worker-medical-exams';
 export * from './corrections';
+export * from './sal';

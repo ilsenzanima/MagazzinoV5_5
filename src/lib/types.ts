@@ -121,6 +121,7 @@ export interface JobLog {
     userName?: string;
     date: string;
     content: string;
+    isCompleted: boolean;
     weatherInfo?: {
         condition: string;
         tempMax: string;
@@ -293,6 +294,8 @@ export interface Worker {
     lastName: string;
     email: string;
     isActive: boolean;
+    hourlyRate: number;
+    trasfertaRate: number;
     createdAt: string;
 }
 
@@ -336,6 +339,8 @@ export interface Attendance {
     notes?: string;
     courseId?: string; // Reference to worker_courses when status='course'
     courseName?: string; // For display
+    hourlyRate?: number;
+    trasfertaRate?: number;
     createdAt?: string;
 }
 
