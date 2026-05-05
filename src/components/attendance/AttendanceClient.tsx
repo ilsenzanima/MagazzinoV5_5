@@ -215,10 +215,26 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             };
 
             try {
-                // Always append (manual insert) in manual mode, unless we want to prevent dups?
-                // User said "add details... not overwritten but added".
-                // So we always use addAttendance.
                 await attendanceApi.addAttendance(payload);
+
+                // Auto-create medical exam record when painting medical_exam
+                if (selectedTool === 'medical_exam') {
+                    try {
+                        const existingExams = await workerMedicalExamsApi.getByWorkerId(worker.id);
+                        const alreadyExists = existingExams.some(e => e.examDate === dateStr);
+                        if (!alreadyExists) {
+                            const nextExamDate = format(addMonths(new Date(dateStr), 12), 'yyyy-MM-dd');
+                            await workerMedicalExamsApi.create({
+                                workerId: worker.id,
+                                examDate: dateStr,
+                                nextExamDate: nextExamDate
+                            });
+                        }
+                    } catch (examError) {
+                        console.error('⚠️ Failed to create medical exam record:', examError);
+                    }
+                }
+
                 toast.success("Aggiunto", { duration: 1000, position: 'bottom-center' });
                 loadData();
             } catch (e) {
@@ -283,6 +299,16 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                         };
                         console.log('📝 Saving entry:', payload);
                         promises.push(attendanceApi.addAttendance(payload));
+
+                        // Auto-create course record if status is course
+                        if (entry.status === 'course' && entry.courseName) {
+                            try {
+                                await workerCoursesApi.upsertByName(wId, entry.courseName, dateStr, 5);
+                                console.log('📚 Created/updated course record for worker:', wId);
+                            } catch (courseError) {
+                                console.error('⚠️ Failed to create course record:', courseError);
+                            }
+                        }
 
                         // Auto-create medical exam record if status is medical_exam
                         if (entry.status === 'medical_exam') {
