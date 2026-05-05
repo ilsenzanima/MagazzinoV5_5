@@ -139,10 +139,15 @@ export default function JobDetailsPage() {
                     ? `€ ${(unitPrice * Math.abs(m.quantity)).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
                     : '-';
                 const desc = m.itemModel ? `${m.itemName || ''} (${m.itemModel})` : (m.itemName || '-');
+                const purDate = m.purchaseDate
+                    ? format(new Date(m.purchaseDate.split('T')[0] + 'T00:00:00'), 'dd/MM/yy')
+                    : '-';
                 return [
                     m.date ? format(new Date(m.date.split('T')[0] + 'T00:00:00'), 'dd/MM/yy') : '-',
                     typeLabel,
-                    m.itemCode || '-',
+                    m.purchaseNumber ? `DDT ${m.purchaseNumber}` : '-',
+                    purDate,
+                    m.supplierName || '-',
                     desc,
                     `${Math.abs(m.quantity)} ${m.itemUnit || ''}`.trim(),
                     amount,
@@ -155,21 +160,23 @@ export default function JobDetailsPage() {
 
         autoTable(doc, {
             startY: curY,
-            head: [['Data', 'Tipo', 'Codice', 'Articolo', 'Q.tà', 'Importo', 'SAL']],
+            head: [['Data mov.', 'Tipo', 'Acquisto', 'Data acq.', 'Fornitore', 'Articolo', 'Q.tà', 'Importo', 'SAL']],
             body: matRows,
-            foot: [['', '', '', '', 'TOTALE MATERIALI', `€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, '']],
+            foot: [['', '', '', '', '', 'TOTALE MATERIALI', '', `€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, '']],
             theme: 'grid',
             styles: { fontSize: 6.5, cellPadding: 1.2 },
             headStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
             footStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
             columnStyles: {
-                0: { cellWidth: 20 },
-                1: { cellWidth: 18 },
-                2: { cellWidth: 24 },
-                3: { cellWidth: 'auto' },
-                4: { cellWidth: 22 },
-                5: { cellWidth: 30, halign: 'right' },
-                6: { cellWidth: 25 },
+                0: { cellWidth: 18 },
+                1: { cellWidth: 16 },
+                2: { cellWidth: 22 },
+                3: { cellWidth: 18 },
+                4: { cellWidth: 38 },
+                5: { cellWidth: 'auto' },
+                6: { cellWidth: 18 },
+                7: { cellWidth: 28, halign: 'right' },
+                8: { cellWidth: 22 },
             },
             margin: { left: ML, right: ML },
         });
@@ -213,10 +220,7 @@ export default function JobDetailsPage() {
 
         // ── 3a. CROSS-TABLE (dates × workers) ─────────────────────────────────
         // Each worker column gets a short first-name label
-        const workerShortNames = allWorkers.map(([, w]) => {
-            const parts = w.name.trim().split(' ');
-            return parts[0]; // first name only for column header
-        });
+        const workerShortNames = allWorkers.map(([, w]) => w.name.trim());
 
         const crossHead = ['Data', ...workerShortNames];
         const crossBody = allDates.map(dateStr => {
@@ -228,7 +232,7 @@ export default function JobDetailsPage() {
                     row.push('');
                 } else {
                     const parts: string[] = [];
-                    if (day.normal > 0) parts.push(`${day.normal}N`);
+                    if (day.normal > 0) parts.push(`${day.normal}`);
                     if (day.transfer > 0) parts.push(`${day.transfer}T`);
                     const sal = attSalMap.get(`${wid}_${dateStr}`);
                     if (sal) parts.push(`[${sal}]`);
