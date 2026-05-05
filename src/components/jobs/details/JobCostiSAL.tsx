@@ -188,6 +188,12 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
     const toggleGroupExpanded = (groupId: string) => setExpandedGroups(prev => {
         const next = new Set(prev); next.has(groupId) ? next.delete(groupId) : next.add(groupId); return next
     })
+
+    // ── Ore Operai section ────────────────────────────────────────────────────
+    const [expandedWHItems, setExpandedWHItems] = useState<Set<string>>(new Set())
+    const toggleWHExpanded = (id: string) => setExpandedWHItems(prev => {
+        const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
+    })
     const [isAddSalOpen, setIsAddSalOpen] = useState(false)
     const [addSalName, setAddSalName] = useState('')
     const [addSalMode, setAddSalMode] = useState<'new' | 'existing'>('new')
@@ -1128,79 +1134,97 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                     </Button>
                 }
             >
-                {filteredWorkerRows.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-6">
-                        {activeFilter === 'all' ? 'Nessuna presenza registrata.' : `Nessuna ore operai per il SAL "${activeFilter}".`}
-                    </p>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-slate-50 dark:bg-slate-800/50">
-                                    <th className="text-left p-2 font-medium text-slate-500">Operaio</th>
-                                    <th className="text-right p-2 font-medium text-slate-500">Ore Norm.</th>
-                                    <th className="text-right p-2 font-medium text-slate-500">Ore Trasf.</th>
-                                    <th className="text-right p-2 font-medium text-slate-500">Costo</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredWorkerRows.map(row => (
-                                    <tr
-                                        key={row.workerId}
-                                        className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer"
-                                        onClick={() => handleViewWorkerDetail(row)}
-                                    >
-                                        <td className="p-2 font-medium text-slate-800 dark:text-slate-200 capitalize">{row.workerName}</td>
-                                        <td className="p-2 text-right text-slate-600">{row.normalHours.toFixed(1)}h</td>
-                                        <td className="p-2 text-right text-slate-600">{row.transferHours.toFixed(1)}h</td>
-                                        <td className="p-2 text-right font-medium">€ {fmt(row.total)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                {(() => {
+                    const whItems = salItems.filter(s =>
+                        s.itemType === 'worker_hours' &&
+                        (activeFilter === 'all' || s.salName === activeFilter)
+                    )
 
-                {/* Saved worker_hours SAL entries (always shown, not filtered by activeFilter) */}
-                {salItems.filter(s => s.itemType === 'worker_hours').length > 0 && activeFilter === 'all' && (
-                    <div className="mt-4 border-t pt-3">
-                        <p className="text-xs text-slate-500 mb-2">Registrazioni SAL salvate:</p>
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b">
-                                    <th className="text-left p-2 font-medium text-slate-500">SAL</th>
-                                    <th className="text-left p-2 font-medium text-slate-500">Periodo</th>
-                                    <th className="text-right p-2 font-medium text-slate-500">Costo</th>
-                                    <th className="w-8 p-2"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {salItems.filter(s => s.itemType === 'worker_hours').map(item => (
-                                    <tr
-                                        key={item.id}
-                                        className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer"
-                                        onClick={() => item.workerHoursData && (setViewingWH(item.workerHoursData), setViewingWHTitle(`${item.salName} — Ore Operai`))}
-                                    >
-                                        <td className="p-2">
-                                            <span className="text-xs bg-blue-100 text-blue-800 rounded px-1.5 py-0.5">{item.salName}</span>
-                                        </td>
-                                        <td className="p-2 text-slate-500">
-                                            {item.dateFrom && item.dateTo ? `${new Date(item.dateFrom).toLocaleDateString('it-IT')} – ${new Date(item.dateTo).toLocaleDateString('it-IT')}` : '—'}
-                                        </td>
-                                        <td className="p-2 text-right font-medium">
-                                            {item.workerHoursData ? `€ ${fmt(item.workerHoursData.grandTotal)}` : '—'}
-                                        </td>
-                                        <td className="p-2">
-                                            <button onClick={e => { e.stopPropagation(); salApi.deleteItem(item.id).then(loadData) }} className="text-slate-300 hover:text-red-500">
-                                                <X className="h-3.5 w-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                    if (filteredWorkerRows.length === 0 && whItems.length === 0) {
+                        return (
+                            <p className="text-sm text-slate-400 text-center py-6">
+                                {activeFilter === 'all' ? 'Nessuna presenza registrata.' : `Nessuna ore operai per il SAL "${activeFilter}".`}
+                            </p>
+                        )
+                    }
+
+                    return (
+                        <div className="space-y-3">
+                            {/* Riepilogo per operaio */}
+                            {filteredWorkerRows.length > 0 && (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b bg-slate-50 dark:bg-slate-800/50">
+                                                <th className="text-left p-2 font-medium text-slate-500">Operaio</th>
+                                                <th className="text-right p-2 font-medium text-slate-500">Ore Norm.</th>
+                                                <th className="text-right p-2 font-medium text-slate-500">Ore Trasf.</th>
+                                                <th className="text-right p-2 font-medium text-slate-500">Costo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredWorkerRows.map(row => (
+                                                <tr key={row.workerId} className="border-b border-slate-100 dark:border-slate-800">
+                                                    <td className="p-2 font-medium text-slate-800 dark:text-slate-200 capitalize">{row.workerName}</td>
+                                                    <td className="p-2 text-right text-slate-600">{row.normalHours.toFixed(1)}h</td>
+                                                    <td className="p-2 text-right text-slate-600">{row.transferHours.toFixed(1)}h</td>
+                                                    <td className="p-2 text-right font-medium">€ {fmt(row.total)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {/* Dettaglio giornaliero per registrazione SAL — espandibile inline */}
+                            {whItems.length > 0 && (
+                                <div className="border-t pt-3 space-y-2">
+                                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Dettaglio presenze per SAL</p>
+                                    {whItems.map(item => {
+                                        const isOpen = expandedWHItems.has(item.id)
+                                        return (
+                                            <div key={item.id} className="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden">
+                                                {/* Header row */}
+                                                <div
+                                                    className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-800/40 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/60 select-none"
+                                                    onClick={() => toggleWHExpanded(item.id)}
+                                                >
+                                                    {isOpen
+                                                        ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
+                                                        : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
+                                                    }
+                                                    <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 rounded px-1.5 py-0.5 font-medium shrink-0">
+                                                        {item.salName}
+                                                    </span>
+                                                    <span className="text-xs text-slate-500">
+                                                        {item.dateFrom && item.dateTo
+                                                            ? `${new Date(item.dateFrom).toLocaleDateString('it-IT')} – ${new Date(item.dateTo).toLocaleDateString('it-IT')}`
+                                                            : '—'}
+                                                    </span>
+                                                    <span className="ml-auto text-sm font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+                                                        {item.workerHoursData ? `€ ${fmt(item.workerHoursData.grandTotal)}` : '—'}
+                                                    </span>
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); salApi.deleteItem(item.id).then(loadData) }}
+                                                        className="text-slate-300 hover:text-red-500 shrink-0 ml-1"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                                {/* Cross-table: visible when expanded */}
+                                                {isOpen && item.workerHoursData && (
+                                                    <div className="p-3 bg-white dark:bg-slate-900/20">
+                                                        <WorkerHoursTable data={item.workerHoursData} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )
+                })()}
             </Section>
 
             {/* ── 3. Altri Costi ────────────────────────────────────────── */}
