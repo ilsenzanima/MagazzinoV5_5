@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Worker } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { Worker, workersApi } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card components
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, HardHat, Mail, Trash2, Pencil, Calendar, AlertCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Search, Plus, HardHat, Mail, Pencil, Calendar } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { WorkerDialog } from "./worker-dialog";
-import { WorkerDetailsDialog } from "./worker-details-dialog";
+import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
 interface WorkersContentProps {
@@ -17,23 +19,25 @@ interface WorkersContentProps {
 }
 
 export default function WorkersContent({ initialWorkers }: WorkersContentProps) {
-    const [workers] = useState<Worker[]>(initialWorkers);
+    const router = useRouter();
+    const [workers, setWorkers] = useState<Worker[]>(initialWorkers);
     const [search, setSearch] = useState("");
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
-    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
-    const { userRole } = useAuth(); // Ensure this hook is correctly imported
+    const [togglingId, setTogglingId] = useState<string | null>(null);
+    const { userRole } = useAuth();
+    const { toast } = useToast();
 
     const canCreate = userRole === 'admin' || userRole === 'operativo';
+    const canEdit = userRole === 'admin' || userRole === 'operativo';
 
-    // Filter logic - split search into words for fuzzy matching
     const filteredWorkers = workers.filter((worker) => {
-        if (!search.trim()) return true
-        const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0)
-        if (words.length === 0) return true
-        const searchTarget = `${worker.firstName} ${worker.lastName} ${worker.email || ''}`.toLowerCase()
-        return words.every(word => searchTarget.includes(word))
+        if (!search.trim()) return true;
+        const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
+        if (words.length === 0) return true;
+        const searchTarget = `${worker.firstName} ${worker.lastName} ${worker.email || ''}`.toLowerCase();
+        return words.every(word => searchTarget.includes(word));
     });
 
     const handleWorkerCreated = () => {
@@ -44,9 +48,30 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
         window.location.reload();
     };
 
+    const handleToggleStatus = async (worker: Worker, checked: boolean, e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            setTogglingId(worker.id);
+            const updated = await workersApi.toggleStatus(worker.id, checked);
+            setWorkers(prev => prev.map(w => w.id === worker.id ? updated : w));
+            toast({
+                title: "Stato aggiornato",
+                description: `${worker.firstName} è ora ${checked ? 'Attivo' : 'Inattivo'}.`,
+            });
+        } catch {
+            toast({
+                variant: "destructive",
+                title: "Errore",
+                description: "Impossibile aggiornare lo stato.",
+            });
+        } finally {
+            setTogglingId(null);
+        }
+    };
+
     return (
         <div className="space-y-6">
-            {/* Sticky Header - Matching Clients Page */}
+            {/* Sticky Header */}
             <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -72,7 +97,7 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                 </div>
             </div>
 
-            {/* Grid Layout - Matching Clients Page */}
+            {/* Grid Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredWorkers.length === 0 ? (
                     <div className="col-span-full text-center py-10 text-slate-400">
@@ -84,32 +109,16 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                         <Card
                             key={worker.id}
                             className="hover:shadow-md transition-shadow cursor-pointer relative group"
-                            onClick={() => {
-                                setSelectedWorker(worker);
-                                setIsDetailsOpen(true);
-                            }}
+                            onClick={() => router.push(`/workers/${worker.id}`)}
                         >
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="truncate capitalize">{worker.firstName} {worker.lastName}</span>
-                                        <Badge
-                                            variant={worker.isActive ? "default" : "secondary"}
-                                            className={cn(
-                                                "text-xs px-1.5 py-0",
-                                                worker.isActive
-                                                    ? "bg-green-100 text-green-700 pointer-events-none border-green-200"
-                                                    : "bg-slate-100 text-slate-500 pointer-events-none"
-                                            )}
-                                        >
-                                            {worker.isActive ? "Attivo" : "Inattivo"}
-                                        </Badge>
-                                    </div>
-                                    {canCreate && (
+                                    <span className="truncate capitalize">{worker.firstName} {worker.lastName}</span>
+                                    {canEdit && (
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8 text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="h-8 w-8 text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedWorker(worker);
@@ -121,11 +130,15 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                                     )}
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                            <CardContent className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
                                 {worker.email && (
                                     <div className="flex items-center gap-2">
                                         <Mail className="h-4 w-4 shrink-0" />
-                                        <a href={`mailto:${worker.email}`} className="hover:underline text-blue-600" onClick={(e) => e.stopPropagation()}>
+                                        <a
+                                            href={`mailto:${worker.email}`}
+                                            className="hover:underline text-blue-600 truncate"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
                                             {worker.email}
                                         </a>
                                     </div>
@@ -133,6 +146,34 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                                 <div className="flex items-center gap-2">
                                     <Calendar className="h-4 w-4 shrink-0" />
                                     <span>Registrato il {new Date(worker.createdAt).toLocaleDateString('it-IT')}</span>
+                                </div>
+
+                                {/* Toggle attivo/inattivo direttamente sulla scheda */}
+                                <div
+                                    className="flex items-center justify-between pt-1 border-t dark:border-border"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <Badge
+                                        className={cn(
+                                            "text-xs px-1.5 py-0 pointer-events-none",
+                                            worker.isActive
+                                                ? "bg-green-100 text-green-700 border-green-200"
+                                                : "bg-slate-100 text-slate-500"
+                                        )}
+                                    >
+                                        {worker.isActive ? "Attivo" : "Inattivo"}
+                                    </Badge>
+                                    {canEdit && (
+                                        <Switch
+                                            checked={worker.isActive}
+                                            disabled={togglingId === worker.id}
+                                            onCheckedChange={(checked) => {
+                                                const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                                                handleToggleStatus(worker, checked, fakeEvent);
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -148,24 +189,12 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
             />
 
             {selectedWorker && (
-                <>
-                    <WorkerDetailsDialog
-                        open={isDetailsOpen}
-                        onOpenChange={setIsDetailsOpen}
-                        worker={selectedWorker}
-                        onUpdate={handleWorkerUpdated}
-                        onEdit={(worker) => {
-                            setIsDetailsOpen(false);
-                            setIsEditOpen(true);
-                        }}
-                    />
-                    <WorkerDialog
-                        open={isEditOpen}
-                        onOpenChange={setIsEditOpen}
-                        workerToEdit={selectedWorker}
-                        onSuccess={handleWorkerUpdated}
-                    />
-                </>
+                <WorkerDialog
+                    open={isEditOpen}
+                    onOpenChange={setIsEditOpen}
+                    workerToEdit={selectedWorker}
+                    onSuccess={handleWorkerUpdated}
+                />
             )}
         </div>
     );

@@ -58,8 +58,9 @@ const mapDbToJobLog = (db: any): JobLog => ({
     userName: db.profiles?.full_name,
     date: db.date,
     content: db.content,
+    isCompleted: db.is_completed ?? false,
     weatherInfo: db.weather_info,
-    condition: db.weather_info?.condition, // Flatten for easier access if type mismatch, relying on type def
+    condition: db.weather_info?.condition,
     tempMax: db.weather_info?.tempMax,
     tempMin: db.weather_info?.tempMin,
     tags: db.tags || [],
@@ -71,6 +72,7 @@ const mapJobLogToDb = (log: Partial<JobLog>) => ({
     user_id: log.userId,
     date: log.date,
     content: log.content,
+    is_completed: log.isCompleted,
     weather_info: log.weatherInfo,
     tags: log.tags
 });

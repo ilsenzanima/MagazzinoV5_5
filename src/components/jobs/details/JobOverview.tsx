@@ -8,7 +8,7 @@ import { Job, jobsApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Euro, Trash2, Pencil, Building2, MapPin, User, FileText, Clock } from "lucide-react"
+import { Calendar, Trash2, Pencil, Building2, MapPin, User, FileText, Clock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -149,23 +149,6 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <Euro className="h-4 w-4" />
-              Costo Materiali
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {userRole === 'user' ? (
-              <div className="text-xl font-bold text-slate-400 italic">Riservato</div>
-            ) : (
-              <div className="text-2xl font-bold">€ {totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
-            )}
-            <div className="text-xs text-slate-500 mt-1">Calcolato su listino interno</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Ore Lavoro
             </CardTitle>
@@ -274,7 +257,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
       </div>
 
       {job.siteAddress && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 min-h-[300px]">
             <JobMap address={job.siteAddress} />
           </div>
