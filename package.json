@@ -59,6 +59,7 @@
     "tailwind-merge": "^3.4.0",
     "three": "^0.183.2",
     "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {
