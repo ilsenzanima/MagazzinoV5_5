@@ -428,6 +428,16 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
         const today = new Date().toISOString().slice(0, 10)
         const fileLabel = isAll ? 'Completo' : scope.replace(/\s+/g, '_')
 
+        // Nome cantiere dal primo movimento disponibile
+        const firstMov = movements[0]
+        const jobSlug = [firstMov?.jobCode, firstMov?.jobDescription]
+            .filter(Boolean)
+            .join('_')
+            .replace(/[^a-zA-Z0-9_\-àáèéìíòóùú]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '')
+            .slice(0, 40)
+
         // ── Palette colori SAL (ARGB, 8 char) ────────────────────────────────
         const SAL_LIGHT  = ['FFD6E4FF','FFD4EDDA','FFFFF3CD','FFFFD6CC','FFE8D5FC','FFFCE4D6','FFD9F2F7','FFE2EFDA']
         const SAL_MID    = ['FF9DC3F0','FF9CD4B4','FFFFD966','FFFFB3A0','FFC5A8E8','FFFAB588','FF8EC8D5','FFA8C88E']
@@ -630,7 +640,8 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
         sheet4['!cols'] = [{ wch: 35 },{ wch: 18 },{ wch: 14 }]
         XLSX.utils.book_append_sheet(wb, sheet4, 'Altri Costi')
 
-        XLSX.writeFile(wb, `Costi_${fileLabel}_${today}.xlsx`)
+        const nameParts = [jobSlug, fileLabel, today].filter(Boolean)
+        XLSX.writeFile(wb, `${nameParts.join('_')}.xlsx`)
     }
 
     // ── Materials: toggle selection ───────────────────────────────────────────
