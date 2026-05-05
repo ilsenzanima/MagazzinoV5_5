@@ -548,31 +548,37 @@ export function JobCostiSAL({ jobId, movements }: JobCostiSALProps) {
                 oreRows.push([])
                 oreRows.push([`SAL: ${whi.salName || '(nessun SAL)'}`, `Periodo: ${d.dateFrom} → ${d.dateTo}`])
 
-                // Collect all unique dates across all workers, sorted
+                // Collect all unique dates, sorted
                 const allDates = [...new Set(d.workers.flatMap(w => w.days.map(day => day.date)))].sort()
 
-                // Header: Operaio | date1 | date2 | ... | Tot.Norm | Tot.Trasf | Costo
-                const hdr: any[] = ['Operaio / Giorno', ...allDates, 'Tot. Normali', 'Tot. Trasferta', 'Costo (€)']
+                // Header: Giorno | worker1 | worker2 | ... (workers as columns)
+                const hdr: any[] = ['Giorno', ...d.workers.map(w => w.workerName)]
                 oreRows.push(hdr)
 
-                for (const worker of d.workers) {
-                    const row: any[] = [worker.workerName]
-                    for (const dateStr of allDates) {
+                // One row per date
+                for (const dateStr of allDates) {
+                    const label = new Date(dateStr + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' })
+                    const row: any[] = [label]
+                    for (const worker of d.workers) {
                         const day = worker.days.find(day => day.date === dateStr)
                         if (day && (day.normalHours > 0 || day.transferHours > 0)) {
                             const parts = []
-                            if (day.normalHours > 0) parts.push(`${day.normalHours}h norm.`)
-                            if (day.transferHours > 0) parts.push(`${day.transferHours}h trasf.`)
-                            row.push(parts.join(' + '))
+                            if (day.normalHours > 0) parts.push(`${day.normalHours}N`)
+                            if (day.transferHours > 0) parts.push(`${day.transferHours}T`)
+                            row.push(parts.join('+'))
                         } else {
                             row.push('')
                         }
                     }
-                    row.push(fmtN(worker.totalNormal), fmtN(worker.totalTransfer), fmtN(worker.totalCost))
                     oreRows.push(row)
                 }
 
-                oreRows.push(['', ...allDates.map(() => ''), 'TOTALE', '', fmtN(d.grandTotal)])
+                // Totals row per worker
+                const totRow: any[] = ['TOTALE']
+                for (const worker of d.workers) {
+                    totRow.push(`${fmtN(worker.totalNormal)}N + ${fmtN(worker.totalTransfer)}T = €${fmtN(worker.totalCost)}`)
+                }
+                oreRows.push(totRow)
             }
         }
 
