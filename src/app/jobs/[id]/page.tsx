@@ -375,7 +375,14 @@ export default function JobDetailsPage() {
             doc.setTextColor(0, 0, 0);
         }
 
-        doc.save(`Scheda_${job.code || job.id}.pdf`);
+        const pdfSlug = [job.code, job.name]
+            .filter(Boolean)
+            .join('_')
+            .replace(/[^a-zA-Z0-9_\-àáèéìíòóùú]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '')
+            .slice(0, 50);
+        doc.save(`Scheda_${pdfSlug}.pdf`);
     };
 
     const loadData = async () => {
