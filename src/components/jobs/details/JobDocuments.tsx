@@ -102,6 +102,18 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     }
   }
 
+  const handleOpenDocument = async (fileUrl: string) => {
+    try {
+      const path = fileUrl.split('/public/documents/')[1];
+      if (!path) { window.open(fileUrl, '_blank'); return; }
+      const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600);
+      if (error || !data?.signedUrl) { window.open(fileUrl, '_blank'); return; }
+      window.open(data.signedUrl, '_blank');
+    } catch {
+      window.open(fileUrl, '_blank');
+    }
+  };
+
   const handleDelete = async (doc: JobDocument) => {
     if (!confirm("Sei sicuro di voler eliminare questo documento?")) return
 
@@ -234,11 +246,9 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
                   <div className="flex justify-between items-start">
                     <p className="font-medium truncate pr-2" title={doc.name}>{doc.name}</p>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" download>
-                        <Button variant="ghost" size="icon" className="h-6 w-6">
-                          <Download className="h-3 w-3 text-slate-500" />
-                        </Button>
-                      </a>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenDocument(doc.fileUrl)}>
+                        <Download className="h-3 w-3 text-slate-500" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(doc)}>
                         <Trash2 className="h-3 w-3 text-red-500" />
                       </Button>

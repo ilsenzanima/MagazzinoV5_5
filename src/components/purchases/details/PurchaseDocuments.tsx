@@ -7,6 +7,7 @@ import { purchasesApi } from "@/lib/api"
 import { useState } from "react"
 import { DocumentScanner } from "@/components/ui/document-scanner"
 import { notify } from "@/lib/notify"
+import { createClient } from "@/lib/supabase/client"
 
 interface PurchaseDocumentsProps {
   purchaseId: string;
@@ -15,10 +16,25 @@ interface PurchaseDocumentsProps {
 }
 
 export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: PurchaseDocumentsProps) {
+  const supabase = createClient();
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  const handleOpenDocument = async () => {
+    if (!documentUrl) return;
+    try {
+      // Estrae il percorso dal publicUrl: .../public/documents/<path>
+      const path = documentUrl.split('/public/documents/')[1];
+      if (!path) { window.open(documentUrl, '_blank'); return; }
+      const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600);
+      if (error || !data?.signedUrl) { window.open(documentUrl, '_blank'); return; }
+      window.open(data.signedUrl, '_blank');
+    } catch {
+      window.open(documentUrl, '_blank');
+    }
+  };
 
   const uploadFile = async (file: File) => {
     try {
@@ -139,14 +155,12 @@ export function PurchaseDocuments({ purchaseId, documentUrl, onUpdate }: Purchas
                 </div>
                 <div className="overflow-hidden min-w-0">
                   <p className="font-medium text-sm truncate text-slate-900 dark:text-slate-100">Documento Allegato</p>
-                  <a
-                    href={documentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={handleOpenDocument}
                     className="text-xs text-blue-600 hover:underline flex items-center mt-0.5"
                   >
                     Apri Documento <ExternalLink className="h-3 w-3 ml-1" />
-                  </a>
+                  </button>
                 </div>
               </div>
               <Button
