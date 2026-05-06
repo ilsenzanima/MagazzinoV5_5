@@ -313,7 +313,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                 totalAmount: g.children.reduce((s, c) => s + c.amount, 0),
                 totalPieces: g.children.reduce((s, c) => s + (c.pieces ?? 0), 0),
                 children: g.children,
-                linkHref: isRealNote ? `/load-notes/${gk}` : undefined,
+                linkHref: isRealNote ? `/movements/${gk}` : undefined,
             })
         })
 
