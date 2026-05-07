@@ -1,22 +1,19 @@
 /**
  * Database Backup Script
- * Exports all Supabase tables to JSON files
- * 
+ * Exports all Supabase tables to a private Supabase Storage bucket.
+ *
  * Usage: npm run backup
- * 
- * Saves backups to: backups/YYYY-MM-DD_HH-mm/
- * Keeps last 4 backups (configurable via MAX_BACKUPS)
+ *
+ * Saves backups to: storage bucket "backups" / YYYY-MM-DDTHH-mm / <table>.json
+ * Keeps last MAX_BACKUPS weekly snapshots (older ones are auto-deleted).
  */
 
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
 const path = require('path');
 
-// Configuration
-const MAX_BACKUPS = 12; // Keep last 12 weekly backups (3 months)
-const BACKUP_DIR = path.join(__dirname, '..', 'backups');
+const MAX_BACKUPS = 12; // keep last 12 weekly backups (~3 months)
+const BUCKET = 'backups';
 
-// Tables to backup (in order of dependencies)
 const TABLES = [
     'profiles',
     'clients',
@@ -31,23 +28,31 @@ const TABLES = [
     'attendance',
 ];
 
-// Get Supabase credentials from environment or .env.local
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
     console.error('❌ Missing Supabase credentials!');
-    console.error('Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
+    console.error('Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
     process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+async function ensureBucket() {
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const exists = buckets?.some(b => b.name === BUCKET);
+    if (!exists) {
+        const { error } = await supabase.storage.createBucket(BUCKET, { public: false });
+        if (error) throw new Error(`Cannot create bucket: ${error.message}`);
+        console.log(`🪣  Created private bucket "${BUCKET}"`);
+    }
+}
+
 async function backupTable(tableName) {
     console.log(`  📦 Backing up ${tableName}...`);
-
     try {
         const { data, error } = await supabase
             .from(tableName)
@@ -58,7 +63,6 @@ async function backupTable(tableName) {
             console.error(`  ❌ Error backing up ${tableName}:`, error.message);
             return { tableName, count: 0, error: error.message };
         }
-
         return { tableName, data, count: data?.length || 0 };
     } catch (err) {
         console.error(`  ❌ Exception backing up ${tableName}:`, err.message);
@@ -66,38 +70,51 @@ async function backupTable(tableName) {
     }
 }
 
-function cleanOldBackups() {
-    if (!fs.existsSync(BACKUP_DIR)) return;
+async function uploadFile(storagePath, content) {
+    const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(storagePath, Buffer.from(content, 'utf-8'), {
+            contentType: 'application/json',
+            upsert: true,
+        });
+    if (error) throw new Error(`Upload failed for ${storagePath}: ${error.message}`);
+}
 
-    const backups = fs.readdirSync(BACKUP_DIR)
-        .filter(f => fs.statSync(path.join(BACKUP_DIR, f)).isDirectory())
+async function cleanOldBackups(currentTimestamp) {
+    // List top-level "folders" (unique prefixes before the first /)
+    const { data, error } = await supabase.storage.from(BUCKET).list('', { limit: 200 });
+    if (error) {
+        console.warn('  ⚠️  Could not list backups for cleanup:', error.message);
+        return;
+    }
+
+    // Each item is a folder entry whose name is the timestamp prefix
+    const folders = (data || [])
+        .filter(item => item.id === null) // folders have null id in Supabase Storage
+        .map(item => item.name)
         .sort()
         .reverse();
 
-    // Keep only MAX_BACKUPS
-    const toDelete = backups.slice(MAX_BACKUPS);
-
-    for (const backup of toDelete) {
-        const backupPath = path.join(BACKUP_DIR, backup);
-        console.log(`  🗑️  Removing old backup: ${backup}`);
-        fs.rmSync(backupPath, { recursive: true, force: true });
+    const toDelete = folders.slice(MAX_BACKUPS);
+    for (const folder of toDelete) {
+        // List all files inside the folder then remove them
+        const { data: files } = await supabase.storage.from(BUCKET).list(folder);
+        if (files?.length) {
+            const paths = files.map(f => `${folder}/${f.name}`);
+            await supabase.storage.from(BUCKET).remove(paths);
+        }
+        console.log(`  🗑️  Removed old backup: ${folder}`);
     }
 }
 
 async function main() {
     console.log('🚀 Starting database backup...\n');
 
-    // Create backup directory with timestamp
+    await ensureBucket();
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
-    const backupPath = path.join(BACKUP_DIR, timestamp);
+    console.log(`📁 Backup folder: ${BUCKET}/${timestamp}\n`);
 
-    if (!fs.existsSync(backupPath)) {
-        fs.mkdirSync(backupPath, { recursive: true });
-    }
-
-    console.log(`📁 Backup directory: ${backupPath}\n`);
-
-    // Backup all tables
     const results = [];
     let totalRecords = 0;
 
@@ -106,29 +123,21 @@ async function main() {
         results.push(result);
 
         if (result.data) {
-            const filePath = path.join(backupPath, `${table}.json`);
-            fs.writeFileSync(filePath, JSON.stringify(result.data, null, 2));
+            await uploadFile(`${timestamp}/${table}.json`, JSON.stringify(result.data, null, 2));
             totalRecords += result.count;
         }
     }
 
-    // Create summary file
     const summary = {
         timestamp: new Date().toISOString(),
         tables: results.map(r => ({ name: r.tableName, records: r.count, error: r.error })),
         totalRecords,
     };
+    await uploadFile(`${timestamp}/_summary.json`, JSON.stringify(summary, null, 2));
 
-    fs.writeFileSync(
-        path.join(backupPath, '_summary.json'),
-        JSON.stringify(summary, null, 2)
-    );
-
-    // Clean old backups
     console.log('\n🧹 Cleaning old backups...');
-    cleanOldBackups();
+    await cleanOldBackups(timestamp);
 
-    // Print summary
     console.log('\n✅ Backup completed!\n');
     console.log('📊 Summary:');
     for (const result of results) {
@@ -136,7 +145,10 @@ async function main() {
         console.log(`   ${status} ${result.tableName}: ${result.count} records`);
     }
     console.log(`\n   Total: ${totalRecords} records`);
-    console.log(`   Location: ${backupPath}`);
+    console.log(`   Location: Supabase Storage → ${BUCKET}/${timestamp}`);
 }
 
-main().catch(console.error);
+main().catch(err => {
+    console.error('💥 Backup failed:', err.message);
+    process.exit(1);
+});
