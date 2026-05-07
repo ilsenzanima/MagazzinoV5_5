@@ -1,44 +1,28 @@
 name: Weekly Database Backup
 
 on:
-  # Run every Sunday night at 2:00 AM Italian time (1:00 AM UTC)
   schedule:
-    - cron: '0 1 * * 0'
-  
-  # Allow manual trigger
+    - cron: '0 1 * * 0'  # Every Sunday at 01:00 UTC (02:00–03:00 Italian time)
   workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run backup script
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/backup-database.js
-      
-      - name: Configure Git
-        run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions@github.com"
-      
-      - name: Commit and push backup
-        run: |
-          git add backups/
-          git diff --staged --quiet || git commit -m "🗄️ Automated backup $(date +'%Y-%m-%d')"
-          git push

@@ -47,3 +47,6 @@ File da utilizzare/
 
 # debug files
 debug_*.ts
+
+# database backups (stored in Supabase Storage, not in the repo)
+/backups/
