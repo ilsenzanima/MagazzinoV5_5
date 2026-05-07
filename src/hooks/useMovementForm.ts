@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
 import { inventoryApi } from "@/lib/services/inventory";
 import { jobsApi } from "@/lib/services/jobs";
 import { warehousesApi } from "@/lib/services/warehouses";
@@ -9,7 +8,7 @@ import { createMovement, updateMovement } from "@/app/movements/actions";
 import { notify } from "@/lib/notify";
 
 export interface MovementLine {
-    id?: string; // Database ID for existing items
+    id?: string;
     tempId: string;
     itemId: string;
     itemName: string;
@@ -18,109 +17,121 @@ export interface MovementLine {
     itemBrand?: string;
     itemCategory?: string;
     itemDescription?: string;
-    quantity: number;
-    pieces?: number;
-    coefficient?: number;
+    coefficient: number;
+    quantity: string;
+    pieces: string;
     purchaseItemId?: string;
     purchaseRef?: string;
-    isFictitious?: boolean;
+    isFictitious: boolean;
+    availableBatches: any[];
+    batchesLoading: boolean;
 }
+
+const emptyLine = (): MovementLine => ({
+    tempId: Math.random().toString(36).substr(2, 9),
+    itemId: "",
+    itemName: "",
+    itemCode: "",
+    itemUnit: "PZ",
+    coefficient: 1,
+    quantity: "",
+    pieces: "",
+    isFictitious: false,
+    availableBatches: [],
+    batchesLoading: false,
+});
+
+const ensureTrailingEmpty = (lines: MovementLine[]): MovementLine[] => {
+    const last = lines[lines.length - 1];
+    if (!last || last.itemId || last.quantity || last.pieces) {
+        return [...lines, emptyLine()];
+    }
+    return lines;
+};
 
 interface UseMovementFormProps {
     initialInventory: InventoryItem[];
     initialJobs: Job[];
-    initialNote?: DeliveryNote; // Optional: if provided, we're in edit mode
+    initialNote?: DeliveryNote;
 }
 
 export function useMovementForm({ initialInventory, initialJobs, initialNote }: UseMovementFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
-    // Edit Mode
     const isEditing = !!initialNote;
     const editingId = initialNote?.id;
 
-    // Data Sources
     const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
     const [jobs, setJobs] = useState<Job[]>(initialJobs);
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [primaryWarehouse, setPrimaryWarehouse] = useState<Warehouse | null>(null);
 
-    // Dialog States
     const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
-    const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
-
-    // Loading States for Search
     const [jobsLoading, setJobsLoading] = useState(false);
     const [itemsLoading, setItemsLoading] = useState(false);
 
-    // Form State - Initialize from initialNote if editing
-    const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale' | 'waste'>(initialNote?.type || 'entry');
-    const [numberPart, setNumberPart] = useState(initialNote?.number.split('/')[0] || "");
-    const [date, setDate] = useState(initialNote?.date.split('T')[0] || new Date().toISOString().split('T')[0]);
+    const [activeTab, setActiveTab] = useState<"entry" | "exit" | "sale" | "waste">(
+        initialNote?.type || "entry"
+    );
+    const [numberPart, setNumberPart] = useState(initialNote?.number.split("/")[0] || "");
+    const [date, setDate] = useState(
+        initialNote?.date.split("T")[0] || new Date().toISOString().split("T")[0]
+    );
     const [selectedJob, setSelectedJob] = useState<Job | null>(
-        initialNote?.jobId ? (initialJobs.find(j => j.id === initialNote.jobId) || null) : null
+        initialNote?.jobId ? initialJobs.find((j) => j.id === initialNote.jobId) || null : null
     );
     const [causal, setCausal] = useState(initialNote?.causal || "");
     const [pickupLocation, setPickupLocation] = useState(initialNote?.pickupLocation || "");
     const [deliveryLocation, setDeliveryLocation] = useState(initialNote?.deliveryLocation || "");
 
-    // Footer fields
     const [transportMean, setTransportMean] = useState(initialNote?.transportMean || "Mittente");
     const [transportTime, setTransportTime] = useState(initialNote?.transportTime || "");
     const [appearance, setAppearance] = useState(initialNote?.appearance || "A VISTA");
-    const [packagesCount, setPackagesCount] = useState<string>(initialNote?.packagesCount?.toString() || "1");
+    const [packagesCount, setPackagesCount] = useState<string>(
+        initialNote?.packagesCount?.toString() || "1"
+    );
     const [notes, setNotes] = useState(initialNote?.notes || "");
 
-    // Line State - Initialize from initialNote items if editing
-    const [lines, setLines] = useState<MovementLine[]>(
-        initialNote?.items ? initialNote.items.map(item => ({
-            id: item.id,
-            tempId: item.id || Math.random().toString(36).substr(2, 9),
-            itemId: item.inventoryId,
-            itemName: item.inventoryName || "",
-            itemCode: item.inventoryCode || "",
-            itemUnit: item.inventoryUnit || "PZ",
-            itemBrand: item.inventoryBrand,
-            itemCategory: item.inventoryCategory,
-            itemDescription: item.inventoryDescription,
-            quantity: item.quantity,
-            pieces: item.pieces,
-            coefficient: item.coefficient || 1,
-            purchaseItemId: item.purchaseItemId,
-            purchaseRef: item.purchaseNumber || (item.purchaseItemId ? "Lotto" : undefined),
-            isFictitious: item.isFictitious
-        })) : []
-    );
-    const [currentLine, setCurrentLine] = useState({
-        itemId: "",
-        quantity: "",
-        pieces: "",
-        coefficient: 1,
-        unit: "PZ",
-        purchaseItemId: "",
-        isFictitious: false
+    const [lines, setLines] = useState<MovementLine[]>(() => {
+        if (initialNote?.items && initialNote.items.length > 0) {
+            return ensureTrailingEmpty(
+                initialNote.items.map((item) => ({
+                    id: item.id,
+                    tempId: item.id || Math.random().toString(36).substr(2, 9),
+                    itemId: item.inventoryId,
+                    itemName: item.inventoryName || "",
+                    itemCode: item.inventoryCode || "",
+                    itemUnit: item.inventoryUnit || "PZ",
+                    itemBrand: item.inventoryBrand,
+                    itemCategory: item.inventoryCategory,
+                    itemDescription: item.inventoryDescription,
+                    coefficient: item.coefficient || 1,
+                    quantity: item.quantity.toString(),
+                    pieces: item.pieces?.toString() || "",
+                    purchaseItemId: item.purchaseItemId,
+                    purchaseRef: item.purchaseNumber || undefined,
+                    isFictitious: item.isFictitious || false,
+                    availableBatches: [],
+                    batchesLoading: false,
+                }))
+            );
+        }
+        return [emptyLine()];
     });
-    const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
 
-    // Availability State
-    const [availableBatches, setAvailableBatches] = useState<any[]>([]); // For Exit
-    const [jobInventory, setJobInventory] = useState<any[]>([]); // For Entry (Legacy/Simple)
-    const [jobBatchAvailability, setJobBatchAvailability] = useState<any[]>([]); // For Entry (Detailed)
+    const [jobInventory, setJobInventory] = useState<any[]>([]);
+    const [jobBatchAvailability, setJobBatchAvailability] = useState<any[]>([]);
 
-    // Computed
-    const yearSuffix = date ? new Date(date).getFullYear().toString().slice(-2) : new Date().getFullYear().toString().slice(-2);
+    const yearSuffix = date
+        ? new Date(date).getFullYear().toString().slice(-2)
+        : new Date().getFullYear().toString().slice(-2);
     const fullNumber = numberPart ? `${numberPart}/PP${yearSuffix}` : `/PP${yearSuffix}`;
 
-    // Load warehouses
     useEffect(() => {
-        warehousesApi.getAll().then(setWarehouses).catch(console.error);
         warehousesApi.getPrimary().then(setPrimaryWarehouse).catch(console.error);
     }, []);
 
-    // Effects
     useEffect(() => {
-        // Auto-fill logic
         let jobAddress = "";
         if (selectedJob) {
             if (selectedJob.clientName) {
@@ -128,16 +139,13 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 if (selectedJob.clientAddress) jobAddress += ` - ${selectedJob.clientAddress}`;
                 jobAddress += `\n`;
             }
-            let destinationText = "";
             const siteAddr = selectedJob.siteAddress || "";
             const clientAddr = selectedJob.clientAddress || "";
-            const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-
-            if (siteAddr && clientAddr && normalize(siteAddr) === normalize(clientAddr)) {
-                destinationText = "Stessa";
-            } else {
-                destinationText = selectedJob.siteAddress || `${selectedJob.code} - ${selectedJob.description}`;
-            }
+            const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+            const destinationText =
+                siteAddr && clientAddr && normalize(siteAddr) === normalize(clientAddr)
+                    ? "Stessa"
+                    : selectedJob.siteAddress || `${selectedJob.code} - ${selectedJob.description}`;
             jobAddress += `DESTINAZIONE: ${destinationText}`;
         }
 
@@ -145,66 +153,175 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             ? `${primaryWarehouse.name}\n${primaryWarehouse.address}`
             : "OPI FIRESAFE S.R.L. MAGAZZINO\nVia A. Malignani, 9 - 33010 - REANA DEL ROJALE (UD)";
 
-        if (activeTab === 'entry') {
+        if (activeTab === "entry") {
             setCausal("Rientro da cantiere");
             setPickupLocation(jobAddress || "DESTINAZIONE");
             setDeliveryLocation(warehouseAddress);
-            setTransportTime("17:00"); // Default per entrate
-        } else if (activeTab === 'exit') {
+            setTransportTime("17:00");
+        } else if (activeTab === "exit") {
             setCausal("Uscita merce per cantiere");
             setPickupLocation(warehouseAddress);
             setDeliveryLocation(jobAddress || "DESTINAZIONE");
-            setTransportTime("08:00"); // Default per uscite
-        } else if (activeTab === 'sale') {
+            setTransportTime("08:00");
+        } else if (activeTab === "sale") {
             setCausal("Vendita");
             setPickupLocation(warehouseAddress);
             setDeliveryLocation("Cliente");
-            setTransportTime("08:00"); // Default per vendite
-        } else if (activeTab === 'waste') {
+            setTransportTime("08:00");
+        } else if (activeTab === "waste") {
             setCausal("Trasporto rifiuti cantiere");
             setPickupLocation(jobAddress || "CANTIERE");
-            setDeliveryLocation("OPI FIRESAFE S.R.L. DEPOSITO TEMPORANEO\nVia Monfalcone, 33 - 33052 - Cervignano del Friuli (UD)");
+            setDeliveryLocation(
+                "OPI FIRESAFE S.R.L. DEPOSITO TEMPORANEO\nVia Monfalcone, 33 - 33052 - Cervignano del Friuli (UD)"
+            );
             setTransportTime("08:00");
         }
 
         if (selectedJob) {
-            const parts = [];
+            const parts: string[] = [];
             if (selectedJob.cig) parts.push(`CIG: ${selectedJob.cig}`);
             if (selectedJob.cup) parts.push(`CUP: ${selectedJob.cup}`);
-            if (parts.length > 0) setNotes(parts.join(' '));
-            else setNotes("");
+            setNotes(parts.length > 0 ? parts.join(" ") : "");
         } else {
             setNotes("");
         }
     }, [activeTab, selectedJob, primaryWarehouse]);
 
     useEffect(() => {
-        // Fetch Job Inventory for Return
-        if (activeTab === 'entry' && selectedJob) {
+        if (activeTab === "entry" && selectedJob) {
             Promise.allSettled([
                 inventoryApi.getJobBatchAvailability(selectedJob.id),
-                inventoryApi.getJobInventory(selectedJob.id)
+                inventoryApi.getJobInventory(selectedJob.id),
             ]).then(([batchResult, inventoryResult]) => {
-                if (batchResult.status === 'fulfilled') setJobBatchAvailability(batchResult.value || []);
-                if (inventoryResult.status === 'fulfilled') setJobInventory(inventoryResult.value || []);
+                if (batchResult.status === "fulfilled") {
+                    const batches = batchResult.value || [];
+                    setJobBatchAvailability(batches);
+                    if (isEditing && batches.length > 0) {
+                        setLines((prev) =>
+                            prev.map((line) => {
+                                if (!line.itemId || line.availableBatches.length > 0) return line;
+                                const itemBatches = batches
+                                    .filter((b: any) => b.itemId === line.itemId)
+                                    .map((b: any) => {
+                                        const totalQty = (initialNote?.items ?? [])
+                                            .filter((item) => item.purchaseItemId === b.purchaseItemId)
+                                            .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+                                        const totalPieces = (initialNote?.items ?? [])
+                                            .filter((item) => item.purchaseItemId === b.purchaseItemId)
+                                            .reduce((sum, item) => sum + (item.pieces ?? 0), 0);
+                                        return {
+                                            id: b.purchaseItemId,
+                                            purchaseRef: b.purchaseRef,
+                                            remainingQty: (b.quantity ?? 0) + totalQty,
+                                            remainingPieces: b.pieces != null ? b.pieces + totalPieces : b.pieces,
+                                            date: b.date,
+                                        };
+                                    });
+                                return itemBatches.length > 0 ? { ...line, availableBatches: itemBatches } : line;
+                            })
+                        );
+                    }
+                }
+                if (inventoryResult.status === "fulfilled") setJobInventory(inventoryResult.value || []);
             });
         } else {
             setJobInventory([]);
             setJobBatchAvailability([]);
         }
-    }, [activeTab, selectedJob]);
+    }, [activeTab, selectedJob, isEditing]);
 
-    // Auto-sync packagesCount with number of lines
+    // When editing exit/sale: load available batches for each existing line
+    const exitSaleBatchesLoaded = useRef(false);
     useEffect(() => {
-        const count = lines.length > 0 ? lines.length : 1;
-        setPackagesCount(count.toString());
-    }, [lines.length]);
+        if (!isEditing || exitSaleBatchesLoaded.current) return;
+        if (activeTab !== "exit" && activeTab !== "sale") return;
+        exitSaleBatchesLoaded.current = true;
 
-    // Handlers
+        const itemLines = lines.filter((l) => l.itemId && l.availableBatches.length === 0);
+        if (itemLines.length === 0) return;
+
+        setLines((prev) =>
+            prev.map((l) =>
+                l.itemId && l.availableBatches.length === 0 ? { ...l, batchesLoading: true } : l
+            )
+        );
+
+        itemLines.forEach(async (line) => {
+            try {
+                const batches: any[] = await inventoryApi.getAvailableBatches(line.itemId);
+                // Add back quantities that this bolla originally consumed from each lot
+                const adjustedBatches = batches.map((b) => {
+                    const totalQty = (initialNote?.items ?? [])
+                        .filter((item) => item.purchaseItemId === b.id)
+                        .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+                    const totalPieces = (initialNote?.items ?? [])
+                        .filter((item) => item.purchaseItemId === b.id)
+                        .reduce((sum, item) => sum + (item.pieces ?? 0), 0);
+                    if (totalQty === 0 && totalPieces === 0) return b;
+                    return {
+                        ...b,
+                        remainingQty: (b.remainingQty ?? 0) + totalQty,
+                        remainingPieces: b.remainingPieces != null ? b.remainingPieces + totalPieces : b.remainingPieces,
+                    };
+                });
+                const validBatches = adjustedBatches.filter((b) => {
+                    if (b.remainingPieces !== undefined && b.remainingPieces !== null)
+                        return b.remainingPieces > 0.001;
+                    return b.remainingQty > 0.001;
+                });
+                // Ensure the currently-selected batch is always present even if exhausted
+                if (line.purchaseItemId && !validBatches.find((b) => b.id === line.purchaseItemId)) {
+                    const found = adjustedBatches.find((b) => b.id === line.purchaseItemId);
+                    if (found) {
+                        validBatches.unshift(found);
+                    } else {
+                        // Batch not returned by API (fully exhausted server-side):
+                        // reconstruct from initialNote items, then fallback to direct DB query
+                        const originalItems = (initialNote?.items ?? []).filter(
+                            (item) => item.purchaseItemId === line.purchaseItemId
+                        );
+                        const totalQty = originalItems.reduce((s, i) => s + (i.quantity ?? 0), 0);
+                        const totalPieces = originalItems.reduce((s, i) => s + (i.pieces ?? 0), 0);
+                        let purchaseRef = originalItems[0]?.purchaseNumber ?? null;
+                        if (!purchaseRef && line.purchaseItemId) {
+                            const info = await inventoryApi.getPurchaseItemRef(line.purchaseItemId);
+                            purchaseRef = info?.purchaseRef ?? null;
+                        }
+                        validBatches.unshift({
+                            id: line.purchaseItemId,
+                            purchaseRef,
+                            remainingQty: totalQty,
+                            remainingPieces: totalPieces > 0 ? totalPieces : null,
+                        });
+                    }
+                }
+                setLines((prev) =>
+                    prev.map((l) =>
+                        l.tempId === line.tempId
+                            ? { ...l, batchesLoading: false, availableBatches: validBatches }
+                            : l
+                    )
+                );
+            } catch {
+                setLines((prev) =>
+                    prev.map((l) =>
+                        l.tempId === line.tempId ? { ...l, batchesLoading: false } : l
+                    )
+                );
+            }
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEditing, activeTab]);
+
+    useEffect(() => {
+        const completedCount = lines.filter((l) => l.itemId && l.quantity).length;
+        setPackagesCount((completedCount > 0 ? completedCount : 1).toString());
+    }, [lines]);
+
     const handleJobSearch = useCallback(async (term: string) => {
         setJobsLoading(true);
         try {
-            const { data } = await jobsApi.getPaginated({ page: 1, limit: 50, search: term, status: 'active' });
+            const { data } = await jobsApi.getPaginated({ page: 1, limit: 50, search: term, status: "active" });
             setJobs(data);
         } catch (error) {
             console.error("Failed to search jobs", error);
@@ -214,7 +331,6 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     }, []);
 
     const handleItemSearch = useCallback(async (term: string) => {
-        if (activeTab === 'entry' && selectedJob) return;
         setItemsLoading(true);
         try {
             const { items } = await inventoryApi.getPaginated({ page: 1, limit: 50, search: term });
@@ -224,207 +340,385 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         } finally {
             setItemsLoading(false);
         }
-    }, [activeTab, selectedJob]);
+    }, []);
 
     const handleJobSelect = (job: Job) => {
         setSelectedJob(job);
         setIsJobSelectorOpen(false);
     };
 
-    const handleItemSelect = (item: InventoryItem) => {
-        setSelectedItemForLine(item);
-        setCurrentLine({
-            itemId: item.id,
-            quantity: "",
-            pieces: "",
-            coefficient: item.coefficient || 1,
-            unit: item.unit,
-            purchaseItemId: "",
-            isFictitious: false
-        });
-
-        if (activeTab === 'exit' || activeTab === 'sale') {
-            inventoryApi.getAvailableBatches(item.id).then(batches => {
-                const validBatches = batches.filter((b: any) => {
-                    if (b.remainingPieces !== undefined && b.remainingPieces !== null) return b.remainingPieces > 0.001;
-                    return b.remainingQty > 0.001;
+    const handleInlineItemSelect = useCallback(
+        async (
+            rowId: string,
+            item: InventoryItem,
+            prefill?: { pieces?: string; quantity?: string }
+        ) => {
+            const tab = activeTab;
+            setLines((prev) => {
+                const updated = prev.map((line) => {
+                    if (line.tempId !== rowId) return line;
+                    return {
+                        ...line,
+                        itemId: item.id,
+                        itemName: item.name,
+                        itemCode: item.code,
+                        itemUnit: item.unit,
+                        itemBrand: item.brand,
+                        itemCategory: item.type,
+                        itemDescription: item.description,
+                        coefficient: item.coefficient || 1,
+                        quantity: prefill?.quantity || "",
+                        pieces: prefill?.pieces || "",
+                        purchaseItemId: undefined,
+                        purchaseRef: undefined,
+                        isFictitious: tab === "waste",
+                        availableBatches: [],
+                        batchesLoading: tab === "exit" || tab === "sale",
+                    };
                 });
-                setAvailableBatches(validBatches);
-                if (validBatches.length > 0) {
-                    setCurrentLine(prev => ({ ...prev, purchaseItemId: validBatches[0].id }));
-                }
-            }).catch(err => {
-                console.error("Failed to load batches", err);
-                setAvailableBatches([]);
+                return ensureTrailingEmpty(updated);
             });
-        }
-        setIsItemSelectorOpen(false);
-    };
 
-    const handleSelectReturnBatch = (batch: any) => {
-        const item: InventoryItem = {
-            id: batch.itemId,
-            code: batch.itemCode,
-            name: batch.itemName,
-            unit: batch.itemUnit,
-            brand: batch.itemBrand,
-            type: batch.itemCategory,
-            quantity: 0,
-            minStock: 0,
-            status: 'in_stock',
-            description: "",
-            coefficient: batch.coefficient,
-            supplierCode: "",
-            price: 0,
-            model: batch.itemModel
-        };
-        setSelectedItemForLine(item);
-        setCurrentLine({
-            itemId: item.id,
-            quantity: "",
-            pieces: "",
-            coefficient: batch.coefficient || 1,
-            unit: item.unit,
-            purchaseItemId: batch.purchaseItemId,
-            isFictitious: false
-        });
-        setAvailableBatches([{
-            id: batch.purchaseItemId,
-            purchaseRef: batch.purchaseRef,
-            remainingQty: batch.quantity,
-            remainingPieces: batch.pieces,
-            date: new Date().toISOString()
-        }]);
-    };
+            if (tab === "exit" || tab === "sale") {
+                try {
+                    const batches = await inventoryApi.getAvailableBatches(item.id);
+                    const validBatches = batches.filter((b: any) => {
+                        if (b.remainingPieces !== undefined && b.remainingPieces !== null)
+                            return b.remainingPieces > 0.001;
+                        return b.remainingQty > 0.001;
+                    });
+                    // All lots exhausted: show them anyway and auto-flag as fittizio
+                    const allExhausted = validBatches.length === 0 && batches.length > 0;
+                    const batchesToShow = allExhausted ? batches : validBatches;
+                    setLines((prev) =>
+                        prev.map((line) => {
+                            if (line.tempId !== rowId) return line;
+                            return {
+                                ...line,
+                                batchesLoading: false,
+                                availableBatches: batchesToShow,
+                                purchaseItemId: batchesToShow.length > 0 ? batchesToShow[0].id : undefined,
+                                purchaseRef: batchesToShow.length > 0 ? batchesToShow[0].purchaseRef : undefined,
+                                isFictitious: allExhausted ? true : line.isFictitious,
+                            };
+                        })
+                    );
+                } catch (err) {
+                    console.error("Failed to load batches", err);
+                    setLines((prev) =>
+                        prev.map((line) => {
+                            if (line.tempId !== rowId) return line;
+                            return { ...line, batchesLoading: false, availableBatches: [] };
+                        })
+                    );
+                }
+            }
+        },
+        [activeTab]
+    );
 
-    const handleAddLine = () => {
-        if (!selectedItemForLine || !currentLine.quantity) return;
-        const qty = parseFloat(currentLine.quantity);
-        if (qty <= 0) return;
+    const handleInlineReturnBatchSelect = useCallback(
+        (rowId: string, batch: any, prefill?: { pieces?: string; quantity?: string }) => {
+            const allItemBatches = jobBatchAvailability
+                .filter((b) => b.itemId === batch.itemId)
+                .map((b) => ({
+                    id: b.purchaseItemId,
+                    purchaseRef: b.purchaseRef,
+                    remainingQty: b.quantity,
+                    remainingPieces: b.pieces,
+                    date: b.date,
+                }));
 
-        // Validation logic
-        if ((activeTab === 'exit' || activeTab === 'sale') && !currentLine.isFictitious) {
-            const batch = availableBatches.find(b => b.id === currentLine.purchaseItemId);
-            if (currentLine.purchaseItemId && batch) {
-                if (currentLine.pieces && batch.remainingPieces !== undefined) {
-                    if (Number(currentLine.pieces) > batch.remainingPieces) {
-                        notify.warning(`Quantità eccessiva. Disponibile nel lotto: ${batch.remainingPieces} pezzi`);
-                        return;
+            const batchesForLine =
+                allItemBatches.length > 0
+                    ? allItemBatches
+                    : [
+                          {
+                              id: batch.purchaseItemId,
+                              purchaseRef: batch.purchaseRef,
+                              remainingQty: batch.quantity,
+                              remainingPieces: batch.pieces,
+                              date: undefined,
+                          },
+                      ];
+
+            setLines((prev) => {
+                const updated = prev.map((line) => {
+                    if (line.tempId !== rowId) return line;
+                    return {
+                        ...line,
+                        itemId: batch.itemId,
+                        itemName: batch.itemName,
+                        itemCode: batch.itemCode,
+                        itemUnit: batch.itemUnit,
+                        itemBrand: batch.itemBrand,
+                        coefficient: batch.coefficient || 1,
+                        quantity: prefill?.quantity || "",
+                        pieces: prefill?.pieces || "",
+                        purchaseItemId: batch.purchaseItemId,
+                        purchaseRef: batch.purchaseRef,
+                        isFictitious: false,
+                        availableBatches: batchesForLine,
+                        batchesLoading: false,
+                    };
+                });
+                return ensureTrailingEmpty(updated);
+            });
+        },
+        [jobBatchAvailability]
+    );
+
+    const handleInlineLineChange = useCallback((rowId: string, field: string, value: any) => {
+        // Capture item info for async batch reload (needed for isFictitious toggle)
+        let itemIdForBatchReload: string | undefined;
+
+        setLines((prev) => {
+            const updated = prev.map((line) => {
+                if (line.tempId !== rowId) return line;
+
+                const updates: Partial<MovementLine> = { [field]: value };
+
+                if (field === "pieces") {
+                    const pieces = parseFloat(value);
+                    const coef = line.coefficient || 1;
+                    if (!isNaN(pieces) && coef > 0) {
+                        updates.quantity = (pieces * coef).toFixed(2);
+                    } else if (value === "") {
+                        updates.quantity = "";
                     }
-                } else if (qty > batch.remainingQty) {
-                    notify.warning(`Quantità eccessiva per il lotto selezionato. Disponibile: ${batch.remainingQty}`);
-                    return;
+                } else if (field === "quantity") {
+                    const quantity = parseFloat(value);
+                    const coef = line.coefficient || 1;
+                    if (!isNaN(quantity) && coef > 0) {
+                        updates.pieces = coef !== 1 ? (quantity / coef).toFixed(2) : value;
+                    } else if (value === "") {
+                        updates.pieces = "";
+                    }
+                } else if (field === "purchaseItemId") {
+                    const batch = line.availableBatches.find((b: any) => b.id === value);
+                    updates.purchaseRef = batch?.purchaseRef;
+                } else if (
+                    field === "isFictitious" &&
+                    (activeTab === "exit" || activeTab === "sale") &&
+                    line.itemId
+                ) {
+                    // Mark as loading — batch list will be refreshed after state update
+                    itemIdForBatchReload = line.itemId;
+                    updates.batchesLoading = true;
                 }
-            }
-        }
 
-        if (activeTab === 'entry' && selectedJob && currentLine.purchaseItemId && !currentLine.isFictitious) {
-            const batch = jobBatchAvailability.find(b => b.purchaseItemId === currentLine.purchaseItemId);
-            if (batch) {
-                if (qty > batch.quantity) {
-                    notify.warning(`Quantità eccessiva per il reso. In carico: ${batch.quantity}`);
-                    return;
-                }
-            }
-        }
-
-        const newLine: MovementLine = {
-            tempId: Date.now().toString(),
-            itemId: selectedItemForLine.id,
-            itemCode: selectedItemForLine.code,
-            itemName: selectedItemForLine.name,
-            itemUnit: currentLine.unit,
-            itemBrand: selectedItemForLine.brand,
-            itemCategory: selectedItemForLine.type,
-            itemDescription: selectedItemForLine.description,
-            quantity: qty,
-            pieces: currentLine.pieces ? parseFloat(currentLine.pieces) : undefined,
-            coefficient: currentLine.coefficient,
-            purchaseItemId: currentLine.purchaseItemId || undefined,
-            isFictitious: activeTab === 'waste' ? true : (currentLine.isFictitious || false),
-            purchaseRef: availableBatches.find(b => b.id === currentLine.purchaseItemId)?.purchaseRef
-        };
-
-        setLines([...lines, newLine]);
-        setSelectedItemForLine(null);
-        setCurrentLine({
-            itemId: "",
-            quantity: "",
-            pieces: "",
-            coefficient: 1,
-            unit: "PZ",
-            purchaseItemId: "",
-            isFictitious: false
+                return { ...line, ...updates };
+            });
+            return ensureTrailingEmpty(updated);
         });
-        setAvailableBatches([]);
-    };
 
-    const removeLine = (tempId: string) => {
-        setLines(lines.filter(l => l.tempId !== tempId));
-    };
+        // Async batch reload when the fittizio flag is toggled on exit/sale lines
+        if (itemIdForBatchReload) {
+            const itemId = itemIdForBatchReload;
+
+            if (value === true) {
+                // Show ALL lots (including exhausted) so the user can pick one for price attribution.
+                // Sorted: available first, then most recent first.
+                inventoryApi
+                    .getAllBatchesForItem(itemId)
+                    .then((allBatches) => {
+                        setLines((prev) =>
+                            prev.map((l) => {
+                                if (l.tempId !== rowId) return l;
+                                // Keep the existing selection if it's still in the list
+                                const keepExisting = allBatches.find((b) => b.id === l.purchaseItemId);
+                                const preferred = keepExisting ?? allBatches[0];
+                                return {
+                                    ...l,
+                                    batchesLoading: false,
+                                    availableBatches: allBatches,
+                                    purchaseItemId: preferred?.id,
+                                    purchaseRef: preferred?.purchaseRef,
+                                };
+                            })
+                        );
+                    })
+                    .catch(() => {
+                        setLines((prev) =>
+                            prev.map((l) =>
+                                l.tempId === rowId ? { ...l, batchesLoading: false } : l
+                            )
+                        );
+                    });
+            } else {
+                // Restore to available-only lots (FIFO order)
+                inventoryApi
+                    .getAvailableBatches(itemId)
+                    .then((batches) => {
+                        const validBatches = batches.filter((b: any) => {
+                            if (b.remainingPieces !== undefined && b.remainingPieces !== null)
+                                return b.remainingPieces > 0.001;
+                            return b.remainingQty > 0.001;
+                        });
+                        setLines((prev) =>
+                            prev.map((l) => {
+                                if (l.tempId !== rowId) return l;
+                                const preferred = validBatches[0];
+                                return {
+                                    ...l,
+                                    batchesLoading: false,
+                                    availableBatches: validBatches,
+                                    purchaseItemId: preferred?.id,
+                                    purchaseRef: preferred?.purchaseRef,
+                                };
+                            })
+                        );
+                    })
+                    .catch(() => {
+                        setLines((prev) =>
+                            prev.map((l) =>
+                                l.tempId === rowId ? { ...l, batchesLoading: false } : l
+                            )
+                        );
+                    });
+            }
+        }
+    }, [activeTab]);
+
+    const handleInlineLineRemove = useCallback((rowId: string) => {
+        setLines((prev) => {
+            if (prev.length === 1) return [emptyLine()];
+            const updated = prev.filter((l) => l.tempId !== rowId);
+            return ensureTrailingEmpty(updated);
+        });
+    }, []);
+
+    const handleInlineLineDuplicate = useCallback((rowId: string) => {
+        setLines((prev) => {
+            const rowIndex = prev.findIndex((l) => l.tempId === rowId);
+            if (rowIndex === -1) return prev;
+            const row = prev[rowIndex];
+            if (!row.itemId) return prev;
+
+            const newRow: MovementLine = {
+                ...row,
+                id: undefined,
+                tempId: Math.random().toString(36).substr(2, 9),
+                quantity: "",
+                pieces: "",
+                purchaseItemId: undefined,
+                purchaseRef: undefined,
+            };
+
+            const newLines = [...prev];
+            newLines.splice(rowIndex + 1, 0, newRow);
+            const last = newLines[newLines.length - 1];
+            if (last.itemId || last.quantity || last.pieces) {
+                newLines.push(emptyLine());
+            }
+            return newLines;
+        });
+    }, []);
 
     const handleSubmit = async () => {
         if (!numberPart) {
             notify.warning("Inserisci il numero del documento");
             return;
         }
-        if (lines.length === 0) {
+
+        const validLines = lines.filter((l) => l.itemId && l.quantity && parseFloat(l.quantity) > 0);
+        if (validLines.length === 0) {
             notify.warning("Inserisci almeno una riga");
             return;
         }
 
-        // Build waste transport note if applicable
+        for (const line of validLines) {
+            if ((activeTab === "exit" || activeTab === "sale") && !line.isFictitious) {
+                // Validazione: il lotto deve essere selezionato per movimenti di uscita/vendita non fittizi
+                if (!line.purchaseItemId) {
+                    notify.warning(
+                        `Seleziona un lotto di riferimento per "${line.itemName || 'articolo'}"`
+                    );
+                    return;
+                }
+                const batch = line.availableBatches.find((b: any) => b.id === line.purchaseItemId);
+                if (line.purchaseItemId && batch) {
+                    const pieces = parseFloat(line.pieces);
+                    const qty = parseFloat(line.quantity);
+                    if (!isNaN(pieces) && batch.remainingPieces !== undefined && pieces > batch.remainingPieces) {
+                        notify.warning(
+                            `Quantità eccessiva per "${line.itemName}". Disponibile: ${batch.remainingPieces} pezzi`
+                        );
+                        return;
+                    } else if (!isNaN(qty) && qty > batch.remainingQty) {
+                        notify.warning(
+                            `Quantità eccessiva per "${line.itemName}". Disponibile: ${batch.remainingQty}`
+                        );
+                        return;
+                    }
+                }
+            }
+            if (activeTab === "entry" && selectedJob && line.purchaseItemId && !line.isFictitious) {
+                const batch = line.availableBatches.find((b: any) => b.id === line.purchaseItemId);
+                if (batch) {
+                    const qty = parseFloat(line.quantity);
+                    if (!isNaN(qty) && qty > batch.remainingQty) {
+                        notify.warning(
+                            `Quantità eccessiva per il reso di "${line.itemName}". In carico: ${batch.remainingQty}`
+                        );
+                        return;
+                    }
+                }
+            }
+        }
+
         let finalNotes = notes;
-        if (activeTab === 'waste') {
-            // Extract site address from the job
-            const siteAddr = selectedJob?.siteAddress || selectedJob?.clientAddress || pickupLocation || 'cantiere';
+        if (activeTab === "waste") {
+            const siteAddr =
+                selectedJob?.siteAddress ||
+                selectedJob?.clientAddress ||
+                pickupLocation ||
+                "cantiere";
             const wasteNote = `Trasporto di materiale prodotto nel cantiere di ${siteAddr} verso la sede di Cervignano del Friuli (UD) in via Monfalcone n.33 per deposito temporaneo.`;
             finalNotes = finalNotes ? `${finalNotes}\n${wasteNote}` : wasteNote;
         }
 
         const noteData = {
-            type: activeTab === 'waste' ? 'exit' : activeTab,
+            type: activeTab === "waste" ? "exit" : activeTab,
             number: fullNumber,
-            date: date,
+            date,
             jobId: selectedJob?.id,
-            causal: causal,
-            pickupLocation: pickupLocation,
-            deliveryLocation: deliveryLocation,
-            transportMean: transportMean,
-            transportTime: transportTime,
-            appearance: appearance,
+            causal,
+            pickupLocation,
+            deliveryLocation,
+            transportMean,
+            transportTime,
+            appearance,
             packagesCount: parseInt(packagesCount) || 1,
-            notes: finalNotes
+            notes: finalNotes,
         };
 
-        const itemsData = lines.map(l => ({
+        const itemsData = validLines.map((l) => ({
             id: l.id,
             inventoryId: l.itemId,
-            quantity: l.quantity,
-            pieces: l.pieces,
+            quantity: parseFloat(l.quantity),
+            pieces: l.pieces ? parseFloat(l.pieces) : undefined,
             coefficient: l.coefficient,
             purchaseItemId: l.purchaseItemId,
-            isFictitious: activeTab === 'waste' ? true : l.isFictitious,
-            price: 0
+            isFictitious: activeTab === "waste" ? true : l.isFictitious,
+            price: 0,
         }));
 
         try {
             setLoading(true);
             if (isEditing && editingId) {
-                // Edit mode: update existing movement
                 const result = await updateMovement(editingId, noteData, itemsData);
-                if (result && !result.success) {
-                    throw new Error(result.error);
-                }
-                // Redirect user manually since we removed server-side redirect
-                router.push('/movements');
-                router.refresh(); // Ensure cache is refreshed since we disabled revalidatePath
+                if (result && !result.success) throw new Error(result.error);
+                router.push("/movements");
+                router.refresh();
             } else {
-                // Create mode: create new movement
                 await createMovement(noteData, itemsData);
             }
         } catch (error: any) {
-            if (error?.message?.includes('NEXT_REDIRECT') || error?.digest?.includes('NEXT_REDIRECT')) {
+            if (
+                error?.message?.includes("NEXT_REDIRECT") ||
+                error?.digest?.includes("NEXT_REDIRECT")
+            ) {
                 throw error;
             }
             console.error(isEditing ? "Update failed" : "Create failed", error);
@@ -435,44 +729,51 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     };
 
     return {
-        // State
         loading,
         isEditing,
         inventory,
         jobs,
-        isJobSelectorOpen, setIsJobSelectorOpen,
-        isItemSelectorOpen, setIsItemSelectorOpen,
+        isJobSelectorOpen,
+        setIsJobSelectorOpen,
         jobsLoading,
         itemsLoading,
-        activeTab, setActiveTab,
-        numberPart, setNumberPart,
-        date, setDate,
-        selectedJob, setSelectedJob,
-        causal, setCausal,
-        pickupLocation, setPickupLocation,
-        deliveryLocation, setDeliveryLocation,
-        transportMean, setTransportMean,
-        transportTime, setTransportTime,
-        appearance, setAppearance,
-        packagesCount, setPackagesCount,
-        notes, setNotes,
+        activeTab,
+        setActiveTab,
+        numberPart,
+        setNumberPart,
+        date,
+        setDate,
+        selectedJob,
+        setSelectedJob,
+        causal,
+        setCausal,
+        pickupLocation,
+        setPickupLocation,
+        deliveryLocation,
+        setDeliveryLocation,
+        transportMean,
+        setTransportMean,
+        transportTime,
+        setTransportTime,
+        appearance,
+        setAppearance,
+        packagesCount,
+        setPackagesCount,
+        notes,
+        setNotes,
         lines,
-        currentLine, setCurrentLine,
-        selectedItemForLine, setSelectedItemForLine,
-        availableBatches,
         jobBatchAvailability,
         jobInventory,
         yearSuffix,
         fullNumber,
-
-        // Handlers
         handleJobSearch,
         handleItemSearch,
         handleJobSelect,
-        handleItemSelect,
-        handleSelectReturnBatch,
-        handleAddLine,
-        removeLine,
-        handleSubmit
+        handleInlineItemSelect,
+        handleInlineReturnBatchSelect,
+        handleInlineLineChange,
+        handleInlineLineRemove,
+        handleInlineLineDuplicate,
+        handleSubmit,
     };
 }

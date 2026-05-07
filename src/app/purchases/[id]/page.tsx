@@ -993,7 +993,10 @@ export default function PurchaseDetailPage() {
                                             const isJobAssigned = purchase?.jobId != null;
                                             // FIX: Use batch remainingQty if available, otherwise fallback.
                                             // Don't force 0 for isJobAssigned if we have actual batch data (which includes returns).
-                                            const remaining = batch ? batch.remainingQty : (isJobAssigned ? 0 : item.quantity);
+                                            // Se il lotto non è nella vista (es. esaurito o pezzi=null) mostriamo 0,
+                                            // non il valore originale che porterebbe a mostrare come "disponibile"
+                                            // materiale già uscito. Il fallback item.quantity è fuorviante.
+                                            const remaining = batch ? batch.remainingQty : (isJobAssigned ? 0 : 0);
                                             const original = item.quantity;
 
                                             let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
@@ -1109,7 +1112,7 @@ export default function PurchaseDetailPage() {
                                     const batch = batchAvailability.find(b => b.id === item.id);
                                     const isJobAssigned = purchase?.jobId != null;
                                     // FIX: Use batch remainingQty if available, otherwise fallback.
-                                    const remaining = batch ? batch.remainingQty : (isJobAssigned ? 0 : item.quantity);
+                                    const remaining = batch ? batch.remainingQty : 0;
                                     const original = item.quantity;
 
                                     let statusColor = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";

@@ -8,6 +8,8 @@ export const mapDbToWorker = (db: any): Worker => ({
     lastName: db.last_name,
     email: db.email,
     isActive: db.is_active,
+    hourlyRate: Number(db.hourly_rate ?? 25),
+    trasfertaRate: Number(db.trasferta_rate ?? 50),
     createdAt: db.created_at
 });
 
@@ -15,10 +17,22 @@ const mapWorkerToDb = (worker: Partial<Worker>) => ({
     first_name: worker.firstName,
     last_name: worker.lastName,
     email: worker.email,
-    is_active: worker.isActive
+    is_active: worker.isActive,
+    ...(worker.hourlyRate !== undefined && { hourly_rate: worker.hourlyRate }),
+    ...(worker.trasfertaRate !== undefined && { trasferta_rate: worker.trasfertaRate }),
 });
 
 export const workersApi = {
+    getById: async (id: string) => {
+        const { data, error } = await supabase
+            .from('workers')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (error) throw error;
+        return mapDbToWorker(data);
+    },
+
     getAll: async () => {
         const { data, error } = await fetchWithTimeout(
             supabase

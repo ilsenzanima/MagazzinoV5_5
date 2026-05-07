@@ -5,9 +5,10 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock, Euro } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
+import { salApi, salCostsApi } from "@/lib/services/sal";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from "date-fns";
@@ -20,6 +21,7 @@ import { JobStock } from "@/components/jobs/details/JobStock";
 import { JobJournal } from "@/components/jobs/details/JobJournal";
 import { JobDocuments } from "@/components/jobs/details/JobDocuments";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
+import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
 
 export default function JobDetailsPage() {
     const { id } = useParams<{ id: string }>();
@@ -34,99 +36,353 @@ export default function JobDetailsPage() {
     // Ref for printing
     const printRef = useRef<HTMLDivElement>(null);
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         if (!job) return;
 
-        const doc = new jsPDF();
+        // ── Fetch all data needed for the comprehensive PDF ──────────────────
+        const [allAttendance, salItems, salCosts, workerCosts] = await Promise.all([
+            attendanceApi.getByJobId(id),
+            salApi.getByJobId(id),
+            salCostsApi.getByJobId(id),
+            attendanceApi.getWorkerCostsByJobId(id),
+        ]);
 
-        // Header
-        doc.setFontSize(20);
-        doc.text("SCHEDA CANTIERE / COMMESSA", 105, 15, { align: "center" });
+        // Landscape A4
+        const doc = new jsPDF({ orientation: 'landscape' });
+        const PW = 297;
+        const ML = 12;
+        const CW = PW - ML * 2;
+        const HDR_COLOR: [number, number, number] = [30, 58, 95];
 
-        // Job Info
-        doc.setFontSize(10);
-        doc.setLineWidth(0.1);
+        let curY = 14;
 
-        // Box 1: General Info
-        doc.rect(14, 25, 182, 35);
-        doc.setFont("helvetica", "bold");
-        doc.text("Codice:", 16, 32);
-        doc.setFont("helvetica", "normal");
-        doc.text(job.code || "-", 35, 32);
-
-        doc.setFont("helvetica", "bold");
-        doc.text("Descrizione:", 16, 38);
-        doc.setFont("helvetica", "normal");
-        doc.text(job.description || "", 16, 44, { maxWidth: 178 });
-
-        doc.setFont("helvetica", "bold");
-        doc.text("Cliente:", 16, 52);
-        doc.setFont("helvetica", "normal");
-        doc.text(job.clientName || "-", 35, 52);
-
-        // Box 2: Site Info & Status
-        doc.rect(14, 65, 90, 30);
-        doc.setFont("helvetica", "bold");
-        doc.text("Indirizzo Cantiere:", 16, 72);
-        doc.setFont("helvetica", "normal");
-        doc.text(job.siteAddress || "-", 16, 78, { maxWidth: 86 });
-
-        doc.rect(106, 65, 90, 30);
-        doc.setFont("helvetica", "bold");
-        doc.text("Stato:", 108, 72);
-        doc.setFont("helvetica", "normal");
-        const statusLabel = job.status === 'active' ? 'In Lavorazione' : job.status === 'completed' ? 'Completata' : 'Sospesa';
-        doc.text(statusLabel, 125, 72);
-
-        doc.setFont("helvetica", "bold");
-        doc.text("Data Inizio:", 108, 80);
-        doc.setFont("helvetica", "normal");
-        doc.text(job.startDate ? format(new Date(job.startDate), 'dd/MM/yyyy') : "-", 135, 80);
-
-        // Box 3: Economics
-        if (userRole === 'admin' || userRole === 'operativo') {
-            doc.rect(14, 100, 182, 20);
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            doc.text("Totale Costo Materiali:", 16, 113);
-            doc.text(`€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 190, 113, { align: "right" });
-        } else {
-            // Alternative placeholder for restricted roles or just skip
-            doc.rect(14, 100, 182, 20);
+        // ── helper ────────────────────────────────────────────────────────────
+        const sectionTitle = (title: string) => {
             doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setFillColor(...HDR_COLOR);
+            doc.rect(ML, curY, CW, 6, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.text(title, ML + 2, curY + 4.2);
+            doc.setTextColor(0, 0, 0);
+            curY += 8;
+        };
+
+        const checkPage = (needed = 40) => {
+            if (curY + needed > 195) {
+                doc.addPage();
+                curY = 14;
+            }
+        };
+
+        // ── 1. HEADER / INFO COMMESSA ─────────────────────────────────────────
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("SCHEDA CANTIERE / COMMESSA", PW / 2, curY, { align: "center" });
+        curY += 7;
+
+        const statusLabel = job.status === 'active' ? 'In Lavorazione' : job.status === 'completed' ? 'Completata' : 'Sospesa';
+
+        doc.setLineWidth(0.2);
+        doc.rect(ML, curY, CW, 26);
+
+        // Left column
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold"); doc.text("Codice:", ML + 2, curY + 6);
+        doc.setFont("helvetica", "normal"); doc.text(job.code || "-", ML + 20, curY + 6);
+
+        doc.setFont("helvetica", "bold"); doc.text("Nome:", ML + 2, curY + 12);
+        doc.setFont("helvetica", "normal"); doc.text(job.name || "-", ML + 20, curY + 12, { maxWidth: 100 });
+
+        doc.setFont("helvetica", "bold"); doc.text("Cliente:", ML + 2, curY + 20);
+        doc.setFont("helvetica", "normal"); doc.text(job.clientName || "-", ML + 20, curY + 20);
+
+        // Middle column
+        doc.setFont("helvetica", "bold"); doc.text("Indirizzo:", ML + 130, curY + 6);
+        doc.setFont("helvetica", "normal"); doc.text(job.siteAddress || "-", ML + 150, curY + 6, { maxWidth: 60 });
+
+        // Right column
+        doc.setFont("helvetica", "bold"); doc.text("Stato:", ML + 215, curY + 6);
+        doc.setFont("helvetica", "normal"); doc.text(statusLabel, ML + 228, curY + 6);
+
+        doc.setFont("helvetica", "bold"); doc.text("Inizio:", ML + 215, curY + 12);
+        doc.setFont("helvetica", "normal");
+        doc.text(job.startDate ? format(new Date(job.startDate), 'dd/MM/yyyy') : "-", ML + 228, curY + 12);
+
+        if (job.description) {
             doc.setFont("helvetica", "italic");
-            doc.text("Dati economici riservati", 16, 113);
+            doc.setFontSize(7);
+            doc.text(job.description, ML + 2, curY + 24, { maxWidth: CW - 4 });
         }
 
-        // Table of Recent Movements (Limit to last 20 for brevity in summary)
-        doc.setFontSize(11);
-        doc.text("Ultimi Movimenti (Max 20)", 14, 130);
+        curY += 30;
 
-        const tableBody = movements.slice(0, 20).map(m => [
-            format(new Date(m.date), 'dd/MM/yyyy'),
-            m.type === 'purchase' ? 'Acquisto' : m.type === 'exit' ? 'Uscita' : m.type === 'entry' ? 'Rientro' : m.type,
-            m.itemCode || "-",
-            m.itemModel ? `${m.itemName || "Articolo"} (${m.itemModel})` : (m.itemName || "Articolo"),
-            m.quantity.toString() + " " + (m.itemUnit || ""),
-            // Only show price if relevant/visible logic
-            (userRole === 'admin' || userRole === 'operativo') && m.type === 'purchase' ? `€ ${m.itemPrice?.toFixed(2)}` : "-"
+        // ── 2. MATERIALI ──────────────────────────────────────────────────────
+        // Build SAL lookup for movements
+        const movSalMap = new Map<string, string>(); // movement.id → salName
+        const purSalMap = new Map<string, string>(); // purchaseId → salName
+        salItems.forEach(s => {
+            if (!s.itemId) return;
+            if (s.itemType === 'movement') movSalMap.set(s.itemId, s.salName);
+            if (s.itemType === 'purchase') purSalMap.set(s.itemId, s.salName);
+        });
+
+        const matRows = movements
+            .filter(m => m.type === 'exit' || m.type === 'purchase' || m.type === 'entry')
+            .map(m => {
+                const typeLabel = m.type === 'purchase' ? 'Acquisto' : m.type === 'exit' ? 'Uscita' : 'Rientro';
+                const salName = m.type === 'purchase'
+                    ? (m.purchaseId ? purSalMap.get(m.purchaseId) || '-' : '-')
+                    : (movSalMap.get(m.id) || '-');
+                const unitPrice = m.itemPrice ?? 0;
+                const amount = m.type !== 'entry' && unitPrice > 0
+                    ? `€ ${(unitPrice * Math.abs(m.quantity)).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
+                    : '-';
+                const desc = m.itemModel ? `${m.itemName || ''} (${m.itemModel})` : (m.itemName || '-');
+                const purDate = m.purchaseDate
+                    ? format(new Date(m.purchaseDate.split('T')[0] + 'T00:00:00'), 'dd/MM/yy')
+                    : '-';
+                return [
+                    m.date ? format(new Date(m.date.split('T')[0] + 'T00:00:00'), 'dd/MM/yy') : '-',
+                    typeLabel,
+                    m.purchaseNumber ? `DDT ${m.purchaseNumber}` : '-',
+                    purDate,
+                    m.supplierName || '-',
+                    desc,
+                    `${Math.abs(m.quantity)} ${m.itemUnit || ''}`.trim(),
+                    amount,
+                    salName,
+                ];
+            });
+
+        checkPage(50);
+        sectionTitle(`MATERIALI  (totale acquisti: € ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })})`);
+
+        autoTable(doc, {
+            startY: curY,
+            head: [['Data mov.', 'Tipo', 'Acquisto', 'Data acq.', 'Fornitore', 'Articolo', 'Q.tà', 'Importo', 'SAL']],
+            body: matRows,
+            foot: [['', '', '', '', '', 'TOTALE MATERIALI', '', `€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, '']],
+            theme: 'grid',
+            styles: { fontSize: 6.5, cellPadding: 1.2 },
+            headStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
+            footStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
+            columnStyles: {
+                0: { cellWidth: 18 },
+                1: { cellWidth: 16 },
+                2: { cellWidth: 22 },
+                3: { cellWidth: 18 },
+                4: { cellWidth: 38 },
+                5: { cellWidth: 'auto' },
+                6: { cellWidth: 18 },
+                7: { cellWidth: 28, halign: 'right' },
+                8: { cellWidth: 22 },
+            },
+            margin: { left: ML, right: ML },
+        });
+        curY = (doc as any).lastAutoTable.finalY + 6;
+
+        // ── 3. ORE OPERAI ─────────────────────────────────────────────────────
+        // Build SAL coverage: workerId_date → salName(s)
+        const attSalMap = new Map<string, string>();
+        salItems
+            .filter(s => s.itemType === 'worker_hours' && s.workerHoursData)
+            .forEach(s => {
+                s.workerHoursData!.workers.forEach(w => {
+                    w.days.forEach(d => {
+                        if (d.normalHours > 0 || d.transferHours > 0) {
+                            const key = `${w.workerId}_${d.date}`;
+                            const prev = attSalMap.get(key);
+                            attSalMap.set(key, prev ? `${prev},${s.salName}` : s.salName);
+                        }
+                    });
+                });
+            });
+
+        // Group attendance by worker
+        const workerDayMap = new Map<string, {
+            name: string;
+            days: Map<string, { normal: number; transfer: number }>;
+        }>();
+        allAttendance.forEach(a => {
+            if (!workerDayMap.has(a.workerId)) {
+                workerDayMap.set(a.workerId, { name: a.workerName || a.workerId, days: new Map() });
+            }
+            const we = workerDayMap.get(a.workerId)!;
+            if (!we.days.has(a.date)) we.days.set(a.date, { normal: 0, transfer: 0 });
+            const de = we.days.get(a.date)!;
+            if (a.status === 'transfer') de.transfer += a.hours;
+            else de.normal += a.hours;
+        });
+
+        const allDates = [...new Set(allAttendance.map(a => a.date))].sort();
+        const allWorkers = [...workerDayMap.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name));
+
+        // ── 3a. CROSS-TABLE (dates × workers) ─────────────────────────────────
+        // Each worker column gets a short first-name label
+        const workerShortNames = allWorkers.map(([, w]) => w.name.trim());
+
+        const crossHead = ['Data', ...workerShortNames];
+        const crossBody = allDates.map(dateStr => {
+            const label = format(new Date(dateStr + 'T00:00:00'), 'EE dd/MM', { locale: it });
+            const row: string[] = [label];
+            allWorkers.forEach(([wid, w]) => {
+                const day = w.days.get(dateStr);
+                if (!day || (day.normal === 0 && day.transfer === 0)) {
+                    row.push('');
+                } else {
+                    const parts: string[] = [];
+                    if (day.normal > 0) parts.push(`${day.normal}`);
+                    if (day.transfer > 0) parts.push(`${day.transfer}T`);
+                    const sal = attSalMap.get(`${wid}_${dateStr}`);
+                    if (sal) parts.push(`[${sal}]`);
+                    row.push(parts.join(' '));
+                }
+            });
+            return row;
+        });
+
+        checkPage(50);
+        doc.addPage();
+        curY = 14;
+        sectionTitle('ORE OPERAI — Presenze giornaliere');
+
+        // Dynamic column width: date col fixed, rest split evenly
+        const dateColW = 22;
+        const remainW = CW - dateColW;
+        const workerColW = allWorkers.length > 0 ? Math.max(14, Math.floor(remainW / allWorkers.length)) : 20;
+
+        const crossColStyles: Record<number, any> = { 0: { cellWidth: dateColW } };
+        allWorkers.forEach((_, i) => { crossColStyles[i + 1] = { cellWidth: workerColW, halign: 'center' }; });
+
+        autoTable(doc, {
+            startY: curY,
+            head: [crossHead],
+            body: crossBody,
+            theme: 'grid',
+            styles: { fontSize: 6, cellPadding: 0.8 },
+            headStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 6 },
+            columnStyles: crossColStyles,
+            margin: { left: ML, right: ML },
+        });
+        curY = (doc as any).lastAutoTable.finalY + 6;
+
+        // ── 3b. SUMMARY PER WORKER (costs) ────────────────────────────────────
+        checkPage(40);
+        const wCostRows = workerCosts.rows.map(r => [
+            r.workerName,
+            `${r.normalHours}h`,
+            `${r.transferHours}h`,
+            `€ ${r.normalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
+            `€ ${r.trasfertaCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
+            `€ ${r.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
         ]);
 
         autoTable(doc, {
-            startY: 135,
-            head: [['Data', 'Tipo', 'Codice', 'Descrizione', 'Q.tà', 'Prezzo (Acq.)']],
-            body: tableBody,
+            startY: curY,
+            head: [['Operaio', 'Ore norm.', 'Ore trasf.', 'Costo normale', 'Costo trasferta', 'Totale operaio']],
+            body: wCostRows,
+            foot: [['TOTALE ORE OPERAI', `${totalHours}h`, '', '', '', `€ ${workerCosts.totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`]],
             theme: 'grid',
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [41, 128, 185] }
+            styles: { fontSize: 7, cellPadding: 1.5 },
+            headStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
+            footStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
+            columnStyles: {
+                0: { cellWidth: 60 },
+                1: { cellWidth: 22, halign: 'right' },
+                2: { cellWidth: 22, halign: 'right' },
+                3: { cellWidth: 36, halign: 'right' },
+                4: { cellWidth: 36, halign: 'right' },
+                5: { cellWidth: 36, halign: 'right' },
+            },
+            margin: { left: ML, right: ML },
+        });
+        curY = (doc as any).lastAutoTable.finalY + 6;
+
+        // ── 4. ALTRI COSTI ────────────────────────────────────────────────────
+        const altriTotal = salCosts.reduce((s, c) => s + c.amount, 0);
+
+        checkPage(30);
+        sectionTitle('ALTRI COSTI');
+
+        if (salCosts.length === 0) {
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "italic");
+            doc.text("Nessun altro costo registrato.", ML + 2, curY + 4);
+            curY += 10;
+        } else {
+            const altriRows = salCosts.map(c => [
+                c.description,
+                c.salName || '-',
+                `€ ${c.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
+            ]);
+
+            autoTable(doc, {
+                startY: curY,
+                head: [['Descrizione', 'SAL', 'Importo']],
+                body: altriRows,
+                foot: [['TOTALE ALTRI COSTI', '', `€ ${altriTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`]],
+                theme: 'grid',
+                styles: { fontSize: 7, cellPadding: 1.5 },
+                headStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
+                footStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
+                columnStyles: {
+                    0: { cellWidth: 'auto' },
+                    1: { cellWidth: 40 },
+                    2: { cellWidth: 45, halign: 'right' },
+                },
+                margin: { left: ML, right: ML },
+            });
+            curY = (doc as any).lastAutoTable.finalY + 6;
+        }
+
+        // ── 5. TOTALE RIEPILOGATIVO ───────────────────────────────────────────
+        const grandTotal = totalCost + workerCosts.totalCost + altriTotal;
+
+        checkPage(40);
+        sectionTitle('RIEPILOGO TOTALE COMMESSA');
+
+        autoTable(doc, {
+            startY: curY,
+            body: [
+                ['Materiali (acquisti diretti)',    `€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`],
+                ['Ore Operai (costo manodopera)',   `€ ${workerCosts.totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`],
+                ['Altri Costi',                     `€ ${altriTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`],
+            ],
+            foot: [['TOTALE GENERALE', `€ ${grandTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`]],
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 2 },
+            footStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+            columnStyles: {
+                0: { cellWidth: 100 },
+                1: { cellWidth: 50, halign: 'right' },
+            },
+            margin: { left: ML, right: ML },
         });
 
-        // Footer
-        const finalY = (doc as any).lastAutoTable.finalY || 135;
-        doc.setFontSize(8);
-        doc.text(`Generato il ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, finalY + 10);
+        // ── Footer on all pages ───────────────────────────────────────────────
+        const totalPages = (doc as any).internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(6.5);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(120, 120, 120);
+            doc.text(
+                `Generato il ${format(new Date(), 'dd/MM/yyyy HH:mm')}  —  Pagina ${i} di ${totalPages}`,
+                ML, 205
+            );
+            doc.text(`Commessa ${job.code} — ${job.name || ''}`, PW - ML, 205, { align: 'right' });
+            doc.setTextColor(0, 0, 0);
+        }
 
-        doc.save(`Commessa_${job.code}.pdf`);
+        const pdfSlug = [job.code, job.name]
+            .filter(Boolean)
+            .join('_')
+            .replace(/[^a-zA-Z0-9_\-àáèéìíòóùú]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '')
+            .slice(0, 50);
+        doc.save(`Scheda_${pdfSlug}.pdf`);
     };
 
     const loadData = async () => {
@@ -209,6 +465,15 @@ export default function JobDetailsPage() {
                                 <Info className="h-4 w-4 md:mr-1" />
                                 <span className="hidden md:inline">Dettagli</span>
                             </TabsTrigger>
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                <TabsTrigger
+                                    value="costi-sal"
+                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                                >
+                                    <Euro className="h-4 w-4 md:mr-1" />
+                                    <span className="hidden md:inline">Costi e SAL</span>
+                                </TabsTrigger>
+                            )}
                             <TabsTrigger
                                 value="stock"
                                 className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
@@ -257,6 +522,10 @@ export default function JobDetailsPage() {
 
                         <TabsContent value="attendance" className="space-y-6 focus-visible:outline-none">
                             <JobAttendance jobId={job.id} />
+                        </TabsContent>
+
+                        <TabsContent value="costi-sal" className="space-y-6 focus-visible:outline-none">
+                            <JobCostiSAL jobId={job.id} jobCode={job.code} jobName={job.name} materialCost={totalCost} movements={movements} />
                         </TabsContent>
                     </Tabs>
                 </div>

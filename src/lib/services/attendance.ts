@@ -6,6 +6,8 @@ export const mapDbToAttendance = (db: any): Attendance => ({
     id: db.id,
     workerId: db.worker_id,
     workerName: db.workers?.first_name ? `${db.workers.first_name} ${db.workers.last_name || ''}` : undefined,
+    hourlyRate: db.workers?.hourly_rate !== undefined ? Number(db.workers.hourly_rate) : undefined,
+    trasfertaRate: db.workers?.trasferta_rate !== undefined ? Number(db.workers.trasferta_rate) : undefined,
     jobId: db.job_id,
     jobCode: db.jobs?.code,
     jobName: db.jobs?.name,
@@ -122,6 +124,34 @@ export const attendanceApi = {
         return (data || []).reduce((sum, record) => sum + (Number(record.hours) || 0), 0);
     },
 
+    // Get first and last presence date for a job (for SAL worker hours date suggestion)
+    getJobPresenceDateRange: async (jobId: string): Promise<{ first: string | null; last: string | null }> => {
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('date')
+            .eq('job_id', jobId)
+            .in('status', ['presence', 'transfer'])
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        if (!data || data.length === 0) return { first: null, last: null };
+        return { first: data[0].date, last: data[data.length - 1].date };
+    },
+
+    // Get attendance for a job within a date range (for SAL worker hours)
+    getByJobIdAndDateRange: async (jobId: string, dateFrom: string, dateTo: string): Promise<Attendance[]> => {
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('*, workers(first_name, last_name, hourly_rate, trasferta_rate)')
+            .eq('job_id', jobId)
+            .gte('date', dateFrom)
+            .lte('date', dateTo)
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        return (data || []).map(mapDbToAttendance);
+    },
+
     // Get aggregated statistics for the last N months (for dashboard chart)
     getAggregatedStats: async (months: number = 6): Promise<{ name: string; presenze: number; ferie: number; malattia: number; corso: number }[]> => {
         const now = new Date();
@@ -181,6 +211,135 @@ export const attendanceApi = {
             });
 
         return result;
+    },
+
+    getYearlyStatsByWorker: async (workerId: string, year?: number): Promise<{
+        presenze: number; orePresenza: number;
+        malattie: number; infortuni: number;
+        ferie: number; permessi: number;
+        corsi: number; visiteMediche: number;
+        trasferimenti: number; assenze: number;
+        oreRettifica: number; oreTotali: number;
+    }> => {
+        const y = year ?? new Date().getFullYear();
+        const start = `${y}-01-01`;
+        const end   = `${y}-12-31`;
+
+        const [attResult, rettResult] = await Promise.all([
+            supabase
+                .from('attendance')
+                .select('status, hours')
+                .eq('worker_id', workerId)
+                .gte('date', start)
+                .lte('date', end),
+            supabase
+                .from('attendance_corrections')
+                .select('hours_delta')
+                .eq('worker_id', workerId)
+                .gte('date', start)
+                .lte('date', end),
+        ]);
+
+        if (attResult.error) throw attResult.error;
+        if (rettResult.error) throw rettResult.error;
+
+        const stats = {
+            presenze: 0, orePresenza: 0,
+            malattie: 0, infortuni: 0,
+            ferie: 0, permessi: 0,
+            corsi: 0, visiteMediche: 0,
+            trasferimenti: 0, assenze: 0,
+            oreRettifica: 0, oreTotali: 0,
+        };
+
+        (attResult.data || []).forEach((r: any) => {
+            const h = Number(r.hours) || 0;
+            stats.oreTotali += h;
+            switch (r.status) {
+                case 'presence':     stats.presenze++;       stats.orePresenza += h; break;
+                case 'sick':         stats.malattie++;       break;
+                case 'injury':       stats.infortuni++;      break;
+                case 'holiday':      stats.ferie++;          break;
+                case 'permit':       stats.permessi++;       break;
+                case 'course':       stats.corsi++;          break;
+                case 'medical_exam': stats.visiteMediche++;  break;
+                case 'transfer':     stats.trasferimenti++;  break;
+                case 'absence':      stats.assenze++;        break;
+            }
+        });
+
+        (rettResult.data || []).forEach((r: any) => {
+            const delta = Number(r.hours_delta) || 0;
+            stats.oreRettifica += delta;
+            stats.oreTotali += delta;
+        });
+
+        return stats;
+    },
+
+    getWorkerCostsByJobId: async (jobId: string): Promise<{
+        rows: { workerId: string; workerName: string; normalHours: number; transferHours: number; normalCost: number; trasfertaCost: number; total: number }[];
+        totalCost: number;
+    }> => {
+        const [attResult, corrResult] = await Promise.all([
+            supabase
+                .from('attendance')
+                .select('worker_id, hours, status, workers(first_name, last_name, hourly_rate, trasferta_rate)')
+                .eq('job_id', jobId),
+            supabase
+                .from('attendance_corrections')
+                .select('worker_id, hours_delta')
+                .eq('job_id', jobId),
+        ]);
+
+        if (attResult.error) throw attResult.error;
+        if (corrResult.error) throw corrResult.error;
+
+        // Aggregate per worker
+        const map = new Map<string, {
+            workerName: string; hourlyRate: number; trasfertaRate: number;
+            normalHours: number; transferHours: number;
+        }>();
+
+        (attResult.data || []).forEach((r: any) => {
+            const wid = r.worker_id;
+            if (!map.has(wid)) {
+                const w = r.workers;
+                map.set(wid, {
+                    workerName: w ? `${w.first_name} ${w.last_name || ''}`.trim() : wid,
+                    hourlyRate: Number(w?.hourly_rate ?? 25),
+                    trasfertaRate: Number(w?.trasferta_rate ?? 50),
+                    normalHours: 0,
+                    transferHours: 0,
+                });
+            }
+            const entry = map.get(wid)!;
+            const h = Number(r.hours) || 0;
+            if (r.status === 'transfer') {
+                entry.transferHours += h;
+            } else {
+                entry.normalHours += h;
+            }
+        });
+
+        // Apply corrections to normal hours
+        (corrResult.data || []).forEach((r: any) => {
+            const wid = r.worker_id;
+            if (map.has(wid)) {
+                map.get(wid)!.normalHours += Number(r.hours_delta) || 0;
+            }
+        });
+
+        let totalCost = 0;
+        const rows = Array.from(map.entries()).map(([workerId, e]) => {
+            const normalCost = Math.max(0, e.normalHours) * e.hourlyRate;
+            const trasfertaCost = e.transferHours * e.trasfertaRate;
+            const total = normalCost + trasfertaCost;
+            totalCost += total;
+            return { workerId, workerName: e.workerName, normalHours: e.normalHours, transferHours: e.transferHours, normalCost, trasfertaCost, total };
+        }).sort((a, b) => b.total - a.total);
+
+        return { rows, totalCost };
     },
 
     // New: Get total hours for all ACTIVE jobs (for dashboard)
