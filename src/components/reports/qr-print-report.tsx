@@ -220,7 +220,7 @@ export default function QrPrintReport() {
           body * { visibility: hidden; }
           #qr-print-area, #qr-print-area * { visibility: visible; }
           #qr-print-area {
-            position: fixed !important;
+            position: absolute !important;
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
