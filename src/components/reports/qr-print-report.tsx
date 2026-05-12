@@ -105,20 +105,18 @@ export default function QrPrintReport() {
     <>
       {/* Stile di stampa iniettato inline */}
       <style>{`
+        @media screen {
+          #qr-print-area { position: fixed; left: -9999px; top: 0; }
+        }
         @media print {
           body * { visibility: hidden; }
-          #qr-print-area,
-          #qr-print-area * { visibility: visible; }
+          #qr-print-area, #qr-print-area * { visibility: visible; }
           #qr-print-area {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            display: flex !important;
-            flex-wrap: wrap;
-            gap: 8px;
-            padding: 16px;
-            background: white;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            background: white !important;
           }
           #qr-print-area .label-card { border: 1px solid #ccc; break-inside: avoid; page-break-inside: avoid; }
         }
@@ -229,12 +227,8 @@ export default function QrPrintReport() {
         </div>
       </div>
 
-      {/* Area di stampa — fuori dal flusso visivo, visibile solo in @media print */}
-      <div
-        id="qr-print-area"
-        ref={printRef}
-        style={{ position: "absolute", visibility: "hidden", top: 0, left: 0, width: 0, height: 0, overflow: "hidden" }}
-      >
+      {/* Area di stampa — fuori schermo in visualizzazione, visibile solo in @media print */}
+      <div id="qr-print-area" ref={printRef} className="flex flex-wrap gap-3 p-4">
         {selectedItems.map(item => (
           <ItemLabel key={item.id} item={item} mode={mode} size={size} />
         ))}
