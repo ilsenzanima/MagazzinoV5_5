@@ -29,10 +29,9 @@ export function JobWeatherWidget({ address }: JobWeatherWidgetProps) {
 
       try {
         setLoading(true)
-        // 1. Geocoding
-        const city = address.split(',').pop()?.trim() || address
+        // 1. Geocoding con indirizzo completo
         const geoRes = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1`
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=it&limit=1`
         )
         const geoData = await geoRes.json()
         
