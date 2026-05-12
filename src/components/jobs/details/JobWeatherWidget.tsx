@@ -21,46 +21,19 @@ export function JobWeatherWidget({ address }: JobWeatherWidgetProps) {
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    async function fetchWeather() {
-      if (!address) {
-        setLoading(false)
-        return
-      }
+    if (!address) { setLoading(false); return }
 
-      try {
-        setLoading(true)
-        // 1. Geocoding via Open-Meteo (stessa piattaforma, gratuito, no chiave)
-        // Estrae la città dall'indirizzo italiano: pattern "CAP Città [Prov]"
-        const capMatch = address.match(/\b\d{5}\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ '\-]*?)(?:\s+[A-Z]{2})?\s*(?:,|$)/)
-        const city = capMatch ? capMatch[1].trim() : address
+    setLoading(true)
+    setError(false)
 
-        const geoRes = await fetch(
-          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=it&format=json`
-        )
-        const geoData = await geoRes.json()
-
-        if (!geoData.results || geoData.results.length === 0) {
-          setError(true)
-          return
-        }
-
-        const { latitude: lat, longitude: lon } = geoData.results[0]
-
-        // 2. Weather
-        const res = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
-        )
-        const data = await res.json()
-        setWeather(data.daily)
-      } catch (error) {
-        console.error("Failed to fetch weather", error)
-        setError(true)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchWeather()
+    fetch(`/api/weather?address=${encodeURIComponent(address)}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then(data => setWeather(data))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
   }, [address])
 
   const getWeatherIcon = (code: number) => {
@@ -84,19 +57,19 @@ export function JobWeatherWidget({ address }: JobWeatherWidgetProps) {
         <p className="text-xs text-slate-400">Impossibile caricare il meteo per questo indirizzo.</p>
       </CardContent>
     </Card>
-  );
+  )
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-            <Cloud className="h-4 w-4" />
-            Meteo Cantiere
+          <Cloud className="h-4 w-4" />
+          Meteo Cantiere
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex gap-4 overflow-x-auto pb-2">
-          {weather?.time.map((date, i) => (
+          {weather.time.slice(0, 5).map((date, i) => (
             <div key={date} className="flex flex-col items-center min-w-[80px] p-2 rounded-lg bg-slate-50 border">
               <span className="text-xs font-semibold text-slate-600 mb-1">
                 {new Date(date).toLocaleDateString('it-IT', { weekday: 'short' })}
@@ -110,7 +83,7 @@ export function JobWeatherWidget({ address }: JobWeatherWidgetProps) {
                 <span className="text-blue-500">{Math.round(weather.temperature_2m_min[i])}°</span>
               </div>
             </div>
-          )).slice(0, 5)} 
+          ))}
         </div>
       </CardContent>
     </Card>
