@@ -29,18 +29,22 @@ export function JobWeatherWidget({ address }: JobWeatherWidgetProps) {
 
       try {
         setLoading(true)
-        // 1. Geocoding con indirizzo completo
+        // 1. Geocoding via Open-Meteo (stessa piattaforma, gratuito, no chiave)
+        // Estrae la città dall'indirizzo italiano: pattern "CAP Città [Prov]"
+        const capMatch = address.match(/\b\d{5}\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ '\-]*?)(?:\s+[A-Z]{2})?\s*(?:,|$)/)
+        const city = capMatch ? capMatch[1].trim() : address
+
         const geoRes = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=it&limit=1`
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=it&format=json`
         )
         const geoData = await geoRes.json()
-        
-        if (!geoData || geoData.length === 0) {
+
+        if (!geoData.results || geoData.results.length === 0) {
           setError(true)
           return
         }
 
-        const { lat, lon } = geoData[0]
+        const { latitude: lat, longitude: lon } = geoData.results[0]
 
         // 2. Weather
         const res = await fetch(
