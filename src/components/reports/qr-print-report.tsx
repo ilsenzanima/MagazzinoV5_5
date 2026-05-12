@@ -106,9 +106,21 @@ export default function QrPrintReport() {
       {/* Stile di stampa iniettato inline */}
       <style>{`
         @media print {
-          body > * { display: none !important; }
-          #qr-print-area { display: flex !important; }
-          #qr-print-area .label-card { border: 1px solid #ccc; page-break-inside: avoid; }
+          body * { visibility: hidden; }
+          #qr-print-area,
+          #qr-print-area * { visibility: visible; }
+          #qr-print-area {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex !important;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 16px;
+            background: white;
+          }
+          #qr-print-area .label-card { border: 1px solid #ccc; break-inside: avoid; page-break-inside: avoid; }
         }
       `}</style>
 
@@ -217,12 +229,11 @@ export default function QrPrintReport() {
         </div>
       </div>
 
-      {/* Area di stampa (visibile solo in print) */}
+      {/* Area di stampa — fuori dal flusso visivo, visibile solo in @media print */}
       <div
         id="qr-print-area"
         ref={printRef}
-        style={{ display: "none" }}
-        className="flex flex-wrap gap-3 p-4"
+        style={{ position: "absolute", visibility: "hidden", top: 0, left: 0, width: 0, height: 0, overflow: "hidden" }}
       >
         {selectedItems.map(item => (
           <ItemLabel key={item.id} item={item} mode={mode} size={size} />
