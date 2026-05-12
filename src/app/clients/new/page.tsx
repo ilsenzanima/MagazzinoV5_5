@@ -137,7 +137,7 @@ export default function NewClientPage() {
                     <Input
                       id="province"
                       value={formData.province}
-                      onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, province: e.target.value.toUpperCase() })}
                       placeholder="MI"
                       maxLength={2}
                       className="uppercase"
