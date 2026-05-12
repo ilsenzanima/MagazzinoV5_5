@@ -21,15 +21,19 @@ async function tryGeocode(candidate: string): Promise<{ lat: number; lon: number
 function extractCandidates(address: string): string[] {
   const candidates: string[] = []
 
+  // Normalizza: rimuove provincia tra parentesi "(ve)" -> "" e appiattisce spazi
+  const normalized = address.replace(/\s*\([a-zA-Z]{2}\)/g, '').replace(/\s+/g, ' ').trim()
+
   // 1. CAP pattern: "12345 NomeCittà [PR]"
-  const capMatch = address.match(/\b\d{5}\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ '\-]+?)(?:\s+[A-Z]{2})?\s*(?:,|$)/)
+  const capMatch = normalized.match(/\b\d{5}\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ '\-]+?)(?:\s+[A-Z]{2})?\s*(?:,|$)/)
   if (capMatch) candidates.push(capMatch[1].trim())
 
   // 2. Ogni segmento separato da virgola, dal fondo (città di solito verso la fine)
-  const parts = address.split(',').map(p => p.trim()).filter(p => p.length > 3)
+  const parts = normalized.split(',').map(p => p.trim()).filter(p => p.length > 3)
   for (const part of parts.reverse()) {
-    // Salta segmenti che sembrano vie (iniziano con Via/Corso/Piazza/ecc.)
+    // Salta segmenti che sembrano vie o iniziano con numero (CAP)
     if (/^(via|corso|piazza|viale|largo|vicolo|strada|loc\.|localit)/i.test(part)) continue
+    if (/^\d/.test(part)) continue
     if (!candidates.includes(part)) candidates.push(part)
   }
 
