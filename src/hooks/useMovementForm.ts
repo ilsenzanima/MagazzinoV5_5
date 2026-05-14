@@ -679,7 +679,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         }
 
         const noteData = {
-            type: activeTab === "waste" ? "exit" : activeTab,
+            type: activeTab,
             number: fullNumber,
             date,
             jobId: selectedJob?.id,
@@ -700,7 +700,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             pieces: l.pieces ? parseFloat(l.pieces) : undefined,
             coefficient: l.coefficient,
             purchaseItemId: l.purchaseItemId,
-            isFictitious: activeTab === "waste" ? true : l.isFictitious,
+            isFictitious: l.isFictitious,
             price: 0,
         }));
 

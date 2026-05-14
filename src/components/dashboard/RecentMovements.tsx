@@ -18,7 +18,7 @@ interface DeliveryNoteItem {
 
 interface Movement {
   id: string;
-  type: 'entry' | 'exit' | 'sale';
+  type: 'entry' | 'exit' | 'sale' | 'waste';
   number: string;
   date: string;
   created_at: string;
@@ -45,6 +45,8 @@ export const RecentMovements = memo(function RecentMovements({ data }: RecentMov
         return { icon: ArrowUpRight, label: 'Uscita', color: 'amber' };
       case 'sale':
         return { icon: ShoppingBag, label: 'Vendita', color: 'blue' };
+      case 'waste':
+        return { icon: FileText, label: 'Immondizie', color: 'orange' };
       default:
         return { icon: FileText, label: type, color: 'slate' };
     }

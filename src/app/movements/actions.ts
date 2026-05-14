@@ -17,7 +17,7 @@ interface MovementLine {
 }
 
 interface MovementData {
-  type: 'entry' | 'exit' | 'sale'
+  type: 'entry' | 'exit' | 'sale' | 'waste'
   number: string
   date: string
   jobId?: string
