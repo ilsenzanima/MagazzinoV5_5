@@ -340,7 +340,8 @@ export async function generateDeliveryNotePDF(
     const typeLabels: { [key: string]: string } = {
         'exit': 'uscita',
         'entry': 'rientro',
-        'sale': 'vendita'
+        'sale': 'vendita',
+        'waste': 'eccedenza'
     };
     const dateFormatted = format(new Date(movement.date), 'yyyyMMMdd', { locale: it });
     // Use jobName if available, otherwise fall back to description or code
@@ -349,10 +350,7 @@ export async function generateDeliveryNotePDF(
         .replace(/[^a-zA-Z0-9\s]/g, '')
         .replace(/\s+/g, '_')
         .substring(0, 30);
-    let typeLabel = typeLabels[movement.type] || movement.type;
-    if (movement.type === 'exit' && movement.causal === 'Trasporto rifiuti cantiere') {
-        typeLabel = 'immondizia';
-    }
+    const typeLabel = typeLabels[movement.type] || movement.type;
     // Pad bolla number with zeros for proper file sorting (e.g., 001 instead of 1)
     const bollaNumber = movement.number.replace('/', '_').replace(/^(\d+)/, (match) => match.padStart(3, '0'));
 

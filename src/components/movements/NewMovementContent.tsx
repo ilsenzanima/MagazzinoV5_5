@@ -115,10 +115,10 @@ export default function NewMovementContent({
                     </TabsTrigger>
                     <TabsTrigger
                         value="waste"
-                        className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800"
+                        className="data-[state=active]:bg-violet-100 data-[state=active]:text-violet-800"
                     >
                         <Recycle className="mr-2 h-4 w-4" />
-                        Immondizie
+                        Eccedenze
                     </TabsTrigger>
                 </TabsList>
 

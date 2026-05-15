@@ -169,7 +169,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             setDeliveryLocation("Cliente");
             setTransportTime("08:00");
         } else if (activeTab === "waste") {
-            setCausal("Trasporto rifiuti cantiere");
+            setCausal("Trasporto eccedenze cantiere");
             setPickupLocation(jobAddress || "CANTIERE");
             setDeliveryLocation(
                 "OPI FIRESAFE S.R.L. DEPOSITO TEMPORANEO\nVia Monfalcone, 33 - 33052 - Cervignano del Friuli (UD)"
@@ -674,12 +674,12 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 selectedJob?.clientAddress ||
                 pickupLocation ||
                 "cantiere";
-            const wasteNote = `Trasporto di materiale prodotto nel cantiere di ${siteAddr} verso la sede di Cervignano del Friuli (UD) in via Monfalcone n.33 per deposito temporaneo.`;
+            const wasteNote = `Trasporto di eccedenze prodotte nel cantiere di ${siteAddr} verso la sede di Cervignano del Friuli (UD) in via Monfalcone n.33 per deposito temporaneo.`;
             finalNotes = finalNotes ? `${finalNotes}\n${wasteNote}` : wasteNote;
         }
 
         const noteData = {
-            type: activeTab === "waste" ? "exit" : activeTab,
+            type: activeTab,
             number: fullNumber,
             date,
             jobId: selectedJob?.id,
@@ -700,7 +700,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             pieces: l.pieces ? parseFloat(l.pieces) : undefined,
             coefficient: l.coefficient,
             purchaseItemId: l.purchaseItemId,
-            isFictitious: activeTab === "waste" ? true : l.isFictitious,
+            isFictitious: l.isFictitious,
             price: 0,
         }));
 

@@ -96,8 +96,8 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   };
 
   const getTypeConfig = (movement: DeliveryNote) => {
-    if (movement.type === 'exit' && movement.causal === 'Trasporto rifiuti cantiere') {
-      return { label: 'Immondizie', color: 'bg-orange-100 text-orange-700 hover:bg-orange-100', icon: Recycle };
+    if (movement.type === 'waste') {
+      return { label: 'Eccedenze', color: 'bg-violet-100 text-violet-700 hover:bg-violet-100', icon: Recycle };
     }
 
     switch (movement.type) {
