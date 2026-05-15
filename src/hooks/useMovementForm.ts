@@ -71,7 +71,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     const [itemsLoading, setItemsLoading] = useState(false);
 
     const [activeTab, setActiveTab] = useState<"entry" | "exit" | "sale" | "waste">(
-        initialNote?.type || "entry"
+        initialNote?.type || "exit"
     );
     const [numberPart, setNumberPart] = useState(initialNote?.number.split("/")[0] || "");
     const [date, setDate] = useState(

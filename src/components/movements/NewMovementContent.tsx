@@ -93,18 +93,18 @@ export default function NewMovementContent({
             >
                 <TabsList className="grid w-full grid-cols-4 mb-6">
                     <TabsTrigger
-                        value="entry"
-                        className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
-                    >
-                        <ArrowDownRight className="mr-2 h-4 w-4" />
-                        Entrata / Reso
-                    </TabsTrigger>
-                    <TabsTrigger
                         value="exit"
                         className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800"
                     >
                         <ArrowUpRight className="mr-2 h-4 w-4" />
                         Uscita
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="entry"
+                        className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
+                    >
+                        <ArrowDownRight className="mr-2 h-4 w-4" />
+                        Entrata / Reso
                     </TabsTrigger>
                     <TabsTrigger
                         value="sale"
