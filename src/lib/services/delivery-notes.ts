@@ -253,6 +253,28 @@ export const deliveryNotesApi = {
         if (error) throw error;
     },
 
+    getWasteByJobId: async (jobId: string) => {
+        const { data, error } = await supabase
+            .from('delivery_notes')
+            .select(`
+                *,
+                delivery_note_items(
+                    id,
+                    quantity,
+                    pieces,
+                    coefficient,
+                    is_fictitious,
+                    inventory:inventory_id(id, name, model, code, unit, brand, category)
+                )
+            `)
+            .eq('job_id', jobId)
+            .eq('type', 'waste')
+            .order('date', { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map(mapDbToDeliveryNote);
+    },
+
     updateLocationBatch: async (jobIds: string[], newAddress: string, newClientName?: string) => {
         // If we have a new client name, we need to update each note individually
         // because we need to replace the client name pattern in the existing delivery_location

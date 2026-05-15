@@ -341,7 +341,7 @@ export async function generateDeliveryNotePDF(
         'exit': 'uscita',
         'entry': 'rientro',
         'sale': 'vendita',
-        'waste': 'immondizia'
+        'waste': 'eccedenza'
     };
     const dateFormatted = format(new Date(movement.date), 'yyyyMMMdd', { locale: it });
     // Use jobName if available, otherwise fall back to description or code

@@ -46,7 +46,7 @@ export const RecentMovements = memo(function RecentMovements({ data }: RecentMov
       case 'sale':
         return { icon: ShoppingBag, label: 'Vendita', color: 'blue' };
       case 'waste':
-        return { icon: FileText, label: 'Immondizie', color: 'orange' };
+        return { icon: FileText, label: 'Eccedenze', color: 'violet' };
       default:
         return { icon: FileText, label: type, color: 'slate' };
     }
