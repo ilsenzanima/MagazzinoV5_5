@@ -4,7 +4,7 @@ import { notify } from "@/lib/notify";
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Job, jobsApi } from "@/lib/api"
+import { Job, Client, jobsApi, clientsApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -50,11 +50,13 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
   const [isSaving, setIsSaving] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Job>>({})
   const [updateExistingMovements, setUpdateExistingMovements] = useState(false)
+  const [clients, setClients] = useState<Client[]>([])
+  const [isLoadingClients, setIsLoadingClients] = useState(false)
 
   const mockBudget = 0
   const percentage = mockBudget > 0 ? Math.min(100, Math.round((totalCost / mockBudget) * 100)) : 0
 
-  const handleEditClick = () => {
+  const handleEditClick = async () => {
     setEditForm({
       name: job.name,
       description: job.description,
@@ -64,10 +66,20 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
       startDate: job.startDate,
       endDate: job.endDate,
       cig: job.cig || '',
-      cup: job.cup || ''
+      cup: job.cup || '',
+      clientId: job.clientId
     })
     setUpdateExistingMovements(false)
     setIsEditOpen(true)
+    setIsLoadingClients(true)
+    try {
+      const data = await clientsApi.getAll()
+      setClients(data)
+    } catch {
+      notify.error("Errore nel caricamento dei committenti")
+    } finally {
+      setIsLoadingClients(false)
+    }
   }
 
   const handleSave = async () => {
@@ -278,6 +290,29 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="committente">Committente *</Label>
+              <Select
+                value={editForm.clientId || ""}
+                onValueChange={(value) => setEditForm({ ...editForm, clientId: value })}
+                disabled={isLoadingClients}
+              >
+                <SelectTrigger id="committente">
+                  <SelectValue placeholder={isLoadingClients ? "Caricamento..." : "Seleziona committente"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editForm.clientId !== job.clientId && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Attenzione: cambiare il committente aggiornerà automaticamente tutte le movimentazioni e bolle associate.
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Nome Commessa *</Label>
               <Input
