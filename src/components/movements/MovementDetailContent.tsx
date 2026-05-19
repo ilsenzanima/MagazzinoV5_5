@@ -108,6 +108,9 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                 grouped.set(key, {
                     ...existing,
                     quantity: existing.quantity + item.quantity,
+                    kgEccedenza: existing.kgEccedenza != null || item.kgEccedenza != null
+                        ? (existing.kgEccedenza ?? 0) + (item.kgEccedenza ?? 0)
+                        : undefined,
                 });
             } else {
                 grouped.set(key, { ...item });

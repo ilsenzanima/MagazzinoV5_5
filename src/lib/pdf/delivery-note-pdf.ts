@@ -179,11 +179,21 @@ export async function generateDeliveryNotePDF(
         return 0;
     });
 
+    const isWaste = movement.type === 'waste';
+
     const tableBody = sortedItems.map(item => {
         const nameWithModel = item.inventoryName + (item.inventoryModel ? ` (${item.inventoryModel})` : '');
+        const description = `${nameWithModel || "Articolo"} ${item.inventoryDescription ? `- ${item.inventoryDescription}` : ""}`;
+        if (isWaste) {
+            return [
+                item.inventoryCategory || "-",
+                description,
+                item.kgEccedenza != null ? item.kgEccedenza.toString() : "-"
+            ];
+        }
         return [
             item.inventoryCategory || "-",
-            `${nameWithModel || "Articolo"} ${item.inventoryDescription ? `- ${item.inventoryDescription}` : ""}`,
+            description,
             item.inventoryUnit || "PZ",
             item.quantity.toString()
         ];
@@ -197,7 +207,10 @@ export async function generateDeliveryNotePDF(
 
     autoTable(doc, {
         startY: currentY,
-        head: [['Categoria', 'Prodotto', 'U.M.', 'Quantità']],
+        head: [isWaste
+            ? ['Categoria', 'Prodotto', 'Peso (kg)']
+            : ['Categoria', 'Prodotto', 'U.M.', 'Quantità']
+        ],
         body: tableBody,
         theme: 'plain', // Cleaner look
         styles: {
@@ -219,7 +232,11 @@ export async function generateDeliveryNotePDF(
             lineWidth: { bottom: 0.1 },
             lineColor: [230, 230, 230]
         },
-        columnStyles: {
+        columnStyles: isWaste ? {
+            0: { cellWidth: 35 },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 25, halign: 'right' }
+        } : {
             0: { cellWidth: 35 },
             1: { cellWidth: 'auto' },
             2: { cellWidth: 20, halign: 'center' },
