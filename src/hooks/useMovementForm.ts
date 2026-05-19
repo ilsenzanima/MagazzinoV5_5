@@ -624,9 +624,17 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             return;
         }
 
-        const validLines = lines.filter((l) => l.itemId && l.quantity && parseFloat(l.quantity) > 0);
+        const validLines = lines.filter((l) => {
+            if (!l.itemId) return false;
+            if (activeTab === "waste") return !!l.kgEccedenza && parseFloat(l.kgEccedenza) > 0;
+            return !!l.quantity && parseFloat(l.quantity) > 0;
+        });
         if (validLines.length === 0) {
-            notify.warning("Inserisci almeno una riga");
+            notify.warning(
+                activeTab === "waste"
+                    ? "Inserisci il peso (kg) per almeno un articolo"
+                    : "Inserisci almeno una riga"
+            );
             return;
         }
 
