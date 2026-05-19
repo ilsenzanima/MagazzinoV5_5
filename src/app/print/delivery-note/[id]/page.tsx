@@ -66,6 +66,7 @@ export default function PrintDeliveryNotePage({ params }: { params: { id: string
                 grouped.set(key, {
                     ...existing,
                     quantity: existing.quantity + item.quantity,
+                    kgEccedenza: (existing.kgEccedenza ?? 0) + (item.kgEccedenza ?? 0) || undefined,
                 });
             } else {
                 grouped.set(key, { ...item });
@@ -74,6 +75,8 @@ export default function PrintDeliveryNotePage({ params }: { params: { id: string
 
         return Array.from(grouped.values());
     }, [note]);
+
+    const isWaste = note?.type === 'waste';
 
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
     if (!note) return <div>Bolla non trovata</div>;
@@ -180,8 +183,10 @@ export default function PrintDeliveryNotePage({ params }: { params: { id: string
                         <tr className="bg-[#003366] text-white">
                             <th className="text-left p-2 border border-[#003366] w-[15%]">Codice</th>
                             <th className="text-left p-2 border border-[#003366]">Descrizione</th>
-                            <th className="text-center p-2 border border-[#003366] w-[10%]">U.M.</th>
-                            <th className="text-right p-2 border border-[#003366] w-[10%]">Q.tà</th>
+                            {!isWaste && <th className="text-center p-2 border border-[#003366] w-[10%]">U.M.</th>}
+                            <th className="text-right p-2 border border-[#003366] w-[10%]">
+                                {isWaste ? "Peso (kg)" : "Q.tà"}
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -195,11 +200,12 @@ export default function PrintDeliveryNotePage({ params }: { params: { id: string
                                     </p>
                                     {item.inventoryDescription && <p className="text-xs text-gray-500">{item.inventoryDescription}</p>}
                                 </td>
-                                <td className="p-2 border-r border-gray-300 text-center">{item.inventoryUnit}</td>
-                                <td className="p-2 border-r border-gray-300 text-right font-bold">{item.quantity}</td>
+                                {!isWaste && <td className="p-2 border-r border-gray-300 text-center">{item.inventoryUnit}</td>}
+                                <td className="p-2 border-r border-gray-300 text-right font-bold">
+                                    {isWaste ? (item.kgEccedenza ?? '-') : item.quantity}
+                                </td>
                             </tr>
                         ))}
-                        {/* Empty rows filler if needed, but usually not for web print */}
                     </tbody>
                 </table>
             </div>

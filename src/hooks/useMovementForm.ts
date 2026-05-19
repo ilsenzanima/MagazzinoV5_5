@@ -370,7 +370,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                         itemCategory: item.type,
                         itemDescription: item.description,
                         coefficient: item.coefficient || 1,
-                        quantity: prefill?.quantity || "",
+                        quantity: tab === "waste" ? "1" : (prefill?.quantity || ""),
                         pieces: prefill?.pieces || "",
                         purchaseItemId: undefined,
                         purchaseRef: undefined,
@@ -677,7 +677,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 selectedJob?.clientAddress ||
                 pickupLocation ||
                 "cantiere";
-            const wasteNote = `Trasporto di eccedenze prodotte nel cantiere di ${siteAddr} verso la sede di Cervignano del Friuli (UD) in via Monfalcone n.33 per deposito temporaneo.`;
+            const wasteNote = `Materiali eccedenti provenienti dal cantiere di ${siteAddr} e diretti alla sede di via Monfalcone n.33 – 33052 Cervignano del Friuli (UD) per deposito temporaneo.`;
             finalNotes = finalNotes ? `${finalNotes}\n${wasteNote}` : wasteNote;
         }
 
