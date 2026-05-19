@@ -721,18 +721,13 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             if (isEditing && editingId) {
                 const result = await updateMovement(editingId, noteData, itemsData);
                 if (result && !result.success) throw new Error(result.error);
-                router.push("/movements");
-                router.refresh();
             } else {
-                await createMovement(noteData, itemsData);
+                const result = await createMovement(noteData, itemsData);
+                if (!result.success) throw new Error(result.error);
             }
+            router.push("/movements");
+            router.refresh();
         } catch (error: any) {
-            if (
-                error?.message?.includes("NEXT_REDIRECT") ||
-                error?.digest?.includes("NEXT_REDIRECT")
-            ) {
-                throw error;
-            }
             console.error(isEditing ? "Update failed" : "Create failed", error);
             alert(`Errore durante il salvataggio: ${error.message}`);
         } finally {
