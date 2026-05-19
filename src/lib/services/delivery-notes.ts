@@ -38,7 +38,8 @@ export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
         purchaseId: i.purchase_items?.purchases?.id,
         purchaseNumber: i.purchase_items?.purchases?.delivery_note_number,
         purchaseDate: i.purchase_items?.purchases?.delivery_note_date,
-        purchaseSupplier: i.purchase_items?.purchases?.suppliers?.name
+        purchaseSupplier: i.purchase_items?.purchases?.suppliers?.name,
+        kgEccedenza: i.kg_eccedenza ?? undefined,
     }))
 });
 
@@ -195,6 +196,7 @@ export const deliveryNotesApi = {
                     inventory_id: item.inventoryId,
                     quantity: item.quantity,
                     pieces: item.pieces,
+                    kg_eccedenza: item.kgEccedenza ?? null,
                     coefficient: item.coefficient,
                     price: item.price,
                     purchase_item_id: item.purchaseItemId || null,
@@ -231,6 +233,7 @@ export const deliveryNotesApi = {
                 inventory_id: item.inventoryId,
                 quantity: item.quantity,
                 pieces: item.pieces,
+                kg_eccedenza: item.kgEccedenza ?? null,
                 coefficient: item.coefficient,
                 price: item.price,
                 purchase_item_id: item.purchaseItemId || null,
@@ -262,6 +265,7 @@ export const deliveryNotesApi = {
                     id,
                     quantity,
                     pieces,
+                    kg_eccedenza,
                     coefficient,
                     is_fictitious,
                     inventory:inventory_id(id, name, model, code, unit, brand, category)

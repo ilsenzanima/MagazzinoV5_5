@@ -75,6 +75,7 @@ export function MovementInlineTable({
     const isEntryWithJob = activeTab === "entry" && !!selectedJob;
     const showLotto = activeTab === "exit" || activeTab === "sale" || activeTab === "entry";
     const showFittizio = activeTab !== "waste";
+    const showKgEccedenza = activeTab === "waste";
 
     return (
         <>
@@ -103,6 +104,9 @@ export function MovementInlineTable({
                                     <TableHead className="w-[88px] text-center">Pezzi</TableHead>
                                     <TableHead className="w-[100px] text-center">Quantità</TableHead>
                                     <TableHead className="w-[44px] text-center">U.M.</TableHead>
+                                    {showKgEccedenza && (
+                                        <TableHead className="w-[100px] text-center text-violet-700 dark:text-violet-400">kg Eccedenza</TableHead>
+                                    )}
                                     {/* Actions: dividi + elimina */}
                                     <TableHead className="w-[72px]"></TableHead>
                                 </TableRow>
@@ -341,6 +345,25 @@ export function MovementInlineTable({
                                                     {line.itemUnit || ""}
                                                 </span>
                                             </TableCell>
+
+                                            {/* kg Eccedenza */}
+                                            {showKgEccedenza && (
+                                                <TableCell className="py-1 px-1">
+                                                    <Input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        min="0"
+                                                        step="0.001"
+                                                        value={line.kgEccedenza}
+                                                        onChange={(e) =>
+                                                            onLineChange(line.tempId, "kgEccedenza", e.target.value)
+                                                        }
+                                                        placeholder="0.000"
+                                                        className="h-8 text-center px-1 text-sm border-violet-300 focus:border-violet-500 dark:border-violet-700"
+                                                        disabled={isEmpty}
+                                                    />
+                                                </TableCell>
+                                            )}
 
                                             {/* Actions: Dividi + Elimina */}
                                             <TableCell className="py-1 px-1">

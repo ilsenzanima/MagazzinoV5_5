@@ -249,6 +249,7 @@ export interface DeliveryNoteItem {
     purchaseNumber?: string;
     purchaseDate?: string;
     purchaseSupplier?: string;
+    kgEccedenza?: number;
 }
 
 export interface DeliveryNote {

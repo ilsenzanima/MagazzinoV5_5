@@ -20,6 +20,7 @@ export interface MovementLine {
     coefficient: number;
     quantity: string;
     pieces: string;
+    kgEccedenza: string;
     purchaseItemId?: string;
     purchaseRef?: string;
     isFictitious: boolean;
@@ -36,6 +37,7 @@ const emptyLine = (): MovementLine => ({
     coefficient: 1,
     quantity: "",
     pieces: "",
+    kgEccedenza: "",
     isFictitious: false,
     availableBatches: [],
     batchesLoading: false,
@@ -108,6 +110,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                     coefficient: item.coefficient || 1,
                     quantity: item.quantity.toString(),
                     pieces: item.pieces?.toString() || "",
+                    kgEccedenza: item.kgEccedenza?.toString() || "",
                     purchaseItemId: item.purchaseItemId,
                     purchaseRef: item.purchaseNumber || undefined,
                     isFictitious: item.isFictitious || false,
@@ -698,6 +701,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             inventoryId: l.itemId,
             quantity: parseFloat(l.quantity),
             pieces: l.pieces ? parseFloat(l.pieces) : undefined,
+            kgEccedenza: l.kgEccedenza ? parseFloat(l.kgEccedenza) : undefined,
             coefficient: l.coefficient,
             purchaseItemId: l.purchaseItemId,
             isFictitious: l.isFictitious,

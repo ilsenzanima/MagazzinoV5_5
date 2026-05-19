@@ -10,6 +10,7 @@ interface MovementLine {
   inventoryId: string
   quantity: number | string
   pieces?: number | string
+  kgEccedenza?: number
   coefficient?: number
   price?: number
   purchaseItemId?: string
@@ -114,6 +115,7 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
           inventory_id: item.inventoryId,
           quantity: quantity,
           pieces: item.pieces ? Number(item.pieces) : null,
+          kg_eccedenza: item.kgEccedenza ?? null,
           coefficient: item.coefficient || 1,
           price: item.price || 0,
           purchase_item_id: item.purchaseItemId || null,
@@ -242,6 +244,7 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
             inventory_id: item.inventoryId,
             quantity: quantity,
             pieces: item.pieces ? Number(item.pieces) : null,
+            kg_eccedenza: item.kgEccedenza ?? null,
             coefficient: item.coefficient,
             price: item.price,
             purchase_item_id: item.purchaseItemId || null,
@@ -268,6 +271,7 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
           inventory_id: item.inventoryId,
           quantity: quantity,
           pieces: item.pieces ? Number(item.pieces) : null,
+          kg_eccedenza: item.kgEccedenza ?? null,
           coefficient: item.coefficient,
           price: item.price,
           purchase_item_id: item.purchaseItemId || null,

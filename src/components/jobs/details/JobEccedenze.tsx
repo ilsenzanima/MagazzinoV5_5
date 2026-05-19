@@ -142,8 +142,15 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
                                                         )}
                                                         <div className="text-xs font-mono text-slate-400">{item.inventoryCode}</div>
                                                     </div>
-                                                    <div className="text-right text-slate-700 dark:text-slate-300 font-bold shrink-0 ml-2">
-                                                        {item.quantity} {item.inventoryUnit}
+                                                    <div className="text-right shrink-0 ml-2 space-y-0.5">
+                                                        <div className="text-slate-700 dark:text-slate-300 font-bold">
+                                                            {item.quantity} {item.inventoryUnit}
+                                                        </div>
+                                                        {item.kgEccedenza != null && (
+                                                            <div className="text-violet-600 dark:text-violet-400 text-xs font-semibold">
+                                                                {item.kgEccedenza} kg
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -236,8 +243,15 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
                                                             <span className="text-slate-400 ml-1 font-normal">({item.inventoryModel})</span>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="text-right font-bold text-slate-700 dark:text-slate-300">
-                                                        {item.quantity} {item.inventoryUnit}
+                                                    <TableCell className="text-right">
+                                                        <div className="font-bold text-slate-700 dark:text-slate-300">
+                                                            {item.quantity} {item.inventoryUnit}
+                                                        </div>
+                                                        {item.kgEccedenza != null && (
+                                                            <div className="text-violet-600 dark:text-violet-400 text-xs font-semibold">
+                                                                {item.kgEccedenza} kg
+                                                            </div>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell></TableCell>
                                                 </TableRow>
