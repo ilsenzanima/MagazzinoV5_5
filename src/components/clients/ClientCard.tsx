@@ -54,7 +54,7 @@ export function ClientCard({ client, canEdit, onEdit, onDelete }: ClientCardProp
                         <span>
                             {client.street} {client.streetNumber}
                             {client.street && client.city && ", "}
-                            {client.postalCode} {client.city} {client.province && `(${client.province})`}
+                            {client.postalCode} {client.city} {client.province && `(${client.province.toUpperCase()})`}
                         </span>
                     </div>
                 )}

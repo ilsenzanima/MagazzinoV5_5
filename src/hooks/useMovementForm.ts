@@ -20,6 +20,7 @@ export interface MovementLine {
     coefficient: number;
     quantity: string;
     pieces: string;
+    kgEccedenza: string;
     purchaseItemId?: string;
     purchaseRef?: string;
     isFictitious: boolean;
@@ -36,6 +37,7 @@ const emptyLine = (): MovementLine => ({
     coefficient: 1,
     quantity: "",
     pieces: "",
+    kgEccedenza: "",
     isFictitious: false,
     availableBatches: [],
     batchesLoading: false,
@@ -71,7 +73,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     const [itemsLoading, setItemsLoading] = useState(false);
 
     const [activeTab, setActiveTab] = useState<"entry" | "exit" | "sale" | "waste">(
-        initialNote?.type || "entry"
+        initialNote?.type || "exit"
     );
     const [numberPart, setNumberPart] = useState(initialNote?.number.split("/")[0] || "");
     const [date, setDate] = useState(
@@ -108,6 +110,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                     coefficient: item.coefficient || 1,
                     quantity: item.quantity.toString(),
                     pieces: item.pieces?.toString() || "",
+                    kgEccedenza: item.kgEccedenza?.toString() || "",
                     purchaseItemId: item.purchaseItemId,
                     purchaseRef: item.purchaseNumber || undefined,
                     isFictitious: item.isFictitious || false,
@@ -169,7 +172,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             setDeliveryLocation("Cliente");
             setTransportTime("08:00");
         } else if (activeTab === "waste") {
-            setCausal("Trasporto rifiuti cantiere");
+            setCausal("Trasporto eccedenze cantiere");
             setPickupLocation(jobAddress || "CANTIERE");
             setDeliveryLocation(
                 "OPI FIRESAFE S.R.L. DEPOSITO TEMPORANEO\nVia Monfalcone, 33 - 33052 - Cervignano del Friuli (UD)"
@@ -367,7 +370,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                         itemCategory: item.type,
                         itemDescription: item.description,
                         coefficient: item.coefficient || 1,
-                        quantity: prefill?.quantity || "",
+                        quantity: tab === "waste" ? "1" : (prefill?.quantity || ""),
                         pieces: prefill?.pieces || "",
                         purchaseItemId: undefined,
                         purchaseRef: undefined,
@@ -621,9 +624,17 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             return;
         }
 
-        const validLines = lines.filter((l) => l.itemId && l.quantity && parseFloat(l.quantity) > 0);
+        const validLines = lines.filter((l) => {
+            if (!l.itemId) return false;
+            if (activeTab === "waste") return !!l.kgEccedenza && parseFloat(l.kgEccedenza) > 0;
+            return !!l.quantity && parseFloat(l.quantity) > 0;
+        });
         if (validLines.length === 0) {
-            notify.warning("Inserisci almeno una riga");
+            notify.warning(
+                activeTab === "waste"
+                    ? "Inserisci il peso (kg) per almeno un articolo"
+                    : "Inserisci almeno una riga"
+            );
             return;
         }
 
@@ -674,12 +685,12 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 selectedJob?.clientAddress ||
                 pickupLocation ||
                 "cantiere";
-            const wasteNote = `Trasporto di materiale prodotto nel cantiere di ${siteAddr} verso la sede di Cervignano del Friuli (UD) in via Monfalcone n.33 per deposito temporaneo.`;
+            const wasteNote = `Materiali eccedenti provenienti dal cantiere di ${siteAddr} e diretti alla sede di via Monfalcone n.33 – 33052 Cervignano del Friuli (UD) per deposito temporaneo.`;
             finalNotes = finalNotes ? `${finalNotes}\n${wasteNote}` : wasteNote;
         }
 
         const noteData = {
-            type: activeTab === "waste" ? "exit" : activeTab,
+            type: activeTab,
             number: fullNumber,
             date,
             jobId: selectedJob?.id,
@@ -698,9 +709,10 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             inventoryId: l.itemId,
             quantity: parseFloat(l.quantity),
             pieces: l.pieces ? parseFloat(l.pieces) : undefined,
+            kgEccedenza: l.kgEccedenza ? parseFloat(l.kgEccedenza) : undefined,
             coefficient: l.coefficient,
             purchaseItemId: l.purchaseItemId,
-            isFictitious: activeTab === "waste" ? true : l.isFictitious,
+            isFictitious: l.isFictitious,
             price: 0,
         }));
 
@@ -709,18 +721,13 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             if (isEditing && editingId) {
                 const result = await updateMovement(editingId, noteData, itemsData);
                 if (result && !result.success) throw new Error(result.error);
-                router.push("/movements");
-                router.refresh();
             } else {
-                await createMovement(noteData, itemsData);
+                const result = await createMovement(noteData, itemsData);
+                if (!result.success) throw new Error(result.error);
             }
+            router.push("/movements");
+            router.refresh();
         } catch (error: any) {
-            if (
-                error?.message?.includes("NEXT_REDIRECT") ||
-                error?.digest?.includes("NEXT_REDIRECT")
-            ) {
-                throw error;
-            }
             console.error(isEditing ? "Update failed" : "Create failed", error);
             alert(`Errore durante il salvataggio: ${error.message}`);
         } finally {

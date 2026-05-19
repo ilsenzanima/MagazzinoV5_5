@@ -76,7 +76,7 @@ export function ClientEditDialog({
 
     // Helper to construct address
     const constructAddress = (c: Partial<Client>) => {
-        return `${c.street || ''} ${c.streetNumber || ''}, ${c.postalCode || ''} ${c.city || ''} ${c.province ? '(' + c.province + ')' : ''}`
+        return `${c.street || ''} ${c.streetNumber || ''}, ${c.postalCode || ''} ${c.city || ''} ${c.province ? '(' + c.province.toUpperCase() + ')' : ''}`
             .trim()
             .replace(/^,/, '')
             .replace(/,$/, '')
@@ -256,7 +256,7 @@ export function ClientEditDialog({
                                     maxLength={2}
                                     className="uppercase"
                                     value={editForm.province || ""}
-                                    onChange={(e) => setEditForm({ ...editForm, province: e.target.value })}
+                                    onChange={(e) => setEditForm({ ...editForm, province: e.target.value.toUpperCase() })}
                                 />
                             </div>
                         </div>

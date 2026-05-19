@@ -179,11 +179,21 @@ export async function generateDeliveryNotePDF(
         return 0;
     });
 
+    const isWaste = movement.type === 'waste';
+
     const tableBody = sortedItems.map(item => {
         const nameWithModel = item.inventoryName + (item.inventoryModel ? ` (${item.inventoryModel})` : '');
+        const description = `${nameWithModel || "Articolo"} ${item.inventoryDescription ? `- ${item.inventoryDescription}` : ""}`;
+        if (isWaste) {
+            return [
+                item.inventoryCategory || "-",
+                description,
+                item.kgEccedenza != null ? item.kgEccedenza.toString() : "-"
+            ];
+        }
         return [
             item.inventoryCategory || "-",
-            `${nameWithModel || "Articolo"} ${item.inventoryDescription ? `- ${item.inventoryDescription}` : ""}`,
+            description,
             item.inventoryUnit || "PZ",
             item.quantity.toString()
         ];
@@ -197,7 +207,10 @@ export async function generateDeliveryNotePDF(
 
     autoTable(doc, {
         startY: currentY,
-        head: [['Categoria', 'Prodotto', 'U.M.', 'Quantità']],
+        head: [isWaste
+            ? ['Categoria', 'Prodotto', 'Peso (kg)']
+            : ['Categoria', 'Prodotto', 'U.M.', 'Quantità']
+        ],
         body: tableBody,
         theme: 'plain', // Cleaner look
         styles: {
@@ -219,7 +232,11 @@ export async function generateDeliveryNotePDF(
             lineWidth: { bottom: 0.1 },
             lineColor: [230, 230, 230]
         },
-        columnStyles: {
+        columnStyles: isWaste ? {
+            0: { cellWidth: 35 },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 25, halign: 'right' }
+        } : {
             0: { cellWidth: 35 },
             1: { cellWidth: 'auto' },
             2: { cellWidth: 20, halign: 'center' },
@@ -340,7 +357,8 @@ export async function generateDeliveryNotePDF(
     const typeLabels: { [key: string]: string } = {
         'exit': 'uscita',
         'entry': 'rientro',
-        'sale': 'vendita'
+        'sale': 'vendita',
+        'waste': 'eccedenza'
     };
     const dateFormatted = format(new Date(movement.date), 'yyyyMMMdd', { locale: it });
     // Use jobName if available, otherwise fall back to description or code
@@ -349,10 +367,7 @@ export async function generateDeliveryNotePDF(
         .replace(/[^a-zA-Z0-9\s]/g, '')
         .replace(/\s+/g, '_')
         .substring(0, 30);
-    let typeLabel = typeLabels[movement.type] || movement.type;
-    if (movement.type === 'exit' && movement.causal === 'Trasporto rifiuti cantiere') {
-        typeLabel = 'immondizia';
-    }
+    const typeLabel = typeLabels[movement.type] || movement.type;
     // Pad bolla number with zeros for proper file sorting (e.g., 001 instead of 1)
     const bollaNumber = movement.number.replace('/', '_').replace(/^(\d+)/, (match) => match.padStart(3, '0'));
 

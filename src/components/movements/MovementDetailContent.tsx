@@ -108,6 +108,9 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                 grouped.set(key, {
                     ...existing,
                     quantity: existing.quantity + item.quantity,
+                    kgEccedenza: existing.kgEccedenza != null || item.kgEccedenza != null
+                        ? (existing.kgEccedenza ?? 0) + (item.kgEccedenza ?? 0)
+                        : undefined,
                 });
             } else {
                 grouped.set(key, { ...item });
@@ -388,7 +391,9 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     <TableHead>Codice</TableHead>
                                     <TableHead>Descrizione</TableHead>
                                     <TableHead>Rif. Acquisto</TableHead>
-                                    <TableHead className="w-[100px] text-right">Quantità</TableHead>
+                                    <TableHead className="w-[100px] text-right">
+                                        {movement.type === 'waste' ? 'Peso (kg)' : 'Quantità'}
+                                    </TableHead>
                                     {canSeePrices && (
                                         <>
                                             <TableHead className="w-[120px] text-right">Prezzo Unit.</TableHead>
@@ -441,7 +446,11 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {isEditing ? (
+                                                {movement.type === 'waste' ? (
+                                                    <Badge variant="secondary" className="bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300">
+                                                        {item.kgEccedenza != null ? `${item.kgEccedenza} kg` : '—'}
+                                                    </Badge>
+                                                ) : isEditing ? (
                                                     <Input
                                                         type="number"
                                                         min="1"
@@ -516,7 +525,11 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                         </div>
 
                                         <div className="shrink-0 flex flex-col items-end gap-1">
-                                            {isEditing ? (
+                                            {movement.type === 'waste' ? (
+                                                <Badge variant="secondary" className="text-sm bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300">
+                                                    {item.kgEccedenza != null ? `${item.kgEccedenza} kg` : '—'}
+                                                </Badge>
+                                            ) : isEditing ? (
                                                 <div className="flex items-center gap-1">
                                                     <Input
                                                         type="number"

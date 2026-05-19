@@ -152,7 +152,7 @@ export interface Movement {
     itemId: string;
     userId?: string;
     userName?: string;
-    type: 'load' | 'unload' | 'purchase' | 'entry' | 'exit' | 'sale';
+    type: 'load' | 'unload' | 'purchase' | 'entry' | 'exit' | 'sale' | 'waste';
     quantity: number;
     reference: string;
     notes?: string;
@@ -178,7 +178,7 @@ export interface Movement {
 export interface StockMovement {
     id: string;
     date: string;
-    type: 'purchase' | 'entry' | 'exit' | 'sale';
+    type: 'purchase' | 'entry' | 'exit' | 'sale' | 'waste';
     quantity: number;
     reference: string;
     itemId: string;
@@ -249,11 +249,12 @@ export interface DeliveryNoteItem {
     purchaseNumber?: string;
     purchaseDate?: string;
     purchaseSupplier?: string;
+    kgEccedenza?: number;
 }
 
 export interface DeliveryNote {
     id: string;
-    type: 'entry' | 'exit' | 'sale';
+    type: 'entry' | 'exit' | 'sale' | 'waste';
     number: string;
     date: string;
     jobId?: string;

@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 
 // Update interface to include ID
 interface MovementLine {
@@ -10,6 +9,7 @@ interface MovementLine {
   inventoryId: string
   quantity: number | string
   pieces?: number | string
+  kgEccedenza?: number
   coefficient?: number
   price?: number
   purchaseItemId?: string
@@ -17,7 +17,7 @@ interface MovementLine {
 }
 
 interface MovementData {
-  type: 'entry' | 'exit' | 'sale'
+  type: 'entry' | 'exit' | 'sale' | 'waste'
   number: string
   date: string
   jobId?: string
@@ -31,7 +31,7 @@ interface MovementData {
   notes?: string
 }
 
-export async function createMovement(data: MovementData, lines: MovementLine[]) {
+export async function createMovement(data: MovementData, lines: MovementLine[]): Promise<{ success: boolean; error?: string }> {
   console.log('=== createMovement START ===')
   // ... (rest of createMovement remains exactly the same, no changes needed)
   console.log('Data:', JSON.stringify(data, null, 2))
@@ -43,7 +43,7 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
     console.log('Supabase client created')
   } catch (e: any) {
     console.error('Failed to create Supabase client:', e)
-    throw new Error('Errore connessione database: ' + e.message)
+    return { success: false, error: 'Errore connessione database: ' + e.message }
   }
 
   // 0. Verify user is authenticated
@@ -54,12 +54,12 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
 
     if (userError || !user) {
       console.error('Auth error in createMovement:', userError)
-      throw new Error('Non sei autenticato. Effettua il login e riprova.')
+      return { success: false, error: 'Non sei autenticato. Effettua il login e riprova.' }
     }
     console.log('User authenticated:', user.id, user.email)
   } catch (e: any) {
     console.error('Auth check failed:', e)
-    throw new Error('Errore verifica autenticazione: ' + e.message)
+    return { success: false, error: 'Errore verifica autenticazione: ' + e.message }
   }
 
   // 1. Create Note
@@ -91,14 +91,13 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
 
     if (noteError) {
       console.error('Error creating delivery note:', JSON.stringify(noteError))
-      throw new Error(`Errore creazione bolla: ${noteError.message} (${noteError.code})`)
+      return { success: false, error: `Errore creazione bolla: ${noteError.message} (${noteError.code})` }
     }
     noteData = result
     console.log('Delivery note created:', noteData.id)
   } catch (e: any) {
     console.error('delivery_notes insert failed:', e)
-    if (e instanceof Error) throw e;
-    throw new Error('Errore sconosciuto durante creazione bolla: ' + JSON.stringify(e));
+    return { success: false, error: 'Errore sconosciuto durante creazione bolla: ' + (e.message || JSON.stringify(e)) }
   }
 
   // 2. Create Items
@@ -114,6 +113,7 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
           inventory_id: item.inventoryId,
           quantity: quantity,
           pieces: item.pieces ? Number(item.pieces) : null,
+          kg_eccedenza: item.kgEccedenza ?? null,
           coefficient: item.coefficient || 1,
           price: item.price || 0,
           purchase_item_id: item.purchaseItemId || null,
@@ -128,17 +128,16 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
 
       if (itemsError) {
         console.error('Error creating items:', JSON.stringify(itemsError))
-        throw new Error(`Errore inserimento articoli: ${itemsError.message} (${itemsError.code})`)
+        // Rollback: delete the note we just created to avoid orphans
+        await supabase.from('delivery_notes').delete().eq('id', noteData.id);
+        return { success: false, error: `Errore inserimento articoli: ${itemsError.message} (${itemsError.code})` }
       }
       console.log('Items created successfully')
     } catch (e: any) {
       console.error('delivery_note_items insert failed:', e)
-      // If items fail, we might want to rollback the note? 
-      // Ideally we should delete the note we just created to avoid orphans
+      // Rollback: delete the note we just created to avoid orphans
       await supabase.from('delivery_notes').delete().eq('id', noteData.id);
-
-      if (e instanceof Error) throw e;
-      throw new Error('Errore sconosciuto durante inserimento articoli: ' + JSON.stringify(e));
+      return { success: false, error: 'Errore sconosciuto durante inserimento articoli: ' + (e.message || JSON.stringify(e)) }
     }
   }
 
@@ -151,9 +150,7 @@ export async function createMovement(data: MovementData, lines: MovementLine[]) 
     console.warn('Revalidate failed, but save successful:', e)
   }
 
-  // Redirect MUST be called outside of try/catch because it throws NEXT_REDIRECT
-  // which is expected behavior and should propagate to the client
-  redirect('/movements')
+  return { success: true }
 }
 
 export async function updateMovement(id: string, data: MovementData, lines: MovementLine[]): Promise<{ success: boolean; error?: string }> {
@@ -242,6 +239,7 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
             inventory_id: item.inventoryId,
             quantity: quantity,
             pieces: item.pieces ? Number(item.pieces) : null,
+            kg_eccedenza: item.kgEccedenza ?? null,
             coefficient: item.coefficient,
             price: item.price,
             purchase_item_id: item.purchaseItemId || null,
@@ -268,6 +266,7 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
           inventory_id: item.inventoryId,
           quantity: quantity,
           pieces: item.pieces ? Number(item.pieces) : null,
+          kg_eccedenza: item.kgEccedenza ?? null,
           coefficient: item.coefficient,
           price: item.price,
           purchase_item_id: item.purchaseItemId || null,

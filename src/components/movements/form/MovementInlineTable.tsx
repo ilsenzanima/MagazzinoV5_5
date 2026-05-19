@@ -75,6 +75,8 @@ export function MovementInlineTable({
     const isEntryWithJob = activeTab === "entry" && !!selectedJob;
     const showLotto = activeTab === "exit" || activeTab === "sale" || activeTab === "entry";
     const showFittizio = activeTab !== "waste";
+    const showKgEccedenza = activeTab === "waste";
+    const showPiecesAndQty = activeTab !== "waste";
 
     return (
         <>
@@ -100,9 +102,18 @@ export function MovementInlineTable({
                                     {showFittizio && (
                                         <TableHead className="w-[72px] text-center">Fittizio</TableHead>
                                     )}
-                                    <TableHead className="w-[88px] text-center">Pezzi</TableHead>
-                                    <TableHead className="w-[100px] text-center">Quantità</TableHead>
-                                    <TableHead className="w-[44px] text-center">U.M.</TableHead>
+                                    {showPiecesAndQty && (
+                                        <TableHead className="w-[88px] text-center">Pezzi</TableHead>
+                                    )}
+                                    {showPiecesAndQty && (
+                                        <TableHead className="w-[100px] text-center">Quantità</TableHead>
+                                    )}
+                                    {showPiecesAndQty && (
+                                        <TableHead className="w-[44px] text-center">U.M.</TableHead>
+                                    )}
+                                    {showKgEccedenza && (
+                                        <TableHead className="w-[120px] text-center text-violet-700 dark:text-violet-400">Peso (kg)</TableHead>
+                                    )}
                                     {/* Actions: dividi + elimina */}
                                     <TableHead className="w-[72px]"></TableHead>
                                 </TableRow>
@@ -298,49 +309,74 @@ export function MovementInlineTable({
                                             )}
 
                                             {/* Pezzi */}
-                                            <TableCell className="py-1 px-1">
-                                                <Input
-                                                    type="number"
-                                                    inputMode="decimal"
-                                                    min="0"
-                                                    step="0.01"
-                                                    value={line.pieces}
-                                                    onChange={(e) =>
-                                                        onLineChange(line.tempId, "pieces", e.target.value)
-                                                    }
-                                                    placeholder="0"
-                                                    className="h-8 text-center px-1 text-sm"
-                                                    disabled={isEmpty}
-                                                />
-                                            </TableCell>
+                                            {showPiecesAndQty && (
+                                                <TableCell className="py-1 px-1">
+                                                    <Input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={line.pieces}
+                                                        onChange={(e) =>
+                                                            onLineChange(line.tempId, "pieces", e.target.value)
+                                                        }
+                                                        placeholder="0"
+                                                        className="h-8 text-center px-1 text-sm"
+                                                        disabled={isEmpty}
+                                                    />
+                                                </TableCell>
+                                            )}
 
                                             {/* Quantità */}
-                                            <TableCell className="py-1 px-1">
-                                                <Input
-                                                    type="number"
-                                                    inputMode="decimal"
-                                                    min="0"
-                                                    step="0.01"
-                                                    value={line.quantity}
-                                                    onChange={(e) =>
-                                                        onLineChange(
-                                                            line.tempId,
-                                                            "quantity",
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    placeholder="0.00"
-                                                    className="h-8 text-center px-1 text-sm"
-                                                    disabled={isEmpty}
-                                                />
-                                            </TableCell>
+                                            {showPiecesAndQty && (
+                                                <TableCell className="py-1 px-1">
+                                                    <Input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={line.quantity}
+                                                        onChange={(e) =>
+                                                            onLineChange(
+                                                                line.tempId,
+                                                                "quantity",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        placeholder="0.00"
+                                                        className="h-8 text-center px-1 text-sm"
+                                                        disabled={isEmpty}
+                                                    />
+                                                </TableCell>
+                                            )}
 
                                             {/* U.M. */}
-                                            <TableCell className="py-1 text-center">
-                                                <span className="text-[11px] text-muted-foreground">
-                                                    {line.itemUnit || ""}
-                                                </span>
-                                            </TableCell>
+                                            {showPiecesAndQty && (
+                                                <TableCell className="py-1 text-center">
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        {line.itemUnit || ""}
+                                                    </span>
+                                                </TableCell>
+                                            )}
+
+                                            {/* kg Eccedenza */}
+                                            {showKgEccedenza && (
+                                                <TableCell className="py-1 px-1">
+                                                    <Input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        min="0"
+                                                        step="0.001"
+                                                        value={line.kgEccedenza}
+                                                        onChange={(e) =>
+                                                            onLineChange(line.tempId, "kgEccedenza", e.target.value)
+                                                        }
+                                                        placeholder="0.000"
+                                                        className="h-8 text-center px-1 text-sm border-violet-300 focus:border-violet-500 dark:border-violet-700"
+                                                        disabled={isEmpty}
+                                                    />
+                                                </TableCell>
+                                            )}
 
                                             {/* Actions: Dividi + Elimina */}
                                             <TableCell className="py-1 px-1">

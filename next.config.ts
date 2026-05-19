@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://vercel.live",
       "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://vercel.live",
       "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.openstreetmap.org https://*.tile.openstreetmap.org https://vercel.live",
-      "connect-src 'self' data: blob: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.vercel.live https://vercel.live https://api.github.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org https://docs.opencv.org https://cdn.jsdelivr.net",
+      "connect-src 'self' data: blob: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.vercel.live https://vercel.live https://api.github.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org https://geocoding-api.open-meteo.com https://api.open-meteo.com https://docs.opencv.org https://cdn.jsdelivr.net",
       "frame-src 'self' https://www.google.com https://maps.google.com https://*.openstreetmap.org https://vercel.live", // For map embeds
       "worker-src 'self' blob:", // For Service Worker and OpenCV.js WASM
       "frame-ancestors 'none'",

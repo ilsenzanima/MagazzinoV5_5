@@ -131,7 +131,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('*, suppliers(name)')
+                .select('*, suppliers(name), profiles(full_name)')
                 .eq('id', id)
                 .single()
         );
@@ -170,7 +170,7 @@ export const purchasesApi = {
     update: async (id: string, purchase: Partial<Purchase>) => {
         const dbPurchase = mapPurchaseToDb(purchase);
 
-        const { data, error } = await supabase.from('purchases').update(dbPurchase).eq('id', id).select('*, suppliers(name)').single();
+        const { data, error } = await supabase.from('purchases').update(dbPurchase).eq('id', id).select('*, suppliers(name), profiles(full_name)').single();
         if (error) throw error;
         return mapDbToPurchase(data);
     },
