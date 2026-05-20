@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Search, Loader2, Trash2, Package, Copy } from "lucide-react";
 import { format } from "date-fns";
-import { MovementLine } from "@/hooks/useMovementForm";
+import { MovementLine, PurchaseItemToImport } from "@/hooks/useMovementForm";
 import { InventoryItem, Job } from "@/lib/types";
 import { MovementMaterialDialog } from "./MovementMaterialDialog";
 
@@ -48,6 +48,7 @@ interface MovementInlineTableProps {
     onLineChange: (rowId: string, field: string, value: any) => void;
     onRemove: (rowId: string) => void;
     onDuplicate: (rowId: string) => void;
+    onPurchaseItemsImport: (items: PurchaseItemToImport[]) => void;
 }
 
 export function MovementInlineTable({
@@ -63,6 +64,7 @@ export function MovementInlineTable({
     onLineChange,
     onRemove,
     onDuplicate,
+    onPurchaseItemsImport,
 }: MovementInlineTableProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [activeRowId, setActiveRowId] = useState<string>("");
@@ -434,6 +436,7 @@ export function MovementInlineTable({
                 onItemSearch={onItemSearch}
                 onItemSelect={onItemSelect}
                 onReturnBatchSelect={onReturnBatchSelect}
+                onPurchaseItemsImport={onPurchaseItemsImport}
             />
         </>
     );

@@ -26,6 +26,10 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
+  useEffect(() => {
+    if (open) setSearchTerm("");
+  }, [open]);
+
   // Effect for server-side search
   useEffect(() => {
     if (onSearch) {

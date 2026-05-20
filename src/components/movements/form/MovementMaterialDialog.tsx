@@ -19,10 +19,13 @@ import {
     PlusCircle,
     ChevronDown,
     ChevronRight,
+    ShoppingCart,
 } from "lucide-react";
-import { InventoryItem, Job, LoadNote, LoadNoteItem } from "@/lib/types";
+import { InventoryItem, Job, LoadNote, LoadNoteItem, Purchase } from "@/lib/types";
 import { loadNotesService } from "@/lib/services/load-notes";
 import { inventoryApi } from "@/lib/services/inventory";
+import { purchasesApi } from "@/lib/services/purchases";
+import { PurchaseItemToImport } from "@/hooks/useMovementForm";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -46,6 +49,25 @@ interface MovementMaterialDialogProps {
         batch: any,
         prefill?: { pieces?: string; quantity?: string }
     ) => void;
+    onPurchaseItemsImport: (items: PurchaseItemToImport[]) => void;
+}
+
+interface CombinedPurchaseItem {
+    id: string;
+    itemId: string;
+    itemName?: string;
+    itemCode?: string;
+    itemUnit?: string;
+    coefficient: number;
+    purchaseRef?: string;
+    remainingQty: number;
+    remainingPieces?: number;
+    batchDate?: string;
+}
+
+interface PurchaseDetail {
+    loading: boolean;
+    items: CombinedPurchaseItem[];
 }
 
 export function MovementMaterialDialog({
@@ -60,6 +82,7 @@ export function MovementMaterialDialog({
     onItemSearch,
     onItemSelect,
     onReturnBatchSelect,
+    onPurchaseItemsImport,
 }: MovementMaterialDialogProps) {
     const isEntryWithJob = activeTab === "entry" && !!selectedJob;
     const defaultDialogTab = isEntryWithJob ? "cantiere" : "magazzino";
@@ -73,10 +96,25 @@ export function MovementMaterialDialog({
     const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
     const [noteItemLoading, setNoteItemLoading] = useState<string | null>(null);
 
+    // Purchase tab state
+    const [purchaseSearchTerm, setPurchaseSearchTerm] = useState("");
+    const [purchaseDateFilter, setPurchaseDateFilter] = useState("");
+    const [purchasesData, setPurchasesData] = useState<Purchase[]>([]);
+    const [purchasesLoading, setPurchasesLoading] = useState(false);
+    const [expandedPurchaseIds, setExpandedPurchaseIds] = useState<Set<string>>(new Set());
+    const [purchaseDetailsMap, setPurchaseDetailsMap] = useState<Record<string, PurchaseDetail>>({});
+    const [selectedPurchaseItemIds, setSelectedPurchaseItemIds] = useState<Set<string>>(new Set());
+
     useEffect(() => {
         if (open) {
             setDialogTab(isEntryWithJob ? "cantiere" : "magazzino");
             setSearchTerm("");
+            setPurchaseSearchTerm("");
+            setPurchaseDateFilter("");
+            setPurchasesData([]);
+            setExpandedPurchaseIds(new Set());
+            setPurchaseDetailsMap({});
+            setSelectedPurchaseItemIds(new Set());
         }
     }, [open, isEntryWithJob]);
 
@@ -85,6 +123,27 @@ export function MovementMaterialDialog({
             fetchNotes();
         }
     }, [open, dialogTab, selectedJob?.id]);
+
+    useEffect(() => {
+        if (!open || dialogTab !== "acquisti") return;
+        const delay = purchaseSearchTerm ? 500 : 0;
+        const handler = setTimeout(async () => {
+            setPurchasesLoading(true);
+            try {
+                const { data } = await purchasesApi.getPaginated({
+                    page: 1,
+                    limit: 20,
+                    search: purchaseSearchTerm,
+                });
+                setPurchasesData(data);
+            } catch (error) {
+                console.error("Failed to fetch purchases", error);
+            } finally {
+                setPurchasesLoading(false);
+            }
+        }, delay);
+        return () => clearTimeout(handler);
+    }, [open, dialogTab, purchaseSearchTerm]);
 
     // Debounced search for Magazzino tab
     useEffect(() => {
@@ -190,6 +249,94 @@ export function MovementMaterialDialog({
         setExpandedNoteIds(next);
     };
 
+    const fetchPurchaseDetails = async (purchaseId: string, fallbackRef: string) => {
+        setPurchaseDetailsMap((prev) => ({
+            ...prev,
+            [purchaseId]: { loading: true, items: prev[purchaseId]?.items || [] },
+        }));
+        try {
+            const [items, availability] = await Promise.all([
+                purchasesApi.getItems(purchaseId),
+                purchasesApi.getPurchaseBatchAvailability(purchaseId),
+            ]);
+            const availMap = new Map(availability.map((a: any) => [a.id, a]));
+            const combined: CombinedPurchaseItem[] = items.map((item) => {
+                const avail = availMap.get(item.id) as any;
+                return {
+                    id: item.id,
+                    itemId: item.itemId,
+                    itemName: item.itemName,
+                    itemCode: item.itemCode,
+                    itemUnit: item.itemUnit,
+                    coefficient: item.coefficient || 1,
+                    purchaseRef: avail?.purchaseRef || fallbackRef,
+                    remainingQty: avail?.remainingQty ?? 0,
+                    remainingPieces: avail?.remainingPieces,
+                    batchDate: avail?.date,
+                };
+            });
+            setPurchaseDetailsMap((prev) => ({
+                ...prev,
+                [purchaseId]: { loading: false, items: combined },
+            }));
+        } catch (error) {
+            console.error("Failed to fetch purchase details", error);
+            setPurchaseDetailsMap((prev) => ({
+                ...prev,
+                [purchaseId]: { loading: false, items: [] },
+            }));
+        }
+    };
+
+    const togglePurchaseExpanded = (purchaseId: string, fallbackRef: string) => {
+        const next = new Set(expandedPurchaseIds);
+        if (next.has(purchaseId)) {
+            next.delete(purchaseId);
+        } else {
+            next.add(purchaseId);
+            if (!purchaseDetailsMap[purchaseId]) {
+                fetchPurchaseDetails(purchaseId, fallbackRef);
+            }
+        }
+        setExpandedPurchaseIds(next);
+    };
+
+    const togglePurchaseItem = (itemId: string) => {
+        const next = new Set(selectedPurchaseItemIds);
+        next.has(itemId) ? next.delete(itemId) : next.add(itemId);
+        setSelectedPurchaseItemIds(next);
+    };
+
+    const handleImportSelected = () => {
+        const itemsToImport: PurchaseItemToImport[] = [];
+        for (const detail of Object.values(purchaseDetailsMap)) {
+            for (const item of detail.items) {
+                if (selectedPurchaseItemIds.has(item.id)) {
+                    itemsToImport.push({
+                        purchaseItemId: item.id,
+                        itemId: item.itemId,
+                        itemName: item.itemName,
+                        itemCode: item.itemCode,
+                        itemUnit: item.itemUnit,
+                        coefficient: item.coefficient,
+                        purchaseRef: item.purchaseRef,
+                        remainingQty: item.remainingQty,
+                        remainingPieces: item.remainingPieces,
+                        batchDate: item.batchDate,
+                    });
+                }
+            }
+        }
+        if (itemsToImport.length === 0) return;
+        onPurchaseItemsImport(itemsToImport);
+        onOpenChange(false);
+    };
+
+    const filteredPurchases = useMemo(() => {
+        if (!purchaseDateFilter) return purchasesData;
+        return purchasesData.filter((p) => p.deliveryNoteDate.startsWith(purchaseDateFilter));
+    }, [purchasesData, purchaseDateFilter]);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
@@ -214,6 +361,10 @@ export function MovementMaterialDialog({
                                         <FileText className="h-4 w-4 mr-2" />
                                         Note di Carico
                                     </TabsTrigger>
+                                    <TabsTrigger value="acquisti" className="flex-1">
+                                        <ShoppingCart className="h-4 w-4 mr-2" />
+                                        Da Acquisto
+                                    </TabsTrigger>
                                 </>
                             ) : (
                                 <>
@@ -224,6 +375,10 @@ export function MovementMaterialDialog({
                                     <TabsTrigger value="note" className="flex-1">
                                         <FileText className="h-4 w-4 mr-2" />
                                         Note di Carico
+                                    </TabsTrigger>
+                                    <TabsTrigger value="acquisti" className="flex-1">
+                                        <ShoppingCart className="h-4 w-4 mr-2" />
+                                        Da Acquisto
                                     </TabsTrigger>
                                 </>
                             )}
@@ -584,6 +739,185 @@ export function MovementMaterialDialog({
                                         </Collapsible>
                                     );
                                 })}
+                            </div>
+                        )}
+                    </TabsContent>
+                    {/* ---- DA ACQUISTO ---- */}
+                    <TabsContent
+                        value="acquisti"
+                        className="flex-1 overflow-hidden flex flex-col px-6 pb-6 mt-4"
+                    >
+                        <div className="flex gap-2 mb-3 shrink-0">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Cerca per numero bolla o fornitore..."
+                                    className="pl-9"
+                                    value={purchaseSearchTerm}
+                                    onChange={(e) => setPurchaseSearchTerm(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                            <Input
+                                type="date"
+                                className="w-[150px]"
+                                value={purchaseDateFilter}
+                                onChange={(e) => setPurchaseDateFilter(e.target.value)}
+                                title="Filtra per data"
+                            />
+                        </div>
+
+                        {purchasesLoading ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : filteredPurchases.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                                <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                                <p className="text-sm">Nessun acquisto trovato</p>
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {filteredPurchases.map((purchase) => {
+                                    const isExpanded = expandedPurchaseIds.has(purchase.id);
+                                    const detail = purchaseDetailsMap[purchase.id];
+                                    const selectedCount =
+                                        detail?.items.filter((i) =>
+                                            selectedPurchaseItemIds.has(i.id)
+                                        ).length || 0;
+
+                                    return (
+                                        <Collapsible
+                                            key={purchase.id}
+                                            open={isExpanded}
+                                            onOpenChange={() =>
+                                                togglePurchaseExpanded(
+                                                    purchase.id,
+                                                    purchase.deliveryNoteNumber
+                                                )
+                                            }
+                                        >
+                                            <CollapsibleTrigger asChild>
+                                                <div className="flex items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors">
+                                                    <div className="flex-shrink-0 p-1.5 rounded bg-blue-500/10 text-blue-600">
+                                                        <ShoppingCart className="h-4 w-4" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-mono text-xs font-semibold">
+                                                                {purchase.deliveryNoteNumber}
+                                                            </span>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {format(
+                                                                    new Date(purchase.deliveryNoteDate),
+                                                                    "d MMM yyyy",
+                                                                    { locale: it }
+                                                                )}
+                                                            </span>
+                                                            {selectedCount > 0 && (
+                                                                <Badge
+                                                                    variant="secondary"
+                                                                    className="text-[10px] px-1.5 py-0"
+                                                                >
+                                                                    {selectedCount}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="font-medium text-sm truncate">
+                                                            {purchase.supplierName || "—"}
+                                                        </div>
+                                                    </div>
+                                                    {isExpanded ? (
+                                                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                    ) : (
+                                                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                    )}
+                                                </div>
+                                            </CollapsibleTrigger>
+
+                                            <CollapsibleContent>
+                                                <div className="ml-4 pl-4 border-l-2 border-muted mt-1 space-y-1">
+                                                    {!detail || detail.loading ? (
+                                                        <div className="flex justify-center py-4">
+                                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                        </div>
+                                                    ) : detail.items.length === 0 ? (
+                                                        <p className="text-xs text-muted-foreground py-2 px-2">
+                                                            Nessuna voce trovata
+                                                        </p>
+                                                    ) : (
+                                                        detail.items.map((item) => {
+                                                            const isSelected =
+                                                                selectedPurchaseItemIds.has(item.id);
+                                                            const isExhausted =
+                                                                item.remainingQty <= 0 &&
+                                                                (item.remainingPieces == null ||
+                                                                    item.remainingPieces <= 0);
+
+                                                            return (
+                                                                <div
+                                                                    key={item.id}
+                                                                    className={`flex items-center gap-2 p-2 rounded border text-sm transition-colors ${
+                                                                        isExhausted
+                                                                            ? "opacity-40 cursor-not-allowed bg-muted/20"
+                                                                            : isSelected
+                                                                            ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800 cursor-pointer"
+                                                                            : "bg-background hover:border-primary/50 cursor-pointer"
+                                                                    }`}
+                                                                    onClick={() =>
+                                                                        !isExhausted &&
+                                                                        togglePurchaseItem(item.id)
+                                                                    }
+                                                                >
+                                                                    <Checkbox
+                                                                        checked={isSelected}
+                                                                        disabled={isExhausted}
+                                                                        onCheckedChange={() =>
+                                                                            !isExhausted &&
+                                                                            togglePurchaseItem(item.id)
+                                                                        }
+                                                                    />
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <span className="font-medium">
+                                                                            {item.itemName}
+                                                                        </span>
+                                                                        {item.itemCode && (
+                                                                            <span className="font-mono text-[10px] text-muted-foreground ml-1">
+                                                                                ({item.itemCode})
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-xs font-semibold whitespace-nowrap">
+                                                                        {item.remainingPieces != null &&
+                                                                        item.remainingPieces > 0
+                                                                            ? `${item.remainingPieces} pz / `
+                                                                            : ""}
+                                                                        {item.remainingQty}{" "}
+                                                                        {item.itemUnit || ""}
+                                                                        {isExhausted && (
+                                                                            <span className="text-muted-foreground ml-1 font-normal">
+                                                                                (esaurito)
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            </CollapsibleContent>
+                                        </Collapsible>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {selectedPurchaseItemIds.size > 0 && (
+                            <div className="shrink-0 pt-3 border-t mt-3">
+                                <Button className="w-full" onClick={handleImportSelected}>
+                                    <PlusCircle className="h-4 w-4 mr-2" />
+                                    Importa selezionati ({selectedPurchaseItemIds.size})
+                                </Button>
                             </div>
                         )}
                     </TabsContent>

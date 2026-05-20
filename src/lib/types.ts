@@ -218,6 +218,7 @@ export interface PurchaseItem {
     itemName?: string;
     itemModel?: string;
     itemCode?: string;
+    itemUnit?: string;
     quantity: number;
     pieces?: number;
     coefficient?: number;

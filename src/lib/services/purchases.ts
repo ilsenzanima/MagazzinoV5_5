@@ -211,7 +211,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchase_items')
-                .select('*, inventory(name, code, model), jobs(code)')
+                .select('*, inventory(name, code, model, unit), jobs(code)')
                 .eq('purchase_id', purchaseId)
         );
 
@@ -223,6 +223,7 @@ export const purchasesApi = {
             itemName: item.inventory?.name,
             itemModel: item.inventory?.model,
             itemCode: item.inventory?.code,
+            itemUnit: item.inventory?.unit,
             quantity: item.quantity,
             pieces: item.pieces,
             coefficient: item.coefficient,

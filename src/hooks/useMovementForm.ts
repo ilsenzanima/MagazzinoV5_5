@@ -7,6 +7,19 @@ import { InventoryItem, Job, Warehouse, DeliveryNote } from "@/lib/types";
 import { createMovement, updateMovement } from "@/app/movements/actions";
 import { notify } from "@/lib/notify";
 
+export interface PurchaseItemToImport {
+    purchaseItemId: string;
+    itemId: string;
+    itemName?: string;
+    itemCode?: string;
+    itemUnit?: string;
+    coefficient: number;
+    purchaseRef?: string;
+    remainingQty: number;
+    remainingPieces?: number;
+    batchDate?: string;
+}
+
 export interface MovementLine {
     id?: string;
     tempId: string;
@@ -618,6 +631,41 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         });
     }, []);
 
+    const handlePurchaseItemsImport = useCallback(
+        (items: PurchaseItemToImport[]) => {
+            const tab = activeTab;
+            setLines((prev) => {
+                const filledLines = prev.filter((l) => l.itemId || l.quantity || l.pieces);
+                const newLines: MovementLine[] = items.map((item) => ({
+                    tempId: Math.random().toString(36).substr(2, 9),
+                    itemId: item.itemId,
+                    itemName: item.itemName || "",
+                    itemCode: item.itemCode || "",
+                    itemUnit: item.itemUnit || "PZ",
+                    coefficient: item.coefficient || 1,
+                    quantity: tab === "waste" ? "1" : item.remainingQty.toString(),
+                    pieces: tab !== "waste" ? (item.remainingPieces?.toString() || "") : "",
+                    kgEccedenza: "",
+                    purchaseItemId: item.purchaseItemId,
+                    purchaseRef: item.purchaseRef,
+                    isFictitious: tab === "waste",
+                    availableBatches: [
+                        {
+                            id: item.purchaseItemId,
+                            purchaseRef: item.purchaseRef,
+                            remainingQty: item.remainingQty,
+                            remainingPieces: item.remainingPieces,
+                            date: item.batchDate,
+                        },
+                    ],
+                    batchesLoading: false,
+                }));
+                return ensureTrailingEmpty([...filledLines, ...newLines]);
+            });
+        },
+        [activeTab]
+    );
+
     const handleSubmit = async () => {
         if (!numberPart) {
             notify.warning("Inserisci il numero del documento");
@@ -781,6 +829,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         handleInlineLineChange,
         handleInlineLineRemove,
         handleInlineLineDuplicate,
+        handlePurchaseItemsImport,
         handleSubmit,
     };
 }
