@@ -105,6 +105,8 @@ export function MovementMaterialDialog({
     const [purchaseDetailsMap, setPurchaseDetailsMap] = useState<Record<string, PurchaseDetail>>({});
     const [selectedPurchaseItemIds, setSelectedPurchaseItemIds] = useState<Set<string>>(new Set());
 
+    const showPurchaseTab = activeTab === "exit" || activeTab === "sale";
+
     useEffect(() => {
         if (open) {
             setDialogTab(isEntryWithJob ? "cantiere" : "magazzino");
@@ -361,6 +363,17 @@ export function MovementMaterialDialog({
                                         <FileText className="h-4 w-4 mr-2" />
                                         Note di Carico
                                     </TabsTrigger>
+                                </>
+                            ) : activeTab === "exit" || activeTab === "sale" ? (
+                                <>
+                                    <TabsTrigger value="magazzino" className="flex-1">
+                                        <Search className="h-4 w-4 mr-2" />
+                                        Magazzino
+                                    </TabsTrigger>
+                                    <TabsTrigger value="note" className="flex-1">
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Note di Carico
+                                    </TabsTrigger>
                                     <TabsTrigger value="acquisti" className="flex-1">
                                         <ShoppingCart className="h-4 w-4 mr-2" />
                                         Da Acquisto
@@ -375,10 +388,6 @@ export function MovementMaterialDialog({
                                     <TabsTrigger value="note" className="flex-1">
                                         <FileText className="h-4 w-4 mr-2" />
                                         Note di Carico
-                                    </TabsTrigger>
-                                    <TabsTrigger value="acquisti" className="flex-1">
-                                        <ShoppingCart className="h-4 w-4 mr-2" />
-                                        Da Acquisto
                                     </TabsTrigger>
                                 </>
                             )}
@@ -742,8 +751,8 @@ export function MovementMaterialDialog({
                             </div>
                         )}
                     </TabsContent>
-                    {/* ---- DA ACQUISTO ---- */}
-                    <TabsContent
+                    {/* ---- DA ACQUISTO (solo uscita e vendita) ---- */}
+                    {showPurchaseTab && <TabsContent
                         value="acquisti"
                         className="flex-1 overflow-hidden flex flex-col px-6 pb-6 mt-4"
                     >
@@ -920,7 +929,7 @@ export function MovementMaterialDialog({
                                 </Button>
                             </div>
                         )}
-                    </TabsContent>
+                    </TabsContent>}
                 </Tabs>
             </DialogContent>
         </Dialog>
