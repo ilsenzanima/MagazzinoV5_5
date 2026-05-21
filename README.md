@@ -1,6 +1,6 @@
 # Magazzino V5.5
 
-Gestionale interno per **Opifires Safe** — magazzino, acquisti, movimentazione merce, commesse e presenze.
+Gestionale interno per **OPI Fire Safe** — magazzino, acquisti, movimentazione merce, commesse e presenze.
 
 ## Stack
 
