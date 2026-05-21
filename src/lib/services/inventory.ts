@@ -477,7 +477,8 @@ export const inventoryApi = {
             pieces: b.pieces,
             coefficient: b.coefficient,
             originalQuantity: b.original_quantity,
-            originalPieces: b.original_pieces
+            originalPieces: b.original_pieces,
+            isFictitious: b.has_fictitious === true,
         }));
     },
 

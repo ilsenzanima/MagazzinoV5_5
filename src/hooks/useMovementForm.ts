@@ -473,7 +473,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                         pieces: prefill?.pieces || "",
                         purchaseItemId: batch.purchaseItemId,
                         purchaseRef: batch.purchaseRef,
-                        isFictitious: false,
+                        isFictitious: batch.isFictitious === true,
                         availableBatches: batchesForLine,
                         batchesLoading: false,
                     };

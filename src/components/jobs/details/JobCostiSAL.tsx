@@ -37,6 +37,7 @@ interface SalRow {
     unit?: string
     amount: number
     salNames: string[]
+    isFictitious?: boolean
     // For exit child rows: DDT/fornitore di provenienza del materiale
     purchaseId?: string
     purchaseRef?: string    // DDT number (e.g. "DDT-123")
@@ -295,6 +296,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                     unit: m.itemUnit,
                     amount: sign * Math.abs(m.quantity || 0) * (m.itemPrice || 0),
                     salNames: salTagMap.get(`movement:${m.id}`) || [],
+                    isFictitious: m.isFictitious === true,
                     // For exit rows: provenance info from the original purchase
                     ...(kind === 'exit' && {
                         purchaseId: m.purchaseId,
@@ -328,6 +330,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                 unit: m.itemUnit,
                 amount: Math.abs(m.quantity || 0) * (m.itemPrice || 0),
                 salNames: salTagMap.get(`movement:${m.id}`) || [],
+                isFictitious: false,
             }))
             const childTotal = children.reduce((s, c) => s + c.amount, 0)
             groups.push({
@@ -1113,10 +1116,15 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                                                         </td>
                                                         <td className="p-2"></td>
                                                         <td className="p-2 pl-4">
-                                                            <div className="text-slate-700 dark:text-slate-300">
-                                                                {child.description}
+                                                            <div className="text-slate-700 dark:text-slate-300 flex flex-wrap items-center gap-1.5">
+                                                                <span>{child.description}</span>
+                                                                {child.isFictitious && (
+                                                                    <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-[10px] h-5 px-1.5 font-normal">
+                                                                        Fittizio
+                                                                    </Badge>
+                                                                )}
                                                                 {child.kind === 'exit' && (child.supplierName || child.purchaseRef) && (
-                                                                    <span className="text-xs text-slate-400 ml-1.5">
+                                                                    <span className="text-xs text-slate-400">
                                                                         ({[
                                                                             child.purchaseRef && `DDT ${child.purchaseRef}`,
                                                                             child.supplierName,
