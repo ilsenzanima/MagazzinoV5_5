@@ -45,8 +45,15 @@ File da utilizzare/
 .cursorrules
 .trae/
 
+# AI agent / Claude Code (local configs, not for repo)
+.agent/
+.claude/
+.claire/
+
 # debug files
 debug_*.ts
+test-query.mjs
+test-*.mjs
 
 # database backups (stored in Supabase Storage, not in the repo)
 /backups/

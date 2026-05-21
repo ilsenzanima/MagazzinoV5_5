@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Magazzino V5.5
 
-## Getting Started
+Gestionale interno per **Opifires Safe** — magazzino, acquisti, movimentazione merce, commesse e presenze.
 
-First, run the development server:
+## Stack
+
+- **Frontend**: Next.js 16 (App Router, Turbopack) + React 19 + TypeScript
+- **UI**: Tailwind CSS v4 + shadcn/ui + Radix UI
+- **Backend / DB**: Supabase (PostgreSQL 17, Auth, Storage, Realtime)
+- **Deploy**: Vercel → [fire-block.org](https://www.fire-block.org)
+
+## Funzionalità principali
+
+| Modulo | Descrizione |
+|---|---|
+| **Acquisti** | Gestione bolle di acquisto con FIFO automatico |
+| **Movimentazione** | Bolle di entrata / uscita / vendita / eccedenze |
+| **Magazzino** | Inventario articoli con lotti e disponibilità |
+| **Commesse** | Gestione cantieri con associazione movimenti e acquisti |
+| **Fornitori / Clienti** | Anagrafica con storico acquisti |
+| **Presenze** | Registro presenze operai con richieste ferie/permessi |
+| **Corsi e visite mediche** | Scadenzari con alert dashboard |
+| **Report** | Export PDF bolle, inventario, presenze |
+| **PWA** | Installabile su mobile/desktop |
+
+## Setup locale
+
+### Prerequisiti
+
+- Node.js 20+
+- Account Supabase con progetto attivo
+
+### Installazione
+
+```bash
+git clone https://github.com/ilsenzanima/MagazzinoV5_5.git
+cd MagazzinoV5_5
+npm install
+```
+
+### Variabili d'ambiente
+
+Crea un file `.env.local` nella root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+```
+
+### Avvio
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Apri [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Test
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm test                  # unit test
+npm run test:integration  # integration test
+npm run test:coverage     # coverage
+```
 
-## Learn More
+## Deploy
 
-To learn more about Next.js, take a look at the following resources:
+Il deploy avviene automaticamente su Vercel ad ogni push su `master`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Configurazione Supabase (obbligatoria per produzione)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+In **Authentication → URL Configuration** del dashboard Supabase:
+- **Site URL**: `https://www.fire-block.org`
+- **Redirect URLs**: `https://www.fire-block.org/auth/callback`
 
-## Deploy on Vercel
+## Struttura progetto
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+├── app/              # Route Next.js (App Router)
+│   ├── auth/         # Callback, reset password, forgot password
+│   ├── purchases/    # Acquisti
+│   ├── movements/    # Movimentazione
+│   ├── inventory/    # Magazzino
+│   ├── jobs/         # Commesse
+│   ├── workers/      # Operai
+│   ├── attendance/   # Presenze
+│   └── settings/     # Impostazioni (admin, profilo, backup)
+├── components/       # Componenti React riutilizzabili
+├── lib/
+│   ├── api.ts        # Re-export API pubbliche
+│   ├── services/     # Logica accesso dati (Supabase)
+│   ├── supabase/     # Client/server/middleware Supabase
+│   └── pdf/          # Generatori PDF (jsPDF)
+└── hooks/            # Custom React hooks
+supabase/
+└── migrations/       # Migrazioni SQL
+```
