@@ -50,3 +50,15 @@ debug_*.ts
 
 # database backups (stored in Supabase Storage, not in the repo)
 /backups/
+
+# sensitive SQL files (dumps con dati utenti, script con password)
+supabase/data_dump.sql
+supabase/profiles_dump.sql
+supabase/schema_dump.sql
+supabase/scripts/add_user_luisa_bertogna.sql
+
+# log e file di debug locali
+build_err.log
+compile_errors.txt
+debug_lotti.sql
+*.log
