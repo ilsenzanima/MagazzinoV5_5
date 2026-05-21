@@ -91,15 +91,20 @@ export default function LoginPage() {
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
-             <div className="text-sm">
-              Non hai un account?{" "}
-              <Link href="/register" className="text-blue-600 hover:underline">
-                Registrati qui
-              </Link>
-            </div>
-             <Link href="/" className="hover:text-blue-600 underline">
-                Torna alla Home
-             </Link>
+          <div className="text-sm">
+            <Link href="/auth/forgot-password" className="text-blue-600 hover:underline">
+              Password dimenticata?
+            </Link>
+          </div>
+          <div className="text-sm">
+            Non hai un account?{" "}
+            <Link href="/register" className="text-blue-600 hover:underline">
+              Registrati qui
+            </Link>
+          </div>
+          <Link href="/" className="hover:text-blue-600 underline">
+            Torna alla Home
+          </Link>
         </CardFooter>
       </Card>
     </div>

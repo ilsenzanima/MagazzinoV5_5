@@ -8,12 +8,15 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // Se la sessione è di tipo recovery, manda alla pagina di reset password
+      const sessionType = data.session?.user?.aud
+      const isRecovery = next === '/auth/reset-password' || sessionType === 'recovery'
+      const redirectTo = isRecovery ? '/auth/reset-password' : next
+      return NextResponse.redirect(`${origin}${redirectTo}`)
     }
   }
 
-  // return the user to an error page with instructions
   return NextResponse.redirect(`${origin}/auth/auth-code-error`)
 }

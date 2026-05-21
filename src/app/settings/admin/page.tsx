@@ -121,7 +121,7 @@ export default function SettingsAdminPage() {
 
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/auth/callback?next=/settings/profile`,
+                redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
             });
 
             if (error) throw error;
