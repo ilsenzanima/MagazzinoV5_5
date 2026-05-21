@@ -207,37 +207,48 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         if (activeTab === "entry" && selectedJob) {
             Promise.allSettled([
                 inventoryApi.getJobBatchAvailability(selectedJob.id),
+                inventoryApi.getJobFictitiousBatchAvailability(selectedJob.id),
                 inventoryApi.getJobInventory(selectedJob.id),
-            ]).then(([batchResult, inventoryResult]) => {
-                if (batchResult.status === "fulfilled") {
-                    const batches = batchResult.value || [];
-                    setJobBatchAvailability(batches);
-                    if (isEditing && batches.length > 0) {
-                        setLines((prev) =>
-                            prev.map((line) => {
-                                if (!line.itemId || line.availableBatches.length > 0) return line;
-                                const itemBatches = batches
-                                    .filter((b: any) => b.itemId === line.itemId)
-                                    .map((b: any) => {
-                                        const totalQty = (initialNote?.items ?? [])
-                                            .filter((item) => item.purchaseItemId === b.purchaseItemId)
-                                            .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
-                                        const totalPieces = (initialNote?.items ?? [])
-                                            .filter((item) => item.purchaseItemId === b.purchaseItemId)
-                                            .reduce((sum, item) => sum + (item.pieces ?? 0), 0);
-                                        return {
-                                            id: b.purchaseItemId,
-                                            purchaseRef: b.purchaseRef,
-                                            remainingQty: (b.quantity ?? 0) + totalQty,
-                                            remainingPieces: b.pieces != null ? b.pieces + totalPieces : b.pieces,
-                                            date: b.date,
-                                        };
-                                    });
-                                return itemBatches.length > 0 ? { ...line, availableBatches: itemBatches } : line;
-                            })
-                        );
-                    }
+            ]).then(([batchResult, fictitiousBatchResult, inventoryResult]) => {
+                const realBatches: any[] = batchResult.status === "fulfilled" ? batchResult.value || [] : [];
+                const fictitiousBatches: any[] = fictitiousBatchResult.status === "fulfilled" ? fictitiousBatchResult.value || [] : [];
+
+                // Merge: keep all real batches, add fictitious-only batches
+                // (deduplicate by itemId+purchaseItemId to avoid showing same batch twice)
+                const realKeys = new Set(realBatches.map((b: any) => `${b.itemId}:${b.purchaseItemId ?? "null"}`));
+                const fictitiousOnly = fictitiousBatches.filter(
+                    (b: any) => !realKeys.has(`${b.itemId}:${b.purchaseItemId ?? "null"}`)
+                );
+                const combined = [...realBatches, ...fictitiousOnly];
+
+                setJobBatchAvailability(combined);
+
+                if (isEditing && combined.length > 0) {
+                    setLines((prev) =>
+                        prev.map((line) => {
+                            if (!line.itemId || line.availableBatches.length > 0) return line;
+                            const itemBatches = combined
+                                .filter((b: any) => b.itemId === line.itemId && !!b.isFictitious === !!line.isFictitious)
+                                .map((b: any) => {
+                                    const totalQty = (initialNote?.items ?? [])
+                                        .filter((item) => item.purchaseItemId === b.purchaseItemId)
+                                        .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+                                    const totalPieces = (initialNote?.items ?? [])
+                                        .filter((item) => item.purchaseItemId === b.purchaseItemId)
+                                        .reduce((sum, item) => sum + (item.pieces ?? 0), 0);
+                                    return {
+                                        id: b.purchaseItemId,
+                                        purchaseRef: b.purchaseRef,
+                                        remainingQty: (b.quantity ?? 0) + totalQty,
+                                        remainingPieces: b.pieces != null ? b.pieces + totalPieces : b.pieces,
+                                        date: b.date,
+                                    };
+                                });
+                            return itemBatches.length > 0 ? { ...line, availableBatches: itemBatches } : line;
+                        })
+                    );
                 }
+
                 if (inventoryResult.status === "fulfilled") setJobInventory(inventoryResult.value || []);
             });
         } else {
@@ -436,7 +447,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     const handleInlineReturnBatchSelect = useCallback(
         (rowId: string, batch: any, prefill?: { pieces?: string; quantity?: string }) => {
             const allItemBatches = jobBatchAvailability
-                .filter((b) => b.itemId === batch.itemId)
+                .filter((b) => b.itemId === batch.itemId && !!b.isFictitious === !!batch.isFictitious)
                 .map((b) => ({
                     id: b.purchaseItemId,
                     purchaseRef: b.purchaseRef,

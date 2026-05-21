@@ -436,12 +436,19 @@ export function MovementMaterialDialog({
                                                     onClick={() => handleSelectBatch(batch)}
                                                 >
                                                     <TableCell className="py-2">
-                                                        <div className="text-sm font-medium">
-                                                            {batch.itemName}
-                                                            {batch.itemModel && (
-                                                                <span className="text-muted-foreground font-normal ml-1">
-                                                                    ({batch.itemModel})
-                                                                </span>
+                                                        <div className="text-sm font-medium flex flex-wrap items-center gap-1.5">
+                                                            <span>
+                                                                {batch.itemName}
+                                                                {batch.itemModel && (
+                                                                    <span className="text-muted-foreground font-normal ml-1">
+                                                                        ({batch.itemModel})
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            {batch.isFictitious && (
+                                                                <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-[10px] h-5 px-1.5 font-normal">
+                                                                    Fittizio
+                                                                </Badge>
                                                             )}
                                                         </div>
                                                         <div className="text-[10px] text-muted-foreground font-mono">

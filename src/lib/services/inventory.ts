@@ -482,6 +482,35 @@ export const inventoryApi = {
         }));
     },
 
+    // Get job fictitious batch availability (items at job site from fictitious exits only)
+    getJobFictitiousBatchAvailability: async (jobId: string) => {
+        const { data, error } = await supabase
+            .from('job_fictitious_batch_availability')
+            .select('*')
+            .eq('job_id', jobId)
+            .order('item_name', { ascending: true });
+
+        if (error) throw error;
+        return data.map((b: any) => ({
+            itemId: b.item_id,
+            purchaseItemId: b.purchase_item_id,
+            purchaseRef: b.purchase_ref,
+            purchaseDate: b.purchase_date,
+            itemName: b.item_name,
+            itemModel: b.item_model,
+            itemCode: b.item_code,
+            itemUnit: b.item_unit,
+            itemBrand: b.item_brand,
+            itemCategory: b.item_category,
+            quantity: b.quantity,
+            pieces: b.pieces,
+            coefficient: b.coefficient,
+            originalQuantity: b.original_quantity,
+            originalPieces: b.original_pieces,
+            isFictitious: true,
+        }));
+    },
+
     // Get job inventory detailed by batch with delivery notes aggregation
     getJobBatchDetailed: async (jobId: string) => {
         const { data, error } = await supabase
