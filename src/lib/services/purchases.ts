@@ -54,7 +54,7 @@ export const purchasesApi = {
         if (error) throw error;
         return data.map(mapDbToPurchase);
     },
-    getPaginated: async ({ page = 1, limit = 10, search = '', supplierId = '' }) => {
+    getPaginated: async ({ page = 1, limit = 10, search = '', supplierId = '', dateFrom = '', dateTo = '' }) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -64,6 +64,14 @@ export const purchasesApi = {
 
         if (supplierId) {
             query = query.eq('supplier_id', supplierId);
+        }
+
+        if (dateFrom) {
+            query = query.gte('delivery_note_date', dateFrom);
+        }
+
+        if (dateTo) {
+            query = query.lte('delivery_note_date', dateTo);
         }
 
         if (search) {

@@ -20,6 +20,8 @@ function PurchasesContent() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const debouncedSearch = useDeferredValue(searchTerm);
 
   const [page, setPage] = useState(1);
@@ -28,11 +30,11 @@ function PurchasesContent() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, initialSupplierId]);
+  }, [debouncedSearch, dateFrom, dateTo, initialSupplierId]);
 
   useEffect(() => {
     loadPurchases();
-  }, [page, debouncedSearch, initialSupplierId]);
+  }, [page, debouncedSearch, dateFrom, dateTo, initialSupplierId]);
 
   const loadPurchases = async () => {
     try {
@@ -41,7 +43,9 @@ function PurchasesContent() {
         page,
         limit: LIMIT,
         search: debouncedSearch,
-        supplierId: initialSupplierId || ''
+        supplierId: initialSupplierId || '',
+        dateFrom,
+        dateTo,
       });
       setPurchases(data);
       setTotalItems(total);
@@ -78,14 +82,49 @@ function PurchasesContent() {
           </div>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            placeholder="Cerca Acquisto (Bolla, Fornitore...)"
-            className="pl-9 bg-slate-100 dark:bg-muted border-none"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <Input
+              placeholder="Cerca Acquisto (Bolla, Fornitore...)"
+              className="pl-9 bg-slate-100 dark:bg-muted border-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+              <Input
+                type="date"
+                className="pl-9 bg-slate-100 dark:bg-muted border-none w-40"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                title="Data dal"
+              />
+            </div>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+              <Input
+                type="date"
+                className="pl-9 bg-slate-100 dark:bg-muted border-none w-40"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                title="Data al"
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { setDateFrom(""); setDateTo(""); }}
+                title="Rimuovi filtro data"
+                className="shrink-0"
+              >
+                ×
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
