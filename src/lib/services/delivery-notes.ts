@@ -106,13 +106,14 @@ export const deliveryNotesApi = {
             // Split search into words for fuzzy matching
             const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
 
-            // Find matching jobs
+            // Find matching jobs (skip words with '/' to avoid PostgREST filter parsing issues)
             let jobIds: string[] = [];
             for (const word of words) {
+                if (word.includes('/')) continue;
                 const { data: jobs } = await supabase
                     .from('jobs')
                     .select('id')
-                    .or(`code.ilike.%${word}%,description.ilike.%${word}%`);
+                    .or(`code.ilike."%${word}%",description.ilike."%${word}%"`);
                 if (jobs) {
                     jobIds = [...new Set([...jobIds, ...jobs.map(j => j.id)])];
                 }
@@ -120,9 +121,16 @@ export const deliveryNotesApi = {
 
             // For each word, apply OR conditions (chained = AND between words)
             for (const word of words) {
-                let orConditions = [
-                    `number.ilike.%${word}%`,
-                    `causal.ilike.%${word}%`
+                // Words containing '/' are bolla numbers — use direct ilike to avoid
+                // PostgREST raw filter string issues with the '/' character
+                if (word.includes('/')) {
+                    query = query.ilike('number', `%${word}%`);
+                    continue;
+                }
+
+                const orConditions: string[] = [
+                    `number.ilike."%${word}%"`,
+                    `causal.ilike."%${word}%"`,
                 ];
                 if (jobIds.length > 0) {
                     orConditions.push(`job_id.in.(${jobIds.join(',')})`);
