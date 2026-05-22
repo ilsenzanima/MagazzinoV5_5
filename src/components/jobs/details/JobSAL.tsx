@@ -242,7 +242,8 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
                     .map(([date, h]) => ({ date, normalHours: h.normal, transferHours: h.transfer }))
                 const totalNormal = days.reduce((s, d) => s + d.normalHours, 0)
                 const totalTransfer = days.reduce((s, d) => s + d.transferHours, 0)
-                const totalCost = totalNormal * e.hourlyRate + totalTransfer * e.trasfertaRate
+                const transferDays = days.filter(d => d.transferHours > 0).length
+                const totalCost = (totalNormal + totalTransfer) * e.hourlyRate + transferDays * e.trasfertaRate
                 grandTotal += totalCost
                 return {
                     workerId,

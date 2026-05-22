@@ -392,10 +392,11 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                     })
                 }
                 const e = wMap.get(w.workerId)!
+                const wTransferDays = (w.days || []).filter(d => d.transferHours > 0).length
                 e.normalHours += w.totalNormal
                 e.transferHours += w.totalTransfer
                 e.normalCost += w.totalNormal * w.hourlyRate
-                e.trasfertaCost += w.totalTransfer * w.trasfertaRate
+                e.trasfertaCost += w.totalTransfer * w.hourlyRate + wTransferDays * w.trasfertaRate
                 e.total += w.totalCost
             }
         }
@@ -490,7 +491,8 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                 if (!item.workerHoursData) continue
                 for (const w of item.workerHoursData.workers) {
                     const p = wMap.get(w.workerId) ?? { workerId: w.workerId, workerName: w.workerName, normalHours: 0, transferHours: 0, normalCost: 0, trasfertaCost: 0, total: 0 }
-                    wMap.set(w.workerId, { ...p, normalHours: p.normalHours + w.totalNormal, transferHours: p.transferHours + w.totalTransfer, normalCost: p.normalCost + w.totalNormal * w.hourlyRate, trasfertaCost: p.trasfertaCost + w.totalTransfer * w.trasfertaRate, total: p.total + w.totalCost })
+                    const wTrDays = (w.days || []).filter(d => d.transferHours > 0).length
+                    wMap.set(w.workerId, { ...p, normalHours: p.normalHours + w.totalNormal, transferHours: p.transferHours + w.totalTransfer, normalCost: p.normalCost + w.totalNormal * w.hourlyRate, trasfertaCost: p.trasfertaCost + w.totalTransfer * w.hourlyRate + wTrDays * w.trasfertaRate, total: p.total + w.totalCost })
                 }
             }
             return [...wMap.values()]
@@ -736,7 +738,8 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                 const days = Array.from(e.dayMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([date, h]) => ({ date, normalHours: h.normal, transferHours: h.transfer }))
                 const totalNormal = days.reduce((s, d) => s + d.normalHours, 0)
                 const totalTransfer = days.reduce((s, d) => s + d.transferHours, 0)
-                const totalCost = totalNormal * e.hourlyRate + totalTransfer * e.trasfertaRate
+                const transferDays = days.filter(d => d.transferHours > 0).length
+                const totalCost = (totalNormal + totalTransfer) * e.hourlyRate + transferDays * e.trasfertaRate
                 grandTotal += totalCost
                 return { workerId, workerName: e.workerName, days, totalNormal, totalTransfer, hourlyRate: e.hourlyRate, trasfertaRate: e.trasfertaRate, totalCost }
             })

@@ -336,9 +336,9 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                             <h2 className="font-semibold text-slate-900 dark:text-white">Costo Trasferta</h2>
                             <div className="flex items-center justify-between p-4 border rounded-lg">
                                 <div className="space-y-0.5">
-                                    <Label className="text-base">Costo trasferta (€/h)</Label>
+                                    <Label className="text-base">Indennità trasferta (€/giorno)</Label>
                                     <div className="text-sm text-muted-foreground">
-                                        Tariffa oraria applicata durante le trasferte.
+                                        Importo fisso giornaliero aggiunto alle ore normali durante le trasferte.
                                     </div>
                                 </div>
                                 {editingTrasferta ? (
@@ -363,7 +363,7 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                                 ) : (
                                     <div className="flex items-center gap-3">
                                         <span className="text-lg font-bold text-slate-900 dark:text-white">
-                                            € {worker.trasfertaRate.toFixed(2)}/h
+                                            € {worker.trasfertaRate.toFixed(2)}/giorno
                                         </span>
                                         <Button variant="ghost" size="icon" onClick={() => { setEditingTrasferta(true); setTrasfertaValue(String(worker.trasfertaRate)); }}>
                                             <Pencil className="h-4 w-4" />

@@ -31,7 +31,7 @@ export default function AssignmentModal({
     jobs
 }: AssignmentModalProps) {
     const [jobId, setJobId] = useState<string>("");
-    const [hours, setHours] = useState<number>(8);
+    const [hours, setHours] = useState<string>("8");
     const [status, setStatus] = useState<string>("presence");
     const [notes, setNotes] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
@@ -43,14 +43,14 @@ export default function AssignmentModal({
     useEffect(() => {
         if (isOpen && currentAssignment) {
             setJobId(currentAssignment.jobId || "");
-            setHours(currentAssignment.hours || 8);
+            setHours(String(currentAssignment.hours || 8));
             setStatus(currentAssignment.status || "presence");
             setNotes(currentAssignment.notes || "");
             setIsRecurring(false);
             setRepeatUntil("");
         } else {
             setJobId("");
-            setHours(8); // Default to full day
+            setHours("8");
             setStatus("presence");
             setNotes("");
             setIsRecurring(false);
@@ -70,7 +70,7 @@ export default function AssignmentModal({
                 workerId: worker.id,
                 date: format(date, 'yyyy-MM-dd'),
                 jobId: jobId === 'none' ? undefined : jobId,
-                hours,
+                hours: parseFloat(hours.replace(',', '.')) || 0,
                 status: status as any,
                 notes
             };
@@ -120,6 +120,7 @@ export default function AssignmentModal({
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="presence">Presenza</SelectItem>
+                                <SelectItem value="transfer">Trasferta</SelectItem>
                                 <SelectItem value="absence">Assenza Ingiustificata</SelectItem>
                                 <SelectItem value="sick">Malattia</SelectItem>
                                 <SelectItem value="holiday">Ferie</SelectItem>
@@ -128,7 +129,7 @@ export default function AssignmentModal({
                         </Select>
                     </div>
 
-                    {(status === 'presence' || status === 'permit') && (
+                    {(status === 'presence' || status === 'permit' || status === 'transfer') && (
                         <>
                             <div className="space-y-2">
                                 <Label>Cantiere</Label>
@@ -150,12 +151,10 @@ export default function AssignmentModal({
                             <div className="space-y-2">
                                 <Label>Ore</Label>
                                 <Input
-                                    type="number"
-                                    step="0.5"
-                                    min="0"
-                                    max="24"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={hours}
-                                    onChange={(e) => setHours(Number(e.target.value))}
+                                    onChange={(e) => setHours(e.target.value)}
                                 />
                             </div>
                         </>

@@ -284,7 +284,7 @@ export const attendanceApi = {
         const [attResult, corrResult] = await Promise.all([
             supabase
                 .from('attendance')
-                .select('worker_id, hours, status, workers(first_name, last_name, hourly_rate, trasferta_rate)')
+                .select('worker_id, date, hours, status, workers(first_name, last_name, hourly_rate, trasferta_rate)')
                 .eq('job_id', jobId),
             supabase
                 .from('attendance_corrections')
@@ -298,7 +298,7 @@ export const attendanceApi = {
         // Aggregate per worker
         const map = new Map<string, {
             workerName: string; hourlyRate: number; trasfertaRate: number;
-            normalHours: number; transferHours: number;
+            normalHours: number; transferHours: number; transferDates: Set<string>;
         }>();
 
         (attResult.data || []).forEach((r: any) => {
@@ -311,12 +311,14 @@ export const attendanceApi = {
                     trasfertaRate: Number(w?.trasferta_rate ?? 50),
                     normalHours: 0,
                     transferHours: 0,
+                    transferDates: new Set<string>(),
                 });
             }
             const entry = map.get(wid)!;
             const h = Number(r.hours) || 0;
             if (r.status === 'transfer') {
                 entry.transferHours += h;
+                if (r.date) entry.transferDates.add(r.date);
             } else {
                 entry.normalHours += h;
             }
@@ -333,7 +335,7 @@ export const attendanceApi = {
         let totalCost = 0;
         const rows = Array.from(map.entries()).map(([workerId, e]) => {
             const normalCost = Math.max(0, e.normalHours) * e.hourlyRate;
-            const trasfertaCost = e.transferHours * e.trasfertaRate;
+            const trasfertaCost = e.transferHours * e.hourlyRate + e.transferDates.size * e.trasfertaRate;
             const total = normalCost + trasfertaCost;
             totalCost += total;
             return { workerId, workerName: e.workerName, normalHours: e.normalHours, transferHours: e.transferHours, normalCost, trasfertaCost, total };
