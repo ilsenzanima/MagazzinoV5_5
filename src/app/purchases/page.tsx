@@ -92,22 +92,22 @@ function PurchasesContent() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex gap-2">
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Dal</span>
               <Input
                 type="date"
-                className="pl-9 bg-slate-100 dark:bg-muted border-none w-40"
+                className="bg-slate-100 dark:bg-muted border-none w-36"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
                 title="Data dal"
               />
             </div>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Al</span>
               <Input
                 type="date"
-                className="pl-9 bg-slate-100 dark:bg-muted border-none w-40"
+                className="bg-slate-100 dark:bg-muted border-none w-36"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
                 title="Data al"
