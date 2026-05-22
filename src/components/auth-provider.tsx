@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         */
         const { data, error } = await fetchWithTimeout(
           supabase.rpc('get_my_role'),
-          15000 // Increased to 15s to reduce timeouts on slow connections
+          8000 // 8s: se timeout, cade sul cached role senza bloccare a lungo
         );
 
         if (!isMountedRef.current) return;

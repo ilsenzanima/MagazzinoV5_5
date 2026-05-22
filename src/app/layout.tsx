@@ -21,11 +21,13 @@ const geistMono = Geist_Mono({
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  preload: false, // font opzionale, usato solo se selezionato nelle impostazioni
 });
 
 const lexend = Lexend({
   variable: "--font-lexend",
   subsets: ["latin"],
+  preload: false, // font opzionale, usato solo se selezionato nelle impostazioni
 });
 
 export const metadata: Metadata = {
