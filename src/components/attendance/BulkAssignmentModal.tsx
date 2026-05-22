@@ -14,7 +14,7 @@ import { it } from "date-fns/locale";
 interface AttendanceEntry {
     status: string;
     jobId?: string;
-    hours: number;
+    hours: string;
     notes?: string;
     courseId?: string;
     courseName?: string; // For new course creation
@@ -46,7 +46,7 @@ export default function BulkAssignmentModal({
     const [entries, setEntries] = useState<AttendanceEntry[]>([{
         status: 'presence',
         jobId: '',
-        hours: 8,
+        hours: "8",
         notes: ''
     }]);
     const [isLoading, setIsLoading] = useState(false);
@@ -78,7 +78,7 @@ export default function BulkAssignmentModal({
             setEntries([{
                 status: 'presence',
                 jobId: '',
-                hours: 8,
+                hours: "8",
                 notes: ''
             }]);
         }
@@ -109,7 +109,7 @@ export default function BulkAssignmentModal({
         setEntries([...entries, {
             status: 'presence',
             jobId: '',
-            hours: 8,
+            hours: "8",
             notes: ''
         }]);
     };
@@ -137,7 +137,7 @@ export default function BulkAssignmentModal({
                 return {
                     jobId: (!entry.jobId || entry.jobId === 'none' || isWarehouse) ? undefined : entry.jobId,
                     warehouseId: isWarehouse ? entry.jobId : undefined,
-                    hours: entry.hours,
+                    hours: parseFloat(String(entry.hours).replace(',', '.')) || 0,
                     status: entry.status as any,
                     notes: entry.notes,
                     courseId: entry.courseId,
@@ -152,7 +152,7 @@ export default function BulkAssignmentModal({
                 attendanceEntries
             );
             onClose();
-            setEntries([{ status: 'presence', jobId: '', hours: 8, notes: '' }]);
+            setEntries([{ status: 'presence', jobId: '', hours: "8", notes: '' }]);
         } catch (error) {
             console.error("Error saving bulk:", error);
         } finally {
@@ -327,10 +327,10 @@ export default function BulkAssignmentModal({
                                     <div className="space-y-2">
                                         <Label>Ore</Label>
                                         <Input
-                                            type="number"
-                                            step="0.5"
+                                            type="text"
+                                            inputMode="decimal"
                                             value={entry.hours}
-                                            onChange={(e) => updateEntry(index, 'hours', Number(e.target.value))}
+                                            onChange={(e) => updateEntry(index, 'hours', e.target.value)}
                                         />
                                     </div>
 
