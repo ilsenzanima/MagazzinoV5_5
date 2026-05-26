@@ -19,6 +19,9 @@ export const mapDbToPurchase = (db: any): Purchase => ({
     jobId: db.job_id,
     jobCode: db.jobs?.code,
     documentUrl: db.document_url,
+    documentUrls: (db.document_urls && db.document_urls.length > 0)
+        ? db.document_urls
+        : (db.document_url ? [db.document_url] : []),
     totalAmount: db.purchase_items?.reduce((sum: number, item: any) => sum + ((item.price || 0) * (item.quantity || 1)), 0)
 });
 
@@ -33,6 +36,10 @@ export const mapPurchaseToDb = (purchase: Partial<Purchase>) => {
     if (purchase.notes !== undefined) dbPurchase.notes = purchase.notes;
     if (purchase.createdBy !== undefined) dbPurchase.created_by = purchase.createdBy;
     if (purchase.documentUrl !== undefined) dbPurchase.document_url = purchase.documentUrl;
+    if (purchase.documentUrls !== undefined) {
+        dbPurchase.document_urls = purchase.documentUrls;
+        dbPurchase.document_url = purchase.documentUrls[0] ?? null;
+    }
 
     // CRITICAL: Only update job_id when explicitly passed (even if null/empty to clear it)
     // This prevents accidental clearing of job_id when editing other fields
