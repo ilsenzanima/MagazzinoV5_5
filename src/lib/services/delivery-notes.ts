@@ -287,6 +287,20 @@ export const deliveryNotesApi = {
         return (data || []).map(mapDbToDeliveryNote);
     },
 
+    getByJobAndType: async (jobId: string, type: string, excludeId: string): Promise<{ id: string; number: string; date: string }[]> => {
+        const { data, error } = await supabase
+            .from('delivery_notes')
+            .select('id, number, date')
+            .eq('job_id', jobId)
+            .eq('type', type)
+            .neq('id', excludeId)
+            .order('date', { ascending: false })
+            .order('number_int', { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map((d: any) => ({ id: d.id, number: d.number, date: d.date }));
+    },
+
     updateLocationBatch: async (jobIds: string[], newAddress: string, newClientName?: string) => {
         // If we have a new client name, we need to update each note individually
         // because we need to replace the client name pattern in the existing delivery_location

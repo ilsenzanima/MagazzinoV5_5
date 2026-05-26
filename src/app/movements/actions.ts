@@ -153,6 +153,65 @@ export async function createMovement(data: MovementData, lines: MovementLine[]):
   return { success: true }
 }
 
+export async function moveItemsToDeliveryNote(
+  sourceNoteId: string,
+  targetNoteId: string,
+  itemIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  if (!itemIds.length) return { success: false, error: 'Nessun articolo selezionato' }
+
+  const supabase = await createClient()
+
+  const { data: authData, error: userError } = await supabase.auth.getUser()
+  if (userError || !authData.user) {
+    return { success: false, error: 'Non sei autenticato. Effettua il login e riprova.' }
+  }
+
+  const { data: notes, error: notesError } = await supabase
+    .from('delivery_notes')
+    .select('id, type, job_id')
+    .in('id', [sourceNoteId, targetNoteId])
+
+  if (notesError || !notes || notes.length !== 2) {
+    return { success: false, error: 'Impossibile verificare le bolle.' }
+  }
+
+  const sourceNote = notes.find((n: any) => n.id === sourceNoteId)
+  const targetNote = notes.find((n: any) => n.id === targetNoteId)
+
+  if (!sourceNote || !targetNote) {
+    return { success: false, error: 'Una o entrambe le bolle non trovate.' }
+  }
+
+  if (sourceNote.type !== targetNote.type) {
+    return { success: false, error: 'Le bolle devono essere dello stesso tipo.' }
+  }
+
+  if (sourceNote.job_id !== targetNote.job_id) {
+    return { success: false, error: 'Le bolle devono appartenere alla stessa commessa.' }
+  }
+
+  const { error: updateError } = await supabase
+    .from('delivery_note_items')
+    .update({ delivery_note_id: targetNoteId })
+    .in('id', itemIds)
+    .eq('delivery_note_id', sourceNoteId)
+
+  if (updateError) {
+    return { success: false, error: `Errore spostamento: ${updateError.message}` }
+  }
+
+  try {
+    revalidatePath('/movements')
+    revalidatePath(`/movements/${sourceNoteId}`)
+    revalidatePath(`/movements/${targetNoteId}`)
+  } catch (e) {
+    console.warn('Revalidate failed:', e)
+  }
+
+  return { success: true }
+}
+
 export async function updateMovement(id: string, data: MovementData, lines: MovementLine[]): Promise<{ success: boolean; error?: string }> {
   console.log('=== updateMovement START ===')
   console.log('ID:', id)

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search, MoveRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,7 @@ import {
     DeliveryNoteItem
 } from "@/lib/api";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
+import MoveItemsDialog from "@/components/movements/MoveItemsDialog";
 // jsPDF and autoTable are loaded dynamically on demand to reduce bundle size
 import { useAuth } from "@/components/auth-provider";
 interface MovementDetailContentProps {
@@ -58,6 +59,11 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
 
     // Items State (for local manipulation before save)
     const [items, setItems] = useState<DeliveryNoteItem[]>(initialMovement.items || []);
+
+    // Move Mode State
+    const [isMoveMode, setIsMoveMode] = useState(false);
+    const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+    const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
 
     // Helper for role-based visibility
     const canSeePrices = userRole === 'admin' || userRole === 'operativo';
@@ -197,6 +203,38 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
         setItems(newItems);
     };
 
+    const handleToggleMoveMode = () => {
+        if (isMoveMode) {
+            if (selectedItemIds.size > 0) {
+                setIsMoveDialogOpen(true);
+            } else {
+                setIsMoveMode(false);
+            }
+        } else {
+            setSelectedItemIds(new Set());
+            setIsMoveMode(true);
+        }
+    };
+
+    const handleCancelMoveMode = () => {
+        setIsMoveMode(false);
+        setSelectedItemIds(new Set());
+    };
+
+    const handleToggleItemSelection = (itemId: string) => {
+        setSelectedItemIds(prev => {
+            const next = new Set(prev);
+            if (next.has(itemId)) next.delete(itemId);
+            else next.add(itemId);
+            return next;
+        });
+    };
+
+    const handleMoveSuccess = () => {
+        setIsMoveMode(false);
+        setSelectedItemIds(new Set());
+    };
+
     const handleUpdateItem = (index: number, field: keyof DeliveryNoteItem, value: any) => {
         const newItems = [...items];
         newItems[index] = { ...newItems[index], [field]: value };
@@ -249,6 +287,43 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                             </Button>
                             {(userRole === 'admin' || userRole === 'operativo') && (
                                 <>
+                                    {items.length > 0 && movement.jobId && (
+                                        isMoveMode ? (
+                                            <>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={handleCancelMoveMode}
+                                                    className="flex-1 md:flex-none px-2"
+                                                >
+                                                    <span className="hidden md:inline">Annulla selezione</span>
+                                                    <span className="md:hidden">Annulla</span>
+                                                </Button>
+                                                <Button
+                                                    onClick={handleToggleMoveMode}
+                                                    disabled={selectedItemIds.size === 0}
+                                                    className="flex-1 md:flex-none bg-amber-600 hover:bg-amber-700"
+                                                >
+                                                    <MoveRight className="h-4 w-4 md:mr-2" />
+                                                    <span className="hidden md:inline">
+                                                        Conferma selezione{selectedItemIds.size > 0 ? ` (${selectedItemIds.size})` : ""}
+                                                    </span>
+                                                    <span className="md:hidden">
+                                                        {selectedItemIds.size > 0 ? `Sposta (${selectedItemIds.size})` : "Sposta"}
+                                                    </span>
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <Button
+                                                variant="outline"
+                                                onClick={handleToggleMoveMode}
+                                                className="flex-1 md:flex-none px-2"
+                                            >
+                                                <MoveRight className="h-4 w-4 md:mr-2" />
+                                                <span className="hidden md:inline">Sposta Articoli</span>
+                                                <span className="md:hidden">Sposta</span>
+                                            </Button>
+                                        )
+                                    )}
                                     <Button variant="destructive" onClick={handleDelete} className="flex-1 md:flex-none px-2">
                                         <Trash2 className="h-4 w-4 md:mr-2" />
                                         <span className="hidden md:inline">Elimina</span>
@@ -388,6 +463,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    {isMoveMode && <TableHead className="w-[40px]"></TableHead>}
                                     <TableHead>Codice</TableHead>
                                     <TableHead>Descrizione</TableHead>
                                     <TableHead>Rif. Acquisto</TableHead>
@@ -412,7 +488,21 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     </TableRow>
                                 ) : (
                                     items.map((item, index) => (
-                                        <TableRow key={item.id}>
+                                        <TableRow
+                                            key={item.id}
+                                            className={`${isMoveMode ? "cursor-pointer select-none" : ""} ${isMoveMode && item.id && selectedItemIds.has(item.id) ? "bg-amber-50 dark:bg-amber-900/20" : ""}`}
+                                            onClick={isMoveMode && item.id ? () => handleToggleItemSelection(item.id!) : undefined}
+                                        >
+                                            {isMoveMode && (
+                                                <TableCell onClick={e => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="h-4 w-4 cursor-pointer accent-amber-600"
+                                                        checked={item.id ? selectedItemIds.has(item.id) : false}
+                                                        onChange={() => item.id && handleToggleItemSelection(item.id)}
+                                                    />
+                                                </TableCell>
+                                            )}
                                             <TableCell className="font-medium">{item.inventoryCode}</TableCell>
                                             <TableCell>
                                                 <div>
@@ -494,8 +584,22 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                             </div>
                         ) : (
                             items.map((item, index) => (
-                                <div key={item.id} className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-md space-y-2 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <div
+                                    key={item.id}
+                                    className={`bg-slate-50 dark:bg-slate-800 p-2.5 rounded-md space-y-2 text-sm border shadow-sm ${isMoveMode && item.id && selectedItemIds.has(item.id) ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20" : "border-slate-200 dark:border-slate-700"} ${isMoveMode ? "cursor-pointer select-none" : ""}`}
+                                    onClick={isMoveMode && item.id ? () => handleToggleItemSelection(item.id!) : undefined}
+                                >
                                     <div className="flex justify-between items-start gap-2">
+                                        {isMoveMode && (
+                                            <div className="shrink-0 pt-0.5" onClick={e => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 cursor-pointer accent-amber-600"
+                                                    checked={item.id ? selectedItemIds.has(item.id) : false}
+                                                    onChange={() => item.id && handleToggleItemSelection(item.id)}
+                                                />
+                                            </div>
+                                        )}
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <h4 className="font-semibold text-sm truncate text-slate-900 dark:text-slate-100">
@@ -584,6 +688,16 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                 items={inventoryItems}
                 onSearch={handleSearchInventory}
                 loading={isSearchingInventory}
+            />
+
+            <MoveItemsDialog
+                open={isMoveDialogOpen}
+                onOpenChange={setIsMoveDialogOpen}
+                sourceNoteId={initialMovement.id}
+                sourceJobId={movement.jobId}
+                sourceType={movement.type}
+                selectedItemIds={Array.from(selectedItemIds)}
+                onSuccess={handleMoveSuccess}
             />
         </div>
     );
