@@ -206,6 +206,7 @@ export interface Purchase {
     jobId?: string;
     jobCode?: string;
     documentUrl?: string | null;
+    documentUrls?: string[];
     totalAmount?: number;
     isExhausted?: boolean;
 }

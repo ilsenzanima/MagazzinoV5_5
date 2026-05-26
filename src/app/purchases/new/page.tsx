@@ -105,7 +105,7 @@ export default function NewPurchasePage() {
         jobId: ""
     });
 
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
 
     // Form State - Lines (inline table)
@@ -130,8 +130,8 @@ export default function NewPurchasePage() {
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) setSelectedFile(file);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length) setSelectedFiles(prev => [...prev, ...files]);
     };
 
     useEffect(() => {
@@ -329,9 +329,9 @@ export default function NewPurchasePage() {
         try {
             setLoading(true);
 
-            let documentUrl = undefined;
-            if (selectedFile) {
-                documentUrl = await purchasesApi.uploadDocument(selectedFile);
+            let documentUrls: string[] = [];
+            if (selectedFiles.length > 0) {
+                documentUrls = await Promise.all(selectedFiles.map(f => purchasesApi.uploadDocument(f)));
             }
 
             const purchase = await purchasesApi.create({
@@ -340,7 +340,7 @@ export default function NewPurchasePage() {
                 deliveryNoteDate: formData.deliveryNoteDate,
                 notes: '',
                 jobId: formData.jobId || undefined,
-                documentUrl
+                documentUrls
             });
 
             for (const line of validLines) {
@@ -479,16 +479,25 @@ export default function NewPurchasePage() {
                                     <Input
                                         type="file"
                                         accept=".pdf,.jpg,.jpeg,.png"
-                                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                        multiple
+                                        onChange={(e) => {
+                                            const files = Array.from(e.target.files || []);
+                                            if (files.length) setSelectedFiles(prev => [...prev, ...files]);
+                                            e.target.value = "";
+                                        }}
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     />
                                     <div className="pointer-events-none flex flex-col items-center justify-center gap-1">
                                         <Upload className={`h-8 w-8 ${isDragging ? "text-blue-500" : "text-slate-400"}`} />
-                                        {selectedFile ? (
-                                            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">{selectedFile.name}</p>
+                                        {selectedFiles.length > 0 ? (
+                                            <div className="flex flex-col items-center gap-0.5">
+                                                {selectedFiles.map((f, i) => (
+                                                    <p key={i} className="text-sm font-medium text-blue-600 dark:text-blue-400">{f.name}</p>
+                                                ))}
+                                            </div>
                                         ) : (
                                             <p className="text-sm text-slate-500 dark:text-slate-400">
-                                                {isDragging ? "Rilascia il file qui..." : "Clicca o trascina qui un file"}
+                                                {isDragging ? "Rilascia i file qui..." : "Clicca o trascina qui uno o più file"}
                                             </p>
                                         )}
                                     </div>

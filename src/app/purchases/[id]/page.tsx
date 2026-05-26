@@ -632,7 +632,7 @@ export default function PurchaseDetailPage() {
                         <div className="md:col-span-2">
                             <PurchaseDocuments
                                 purchaseId={id}
-                                documentUrl={purchase.documentUrl}
+                                documentUrls={purchase.documentUrls}
                                 onUpdate={loadData}
                             />
                         </div>
