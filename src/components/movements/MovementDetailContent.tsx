@@ -231,6 +231,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     };
 
     const handleMoveSuccess = () => {
+        setItems(prev => prev.filter(item => !selectedItemIds.has(item.id || '')));
         setIsMoveMode(false);
         setSelectedItemIds(new Set());
     };
