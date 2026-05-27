@@ -94,13 +94,20 @@ export const deliveryNotesApi = {
         }
     },
 
-    getPaginated: async ({ page = 1, limit = 10, search = '' }) => {
+    getPaginated: async ({ page = 1, limit = 10, search = '', dateFrom = '', dateTo = '' }) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
         let query = supabase
             .from('delivery_notes')
             .select('*, jobs(code, description, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity)', { count: 'estimated' });
+
+        if (dateFrom) {
+            query = query.gte('date', dateFrom);
+        }
+        if (dateTo) {
+            query = query.lte('date', dateTo);
+        }
 
         if (search) {
             // Split search into words for fuzzy matching

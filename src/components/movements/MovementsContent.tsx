@@ -30,6 +30,8 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   // Pagination & Search state
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearch = useDeferredValue(searchTerm);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(initialTotalPages);
 
@@ -37,15 +39,19 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   const [isFirstRender, setIsFirstRender] = useState(true);
 
   useEffect(() => {
-    // Skip the first load if we are on page 1 and search is empty (we have initial data)
-    if (isFirstRender && page === 1 && deferredSearch === "") {
+    setPage(1);
+  }, [deferredSearch, dateFrom, dateTo]);
+
+  useEffect(() => {
+    // Skip the first load if we are on page 1 and search/date filters are empty (we have initial data)
+    if (isFirstRender && page === 1 && deferredSearch === "" && !dateFrom && !dateTo) {
       setIsFirstRender(false);
       return;
     }
 
     loadMovements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, deferredSearch]);
+  }, [page, deferredSearch, dateFrom, dateTo]);
 
   // Helper to extract numeric part from delivery note number (e.g., "4/PP26" -> 4)
   const extractBollaNumber = (number: string): number => {
@@ -76,7 +82,9 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
       const { data, total } = await deliveryNotesApi.getPaginated({
         page,
         limit: ITEMS_PER_PAGE,
-        search: deferredSearch
+        search: deferredSearch,
+        dateFrom,
+        dateTo,
       });
 
       // Sort client-side for proper numeric ordering
@@ -127,14 +135,49 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
           )}
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            placeholder="Cerca Movimento (Bolla, Commessa, Causale...)"
-            className="pl-9 bg-slate-100 dark:bg-muted border-none"
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <Input
+              placeholder="Cerca Movimento (Bolla, Commessa, Causale...)"
+              className="pl-9 bg-slate-100 dark:bg-muted border-none"
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Dal</span>
+              <Input
+                type="date"
+                className="bg-slate-100 dark:bg-muted border-none w-36"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                title="Data dal"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Al</span>
+              <Input
+                type="date"
+                className="bg-slate-100 dark:bg-muted border-none w-36"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                title="Data al"
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { setDateFrom(""); setDateTo(""); }}
+                title="Rimuovi filtro data"
+                className="shrink-0"
+              >
+                ×
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

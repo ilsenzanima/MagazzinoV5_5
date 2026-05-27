@@ -3,11 +3,12 @@
 import { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, Users, ClipboardList, QrCode } from "lucide-react";
+import { Package, Users, ClipboardList, QrCode, Download } from "lucide-react";
 import ArticlesReport from "@/components/reports/articles-report";
 import AttendanceReport from "@/components/reports/attendance-report";
 import InventoryReport from "@/components/reports/inventory-report";
 import QrPrintReport from "@/components/reports/qr-print-report";
+import DownloadReport from "@/components/reports/download-report";
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState("articles");
@@ -21,7 +22,7 @@ export default function ReportsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 lg:w-[650px]">
+          <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
             <TabsTrigger value="articles" className="gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Articoli</span>
@@ -37,6 +38,10 @@ export default function ReportsPage() {
             <TabsTrigger value="qr" className="gap-2">
               <QrCode className="h-4 w-4" />
               <span className="hidden sm:inline">QR / Codici</span>
+            </TabsTrigger>
+            <TabsTrigger value="download" className="gap-2">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Download</span>
             </TabsTrigger>
           </TabsList>
 
@@ -54,6 +59,10 @@ export default function ReportsPage() {
 
           <TabsContent value="qr" className="mt-6">
             <QrPrintReport />
+          </TabsContent>
+
+          <TabsContent value="download" className="mt-6">
+            <DownloadReport />
           </TabsContent>
         </Tabs>
       </div>
