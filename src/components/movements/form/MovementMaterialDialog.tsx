@@ -213,6 +213,12 @@ export function MovementMaterialDialog({
                 quantity: noteItem.quantity?.toString(),
             };
 
+            // Auto-check the item in the note
+            const parentNote = notes.find((n) => n.items.some((i) => i.id === noteItem.id));
+            if (parentNote) {
+                toggleCheck(parentNote.id, noteItem.id);
+            }
+
             if (isEntryWithJob) {
                 const matchingBatch = jobBatchAvailability.find(
                     (b) => b.itemId === inventoryItem!.id
