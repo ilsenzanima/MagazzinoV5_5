@@ -51,13 +51,10 @@ export function LeaveRequestForm({ workers, onSuccess }: LeaveRequestFormProps) 
         },
     })
 
-    // When startDate changes, update endDate to match if it's before startDate
+    // When startDate changes, always sync endDate to the same date
     const startDate = form.watch("startDate")
     useEffect(() => {
-        const currentEndDate = form.getValues("endDate")
-        if (currentEndDate && new Date(currentEndDate) < new Date(startDate)) {
-            form.setValue("endDate", startDate)
-        }
+        form.setValue("endDate", startDate)
     }, [startDate, form])
 
     const workerOptions = workers.map(w => ({

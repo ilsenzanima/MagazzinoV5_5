@@ -192,6 +192,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         onUseItem(item);
+                                                                        toggleCheck(note.id, item.id);
                                                                     }}
                                                                 >
                                                                     <PlusCircle className="h-4 w-4" />
