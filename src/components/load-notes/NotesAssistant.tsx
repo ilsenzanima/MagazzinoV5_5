@@ -57,8 +57,9 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
         }
     };
 
-    const toggleCheck = async (noteId: string, itemId: string) => {
-        const isCurrentlyChecked = checkedItems.has(itemId);
+    const toggleCheck = async (noteId: string, itemId: string, currentChecked?: boolean) => {
+        // Use the passed current state to correctly handle items already checked server-side
+        const isCurrentlyChecked = currentChecked ?? checkedItems.has(itemId);
         const newChecked = !isCurrentlyChecked;
 
         // Update local state immediately for responsiveness
@@ -172,7 +173,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
                                                         >
                                                             <Checkbox
                                                                 checked={isChecked}
-                                                                onCheckedChange={() => toggleCheck(note.id, item.id)}
+                                                                onCheckedChange={() => toggleCheck(note.id, item.id, isChecked)}
                                                             />
                                                             <div className={`flex-1 min-w-0 ${isChecked ? 'line-through text-muted-foreground' : ''}`}>
                                                                 <span className="font-medium">{item.inventoryName}</span>

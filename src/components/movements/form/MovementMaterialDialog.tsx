@@ -239,8 +239,9 @@ export function MovementMaterialDialog({
         }
     };
 
-    const toggleCheck = async (noteId: string, itemId: string) => {
-        const isChecked = checkedItems.has(itemId);
+    const toggleCheck = async (noteId: string, itemId: string, currentChecked?: boolean) => {
+        // Use the passed current state, or fall back to local set
+        const isChecked = currentChecked ?? checkedItems.has(itemId);
         const next = new Set(checkedItems);
         isChecked ? next.delete(itemId) : next.add(itemId);
         setCheckedItems(next);
@@ -708,7 +709,7 @@ export function MovementMaterialDialog({
                                                                 <Checkbox
                                                                     checked={isChecked}
                                                                     onCheckedChange={() =>
-                                                                        toggleCheck(note.id, item.id)
+                                                                        toggleCheck(note.id, item.id, isChecked)
                                                                     }
                                                                 />
                                                                 <div
