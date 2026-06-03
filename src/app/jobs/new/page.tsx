@@ -2,7 +2,7 @@
 
 import { notify } from "@/lib/notify";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 export default function NewJobPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const cloneId = searchParams.get("clone");
   const { userRole } = useAuth();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -64,6 +66,34 @@ export default function NewJobPage() {
     };
     loadClients();
   }, []);
+
+  // Se viene da "Nuovo inizio cantiere", pre-compila con i dati della commessa originale
+  useEffect(() => {
+    if (!cloneId) return;
+    const loadCloneData = async () => {
+      try {
+        const job = await jobsApi.getById(cloneId);
+        if (!job) return;
+        setFormData(prev => ({
+          ...prev,
+          clientId: job.clientId || "",
+          name: job.name || "",
+          description: job.description || "",
+          siteAddress: job.siteAddress || "",
+          siteManager: job.siteManager || "",
+          status: "active",
+          startDate: "",
+          endDate: "",
+          cig: "",
+          cup: "",
+          code: prev.code, // verrà aggiornato dall'handleClientChange
+        }));
+      } catch (err) {
+        console.error("Errore caricamento commessa da clonare", err);
+      }
+    };
+    loadCloneData();
+  }, [cloneId]);
 
   // Effect to handle "Use client address" checkbox
   useEffect(() => {
@@ -132,7 +162,14 @@ export default function NewJobPage() {
             <ArrowLeft className="h-4 w-4 mr-1" />
             Torna alle Commesse
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900">Nuova Commessa</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {cloneId ? "Nuovo Inizio Cantiere" : "Nuova Commessa"}
+          </h1>
+          {cloneId && (
+            <p className="text-sm text-blue-600 mt-1">
+              Dati pre-compilati dalla commessa precedente. Inserisci la nuova data di inizio — CIG e CUP sono stati lasciati vuoti.
+            </p>
+          )}
         </div>
 
         <Card>

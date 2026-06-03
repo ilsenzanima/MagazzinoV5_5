@@ -8,7 +8,7 @@ import { Job, Client, jobsApi, clientsApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Trash2, Pencil, Building2, MapPin, User, FileText, Clock } from "lucide-react"
+import { Calendar, Trash2, Pencil, Building2, MapPin, User, FileText, Clock, RefreshCcw } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -125,10 +125,22 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
           </div>
           <div className="flex gap-2 shrink-0">
             {(userRole === 'admin' || userRole === 'operativo') && (
-              <Button variant="outline" size="sm" onClick={handleEditClick} className="px-2 md:px-4">
-                <Pencil className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Modifica</span>
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={handleEditClick} className="px-2 md:px-4">
+                  <Pencil className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Modifica</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/jobs/new?clone=${job.id}`)}
+                  className="px-2 md:px-4 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950"
+                  title="Nuovo inizio cantiere"
+                >
+                  <RefreshCcw className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Nuovo inizio</span>
+                </Button>
+              </>
             )}
             {userRole === 'admin' && (
               <Button
