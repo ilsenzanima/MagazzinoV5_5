@@ -1,7 +1,7 @@
 "use client"
 
 import { notify } from "@/lib/notify";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,16 @@ import Link from "next/link";
 import { jobsApi, clientsApi, Client } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
+
 export default function NewJobPage() {
+  return (
+    <Suspense>
+      <NewJobForm />
+    </Suspense>
+  );
+}
+
+function NewJobForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const cloneId = searchParams.get("clone");
