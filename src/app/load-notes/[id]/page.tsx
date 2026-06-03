@@ -46,14 +46,19 @@ export default function LoadNoteDetailPage() {
         }
     };
 
-    const toggleCheck = (itemId: string) => {
+    const toggleCheck = async (itemId: string, currentChecked: boolean) => {
         const next = new Set(checkedItems);
-        if (next.has(itemId)) {
+        if (currentChecked) {
             next.delete(itemId);
         } else {
             next.add(itemId);
         }
         setCheckedItems(next);
+        try {
+            await loadNotesService.toggleItemCheck(noteId, itemId, !currentChecked);
+        } catch (error) {
+            toast.error("Errore aggiornamento spunta");
+        }
     };
 
     const handleDelete = async () => {
@@ -216,7 +221,7 @@ export default function LoadNoteDetailPage() {
                                                 <TableCell>
                                                     <Checkbox
                                                         checked={isChecked}
-                                                        onCheckedChange={() => toggleCheck(item.id)}
+                                                        onCheckedChange={() => toggleCheck(item.id, isChecked)}
                                                     />
                                                 </TableCell>
                                                 <TableCell className={isChecked ? 'line-through text-muted-foreground' : ''}>
