@@ -81,8 +81,14 @@ function NewJobForm() {
     if (!cloneId) return;
     const loadCloneData = async () => {
       try {
-        const job = await jobsApi.getById(cloneId);
+        const [job, allClients] = await Promise.all([
+          jobsApi.getById(cloneId),
+          clientsApi.getAll(),
+        ]);
         if (!job) return;
+        setClients(allClients);
+        const client = allClients.find(c => c.id === job.clientId);
+        const code = client ? generateCode(client.name) : "";
         setFormData(prev => ({
           ...prev,
           clientId: job.clientId || "",
@@ -95,7 +101,7 @@ function NewJobForm() {
           endDate: "",
           cig: "",
           cup: "",
-          code: prev.code, // verrà aggiornato dall'handleClientChange
+          code,
         }));
       } catch (err) {
         console.error("Errore caricamento commessa da clonare", err);
