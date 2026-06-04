@@ -36,6 +36,8 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   const [hasMore, setHasMore] = useState(initialTotalPages > 1);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(initialTotalPages > 1);
 
   // Reset list when filters change
   useEffect(() => {
@@ -55,18 +57,18 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, deferredSearch, dateFrom, dateTo]);
 
-  // IntersectionObserver: load next page when sentinel is visible inside the scrollable main container
+  // IntersectionObserver creato una sola volta — legge loading/hasMore tramite ref
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const root = document.getElementById("main-scroll");
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && !loading && hasMore) setPage(p => p + 1); },
+      ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
       { root, rootMargin: "200px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loading, hasMore]);
+  }, []);
 
   // Helper to extract numeric part from delivery note number (e.g., "4/PP26" -> 4)
   const extractBollaNumber = (number: string): number => {
@@ -91,6 +93,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
 
   const loadMovements = async () => {
     try {
+      loadingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -102,13 +105,15 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
         dateTo,
       });
 
-      // Sort client-side for proper numeric ordering and append
+      const more = page < Math.ceil(total / ITEMS_PER_PAGE);
       setMovements(prev => sortMovements([...prev, ...data]));
-      setHasMore(page < Math.ceil(total / ITEMS_PER_PAGE));
+      setHasMore(more);
+      hasMoreRef.current = more;
     } catch (error: any) {
       console.error("Failed to load movements", error);
       setError(error.message || "Errore durante il caricamento dei movimenti");
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };

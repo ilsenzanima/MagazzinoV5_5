@@ -28,6 +28,8 @@ function PurchasesContent() {
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
   const LIMIT = 12;
 
   // Reset list when filters change
@@ -36,6 +38,7 @@ function PurchasesContent() {
     setPurchases([]);
     setPage(1);
     setHasMore(true);
+    hasMoreRef.current = true;
   }, [debouncedSearch, dateFrom, dateTo, initialSupplierId]);
 
   useEffect(() => {
@@ -44,6 +47,7 @@ function PurchasesContent() {
 
   const loadPurchases = async () => {
     try {
+      loadingRef.current = true;
       setLoading(true);
       const { data, total } = await purchasesApi.getPaginated({
         page,
@@ -53,27 +57,30 @@ function PurchasesContent() {
         dateFrom,
         dateTo,
       });
+      const more = page < Math.ceil(total / LIMIT);
       setPurchases(prev => page === 1 ? data : [...prev, ...data]);
-      setHasMore(page < Math.ceil(total / LIMIT));
+      setHasMore(more);
+      hasMoreRef.current = more;
     } catch (error) {
       console.error("Failed to load purchases", error);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
 
-  // IntersectionObserver: load next page when sentinel is visible inside the scrollable main container
+  // IntersectionObserver creato una sola volta — legge loading/hasMore tramite ref
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const root = document.getElementById("main-scroll");
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && !loading && hasMore) setPage(p => p + 1); },
+      ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
       { root, rootMargin: "200px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loading, hasMore]);
+  }, []);
 
   return (
     <>

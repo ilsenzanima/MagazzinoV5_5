@@ -104,6 +104,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [hasMore, setHasMore] = useState(initialTotal > LIMIT);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(initialTotal > LIMIT);
 
   // Debounce search term
   useEffect(() => {
@@ -119,6 +121,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     setItems([]);
     setPage(1);
     setHasMore(true);
+    hasMoreRef.current = true;
   }, [debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
 
   // Load types if not provided (fallback)
@@ -167,21 +170,22 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
 
-  // IntersectionObserver: load next page when sentinel is visible inside the scrollable main container
+  // IntersectionObserver creato una sola volta — legge loading/hasMore tramite ref
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const root = document.getElementById("main-scroll");
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && !loading && hasMore) setPage(p => p + 1); },
+      ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
       { root, rootMargin: "200px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loading, hasMore]);
+  }, []);
 
   const loadItems = async () => {
     try {
+      loadingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -193,14 +197,17 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         brand: selectedBrand !== "all" ? selectedBrand : undefined,
         type: selectedType !== "all" ? selectedType : undefined
       });
+      const more = page < Math.ceil(total / LIMIT);
       setItems(prev => page === 1 ? paginatedItems : [...prev, ...paginatedItems]);
       setTotalItems(total);
-      setHasMore(page < Math.ceil(total / LIMIT));
+      setHasMore(more);
+      hasMoreRef.current = more;
 
     } catch (error: any) {
       console.error("Failed to load inventory:", error);
       setError(error.message || "Errore sconosciuto durante il caricamento inventario");
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
