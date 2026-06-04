@@ -12,6 +12,7 @@ import {
   Search,
   Filter,
   Plus,
+  ChevronLeft,
   Package,
   ScanLine,
   Loader2
