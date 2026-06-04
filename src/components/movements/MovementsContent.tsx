@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, Printer, Recycle } from "lucide-react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
-import { useState, useEffect, useRef, useDeferredValue } from "react";
+import { useState, useEffect, useDeferredValue } from "react";
 import { deliveryNotesApi, DeliveryNote, DeliveryNoteItem } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -27,49 +28,31 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Infinite scroll state
+  // Pagination & Search state
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearch = useDeferredValue(searchTerm);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(initialTotalPages > 1);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const isFirstRender = useRef(true);
-  const loadingRef = useRef(false);
-  const hasMoreRef = useRef(initialTotalPages > 1);
+  const [totalPages, setTotalPages] = useState(initialTotalPages);
 
-  // Reset list when filters change
+  // Track if it's the first render to avoid fetching what we already have
+  const [isFirstRender, setIsFirstRender] = useState(true);
+
   useEffect(() => {
-    setMovements([]);
     setPage(1);
-    setHasMore(true);
-    isFirstRender.current = false;
   }, [deferredSearch, dateFrom, dateTo]);
 
   useEffect(() => {
-    // Skip first load — we already have initialMovements
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
+    // Skip the first load if we are on page 1 and search/date filters are empty (we have initial data)
+    if (isFirstRender && page === 1 && deferredSearch === "" && !dateFrom && !dateTo) {
+      setIsFirstRender(false);
       return;
     }
+
     loadMovements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, deferredSearch, dateFrom, dateTo]);
-
-  // IntersectionObserver creato una sola volta — legge loading/hasMore tramite ref
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const root = document.getElementById("main-scroll");
-    observerRef.current = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
-      { root, rootMargin: "200px" }
-    );
-    observerRef.current.observe(el);
-    return () => observerRef.current?.disconnect();
-  }, []);
 
   // Helper to extract numeric part from delivery note number (e.g., "4/PP26" -> 4)
   const extractBollaNumber = (number: string): number => {
@@ -94,7 +77,6 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
 
   const loadMovements = async () => {
     try {
-      loadingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -106,26 +88,20 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
         dateTo,
       });
 
-      const more = page < Math.ceil(total / ITEMS_PER_PAGE);
-      setMovements(prev => sortMovements([...prev, ...data]));
-      setHasMore(more);
-      hasMoreRef.current = more;
+      // Sort client-side for proper numeric ordering
+      setMovements(sortMovements(data));
+      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
     } catch (error: any) {
       console.error("Failed to load movements", error);
       setError(error.message || "Errore durante il caricamento dei movimenti");
     } finally {
-      loadingRef.current = false;
       setLoading(false);
-      // Re-check sentinel in caso sia ancora visibile dopo il caricamento
-      if (sentinelRef.current && observerRef.current) {
-        observerRef.current.unobserve(sentinelRef.current);
-        observerRef.current.observe(sentinelRef.current);
-      }
     }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setPage(1); // Reset page on search
   };
 
   const getTypeConfig = (movement: DeliveryNote) => {
@@ -335,16 +311,13 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
             )}
           </div>
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="h-4" />
-          {loading && (
-            <div className="flex justify-center py-6">
-              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-            </div>
-          )}
-          {!hasMore && movements.length > 0 && (
-            <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">Tutti i movimenti caricati</p>
-          )}
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            loading={loading}
+            onPageChange={setPage}
+            itemLabel="movimenti"
+          />
         </>
       )}
     </>

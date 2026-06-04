@@ -263,7 +263,7 @@ export default function DashboardLayout({
           </SheetContent>
         </Sheet>
 
-        <main id="main-scroll" className="flex-1 p-2 md:p-8 overflow-y-auto overflow-x-hidden min-w-0">
+        <main className="flex-1 p-2 md:p-8 overflow-y-auto overflow-x-hidden min-w-0">
           {children}
         </main>
 

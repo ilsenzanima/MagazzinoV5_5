@@ -17,6 +17,7 @@ import {
   ScanLine,
   Loader2
 } from "lucide-react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { InventoryItem } from "@/lib/mock-data";
@@ -97,33 +98,22 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [error, setError] = useState<string | null>(null);
   const [pendingMap, setPendingMap] = useState<Map<string, { uscita: number; reso: number }>>(new Map());
 
-  // Infinite scroll state
-  const LIMIT = 12;
+  // Pagination state
   const [page, setPage] = useState(1);
+  const [limit] = useState(12); // Grid layout: 1, 2, 3, 4 cols
+  const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / 12) || 1);
   const [totalItems, setTotalItems] = useState(initialTotal);
-  const [hasMore, setHasMore] = useState(initialTotal > LIMIT);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const isFirstRender = useRef(true);
-  const loadingRef = useRef(false);
-  const hasMoreRef = useRef(initialTotal > LIMIT);
 
   // Debounce search term
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
+      if (searchTerm !== debouncedSearchTerm) {
+        setPage(1); // Reset to first page on new search
+      }
     }, 500);
     return () => clearTimeout(handler);
-  }, [searchTerm]);
-
-  // Reset list when filters change
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
-    setItems([]);
-    setPage(1);
-    setHasMore(true);
-    hasMoreRef.current = true;
-  }, [debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
+  }, [searchTerm, debouncedSearchTerm]);
 
   // Load types if not provided (fallback)
   useEffect(() => {
@@ -161,59 +151,41 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
   const activeFiltersCount = (selectedBrand !== "all" ? 1 : 0) + (selectedType !== "all" ? 1 : 0);
 
-  // Load items when page changes (filter changes reset page via the effect above)
+  // Load items when dependencies change
   useEffect(() => {
-    // Skip first render — we already have initialItems
-    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && items.length > 0) {
+    // Skip first load if parameters match initial props
+    // This prevents double fetching on mount
+    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && items === initialItems) {
       return;
     }
+
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
 
-  // IntersectionObserver creato una sola volta — legge loading/hasMore tramite ref
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const root = document.getElementById("main-scroll");
-    observerRef.current = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
-      { root, rootMargin: "200px" }
-    );
-    observerRef.current.observe(el);
-    return () => observerRef.current?.disconnect();
-  }, []);
-
   const loadItems = async () => {
     try {
-      loadingRef.current = true;
       setLoading(true);
       setError(null);
 
+      // Server-side pagination for ALL tabs (including low_stock via RPC)
       const { items: paginatedItems, total } = await inventoryApi.getPaginated({
         page,
-        limit: LIMIT,
+        limit,
         search: debouncedSearchTerm,
         tab: activeTab,
         brand: selectedBrand !== "all" ? selectedBrand : undefined,
         type: selectedType !== "all" ? selectedType : undefined
       });
-      const more = page < Math.ceil(total / LIMIT);
-      setItems(prev => page === 1 ? paginatedItems : [...prev, ...paginatedItems]);
+      setItems(paginatedItems);
       setTotalItems(total);
-      setHasMore(more);
-      hasMoreRef.current = more;
+      setTotalPages(Math.ceil(total / limit) || 1);
 
     } catch (error: any) {
       console.error("Failed to load inventory:", error);
       setError(error.message || "Errore sconosciuto durante il caricamento inventario");
     } finally {
-      loadingRef.current = false;
       setLoading(false);
-      if (sentinelRef.current && observerRef.current) {
-        observerRef.current.unobserve(sentinelRef.current);
-        observerRef.current.observe(sentinelRef.current);
-      }
     }
   };
 
@@ -378,7 +350,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => { setActiveTab(val); setItems([]); setPage(1); setHasMore(true); }} className="w-full">
+        <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }} className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-slate-100 dark:bg-muted">
             <TabsTrigger value="all">Tutti</TabsTrigger>
             <TabsTrigger value="low_stock" className="data-[state=active]:text-amber-600">Basse Scorte</TabsTrigger>
@@ -501,18 +473,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
             )}
           </div>
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="h-4 mt-4" />
-          {loading && (
-            <div className="flex justify-center py-6">
-              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-            </div>
-          )}
-          {!hasMore && items.length > 0 && (
-            <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">
-              Tutti gli articoli caricati ({totalItems})
-            </p>
-          )}
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            loading={loading}
+            onPageChange={setPage}
+            totalItems={totalItems}
+            itemLabel="articoli"
+          />
         </>
       )}
 

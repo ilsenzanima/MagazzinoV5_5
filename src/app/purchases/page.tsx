@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, Paperclip, Package, PackageX } from "lucide-react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
-import { useState, useEffect, useRef, Suspense, useDeferredValue } from "react";
+import { useState, useEffect, Suspense, useDeferredValue } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { purchasesApi, Purchase } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -25,21 +26,11 @@ function PurchasesContent() {
   const debouncedSearch = useDeferredValue(searchTerm);
 
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const isFirstRender = useRef(true);
-  const loadingRef = useRef(false);
-  const hasMoreRef = useRef(true);
+  const [totalItems, setTotalItems] = useState(0);
   const LIMIT = 12;
 
-  // Reset list when filters change
   useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
-    setPurchases([]);
     setPage(1);
-    setHasMore(true);
-    hasMoreRef.current = true;
   }, [debouncedSearch, dateFrom, dateTo, initialSupplierId]);
 
   useEffect(() => {
@@ -48,7 +39,6 @@ function PurchasesContent() {
 
   const loadPurchases = async () => {
     try {
-      loadingRef.current = true;
       setLoading(true);
       const { data, total } = await purchasesApi.getPaginated({
         page,
@@ -58,34 +48,16 @@ function PurchasesContent() {
         dateFrom,
         dateTo,
       });
-      const more = page < Math.ceil(total / LIMIT);
-      setPurchases(prev => page === 1 ? data : [...prev, ...data]);
-      setHasMore(more);
-      hasMoreRef.current = more;
+      setPurchases(data);
+      setTotalItems(total);
     } catch (error) {
       console.error("Failed to load purchases", error);
     } finally {
-      loadingRef.current = false;
       setLoading(false);
-      if (sentinelRef.current && observerRef.current) {
-        observerRef.current.unobserve(sentinelRef.current);
-        observerRef.current.observe(sentinelRef.current);
-      }
     }
   };
 
-  // IntersectionObserver creato una sola volta — legge loading/hasMore tramite ref
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const root = document.getElementById("main-scroll");
-    observerRef.current = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
-      { root, rootMargin: "200px" }
-    );
-    observerRef.current.observe(el);
-    return () => observerRef.current?.disconnect();
-  }, []);
+  const totalPages = Math.ceil(totalItems / LIMIT);
 
   return (
     <>
@@ -239,16 +211,13 @@ function PurchasesContent() {
             )}
           </div>
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="h-4" />
-          {loading && (
-            <div className="flex justify-center py-6">
-              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-            </div>
-          )}
-          {!hasMore && purchases.length > 0 && (
-            <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">Tutti gli acquisti caricati</p>
-          )}
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            loading={loading}
+            onPageChange={setPage}
+            itemLabel="acquisti"
+          />
         </>
       )}
     </>
