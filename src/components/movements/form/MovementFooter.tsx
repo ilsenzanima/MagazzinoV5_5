@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,6 +32,10 @@ export function MovementFooter({
     notes, setNotes,
     linesCount = 1
 }: MovementFooterProps) {
+    useEffect(() => {
+        setPackagesCount(linesCount.toString());
+    }, [linesCount]);
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div className="space-y-4">
