@@ -17,8 +17,8 @@ export function ClientCard({ client, canEdit, onEdit, onDelete }: ClientCardProp
     return (
         <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
-                <CardTitle className="flex items-center justify-between">
-                    <span className="truncate">{client.name}</span>
+                <CardTitle className="flex items-start justify-between gap-2">
+                    <span className="break-words min-w-0">{client.name}</span>
                     {canEdit && (
                         <div className="flex gap-1">
                             <Button

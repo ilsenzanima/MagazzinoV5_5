@@ -208,10 +208,10 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold truncate" title={job.clientName}>
+            <div className="text-lg font-bold break-words" title={job.clientName}>
               {job.clientName || '-'}
             </div>
-            <div className="text-xs text-slate-500 mt-1 truncate" title={job.clientAddress}>
+            <div className="text-xs text-slate-500 mt-1 break-words" title={job.clientAddress}>
               {job.clientAddress || 'Indirizzo non disponibile'}
             </div>
           </CardContent>
@@ -225,7 +225,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm font-medium mb-1 truncate" title={job.siteAddress}>
+            <div className="text-sm font-medium mb-1 break-words" title={job.siteAddress}>
               {job.siteAddress || 'Indirizzo cantiere mancante'}
             </div>
             {job.siteManager && (
