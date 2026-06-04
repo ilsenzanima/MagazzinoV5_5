@@ -12,8 +12,6 @@ import {
   Search,
   Filter,
   Plus,
-  ChevronLeft,
-  ChevronRight,
   Package,
   ScanLine,
   Loader2
@@ -98,22 +96,29 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [error, setError] = useState<string | null>(null);
   const [pendingMap, setPendingMap] = useState<Map<string, { uscita: number; reso: number }>>(new Map());
 
-  // Pagination state
+  // Infinite scroll state
+  const LIMIT = 12;
   const [page, setPage] = useState(1);
-  const [limit] = useState(12); // Grid layout: 1, 2, 3, 4 cols
-  const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / 12) || 1);
   const [totalItems, setTotalItems] = useState(initialTotal);
+  const [hasMore, setHasMore] = useState(initialTotal > LIMIT);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
 
   // Debounce search term
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-      if (searchTerm !== debouncedSearchTerm) {
-        setPage(1); // Reset to first page on new search
-      }
     }, 500);
     return () => clearTimeout(handler);
-  }, [searchTerm, debouncedSearchTerm]);
+  }, [searchTerm]);
+
+  // Reset list when filters change
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setItems([]);
+    setPage(1);
+    setHasMore(true);
+  }, [debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
 
   // Load types if not provided (fallback)
   useEffect(() => {
@@ -151,35 +156,44 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
   const activeFiltersCount = (selectedBrand !== "all" ? 1 : 0) + (selectedType !== "all" ? 1 : 0);
 
-  // Load items when dependencies change
+  // Load items when page changes (filter changes reset page via the effect above)
   useEffect(() => {
-    // Skip first load if parameters match initial props
-    // This prevents double fetching on mount
-    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && items === initialItems) {
+    // Skip first render — we already have initialItems
+    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && items.length > 0) {
       return;
     }
-
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
+
+  // IntersectionObserver: load next page when sentinel is visible
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting && !loading && hasMore) setPage(p => p + 1); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, hasMore]);
 
   const loadItems = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Server-side pagination for ALL tabs (including low_stock via RPC)
       const { items: paginatedItems, total } = await inventoryApi.getPaginated({
         page,
-        limit,
+        limit: LIMIT,
         search: debouncedSearchTerm,
         tab: activeTab,
         brand: selectedBrand !== "all" ? selectedBrand : undefined,
         type: selectedType !== "all" ? selectedType : undefined
       });
-      setItems(paginatedItems);
+      setItems(prev => page === 1 ? paginatedItems : [...prev, ...paginatedItems]);
       setTotalItems(total);
-      setTotalPages(Math.ceil(total / limit) || 1);
+      setHasMore(page < Math.ceil(total / LIMIT));
 
     } catch (error: any) {
       console.error("Failed to load inventory:", error);
@@ -350,7 +364,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }} className="w-full">
+        <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => { setActiveTab(val); setItems([]); setPage(1); setHasMore(true); }} className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-slate-100 dark:bg-muted">
             <TabsTrigger value="all">Tutti</TabsTrigger>
             <TabsTrigger value="low_stock" className="data-[state=active]:text-amber-600">Basse Scorte</TabsTrigger>
@@ -475,31 +489,18 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
           {/* Pagination Controls */}
           {items.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between mt-8 border-t pt-4 dark:border-border gap-4">
-              <div className="text-sm text-slate-500 dark:text-slate-400 order-2 sm:order-1">
-                Pagina {page} di {totalPages} ({totalItems} articoli)
+            {/* Infinite scroll sentinel */}
+            <div ref={sentinelRef} className="h-4 mt-4" />
+            {loading && (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
               </div>
-              <div className="flex gap-2 order-1 sm:order-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Precedente
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                >
-                  Successiva
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
+            )}
+            {!hasMore && items.length > 0 && (
+              <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">
+                Tutti gli articoli caricati ({totalItems})
+              </p>
+            )}
           )}
         </>
       )}

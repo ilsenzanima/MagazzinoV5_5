@@ -4,9 +4,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, ChevronLeft, ChevronRight, Paperclip, Package, PackageX } from "lucide-react";
+import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, Paperclip, Package, PackageX } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, Suspense, useDeferredValue } from "react";
+import { useState, useEffect, useRef, Suspense, useDeferredValue } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { purchasesApi, Purchase } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +25,17 @@ function PurchasesContent() {
   const debouncedSearch = useDeferredValue(searchTerm);
 
   const [page, setPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
   const LIMIT = 12;
 
+  // Reset list when filters change
   useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setPurchases([]);
     setPage(1);
+    setHasMore(true);
   }, [debouncedSearch, dateFrom, dateTo, initialSupplierId]);
 
   useEffect(() => {
@@ -47,8 +53,8 @@ function PurchasesContent() {
         dateFrom,
         dateTo,
       });
-      setPurchases(data);
-      setTotalItems(total);
+      setPurchases(prev => page === 1 ? data : [...prev, ...data]);
+      setHasMore(page < Math.ceil(total / LIMIT));
     } catch (error) {
       console.error("Failed to load purchases", error);
     } finally {
@@ -56,7 +62,17 @@ function PurchasesContent() {
     }
   };
 
-  const totalPages = Math.ceil(totalItems / LIMIT);
+  // IntersectionObserver: load next page when sentinel is visible
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting && !loading && hasMore) setPage(p => p + 1); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, hasMore]);
 
   return (
     <>
@@ -210,29 +226,15 @@ function PurchasesContent() {
             )}
           </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-8">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1 || loading}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                Pagina {page} di {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages || loading}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="h-4" />
+          {loading && (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
             </div>
+          )}
+          {!hasMore && purchases.length > 0 && (
+            <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">Tutti gli acquisti caricati</p>
           )}
         </>
       )}
