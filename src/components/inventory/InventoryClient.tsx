@@ -103,6 +103,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [totalItems, setTotalItems] = useState(initialTotal);
   const [hasMore, setHasMore] = useState(initialTotal > LIMIT);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
   const isFirstRender = useRef(true);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(initialTotal > LIMIT);
@@ -175,12 +176,12 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     const el = sentinelRef.current;
     if (!el) return;
     const root = document.getElementById("main-scroll");
-    const observer = new IntersectionObserver(
+    observerRef.current = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
       { root, rootMargin: "200px" }
     );
-    observer.observe(el);
-    return () => observer.disconnect();
+    observerRef.current.observe(el);
+    return () => observerRef.current?.disconnect();
   }, []);
 
   const loadItems = async () => {
@@ -209,6 +210,10 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     } finally {
       loadingRef.current = false;
       setLoading(false);
+      if (sentinelRef.current && observerRef.current) {
+        observerRef.current.unobserve(sentinelRef.current);
+        observerRef.current.observe(sentinelRef.current);
+      }
     }
   };
 

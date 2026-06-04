@@ -27,6 +27,7 @@ function PurchasesContent() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
   const isFirstRender = useRef(true);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
@@ -66,6 +67,10 @@ function PurchasesContent() {
     } finally {
       loadingRef.current = false;
       setLoading(false);
+      if (sentinelRef.current && observerRef.current) {
+        observerRef.current.unobserve(sentinelRef.current);
+        observerRef.current.observe(sentinelRef.current);
+      }
     }
   };
 
@@ -74,12 +79,12 @@ function PurchasesContent() {
     const el = sentinelRef.current;
     if (!el) return;
     const root = document.getElementById("main-scroll");
-    const observer = new IntersectionObserver(
+    observerRef.current = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
       { root, rootMargin: "200px" }
     );
-    observer.observe(el);
-    return () => observer.disconnect();
+    observerRef.current.observe(el);
+    return () => observerRef.current?.disconnect();
   }, []);
 
   return (

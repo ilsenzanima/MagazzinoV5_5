@@ -35,6 +35,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialTotalPages > 1);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
   const isFirstRender = useRef(true);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(initialTotalPages > 1);
@@ -62,12 +63,12 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
     const el = sentinelRef.current;
     if (!el) return;
     const root = document.getElementById("main-scroll");
-    const observer = new IntersectionObserver(
+    observerRef.current = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) setPage(p => p + 1); },
       { root, rootMargin: "200px" }
     );
-    observer.observe(el);
-    return () => observer.disconnect();
+    observerRef.current.observe(el);
+    return () => observerRef.current?.disconnect();
   }, []);
 
   // Helper to extract numeric part from delivery note number (e.g., "4/PP26" -> 4)
@@ -115,6 +116,11 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
     } finally {
       loadingRef.current = false;
       setLoading(false);
+      // Re-check sentinel in caso sia ancora visibile dopo il caricamento
+      if (sentinelRef.current && observerRef.current) {
+        observerRef.current.unobserve(sentinelRef.current);
+        observerRef.current.observe(sentinelRef.current);
+      }
     }
   };
 
