@@ -191,7 +191,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <div className="flex justify-between items-start">
                       <div className="min-w-0 pr-2">
                         <div className="text-xs font-mono text-slate-500 dark:text-muted-foreground mb-1">{job.code}</div>
-                        <CardTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-white line-clamp-1" title={job.name}>{job.name}</CardTitle>
+                        <CardTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-white break-words" title={job.name}>{job.name}</CardTitle>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
                       </div>
                       <div className="flex flex-col items-end gap-2 shrink-0">
