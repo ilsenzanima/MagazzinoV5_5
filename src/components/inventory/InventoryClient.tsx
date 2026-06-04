@@ -487,20 +487,17 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
             )}
           </div>
 
-          {/* Pagination Controls */}
-          {items.length > 0 && (
-            {/* Infinite scroll sentinel */}
-            <div ref={sentinelRef} className="h-4 mt-4" />
-            {loading && (
-              <div className="flex justify-center py-6">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-              </div>
-            )}
-            {!hasMore && items.length > 0 && (
-              <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">
-                Tutti gli articoli caricati ({totalItems})
-              </p>
-            )}
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="h-4 mt-4" />
+          {loading && (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+            </div>
+          )}
+          {!hasMore && items.length > 0 && (
+            <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">
+              Tutti gli articoli caricati ({totalItems})
+            </p>
           )}
         </>
       )}
