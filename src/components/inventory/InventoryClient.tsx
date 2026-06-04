@@ -167,13 +167,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
 
-  // IntersectionObserver: load next page when sentinel is visible
+  // IntersectionObserver: load next page when sentinel is visible inside the scrollable main container
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
+    const root = document.getElementById("main-scroll");
     const observer = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting && !loading && hasMore) setPage(p => p + 1); },
-      { rootMargin: "200px" }
+      { root, rootMargin: "200px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
