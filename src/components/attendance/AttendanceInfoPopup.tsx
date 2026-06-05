@@ -44,15 +44,10 @@ export default function AttendanceInfoPopup({
 
                 <div className="space-y-3 py-4">
                     {assignments.length === 0 ? (
-                        <div className="text-center py-6 space-y-4">
+                        <div className="text-center py-6">
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                                 Nessuna presenza registrata
                             </p>
-                            {canEdit && onAddPresence && (
-                                <Button onClick={onAddPresence} className="bg-blue-600 hover:bg-blue-700">
-                                    Aggiungi Presenza
-                                </Button>
-                            )}
                         </div>
                     ) : (
                         assignments.map((assignment) => (
@@ -115,7 +110,14 @@ export default function AttendanceInfoPopup({
                     )}
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex justify-between items-center">
+                    {canEdit && onAddPresence ? (
+                        <Button onClick={onAddPresence} className="bg-blue-600 hover:bg-blue-700">
+                            Aggiungi Presenza
+                        </Button>
+                    ) : (
+                        <span />
+                    )}
                     <Button variant="outline" onClick={onClose}>
                         Chiudi
                     </Button>
