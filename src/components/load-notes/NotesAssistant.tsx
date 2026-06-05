@@ -71,6 +71,13 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
         }
         setCheckedItems(next);
 
+        // Also update the notes array so item.isChecked reflects the new state
+        setNotes(prev => prev.map(n =>
+            n.id === noteId
+                ? { ...n, items: n.items.map(i => i.id === itemId ? { ...i, isChecked: newChecked } : i) }
+                : n
+        ));
+
         // Persist to service (syncs with note detail page)
         try {
             await loadNotesService.toggleItemCheck(noteId, itemId, newChecked);

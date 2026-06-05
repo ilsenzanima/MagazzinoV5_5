@@ -242,11 +242,18 @@ export function MovementMaterialDialog({
     const toggleCheck = async (noteId: string, itemId: string, currentChecked?: boolean) => {
         // Use the passed current state, or fall back to local set
         const isChecked = currentChecked ?? checkedItems.has(itemId);
+        const newChecked = !isChecked;
         const next = new Set(checkedItems);
-        isChecked ? next.delete(itemId) : next.add(itemId);
+        newChecked ? next.add(itemId) : next.delete(itemId);
         setCheckedItems(next);
+        // Also update the notes array so item.isChecked reflects the new state immediately
+        setNotes(prev => prev.map(n =>
+            n.id === noteId
+                ? { ...n, items: n.items.map(i => i.id === itemId ? { ...i, isChecked: newChecked } : i) }
+                : n
+        ));
         try {
-            await loadNotesService.toggleItemCheck(noteId, itemId, !isChecked);
+            await loadNotesService.toggleItemCheck(noteId, itemId, newChecked);
         } catch (error) {
             console.error("Failed to toggle item check", error);
         }
