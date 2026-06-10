@@ -209,8 +209,24 @@ export interface Purchase {
     documentUrls?: string[];
     totalAmount?: number;
     isExhausted?: boolean;
+    invoiceId?: string | null;
+    invoiceNumber?: string;
 }
 
+// Invoices
+export interface Invoice {
+    id: string;
+    supplierId: string;
+    supplierName?: string;
+    invoiceNumber: string;
+    invoiceDate: string;
+    documentUrls?: string[];
+    totalAmount?: number;
+    notes?: string;
+    createdBy?: string;
+    createdAt: string;
+    purchases?: { id: string; deliveryNoteNumber: string; totalAmount?: number }[];
+}
 
 export interface PurchaseItem {
     id: string;

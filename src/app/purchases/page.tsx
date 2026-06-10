@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, Paperclip, Package, PackageX } from "lucide-react";
+import { Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle, Paperclip, Package, PackageX, Receipt } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
 import { useState, useEffect, Suspense, useDeferredValue } from "react";
@@ -72,6 +72,12 @@ function PurchasesContent() {
                 <Button variant="outline">Mostra Tutti</Button>
               </Link>
             )}
+            <Link href="/invoices" className="flex-1 sm:flex-none">
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Receipt className="mr-2 h-4 w-4" />
+                Fatturazione
+              </Button>
+            </Link>
             {(userRole === 'admin' || userRole === 'operativo') && (
               <Link href="/purchases/new" className="flex-1 sm:flex-none">
                 <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
@@ -164,6 +170,11 @@ function PurchasesContent() {
                           </div>
                           {/* Status Icons */}
                           <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                            {purchase.invoiceId && (
+                              <span title="Fattura collegata">
+                                <Receipt className="h-4 w-4 text-blue-500" />
+                              </span>
+                            )}
                             {purchase.isExhausted ? (
                               <span title="Materiale esaurito">
                                 <PackageX className="h-4 w-4 text-slate-400" />

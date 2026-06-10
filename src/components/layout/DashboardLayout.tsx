@@ -20,7 +20,8 @@ import {
   Building2,
   HardHat,
   Calendar,
-  Scissors
+  Scissors,
+  Receipt
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -59,6 +60,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           icon: ShoppingCart,
           href: "/purchases",
           active: pathname === "/purchases" || pathname.startsWith("/purchases/"),
+        },
+        {
+          label: "Fatturazione",
+          icon: Receipt,
+          href: "/invoices",
+          active: pathname === "/invoices" || pathname.startsWith("/invoices/"),
         },
         {
           label: "Movimentazione",

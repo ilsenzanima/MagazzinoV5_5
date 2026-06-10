@@ -22,7 +22,8 @@ export const mapDbToPurchase = (db: any): Purchase => ({
     documentUrls: (db.document_urls && db.document_urls.length > 0)
         ? db.document_urls
         : (db.document_url ? [db.document_url] : []),
-    totalAmount: db.purchase_items?.reduce((sum: number, item: any) => sum + ((item.price || 0) * (item.quantity || 1)), 0)
+    totalAmount: db.purchase_items?.reduce((sum: number, item: any) => sum + ((item.price || 0) * (item.quantity || 1)), 0),
+    invoiceId: db.invoice_id ?? null,
 });
 
 
