@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Save, Trash2, Loader2, Search, X, Upload } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     suppliersApi,
     inventoryApi,
@@ -69,6 +69,8 @@ const ensureTrailingEmpty = (lines: PurchaseLine[]): PurchaseLine[] => {
 
 export default function NewPurchasePage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const isOrder = searchParams?.get("type") === "order";
     const { userRole } = useAuth();
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
@@ -80,11 +82,11 @@ export default function NewPurchasePage() {
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center h-full py-20">
                     <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
-                    <p className="text-slate-500 mb-6">Non hai i permessi necessari per registrare nuovi acquisti.</p>
+                    <p className="text-slate-500 mb-6">Non hai i permessi necessari.</p>
                     <Link href="/purchases">
                         <Button variant="outline">
                             <ArrowLeft className="mr-2 h-4 w-4" />
-                            Torna agli Acquisti
+                            Torna
                         </Button>
                     </Link>
                 </div>
@@ -340,7 +342,8 @@ export default function NewPurchasePage() {
                 deliveryNoteDate: formData.deliveryNoteDate,
                 notes: '',
                 jobId: formData.jobId || undefined,
-                documentUrls
+                documentUrls,
+                orderType: isOrder ? 'order' : 'purchase',
             });
 
             for (const line of validLines) {
@@ -357,7 +360,7 @@ export default function NewPurchasePage() {
                 });
             }
 
-            router.push('/purchases');
+            router.push(isOrder ? '/purchases?tab=ordini' : '/purchases');
         } catch (error: any) {
             console.error("Failed to save purchase", error);
             alert(`Errore durante il salvataggio: ${error.message || error.toString()}`);
@@ -386,18 +389,20 @@ export default function NewPurchasePage() {
         <DashboardLayout>
             <div className="max-w-5xl mx-auto pb-10">
                 <div className="mb-6">
-                    <Link href="/purchases" className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
+                    <Link href={isOrder ? "/purchases?tab=ordini" : "/purchases"} className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        Torna agli Acquisti
+                        {isOrder ? "Torna agli Ordini" : "Torna agli Acquisti"}
                     </Link>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Registrazione Acquisto / Bolla</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {isOrder ? "Registrazione Ordine" : "Registrazione Acquisto / Bolla"}
+                    </h1>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Header Data */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Dati Bolla</CardTitle>
+                            <CardTitle>{isOrder ? "Dati Ordine" : "Dati Bolla"}</CardTitle>
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="space-y-2">

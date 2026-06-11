@@ -200,7 +200,8 @@ export interface Purchase {
     createdBy?: string;
     createdByName?: string;
     createdAt: string;
-    items?: { price: number; quantity?: number }[];
+    items?: { price: number; quantity?: number; itemName?: string; itemModel?: string }[];
+    orderType?: 'purchase' | 'order';
     price?: number;
     quantity?: number;
     jobId?: string;
@@ -225,7 +226,12 @@ export interface Invoice {
     notes?: string;
     createdBy?: string;
     createdAt: string;
-    purchases?: { id: string; deliveryNoteNumber: string; totalAmount?: number }[];
+    purchases?: {
+        id: string;
+        deliveryNoteNumber: string;
+        totalAmount?: number;
+        items?: { itemName?: string; itemModel?: string; quantity?: number; price?: number }[];
+    }[];
 }
 
 export interface PurchaseItem {

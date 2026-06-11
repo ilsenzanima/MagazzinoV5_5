@@ -14,8 +14,11 @@ export const mapDbToPurchase = (db: any): Purchase => ({
     createdAt: db.created_at,
     items: db.purchase_items?.map((item: any) => ({
         price: item.price,
-        quantity: item.quantity
+        quantity: item.quantity,
+        itemName: item.inventory?.name,
+        itemModel: item.inventory?.model,
     })),
+    orderType: db.order_type ?? 'purchase',
     jobId: db.job_id,
     jobCode: db.jobs?.code,
     documentUrl: db.document_url,
@@ -56,19 +59,20 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('*, suppliers(name), purchase_items(price, quantity)')
+                .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model))')
                 .order('delivery_note_date', { ascending: false })
         );
         if (error) throw error;
         return data.map(mapDbToPurchase);
     },
-    getPaginated: async ({ page = 1, limit = 10, search = '', supplierId = '', dateFrom = '', dateTo = '' }) => {
+    getPaginated: async ({ page = 1, limit = 10, search = '', supplierId = '', dateFrom = '', dateTo = '', orderType = 'purchase' as 'purchase' | 'order' }) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
         let query = supabase
             .from('purchases')
-            .select('*, suppliers(name), purchase_items(price, quantity)', { count: 'estimated' });
+            .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model))', { count: 'estimated' })
+            .eq('order_type', orderType);
 
         if (supplierId) {
             query = query.eq('supplier_id', supplierId);
@@ -158,7 +162,10 @@ export const purchasesApi = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Utente non autenticato");
 
-        const dbPurchase = mapPurchaseToDb({ ...purchase, createdBy: user.id });
+        const dbPurchase = {
+            ...mapPurchaseToDb({ ...purchase, createdBy: user.id }),
+            order_type: purchase.orderType ?? 'purchase',
+        };
 
         const { data, error } = await supabase.from('purchases').insert(dbPurchase).select('*, suppliers(name)').single();
         if (error) throw error;

@@ -34,7 +34,7 @@ export default function NewInvoicePage() {
                 <div className="flex flex-col items-center justify-center h-full py-20">
                     <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Negato</h2>
                     <p className="text-slate-500 mb-6">Non hai i permessi necessari per registrare fatture.</p>
-                    <Link href="/invoices">
+                    <Link href="/purchases?tab=fatture">
                         <Button variant="outline">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Torna alle Fatture
@@ -135,7 +135,7 @@ export default function NewInvoicePage() {
             await invoicesApi.updateTotal(invoice.id, totalAmount);
 
             notify.success("Fattura salvata con successo");
-            router.push('/invoices');
+            router.push('/purchases?tab=fatture');
         } catch (error: any) {
             console.error("Failed to save invoice", error);
             notify.error(`Errore durante il salvataggio: ${error.message || error.toString()}`);
@@ -148,7 +148,7 @@ export default function NewInvoicePage() {
         <DashboardLayout>
             <div className="max-w-4xl mx-auto pb-10">
                 <div className="mb-6">
-                    <Link href="/invoices" className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
+                    <Link href="/purchases?tab=fatture" className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         Torna alle Fatture
                     </Link>

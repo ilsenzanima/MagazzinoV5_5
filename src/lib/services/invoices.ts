@@ -20,6 +20,12 @@ const mapDbToInvoice = (db: any): Invoice => ({
             (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1),
             0
         ),
+        items: p.purchase_items?.map((i: any) => ({
+            itemName: i.inventory?.name,
+            itemModel: i.inventory?.model,
+            quantity: i.quantity,
+            price: i.price,
+        })),
     })),
 });
 
@@ -58,7 +64,7 @@ export const invoicesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('invoices')
-                .select('*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity))')
+                .select('*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity, inventory(name, model)))')
                 .eq('id', id)
                 .single()
         );

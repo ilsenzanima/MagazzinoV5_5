@@ -62,12 +62,6 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           active: pathname === "/purchases" || pathname.startsWith("/purchases/"),
         },
         {
-          label: "Fatturazione",
-          icon: Receipt,
-          href: "/invoices",
-          active: pathname === "/invoices" || pathname.startsWith("/invoices/"),
-        },
-        {
           label: "Movimentazione",
           icon: Truck,
           href: "/movements",
