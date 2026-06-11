@@ -21,6 +21,7 @@ const mapDbToInvoice = (db: any): Invoice => ({
             0
         ),
         items: p.purchase_items?.map((i: any) => ({
+            id: i.id,
             itemName: i.inventory?.name,
             itemModel: i.inventory?.model,
             quantity: i.quantity,

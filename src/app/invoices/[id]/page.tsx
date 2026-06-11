@@ -7,16 +7,89 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     ArrowLeft, FileText, Calendar, User, Loader2, ExternalLink,
-    Trash2, ChevronDown, ChevronRight, Pencil, X, Save
+    Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { invoicesApi, suppliersApi, Invoice, Supplier } from "@/lib/api";
+import { invoicesApi, purchasesApi, suppliersApi, Invoice, Supplier } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
 import { InvoiceDocuments } from "@/components/invoices/InvoiceDocuments";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// ── Inline editable price row ─────────────────────────────────────────────────
+
+function ItemPriceRow({
+    item,
+    canEdit,
+    onSaved,
+}: {
+    item: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number };
+    canEdit: boolean;
+    onSaved: () => void;
+}) {
+    const [price, setPrice] = useState(item.price?.toFixed(2) ?? "");
+    const [saving, setSaving] = useState(false);
+    const qty = item.quantity ?? 0;
+    const total = (parseFloat(price) || 0) * qty;
+
+    const save = async () => {
+        const p = parseFloat(price);
+        if (isNaN(p)) return;
+        if (p === item.price) return;
+        try {
+            setSaving(true);
+            await purchasesApi.updateItem(item.id, { price: p });
+            notify.success("Prezzo aggiornato");
+            onSaved();
+        } catch (e: any) {
+            notify.error(`Errore: ${e.message}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <tr className="border-b border-slate-100 dark:border-slate-700/50 last:border-0">
+            <td className="py-1.5 pr-2">
+                <span className="font-medium text-slate-700 dark:text-slate-300">{item.itemName || '—'}</span>
+                {item.itemModel && <span className="text-slate-400 ml-1">({item.itemModel})</span>}
+            </td>
+            <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-16">{qty}</td>
+            {canEdit ? (
+                <>
+                    <td className="py-1 w-28 pl-2">
+                        <div className="flex items-center gap-1">
+                            <span className="text-slate-400 text-xs">€</span>
+                            <Input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="0.00001"
+                                value={price}
+                                onChange={e => setPrice(e.target.value)}
+                                onBlur={save}
+                                className="h-7 text-right px-1 text-xs w-20"
+                            />
+                            {saving && <Loader2 className="h-3 w-3 animate-spin text-slate-400 shrink-0" />}
+                        </div>
+                    </td>
+                    <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-24 pr-1">
+                        {!isNaN(total) ? `€ ${total.toFixed(2)}` : '—'}
+                    </td>
+                </>
+            ) : (
+                <td className="py-1.5 text-right text-slate-600 dark:text-slate-400" colSpan={2}>
+                    {item.price != null ? `€ ${item.price.toFixed(2)}` : '—'}
+                </td>
+            )}
+        </tr>
+    );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function InvoiceDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -27,13 +100,21 @@ export default function InvoiceDetailPage() {
     const [deleting, setDeleting] = useState(false);
     const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
 
-    // Edit state
+    // Edit header state
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [editData, setEditData] = useState({ supplierId: "", invoiceNumber: "", invoiceDate: "", notes: "" });
 
+    // Edit linked purchases state
+    const [availablePurchases, setAvailablePurchases] = useState<{ id: string; deliveryNoteNumber: string; deliveryNoteDate: string; totalAmount: number }[]>([]);
+    const [loadingAvailable, setLoadingAvailable] = useState(false);
+    const [toAdd, setToAdd] = useState<Set<string>>(new Set());
+    const [toRemove, setToRemove] = useState<Set<string>>(new Set());
+    const [savingLinks, setSavingLinks] = useState(false);
+
     const load = () => {
+        setLoading(true);
         invoicesApi.getById(id)
             .then(inv => {
                 setInvoice(inv);
@@ -50,14 +131,24 @@ export default function InvoiceDetailPage() {
 
     useEffect(() => { load(); }, [id]);
 
+    // Load suppliers + available purchases when entering edit mode
     const startEdit = () => {
         if (suppliers.length === 0) {
             suppliersApi.getAll().then(setSuppliers).catch(console.error);
         }
+        if (invoice) {
+            setLoadingAvailable(true);
+            invoicesApi.getUnlinkedPurchasesBySupplier(invoice.supplierId)
+                .then(setAvailablePurchases)
+                .catch(console.error)
+                .finally(() => setLoadingAvailable(false));
+        }
+        setToAdd(new Set());
+        setToRemove(new Set());
         setIsEditing(true);
     };
 
-    const handleSave = async () => {
+    const handleSaveHeader = async () => {
         if (!editData.invoiceNumber || !editData.invoiceDate) {
             notify.warning("Numero e data fattura sono obbligatori");
             return;
@@ -65,7 +156,7 @@ export default function InvoiceDetailPage() {
         try {
             setSaving(true);
             await invoicesApi.update(id, editData);
-            notify.success("Fattura aggiornata");
+            notify.success("Dati aggiornati");
             setIsEditing(false);
             load();
         } catch (error: any) {
@@ -75,11 +166,37 @@ export default function InvoiceDetailPage() {
         }
     };
 
+    const handleSaveLinks = async () => {
+        if (toAdd.size === 0 && toRemove.size === 0) {
+            setIsEditing(false);
+            return;
+        }
+        try {
+            setSavingLinks(true);
+            await Promise.all([
+                ...[...toAdd].map(pid => invoicesApi.linkPurchase(id, pid)),
+                ...[...toRemove].map(pid => invoicesApi.unlinkPurchase(pid)),
+            ]);
+            // Recalculate total
+            const inv = await invoicesApi.getById(id);
+            const newTotal = inv.purchases?.reduce((s, p) => s + (p.totalAmount ?? 0), 0) ?? 0;
+            await invoicesApi.updateTotal(id, newTotal);
+            notify.success("Bolle aggiornate");
+            setIsEditing(false);
+            setToAdd(new Set());
+            setToRemove(new Set());
+            load();
+        } catch (error: any) {
+            notify.error(`Errore: ${error.message}`);
+        } finally {
+            setSavingLinks(false);
+        }
+    };
+
     const togglePurchase = (purchaseId: string) => {
         setExpandedPurchases(prev => {
             const next = new Set(prev);
-            if (next.has(purchaseId)) next.delete(purchaseId);
-            else next.add(purchaseId);
+            next.has(purchaseId) ? next.delete(purchaseId) : next.add(purchaseId);
             return next;
         });
     };
@@ -114,9 +231,13 @@ export default function InvoiceDetailPage() {
     const canSeeAmounts = userRole === 'admin' || userRole === 'operativo';
     const canEdit = userRole === 'admin' || userRole === 'operativo';
 
+    // Current linked purchases, minus those marked for removal
+    const linkedPurchases = (invoice.purchases ?? []).filter(p => !toRemove.has(p.id));
+
     return (
         <DashboardLayout>
             <div className="max-w-3xl mx-auto pb-10">
+                {/* Header */}
                 <div className="mb-6 flex items-start justify-between">
                     <div>
                         <Link href="/purchases?tab=fatture" className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
@@ -142,17 +263,17 @@ export default function InvoiceDetailPage() {
                 </div>
 
                 <div className="space-y-6">
-                    {/* Dati fattura — view o edit */}
+                    {/* ── Dati fattura ── */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between py-4">
                             <CardTitle>Dati Fattura</CardTitle>
                             {isEditing && (
                                 <div className="flex gap-2">
-                                    <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} disabled={saving}>
+                                    <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} disabled={saving || savingLinks}>
                                         <X className="h-4 w-4 mr-1" />Annulla
                                     </Button>
-                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={handleSave} disabled={saving}>
-                                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-1" />Salva</>}
+                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={async () => { await handleSaveHeader(); await handleSaveLinks(); }} disabled={saving || savingLinks}>
+                                        {(saving || savingLinks) ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-1" />Salva</>}
                                     </Button>
                                 </div>
                             )}
@@ -213,40 +334,43 @@ export default function InvoiceDetailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Documenti — SOPRA le bolle */}
+                    {/* ── Documenti ── */}
                     <InvoiceDocuments
                         invoiceId={id}
                         documentUrls={invoice.documentUrls}
                         onUpdate={load}
                     />
 
-                    {/* Bolle collegate con dropdown articoli */}
-                    {invoice.purchases && invoice.purchases.length > 0 && (
-                        <Card>
-                            <CardHeader><CardTitle>Bolle Collegate</CardTitle></CardHeader>
-                            <CardContent className="p-0">
+                    {/* ── Bolle collegate ── */}
+                    <Card>
+                        <CardHeader className="py-4">
+                            <CardTitle>Bolle Collegate</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {/* Bolle attuali */}
+                            {linkedPurchases.length > 0 ? (
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-slate-500">
                                             <th className="w-8 py-2 pl-4"></th>
                                             <th className="text-left py-2 px-2">Numero Bolla</th>
                                             {canSeeAmounts && <th className="text-right py-2 px-4">Importo</th>}
-                                            <th className="w-10 py-2 px-4"></th>
+                                            <th className="w-10 py-2 px-2"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {invoice.purchases.map((p) => {
+                                        {linkedPurchases.map((p) => {
                                             const isExpanded = expandedPurchases.has(p.id);
                                             const hasItems = p.items && p.items.length > 0;
                                             return (
                                                 <>
                                                     <tr
                                                         key={p.id}
-                                                        className={`border-b hover:bg-slate-50 dark:hover:bg-slate-800 ${hasItems ? 'cursor-pointer' : ''}`}
-                                                        onClick={() => hasItems && togglePurchase(p.id)}
+                                                        className={`border-b hover:bg-slate-50 dark:hover:bg-slate-800 ${hasItems && !isEditing ? 'cursor-pointer' : ''}`}
+                                                        onClick={() => !isEditing && hasItems && togglePurchase(p.id)}
                                                     >
                                                         <td className="py-2.5 pl-4">
-                                                            {hasItems && (
+                                                            {!isEditing && hasItems && (
                                                                 isExpanded
                                                                     ? <ChevronDown className="h-4 w-4 text-slate-400" />
                                                                     : <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -258,44 +382,43 @@ export default function InvoiceDetailPage() {
                                                                 {p.totalAmount !== undefined ? `€ ${p.totalAmount.toFixed(2)}` : '—'}
                                                             </td>
                                                         )}
-                                                        <td className="py-2.5 px-4" onClick={e => e.stopPropagation()}>
-                                                            <Link href={`/purchases/${p.id}`} className="text-blue-500 hover:text-blue-700">
-                                                                <ExternalLink className="h-3.5 w-3.5" />
-                                                            </Link>
+                                                        <td className="py-2.5 px-2">
+                                                            {isEditing ? (
+                                                                <button
+                                                                    title="Rimuovi bolla"
+                                                                    className="text-red-400 hover:text-red-600"
+                                                                    onClick={() => setToRemove(prev => { const n = new Set(prev); n.add(p.id); return n; })}
+                                                                >
+                                                                    <X className="h-4 w-4" />
+                                                                </button>
+                                                            ) : (
+                                                                <Link href={`/purchases/${p.id}`} className="text-blue-500 hover:text-blue-700">
+                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                </Link>
+                                                            )}
                                                         </td>
                                                     </tr>
 
-                                                    {isExpanded && hasItems && (
+                                                    {/* Dropdown articoli con prezzi editabili */}
+                                                    {isExpanded && !isEditing && hasItems && (
                                                         <tr key={`${p.id}-items`} className="border-b bg-slate-50 dark:bg-slate-800/50">
                                                             <td colSpan={canSeeAmounts ? 4 : 3} className="py-2 px-4">
                                                                 <table className="w-full text-xs">
                                                                     <thead>
                                                                         <tr className="text-slate-400 border-b border-slate-200 dark:border-slate-700">
                                                                             <th className="text-left py-1">Articolo</th>
-                                                                            <th className="text-right py-1 w-20">Quantità</th>
-                                                                            {canSeeAmounts && <th className="text-right py-1 w-24">Prezzo Unit.</th>}
+                                                                            <th className="text-right py-1 w-16">Qtà</th>
+                                                                            {canSeeAmounts && <><th className="text-right py-1 w-28 pl-2">Prezzo Unit.</th><th className="text-right py-1 w-24">Totale Riga</th></>}
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
-                                                                        {p.items!.map((item, idx) => (
-                                                                            <tr key={idx} className="border-b border-slate-100 dark:border-slate-700/50 last:border-0">
-                                                                                <td className="py-1.5">
-                                                                                    <span className="font-medium text-slate-700 dark:text-slate-300">
-                                                                                        {item.itemName || '—'}
-                                                                                    </span>
-                                                                                    {item.itemModel && (
-                                                                                        <span className="text-slate-400 ml-1">({item.itemModel})</span>
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="py-1.5 text-right text-slate-600 dark:text-slate-400">
-                                                                                    {item.quantity ?? '—'}
-                                                                                </td>
-                                                                                {canSeeAmounts && (
-                                                                                    <td className="py-1.5 text-right text-slate-600 dark:text-slate-400">
-                                                                                        {item.price != null ? `€ ${item.price.toFixed(2)}` : '—'}
-                                                                                    </td>
-                                                                                )}
-                                                                            </tr>
+                                                                        {p.items!.map((item) => (
+                                                                            <ItemPriceRow
+                                                                                key={item.id}
+                                                                                item={item}
+                                                                                canEdit={canSeeAmounts}
+                                                                                onSaved={load}
+                                                                            />
                                                                         ))}
                                                                     </tbody>
                                                                 </table>
@@ -307,9 +430,45 @@ export default function InvoiceDetailPage() {
                                         })}
                                     </tbody>
                                 </table>
-                            </CardContent>
-                        </Card>
-                    )}
+                            ) : (
+                                <p className="text-center py-6 text-slate-400 text-sm">Nessuna bolla collegata</p>
+                            )}
+
+                            {/* Aggiungi bolle in modalità edit */}
+                            {isEditing && (
+                                <div className="border-t p-4">
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-1">
+                                        <Plus className="h-4 w-4" />Aggiungi bolle disponibili
+                                    </p>
+                                    {loadingAvailable ? (
+                                        <div className="flex items-center gap-2 text-slate-400 text-sm">
+                                            <Loader2 className="h-4 w-4 animate-spin" />Caricamento...
+                                        </div>
+                                    ) : availablePurchases.length === 0 ? (
+                                        <p className="text-slate-400 text-sm">Nessuna bolla disponibile per questo fornitore</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {availablePurchases.map(p => (
+                                                <label key={p.id} className="flex items-center gap-3 p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                                                    <Checkbox
+                                                        checked={toAdd.has(p.id)}
+                                                        onCheckedChange={checked => setToAdd(prev => {
+                                                            const n = new Set(prev);
+                                                            checked ? n.add(p.id) : n.delete(p.id);
+                                                            return n;
+                                                        })}
+                                                    />
+                                                    <span className="flex-1 text-sm font-medium">{p.deliveryNoteNumber}</span>
+                                                    <span className="text-xs text-slate-500">{new Date(p.deliveryNoteDate).toLocaleDateString('it-IT')}</span>
+                                                    {canSeeAmounts && <span className="text-sm font-medium">€ {p.totalAmount.toFixed(2)}</span>}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </DashboardLayout>

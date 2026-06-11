@@ -230,7 +230,7 @@ export interface Invoice {
         id: string;
         deliveryNoteNumber: string;
         totalAmount?: number;
-        items?: { itemName?: string; itemModel?: string; quantity?: number; price?: number }[];
+        items?: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number }[];
     }[];
 }
 
