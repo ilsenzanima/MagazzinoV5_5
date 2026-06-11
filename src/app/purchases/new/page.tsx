@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Save, Trash2, Loader2, Search, X, Upload } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     suppliersApi,
@@ -67,7 +67,7 @@ const ensureTrailingEmpty = (lines: PurchaseLine[]): PurchaseLine[] => {
     return lines;
 };
 
-export default function NewPurchasePage() {
+function NewPurchaseContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const isOrder = searchParams?.get("type") === "order";
@@ -748,5 +748,17 @@ export default function NewPurchasePage() {
                 loading={jobsLoading}
             />
         </DashboardLayout>
+    );
+}
+
+export default function NewPurchasePage() {
+    return (
+        <Suspense fallback={
+            <div className="flex justify-center items-center h-screen">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+        }>
+            <NewPurchaseContent />
+        </Suspense>
     );
 }
