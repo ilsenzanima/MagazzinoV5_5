@@ -430,7 +430,12 @@ function NewPurchaseContent() {
                 });
             }
 
-            router.push(isOrder ? '/purchases?tab=ordini' : '/purchases');
+            // Se creato da ordini, segna gli ordini come evasi
+            if (fromOrderIds.length > 0) {
+                await purchasesApi.markOrdersAsConverted(fromOrderIds, purchase.id);
+            }
+
+            router.push(fromOrderIds.length > 0 ? '/purchases?tab=ordini' : isOrder ? '/purchases?tab=ordini' : '/purchases');
         } catch (error: any) {
             console.error("Failed to save purchase", error);
             alert(`Errore durante il salvataggio: ${error.message || error.toString()}`);

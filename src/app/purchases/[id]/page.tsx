@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -625,6 +625,36 @@ export default function PurchaseDetailPage() {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Fattura o Ordine collegato */}
+                            {(purchase.invoiceId || purchase.convertedPurchaseId) && (
+                                <div className="md:col-span-2 border-t pt-4 mt-2 flex flex-wrap gap-3">
+                                    {purchase.invoiceId && purchase.invoiceNumber && (
+                                        <a
+                                            href={`/invoices/${purchase.invoiceId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md px-3 py-1.5"
+                                        >
+                                            <Receipt className="h-4 w-4" />
+                                            Fattura: {purchase.invoiceNumber}
+                                            <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />
+                                        </a>
+                                    )}
+                                    {purchase.convertedPurchaseId && purchase.convertedPurchaseNumber && (
+                                        <a
+                                            href={`/purchases/${purchase.convertedPurchaseId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md px-3 py-1.5"
+                                        >
+                                            <ClipboardList className="h-4 w-4" />
+                                            Acquisto: {purchase.convertedPurchaseNumber}
+                                            <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />
+                                        </a>
+                                    )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 

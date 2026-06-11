@@ -160,6 +160,11 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              {isOrder && purchase.convertedPurchaseId && (
+                                <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                  Evaso
+                                </span>
+                              )}
                               {purchase.invoiceId && (
                                 <span title="Fattura collegata"><Receipt className="h-4 w-4 text-blue-500" /></span>
                               )}

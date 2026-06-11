@@ -240,7 +240,9 @@ export interface Purchase {
     totalAmount?: number;
     isExhausted?: boolean;
     invoiceId?: string | null;
-    invoiceNumber?: string;
+    invoiceNumber?: string | null;
+    convertedPurchaseId?: string | null;
+    convertedPurchaseNumber?: string | null;
 }
 
 // Invoices

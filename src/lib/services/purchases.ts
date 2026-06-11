@@ -27,6 +27,9 @@ export const mapDbToPurchase = (db: any): Purchase => ({
         : (db.document_url ? [db.document_url] : []),
     totalAmount: db.purchase_items?.reduce((sum: number, item: any) => sum + ((item.price || 0) * (item.quantity || 1)), 0),
     invoiceId: db.invoice_id ?? null,
+    invoiceNumber: db.invoices?.invoice_number ?? null,
+    convertedPurchaseId: db.converted_purchase_id ?? null,
+    convertedPurchaseNumber: db.converted_purchase?.delivery_note_number ?? null,
 });
 
 
@@ -71,7 +74,7 @@ export const purchasesApi = {
 
         let query = supabase
             .from('purchases')
-            .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model))', { count: 'estimated' })
+            .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model)), invoices(invoice_number), converted_purchase:converted_purchase_id(delivery_note_number)', { count: 'estimated' })
             .eq('order_type', orderType);
 
         if (supplierId) {
@@ -151,7 +154,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('*, suppliers(name), profiles(full_name)')
+                .select('*, suppliers(name), profiles(full_name), invoices(invoice_number), converted_purchase:converted_purchase_id(id, delivery_note_number)')
                 .eq('id', id)
                 .single()
         );
@@ -283,6 +286,15 @@ export const purchasesApi = {
     },
     deleteItem: async (id: string) => {
         const { error } = await supabase.from('purchase_items').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    // Mark source orders as converted (sets converted_purchase_id on each order)
+    markOrdersAsConverted: async (orderIds: string[], purchaseId: string) => {
+        const { error } = await supabase
+            .from('purchases')
+            .update({ converted_purchase_id: purchaseId })
+            .in('id', orderIds);
         if (error) throw error;
     },
 
