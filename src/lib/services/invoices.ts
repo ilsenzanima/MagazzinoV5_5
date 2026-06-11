@@ -150,6 +150,16 @@ export const invoicesApi = {
         }));
     },
 
+    update: async (id: string, data: { invoiceNumber?: string; invoiceDate?: string; notes?: string; supplierId?: string }) => {
+        const updates: any = {};
+        if (data.invoiceNumber !== undefined) updates.invoice_number = data.invoiceNumber;
+        if (data.invoiceDate !== undefined) updates.invoice_date = data.invoiceDate;
+        if (data.notes !== undefined) updates.notes = data.notes;
+        if (data.supplierId !== undefined) updates.supplier_id = data.supplierId;
+        const { error } = await supabase.from('invoices').update(updates).eq('id', id);
+        if (error) throw error;
+    },
+
     delete: async (id: string) => {
         // Unlink all purchases first
         await supabase.from('purchases').update({ invoice_id: null }).eq('invoice_id', id);

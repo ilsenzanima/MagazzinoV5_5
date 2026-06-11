@@ -3,14 +3,20 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, FileText, Calendar, User, Loader2, ExternalLink, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    ArrowLeft, FileText, Calendar, User, Loader2, ExternalLink,
+    Trash2, ChevronDown, ChevronRight, Pencil, X, Save
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { invoicesApi, Invoice } from "@/lib/api";
+import { invoicesApi, suppliersApi, Invoice, Supplier } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
 import { InvoiceDocuments } from "@/components/invoices/InvoiceDocuments";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function InvoiceDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -21,14 +27,53 @@ export default function InvoiceDetailPage() {
     const [deleting, setDeleting] = useState(false);
     const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
 
+    // Edit state
+    const [isEditing, setIsEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [editData, setEditData] = useState({ supplierId: "", invoiceNumber: "", invoiceDate: "", notes: "" });
+
     const load = () => {
         invoicesApi.getById(id)
-            .then(setInvoice)
+            .then(inv => {
+                setInvoice(inv);
+                setEditData({
+                    supplierId: inv.supplierId,
+                    invoiceNumber: inv.invoiceNumber,
+                    invoiceDate: inv.invoiceDate,
+                    notes: inv.notes ?? "",
+                });
+            })
             .catch(console.error)
             .finally(() => setLoading(false));
     };
 
     useEffect(() => { load(); }, [id]);
+
+    const startEdit = () => {
+        if (suppliers.length === 0) {
+            suppliersApi.getAll().then(setSuppliers).catch(console.error);
+        }
+        setIsEditing(true);
+    };
+
+    const handleSave = async () => {
+        if (!editData.invoiceNumber || !editData.invoiceDate) {
+            notify.warning("Numero e data fattura sono obbligatori");
+            return;
+        }
+        try {
+            setSaving(true);
+            await invoicesApi.update(id, editData);
+            notify.success("Fattura aggiornata");
+            setIsEditing(false);
+            load();
+        } catch (error: any) {
+            notify.error(`Errore: ${error.message}`);
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const togglePurchase = (purchaseId: string) => {
         setExpandedPurchases(prev => {
@@ -67,6 +112,7 @@ export default function InvoiceDetailPage() {
     );
 
     const canSeeAmounts = userRole === 'admin' || userRole === 'operativo';
+    const canEdit = userRole === 'admin' || userRole === 'operativo';
 
     return (
         <DashboardLayout>
@@ -81,38 +127,98 @@ export default function InvoiceDetailPage() {
                             Fattura {invoice.invoiceNumber}
                         </h1>
                     </div>
-                    {userRole === 'admin' && (
-                        <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-                            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" />Elimina</>}
-                        </Button>
-                    )}
+                    <div className="flex gap-2">
+                        {canEdit && !isEditing && (
+                            <Button variant="outline" size="sm" onClick={startEdit}>
+                                <Pencil className="h-4 w-4 mr-1" />Modifica
+                            </Button>
+                        )}
+                        {userRole === 'admin' && !isEditing && (
+                            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+                                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" />Elimina</>}
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="space-y-6">
-                    {/* Dati fattura */}
+                    {/* Dati fattura — view o edit */}
                     <Card>
-                        <CardHeader><CardTitle>Dati Fattura</CardTitle></CardHeader>
-                        <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                            <div>
-                                <p className="text-slate-500 mb-0.5 flex items-center gap-1"><User className="h-3.5 w-3.5" />Fornitore</p>
-                                <p className="font-medium">{invoice.supplierName}</p>
-                            </div>
-                            <div>
-                                <p className="text-slate-500 mb-0.5 flex items-center gap-1"><FileText className="h-3.5 w-3.5" />Numero Fattura</p>
-                                <p className="font-medium">{invoice.invoiceNumber}</p>
-                            </div>
-                            <div>
-                                <p className="text-slate-500 mb-0.5 flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />Data Fattura</p>
-                                <p className="font-medium">{new Date(invoice.invoiceDate).toLocaleDateString('it-IT')}</p>
-                            </div>
-                            {canSeeAmounts && invoice.totalAmount != null && (
-                                <div>
-                                    <p className="text-slate-500 mb-0.5">Importo Totale</p>
-                                    <p className="font-bold text-lg">€ {Number(invoice.totalAmount).toFixed(2)}</p>
+                        <CardHeader className="flex flex-row items-center justify-between py-4">
+                            <CardTitle>Dati Fattura</CardTitle>
+                            {isEditing && (
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} disabled={saving}>
+                                        <X className="h-4 w-4 mr-1" />Annulla
+                                    </Button>
+                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={handleSave} disabled={saving}>
+                                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-1" />Salva</>}
+                                    </Button>
+                                </div>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                            {isEditing ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Fornitore</Label>
+                                        <Select value={editData.supplierId} onValueChange={v => setEditData(d => ({ ...d, supplierId: v }))}>
+                                            <SelectTrigger><SelectValue placeholder="Seleziona Fornitore" /></SelectTrigger>
+                                            <SelectContent>
+                                                {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Numero Fattura *</Label>
+                                        <Input value={editData.invoiceNumber} onChange={e => setEditData(d => ({ ...d, invoiceNumber: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Data Fattura *</Label>
+                                        <Input type="date" value={editData.invoiceDate} onChange={e => setEditData(d => ({ ...d, invoiceDate: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Note</Label>
+                                        <Input value={editData.notes} onChange={e => setEditData(d => ({ ...d, notes: e.target.value }))} placeholder="Note opzionali" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-slate-500 mb-0.5 flex items-center gap-1"><User className="h-3.5 w-3.5" />Fornitore</p>
+                                        <p className="font-medium">{invoice.supplierName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-500 mb-0.5 flex items-center gap-1"><FileText className="h-3.5 w-3.5" />Numero Fattura</p>
+                                        <p className="font-medium">{invoice.invoiceNumber}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-500 mb-0.5 flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />Data Fattura</p>
+                                        <p className="font-medium">{new Date(invoice.invoiceDate).toLocaleDateString('it-IT')}</p>
+                                    </div>
+                                    {canSeeAmounts && invoice.totalAmount != null && (
+                                        <div>
+                                            <p className="text-slate-500 mb-0.5">Importo Totale</p>
+                                            <p className="font-bold text-lg">€ {Number(invoice.totalAmount).toFixed(2)}</p>
+                                        </div>
+                                    )}
+                                    {invoice.notes && (
+                                        <div className="col-span-2">
+                                            <p className="text-slate-500 mb-0.5">Note</p>
+                                            <p className="font-medium">{invoice.notes}</p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </CardContent>
                     </Card>
+
+                    {/* Documenti — SOPRA le bolle */}
+                    <InvoiceDocuments
+                        invoiceId={id}
+                        documentUrls={invoice.documentUrls}
+                        onUpdate={load}
+                    />
 
                     {/* Bolle collegate con dropdown articoli */}
                     {invoice.purchases && invoice.purchases.length > 0 && (
@@ -152,14 +258,13 @@ export default function InvoiceDetailPage() {
                                                                 {p.totalAmount !== undefined ? `€ ${p.totalAmount.toFixed(2)}` : '—'}
                                                             </td>
                                                         )}
-                                                        <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
+                                                        <td className="py-2.5 px-4" onClick={e => e.stopPropagation()}>
                                                             <Link href={`/purchases/${p.id}`} className="text-blue-500 hover:text-blue-700">
                                                                 <ExternalLink className="h-3.5 w-3.5" />
                                                             </Link>
                                                         </td>
                                                     </tr>
 
-                                                    {/* Dropdown articoli */}
                                                     {isExpanded && hasItems && (
                                                         <tr key={`${p.id}-items`} className="border-b bg-slate-50 dark:bg-slate-800/50">
                                                             <td colSpan={canSeeAmounts ? 4 : 3} className="py-2 px-4">
@@ -205,13 +310,6 @@ export default function InvoiceDetailPage() {
                             </CardContent>
                         </Card>
                     )}
-
-                    {/* Documenti */}
-                    <InvoiceDocuments
-                        invoiceId={id}
-                        documentUrls={invoice.documentUrls}
-                        onUpdate={load}
-                    />
                 </div>
             </div>
         </DashboardLayout>

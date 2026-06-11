@@ -318,13 +318,13 @@ function NewPurchaseContent() {
         e.preventDefault();
 
         if (!formData.supplierId || !formData.deliveryNoteNumber || !formData.deliveryNoteDate) {
-            notify.warning("Compila i dati della bolla (Fornitore, Numero, Data)");
+            notify.warning(isOrder ? "Compila i dati dell'ordine (Fornitore, Numero, Data)" : "Compila i dati della bolla (Fornitore, Numero, Data)");
             return;
         }
 
         const validLines = lines.filter(l => l.itemId && l.quantity && l.price);
         if (validLines.length === 0) {
-            notify.warning("Inserisci almeno una riga nell'acquisto");
+            notify.warning(isOrder ? "Inserisci almeno un materiale nell'ordine" : "Inserisci almeno una riga nell'acquisto");
             return;
         }
 
@@ -422,16 +422,16 @@ function NewPurchaseContent() {
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="bolla">Numero Bolla *</Label>
+                                <Label htmlFor="bolla">{isOrder ? "Numero Ordine *" : "Numero Bolla *"}</Label>
                                 <Input
                                     id="bolla"
                                     value={formData.deliveryNoteNumber}
                                     onChange={(e) => setFormData({ ...formData, deliveryNoteNumber: e.target.value })}
-                                    placeholder="Es. 123/A"
+                                    placeholder={isOrder ? "Es. ORD-2024-001" : "Es. 123/A"}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="date">Data Bolla *</Label>
+                                <Label htmlFor="date">{isOrder ? "Data Ordine *" : "Data Bolla *"}</Label>
                                 <Input
                                     id="date"
                                     type="date"
@@ -514,7 +514,7 @@ function NewPurchaseContent() {
                     {/* Inline Items Table */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Materiali in Bolla</CardTitle>
+                            <CardTitle>{isOrder ? "Materiali Ordinati" : "Materiali in Bolla"}</CardTitle>
                             <CardDescription>Clicca su una riga per selezionare il materiale, poi inserisci le quantità e i prezzi</CardDescription>
                         </CardHeader>
                         <CardContent className="p-0 sm:p-6 sm:pt-0">
@@ -688,11 +688,11 @@ function NewPurchaseContent() {
                                             );
                                         })}
 
-                                        {/* Totale Bolla */}
+                                        {/* Totale */}
                                         {lines.some(l => l.itemId) && (
                                             <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold border-t-2">
                                                 <TableCell colSpan={5} className="text-right pr-4 text-base dark:text-white py-3">
-                                                    TOTALE BOLLA
+                                                    {isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}
                                                 </TableCell>
                                                 <TableCell className="text-right text-base dark:text-white py-3 pr-2">
                                                     <span className="text-xs font-normal text-slate-400 mr-0.5">€</span>
