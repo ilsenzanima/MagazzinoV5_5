@@ -104,20 +104,11 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-        <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-          {initialSupplierId && (
-            <Link href="/purchases"><Button variant="outline">Mostra Tutti</Button></Link>
-          )}
-          {(userRole === 'admin' || userRole === 'operativo') && (
-            <Link href={newHref} className="flex-1 sm:flex-none">
-              <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" />{newLabel}
-              </Button>
-            </Link>
-          )}
+      {initialSupplierId && (
+        <div className="flex justify-end mb-4">
+          <Link href="/purchases"><Button variant="outline" size="sm">Mostra Tutti</Button></Link>
         </div>
-      </div>
+      )}
 
       <FilterBar
         searchTerm={searchTerm} setSearchTerm={setSearchTerm}
@@ -282,16 +273,6 @@ function InvoicesTab() {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
-        {(userRole === 'admin' || userRole === 'operativo') && (
-          <Link href="/invoices/new">
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="mr-2 h-4 w-4" />Nuova Fattura
-            </Button>
-          </Link>
-        )}
-      </div>
-
       <FilterBar
         searchTerm={searchTerm} setSearchTerm={setSearchTerm}
         dateFrom={dateFrom} setDateFrom={setDateFrom}
@@ -390,9 +371,19 @@ function PurchasesPageContent() {
   return (
     <>
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 rounded-lg mb-6 border dark:border-border">
-        <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-3">
-          {tab === "acquisti" ? "Gestione Acquisti" : tab === "ordini" ? "Gestione Ordini" : "Gestione Fatture"}
-        </h1>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+            {tab === "acquisti" ? "Gestione Acquisti" : tab === "ordini" ? "Gestione Ordini" : "Gestione Fatture"}
+          </h1>
+          {canSeeFatture && (
+            <Link href={tab === "fatture" ? "/invoices/new" : tab === "ordini" ? "/purchases/new?type=order" : "/purchases/new"}>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="mr-1.5 h-4 w-4" />
+                {tab === "fatture" ? "Nuova Fattura" : tab === "ordini" ? "Nuovo Ordine" : "Nuovo Acquisto"}
+              </Button>
+            </Link>
+          )}
+        </div>
         <Tabs value={tab} onValueChange={handleTabChange}>
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="acquisti" className="flex items-center gap-1.5 flex-1 sm:flex-none">
