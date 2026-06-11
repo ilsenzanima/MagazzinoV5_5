@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle,
-  Paperclip, Package, PackageX, Receipt, ShoppingCart, ClipboardList
+  Paperclip, Package, PackageX, Receipt, ShoppingCart, ClipboardList, ArrowRightLeft
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
@@ -15,6 +15,7 @@ import { useState, useEffect, Suspense, useDeferredValue } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { purchasesApi, invoicesApi, Purchase, Invoice } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
+import { ConvertOrdersModal } from "@/components/purchases/ConvertOrdersModal";
 
 // ── Shared filter bar ─────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const LIMIT = 12;
+  const [convertOrder, setConvertOrder] = useState<Purchase | null>(null);
 
   const isOrder = orderType === 'order';
   const newHref = isOrder ? "/purchases/new?type=order" : "/purchases/new";
@@ -184,14 +186,26 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                             </div>
                           </div>
 
-                          <div className="mb-2">
-                            {(userRole === 'admin' || userRole === 'operativo') ? (
-                              <div className="font-bold text-lg text-slate-900 dark:text-white">
-                                {purchase.totalAmount !== undefined && purchase.totalAmount !== null
-                                  ? `€ ${purchase.totalAmount.toFixed(2)}` : '-'}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 dark:text-slate-500 italic text-sm">Riservato</span>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <div>
+                              {(userRole === 'admin' || userRole === 'operativo') ? (
+                                <div className="font-bold text-lg text-slate-900 dark:text-white">
+                                  {purchase.totalAmount !== undefined && purchase.totalAmount !== null
+                                    ? `€ ${purchase.totalAmount.toFixed(2)}` : '-'}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 dark:text-slate-500 italic text-sm">Riservato</span>
+                              )}
+                            </div>
+                            {isOrder && (userRole === 'admin' || userRole === 'operativo') && (
+                              <button
+                                onClick={e => { e.preventDefault(); setConvertOrder(purchase); }}
+                                title="Converti in Acquisto"
+                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 border border-blue-200 dark:border-blue-800 rounded px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shrink-0"
+                              >
+                                <ArrowRightLeft className="h-3.5 w-3.5" />
+                                Converti
+                              </button>
                             )}
                           </div>
 
@@ -220,6 +234,14 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
           </>
         )}
       </div>
+
+      {convertOrder && (
+        <ConvertOrdersModal
+          open={!!convertOrder}
+          onOpenChange={open => { if (!open) setConvertOrder(null); }}
+          triggerOrder={convertOrder}
+        />
+      )}
     </>
   );
 }

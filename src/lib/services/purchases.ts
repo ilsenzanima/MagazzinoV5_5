@@ -286,6 +286,36 @@ export const purchasesApi = {
         if (error) throw error;
     },
 
+    // Fetch full order data for conversion to purchase (includes item_id, coefficient, pieces)
+    getOrdersForConversion: async (ids: string[]) => {
+        const { data, error } = await supabase
+            .from('purchases')
+            .select('id, supplier_id, suppliers(name), job_id, jobs(code), purchase_items(item_id, price, quantity, pieces, coefficient, job_id, jobs(code), inventory(id, name, model, code, unit, coefficient))')
+            .in('id', ids)
+            .eq('order_type', 'order');
+        if (error) throw error;
+        return (data ?? []).map((p: any) => ({
+            id: p.id,
+            supplierId: p.supplier_id,
+            supplierName: p.suppliers?.name,
+            jobId: p.job_id ?? null,
+            jobCode: p.jobs?.code ?? null,
+            items: (p.purchase_items ?? []).map((i: any) => ({
+                itemId: i.item_id,
+                itemName: i.inventory?.name ?? '',
+                itemModel: i.inventory?.model,
+                itemCode: i.inventory?.code,
+                itemUnit: i.inventory?.unit ?? 'PZ',
+                coefficient: Number(i.inventory?.coefficient ?? i.coefficient ?? 1),
+                quantity: i.quantity,
+                pieces: i.pieces,
+                price: i.price,
+                jobId: i.job_id ?? null,
+                jobCode: i.jobs?.code ?? null,
+            })),
+        }));
+    },
+
     // Get job movements for all items in a purchase
     getPurchaseItemJobMovements: async (purchaseId: string) => {
         // First get all purchase_item_ids for this purchase

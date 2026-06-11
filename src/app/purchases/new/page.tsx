@@ -72,6 +72,7 @@ function NewPurchaseContent() {
     const searchParams = useSearchParams();
     const isOrder = searchParams?.get("type") === "order";
     const presetJobId = searchParams?.get("jobId") ?? "";
+    const fromOrderIds = searchParams?.get("fromOrders")?.split(',').filter(Boolean) ?? [];
     const { userRole } = useAuth();
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
@@ -153,6 +154,57 @@ function NewPurchaseContent() {
             setInventory(inventoryData.items);
             setJobs(jobsData.data);
 
+            // ── Pre-populate from orders ──────────────────────────────────────
+            if (fromOrderIds.length > 0) {
+                const orders = await purchasesApi.getOrdersForConversion(fromOrderIds);
+                if (orders.length > 0) {
+                    const first = orders[0];
+
+                    // Fornitore
+                    setFormData(prev => ({ ...prev, supplierId: first.supplierId }));
+
+                    // Commessa: usa quella del primo ordine se tutti coincidono
+                    const allSameJob = orders.every(o => o.jobId === first.jobId);
+                    const headerJobId = allSameJob && first.jobId ? first.jobId : null;
+                    if (headerJobId) {
+                        const job = jobsData.data.find((j: any) => j.id === headerJobId)
+                            ?? await jobsApi.getById(headerJobId).catch(() => null);
+                        if (job) {
+                            setSelectedHeaderJob(job);
+                            setFormData(prev => ({ ...prev, supplierId: first.supplierId, jobId: job.id }));
+                        } else {
+                            setFormData(prev => ({ ...prev, supplierId: first.supplierId }));
+                        }
+                    }
+
+                    // Righe: aggrega tutti gli articoli da tutti gli ordini
+                    const orderLines: PurchaseLine[] = orders.flatMap(order =>
+                        order.items.map(item => ({
+                            tempId: Math.random().toString(36).substr(2, 9),
+                            itemId: item.itemId,
+                            itemName: item.itemName,
+                            itemModel: item.itemModel,
+                            itemCode: item.itemCode,
+                            itemBrand: undefined,
+                            itemCategory: undefined,
+                            itemDescription: undefined,
+                            coefficient: item.coefficient,
+                            unit: item.itemUnit,
+                            pieces: item.pieces != null ? String(item.pieces) : "",
+                            quantity: item.quantity != null ? String(item.quantity) : "",
+                            price: item.price != null ? String(item.price) : "0",
+                            total: item.price != null && item.quantity != null
+                                ? (item.price * item.quantity).toFixed(2) : "0",
+                            isJob: !!item.jobId,
+                            jobId: item.jobId ?? undefined,
+                            jobCode: item.jobCode ?? undefined,
+                        }))
+                    );
+                    setLines(ensureTrailingEmpty(orderLines));
+                }
+                return; // skip presetJobId logic below
+            }
+
             // Pre-populate job from query param
             if (presetJobId) {
                 const presetJob = jobsData.data.find((j: any) => j.id === presetJobId);
@@ -160,7 +212,6 @@ function NewPurchaseContent() {
                     setSelectedHeaderJob(presetJob);
                     setFormData(prev => ({ ...prev, jobId: presetJob.id }));
                 } else {
-                    // Job not in first page — fetch directly
                     try {
                         const j = await jobsApi.getById(presetJobId);
                         if (j) {
@@ -408,13 +459,19 @@ function NewPurchaseContent() {
         <DashboardLayout>
             <div className="max-w-5xl mx-auto pb-10">
                 <div className="mb-6">
-                    <Link href={isOrder ? "/purchases?tab=ordini" : "/purchases"} className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
+                    <Link href={fromOrderIds.length > 0 ? "/purchases?tab=ordini" : isOrder ? "/purchases?tab=ordini" : "/purchases"} className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        {isOrder ? "Torna agli Ordini" : "Torna agli Acquisti"}
+                        {fromOrderIds.length > 0 ? "Torna agli Ordini" : isOrder ? "Torna agli Ordini" : "Torna agli Acquisti"}
                     </Link>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-                        {isOrder ? "Registrazione Ordine" : "Registrazione Acquisto / Bolla"}
+                        {fromOrderIds.length > 0 ? "Converti Ordini in Acquisto" : isOrder ? "Registrazione Ordine" : "Registrazione Acquisto / Bolla"}
                     </h1>
+                    {fromOrderIds.length > 0 && (
+                        <p className="text-sm text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                            <span className="inline-block w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                            Form precompilato da {fromOrderIds.length} ordine{fromOrderIds.length > 1 ? 'i' : ''}. Inserisci numero e data bolla, poi salva.
+                        </p>
+                    )}
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
