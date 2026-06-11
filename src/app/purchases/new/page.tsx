@@ -179,7 +179,7 @@ function NewPurchaseContent() {
 
                     // Righe: aggrega tutti gli articoli da tutti gli ordini
                     const orderLines: PurchaseLine[] = orders.flatMap(order =>
-                        order.items.map(item => ({
+                        order.items.map((item: any) => ({
                             tempId: Math.random().toString(36).substr(2, 9),
                             itemId: item.itemId,
                             itemName: item.itemName,
