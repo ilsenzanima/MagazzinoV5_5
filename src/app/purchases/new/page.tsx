@@ -71,6 +71,7 @@ function NewPurchaseContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const isOrder = searchParams?.get("type") === "order";
+    const presetJobId = searchParams?.get("jobId") ?? "";
     const { userRole } = useAuth();
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
@@ -151,6 +152,24 @@ function NewPurchaseContent() {
             setSuppliers(suppliersData);
             setInventory(inventoryData.items);
             setJobs(jobsData.data);
+
+            // Pre-populate job from query param
+            if (presetJobId) {
+                const presetJob = jobsData.data.find((j: any) => j.id === presetJobId);
+                if (presetJob) {
+                    setSelectedHeaderJob(presetJob);
+                    setFormData(prev => ({ ...prev, jobId: presetJob.id }));
+                } else {
+                    // Job not in first page — fetch directly
+                    try {
+                        const j = await jobsApi.getById(presetJobId);
+                        if (j) {
+                            setSelectedHeaderJob(j);
+                            setFormData(prev => ({ ...prev, jobId: j.id }));
+                        }
+                    } catch { /* ignore */ }
+                }
+            }
         } catch (error) {
             console.error("Failed to load data", error);
         } finally {

@@ -23,7 +23,8 @@ export const mapDbToJob = (db: any): Job => ({
     siteAddress: db.site_address,
     siteManager: db.site_manager,
     cig: db.cig,
-    cup: db.cup
+    cup: db.cup,
+    estimatedCost: db.estimated_cost ?? null,
 });
 
 const mapJobToDb = (job: Partial<Job>) => {
@@ -39,6 +40,7 @@ const mapJobToDb = (job: Partial<Job>) => {
     if (job.siteManager !== undefined) dbJob.site_manager = job.siteManager;
     if (job.cig !== undefined) dbJob.cig = job.cig;
     if (job.cup !== undefined) dbJob.cup = job.cup;
+    if ('estimatedCost' in job) dbJob.estimated_cost = job.estimatedCost ?? null;
 
     // Handle nullable fields - only include when explicitly passed
     if ('endDate' in job) {

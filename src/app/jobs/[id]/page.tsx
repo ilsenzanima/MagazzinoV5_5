@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock, Euro, Recycle } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock, Euro, Recycle, ClipboardList, Receipt } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -23,6 +23,8 @@ import { JobDocuments } from "@/components/jobs/details/JobDocuments";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
 import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
 import { JobEccedenze } from "@/components/jobs/details/JobEccedenze";
+import { JobOrdini } from "@/components/jobs/details/JobOrdini";
+import { JobFatturazione } from "@/components/jobs/details/JobFatturazione";
 
 export default function JobDetailsPage() {
     const { id } = useParams<{ id: string }>();
@@ -510,6 +512,22 @@ export default function JobDetailsPage() {
                                 <Recycle className="h-4 w-4 md:mr-1 text-violet-500" />
                                 <span className="hidden md:inline">Eccedenze</span>
                             </TabsTrigger>
+                            <TabsTrigger
+                                value="ordini"
+                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                            >
+                                <ClipboardList className="h-4 w-4 md:mr-1 text-orange-500" />
+                                <span className="hidden md:inline">Ordini</span>
+                            </TabsTrigger>
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                <TabsTrigger
+                                    value="fatturazione"
+                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-teal-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                                >
+                                    <Receipt className="h-4 w-4 md:mr-1 text-teal-600" />
+                                    <span className="hidden md:inline">Fatturazione</span>
+                                </TabsTrigger>
+                            )}
                         </TabsList>
 
                         <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">
@@ -539,6 +557,16 @@ export default function JobDetailsPage() {
                         <TabsContent value="eccedenze" className="space-y-6 focus-visible:outline-none">
                             <JobEccedenze jobId={job.id} />
                         </TabsContent>
+
+                        <TabsContent value="ordini" className="space-y-6 focus-visible:outline-none">
+                            <JobOrdini jobId={job.id} jobCode={job.code} />
+                        </TabsContent>
+
+                        {(userRole === 'admin' || userRole === 'operativo') && (
+                            <TabsContent value="fatturazione" className="space-y-6 focus-visible:outline-none">
+                                <JobFatturazione jobId={job.id} job={job} onJobUpdated={loadData} />
+                            </TabsContent>
+                        )}
                     </Tabs>
                 </div>
             </div>

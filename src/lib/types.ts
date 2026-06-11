@@ -112,6 +112,35 @@ export interface Job {
     siteManager?: string;
     cig?: string;
     cup?: string;
+    estimatedCost?: number | null;
+}
+
+export interface JobSalApprovato {
+    id: string;
+    jobId: string;
+    name: string;
+    amount: number;
+    documentUrl?: string;
+    notes?: string;
+    createdAt: string;
+}
+
+export interface JobFatturaCommittente {
+    id: string;
+    jobId: string;
+    name: string;
+    amount: number;
+    documentUrl?: string;
+    notes?: string;
+    createdAt: string;
+}
+
+export interface JobSalFatturaLink {
+    id: string;
+    salId: string;
+    fatturaId: string;
+    amount: number;
+    createdAt: string;
 }
 
 export interface JobLog {
