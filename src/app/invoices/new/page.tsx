@@ -258,59 +258,52 @@ export default function NewInvoicePage() {
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead className="w-10">
-                                                    <Checkbox
-                                                        checked={unlinkedPurchases.every(p => p.selected)}
-                                                        onCheckedChange={toggleAll}
-                                                    />
+                                                <TableHead colSpan={4}>
+                                                    <label className="flex items-center gap-3 px-0 cursor-pointer">
+                                                        <Checkbox
+                                                            checked={unlinkedPurchases.every(p => p.selected)}
+                                                            onCheckedChange={toggleAll}
+                                                        />
+                                                        <span className="flex-1 flex items-center gap-1 text-xs font-medium">
+                                                            <FileText className="h-3.5 w-3.5" />Numero Bolla
+                                                        </span>
+                                                        <span className="text-xs font-medium flex items-center gap-1">
+                                                            <Calendar className="h-3.5 w-3.5" />Data
+                                                        </span>
+                                                        <span className="text-xs font-medium text-right min-w-[80px]">Importo</span>
+                                                    </label>
                                                 </TableHead>
-                                                <TableHead>
-                                                    <div className="flex items-center gap-1">
-                                                        <FileText className="h-3.5 w-3.5" />
-                                                        Numero Bolla
-                                                    </div>
-                                                </TableHead>
-                                                <TableHead>
-                                                    <div className="flex items-center gap-1">
-                                                        <Calendar className="h-3.5 w-3.5" />
-                                                        Data
-                                                    </div>
-                                                </TableHead>
-                                                <TableHead className="text-right">Importo</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {unlinkedPurchases.map((purchase) => (
-                                                <TableRow
-                                                    key={purchase.id}
-                                                    className="cursor-pointer"
-                                                    onClick={() => togglePurchase(purchase.id)}
-                                                >
-                                                    <TableCell>
-                                                        <Checkbox
-                                                            checked={purchase.selected}
-                                                            onCheckedChange={() => togglePurchase(purchase.id)}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="font-medium">{purchase.deliveryNoteNumber}</TableCell>
-                                                    <TableCell className="text-slate-500">
-                                                        {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}
-                                                    </TableCell>
-                                                    <TableCell className="text-right font-medium">
-                                                        € {purchase.totalAmount.toFixed(2)}
+                                                <TableRow key={purchase.id} className={purchase.selected ? "bg-blue-50 dark:bg-blue-900/10" : ""}>
+                                                    <TableCell colSpan={4} className="p-0">
+                                                        <label className="flex items-center gap-3 px-4 py-3 cursor-pointer w-full">
+                                                            <Checkbox
+                                                                checked={purchase.selected}
+                                                                onCheckedChange={() => togglePurchase(purchase.id)}
+                                                            />
+                                                            <span className="font-medium flex-1">{purchase.deliveryNoteNumber}</span>
+                                                            <span className="text-slate-500 text-sm">
+                                                                {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}
+                                                            </span>
+                                                            <span className="font-medium text-right min-w-[80px]">
+                                                                € {(purchase.totalAmount ?? 0).toFixed(2)}
+                                                            </span>
+                                                        </label>
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
 
                                             {selectedPurchases.length > 0 && (
-                                                <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold border-t-2">
+                                                <TableRow key="total-row" className="bg-slate-50 dark:bg-slate-800 font-bold border-t-2">
                                                     <TableCell colSpan={3} className="text-right pr-4 dark:text-white py-3">
                                                         TOTALE FATTURA
                                                     </TableCell>
                                                     <TableCell className="text-right text-base dark:text-white py-3">
                                                         <span className="text-xs font-normal text-slate-400 mr-0.5">€</span>
-                                                        {totalAmount.toFixed(2)}
+                                                        {(totalAmount ?? 0).toFixed(2)}
                                                     </TableCell>
                                                 </TableRow>
                                             )}
