@@ -18,6 +18,7 @@ import { notify } from "@/lib/notify";
 import { InvoiceDocuments } from "@/components/invoices/InvoiceDocuments";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 
 // ── Inline editable price row ─────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ export default function InvoiceDetailPage() {
     const [invoice, setInvoice] = useState<Invoice | null>(null);
     const [loading, setLoading] = useState(true);
     const [deleting, setDeleting] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
 
     // Edit header state
@@ -269,7 +271,6 @@ export default function InvoiceDetailPage() {
     };
 
     const handleDelete = async () => {
-        if (!confirm("Eliminare questa fattura? Le bolle collegate torneranno disponibili.")) return;
         try {
             setDeleting(true);
             await invoicesApi.delete(id);
@@ -277,7 +278,9 @@ export default function InvoiceDetailPage() {
             router.push('/purchases?tab=fatture');
         } catch (error: any) {
             notify.error(`Errore: ${error.message}`);
+        } finally {
             setDeleting(false);
+            setDeleteDialogOpen(false);
         }
     };
 
@@ -314,6 +317,7 @@ export default function InvoiceDetailPage() {
     const linkedPurchases = (invoice.purchases ?? []).filter(p => !toRemove.has(p.id));
 
     return (
+        <>
         <DashboardLayout>
             <div className="max-w-3xl mx-auto pb-10">
                 {/* Header */}
@@ -334,7 +338,7 @@ export default function InvoiceDetailPage() {
                             </Button>
                         )}
                         {userRole === 'admin' && !isEditing && (
-                            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+                            <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)} disabled={deleting}>
                                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" />Elimina</>}
                             </Button>
                         )}
@@ -550,5 +554,15 @@ export default function InvoiceDetailPage() {
                 </div>
             </div>
         </DashboardLayout>
+
+        <ConfirmDeleteDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            title="Elimina fattura"
+            description={`Stai per eliminare definitivamente la fattura ${invoice?.invoiceNumber}. Le bolle collegate torneranno disponibili. Questa azione non può essere annullata.`}
+            loading={deleting}
+            onConfirm={handleDelete}
+        />
+        </>
     );
 }

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -39,6 +40,10 @@ export default function PurchaseDetailPage() {
 
     const [loading, setLoading] = useState(true);
     const [purchase, setPurchase] = useState<Purchase | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteItemDialogOpen, setDeleteItemDialogOpen] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [sourceOrders, setSourceOrders] = useState<{ id: string; deliveryNoteNumber: string }[]>([]);
     const [items, setItems] = useState<PurchaseItem[]>([]);
     const [batchAvailability, setBatchAvailability] = useState<any[]>([]); // New state for traceability
@@ -304,12 +309,13 @@ export default function PurchaseDetailPage() {
         }
     };
 
-    const handleDeleteItem = async (itemId: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questa riga?")) return;
-
+    const handleDeleteItem = async () => {
+        if (!itemToDelete) return;
         try {
-            await purchasesApi.deleteItem(itemId);
-            setItems(items.filter(i => i.id !== itemId));
+            await purchasesApi.deleteItem(itemToDelete);
+            setItems(items.filter(i => i.id !== itemToDelete));
+            setDeleteItemDialogOpen(false);
+            setItemToDelete(null);
         } catch (error) {
             console.error("Failed to delete item", error);
             alert("Errore durante l'eliminazione");
@@ -317,14 +323,16 @@ export default function PurchaseDetailPage() {
     };
 
     const handleDeletePurchase = async () => {
-        if (!confirm("Sei sicuro di voler eliminare l'intero acquisto? Questa azione non può essere annullata.")) return;
-
         try {
+            setDeleting(true);
             await purchasesApi.delete(id);
             router.push('/purchases');
         } catch (error: any) {
             console.error("Failed to delete purchase", error);
-            alert(`Errore durante l'eliminazione dell'acquisto: ${error.message || "Verifica se ci sono movimenti collegati a questi articoli."}`);
+            alert(`Errore: ${error.message || "Verifica se ci sono movimenti collegati a questi articoli."}`);
+        } finally {
+            setDeleting(false);
+            setDeleteDialogOpen(false);
         }
     };
 
@@ -486,6 +494,7 @@ export default function PurchaseDetailPage() {
     const hasMissingPrices = items.some(i => i.price === 0);
 
     return (
+        <>
         <DashboardLayout>
             <div className="max-w-6xl mx-auto pb-10">
                 <div className="mb-6">
@@ -519,7 +528,7 @@ export default function PurchaseDetailPage() {
                                     </Button>
                                     <Button
                                         variant="destructive"
-                                        onClick={handleDeletePurchase}
+                                        onClick={() => setDeleteDialogOpen(true)}
                                         className="flex-1 sm:flex-none flex items-center justify-center gap-2"
                                     >
                                         <Trash2 className="h-4 w-4" />
@@ -853,7 +862,7 @@ export default function PurchaseDetailPage() {
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    onClick={() => handleDeleteItem(item.id)}
+                                                                    onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}
                                                                     className="text-red-500 hover:text-red-700 hover:bg-red-50"
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
@@ -926,7 +935,7 @@ export default function PurchaseDetailPage() {
                                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" onClick={() => startEditing(item)}>
                                                                 <Edit className="h-3.5 w-3.5" />
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => handleDeleteItem(item.id)}>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}>
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </>
@@ -1423,5 +1432,23 @@ export default function PurchaseDetailPage() {
                 </div >
             </div >
         </DashboardLayout >
+
+        <ConfirmDeleteDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            title={`Elimina ${purchase?.orderType === 'order' ? 'ordine' : 'acquisto'}`}
+            description={`Stai per eliminare definitivamente ${purchase?.orderType === 'order' ? "l'ordine" : "l'acquisto"} ${purchase?.deliveryNoteNumber}. Questa azione non può essere annullata.`}
+            loading={deleting}
+            onConfirm={handleDeletePurchase}
+        />
+
+        <ConfirmDeleteDialog
+            open={deleteItemDialogOpen}
+            onOpenChange={setDeleteItemDialogOpen}
+            title="Elimina riga"
+            description="Sei sicuro di voler eliminare questa riga dall'acquisto?"
+            onConfirm={handleDeleteItem}
+        />
+        </>
     );
 }

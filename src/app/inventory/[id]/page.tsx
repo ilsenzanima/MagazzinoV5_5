@@ -56,6 +56,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import QRCode from "react-qr-code";
 import Barcode from "react-barcode";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
@@ -76,6 +77,7 @@ export default function InventoryDetailPage() {
 
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [stockValue, setStockValue] = useState<number>(0);
@@ -317,19 +319,18 @@ export default function InventoryDetailPage() {
   // Handle Delete Item
   const handleDelete = async () => {
     if (!item) return;
-    if (confirm("Sei sicuro di voler eliminare questo articolo? Questa azione non può essere annullata.")) {
-      try {
-        await inventoryApi.delete(item.id);
-        router.push('/inventory');
-      } catch (error: any) {
-        console.error("Failed to delete item", error);
-        // Check for foreign key constraint violation (Postgres code 23503)
-        if (error?.code === '23503' || error?.message?.includes('foreign key constraint')) {
-          alert("Impossibile eliminare: articolo utilizzato in movimenti");
-        } else {
-          alert("Errore durante l'eliminazione");
-        }
+    try {
+      await inventoryApi.delete(item.id);
+      router.push('/inventory');
+    } catch (error: any) {
+      console.error("Failed to delete item", error);
+      if (error?.code === '23503' || error?.message?.includes('foreign key constraint')) {
+        alert("Impossibile eliminare: articolo utilizzato in movimenti o acquisti.");
+      } else {
+        alert("Errore durante l'eliminazione.");
       }
+    } finally {
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -550,6 +551,7 @@ export default function InventoryDetailPage() {
   const status = getStatus(item.quantity, item.minStock);
 
   return (
+    <>
     <DashboardLayout>
       <ImageCropper
         open={isCropperOpen}
@@ -591,9 +593,11 @@ export default function InventoryDetailPage() {
                   <Button variant="default" size="sm" onClick={handleEdit}>
                     <Pencil className="mr-2 h-4 w-4" /> Modifica
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={handleDelete}>
-                    <Trash2 className="mr-2 h-4 w-4" /> Elimina
-                  </Button>
+                  {userRole === 'admin' && (
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Elimina
+                    </Button>
+                  )}
                 </>
               )
             )}
@@ -1201,5 +1205,14 @@ export default function InventoryDetailPage() {
         </div>
       </div>
     </DashboardLayout>
+
+    <ConfirmDeleteDialog
+      open={deleteDialogOpen}
+      onOpenChange={setDeleteDialogOpen}
+      title="Elimina articolo"
+      description={`Stai per eliminare definitivamente l'articolo "${item?.name}${item?.model ? ` (${item.model})` : ''}". Questa azione non può essere annullata. Se l'articolo ha movimenti o acquisti collegati, l'eliminazione sarà bloccata.`}
+      onConfirm={handleDelete}
+    />
+    </>
   );
 }
