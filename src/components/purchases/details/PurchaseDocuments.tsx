@@ -13,9 +13,10 @@ interface PurchaseDocumentsProps {
   purchaseId: string;
   documentUrls?: string[];
   onUpdate: () => void;
+  isOrder?: boolean;
 }
 
-export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate }: PurchaseDocumentsProps) {
+export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isOrder = false }: PurchaseDocumentsProps) {
   const supabase = createClient();
   const [isUploading, setIsUploading] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
@@ -114,7 +115,7 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate }: P
         onDrop={handleDrop}
       >
         <CardHeader className="flex flex-row items-center justify-between py-4">
-          <CardTitle className="text-base font-semibold">Documenti (DDT / Fattura)</CardTitle>
+          <CardTitle className="text-base font-semibold">{isOrder ? "Documenti (Ordine)" : "Documenti (DDT / Fattura)"}</CardTitle>
           <div className="flex gap-2">
             <Button
               variant="outline"

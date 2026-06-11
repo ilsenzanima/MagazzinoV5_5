@@ -491,6 +491,7 @@ export default function PurchaseDetailPage() {
 
     if (!purchase) return <DashboardLayout><div>Acquisto non trovato</div></DashboardLayout>;
 
+    const isOrder = purchase.orderType === 'order';
     const hasMissingPrices = items.some(i => i.price === 0);
 
     return (
@@ -498,19 +499,19 @@ export default function PurchaseDetailPage() {
         <DashboardLayout>
             <div className="max-w-6xl mx-auto pb-10">
                 <div className="mb-6">
-                    <Link href="/purchases" className="flex items-center text-slate-500 hover:text-slate-900 mb-2">
+                    <Link href={isOrder ? "/purchases?tab=ordini" : "/purchases"} className="flex items-center text-slate-500 hover:text-slate-900 mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        Torna agli Acquisti
+                        {isOrder ? "Torna agli Ordini" : "Torna agli Acquisti"}
                     </Link>
                     <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-slate-900">Dettaglio Acquisto</h1>
+                            <h1 className="text-2xl font-bold text-slate-900">{isOrder ? "Dettaglio Ordine" : "Dettaglio Acquisto"}</h1>
                             <p className="text-slate-500">
-                                Bolla n. {purchase.deliveryNoteNumber} del {new Date(purchase.deliveryNoteDate).toLocaleDateString()}
+                                {isOrder ? "Ordine" : "Bolla"} n. {purchase.deliveryNoteNumber} del {new Date(purchase.deliveryNoteDate).toLocaleDateString()}
                             </p>
                         </div>
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                            {hasMissingPrices && (
+                            {!isOrder && hasMissingPrices && (
                                 <div className="bg-yellow-50 text-yellow-800 px-3 py-2 rounded-md border border-yellow-200 flex items-start shadow-sm animate-pulse max-w-full sm:max-w-xs">
                                     <AlertTriangle className="h-5 w-5 mr-2 shrink-0 mt-0.5" />
                                     <span className="font-medium text-sm leading-tight">Attenzione: Ci sono articoli con prezzo mancante</span>
@@ -585,7 +586,7 @@ export default function PurchaseDetailPage() {
                                 <div className="font-medium">{purchase.createdByName || 'N/D'}</div>
                             </div>
                             <div>
-                                <Label className="text-slate-500">Numero Bolla</Label>
+                                <Label className="text-slate-500">{isOrder ? "Numero Ordine" : "Numero Bolla"}</Label>
                                 {isEditingHeader ? (
                                     <Input
                                         value={editNumber}
@@ -597,7 +598,7 @@ export default function PurchaseDetailPage() {
                                 )}
                             </div>
                             <div>
-                                <Label className="text-slate-500">Data Bolla</Label>
+                                <Label className="text-slate-500">{isOrder ? "Data Ordine" : "Data Bolla"}</Label>
                                 {isEditingHeader ? (
                                     <Input
                                         type="date"
@@ -692,6 +693,7 @@ export default function PurchaseDetailPage() {
                                 purchaseId={id}
                                 documentUrls={purchase.documentUrls}
                                 onUpdate={loadData}
+                                isOrder={isOrder}
                             />
                         </div>
                     </div>
@@ -699,7 +701,7 @@ export default function PurchaseDetailPage() {
                     {/* Items List */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>Materiali in Bolla</CardTitle>
+                            <CardTitle>{isOrder ? "Materiali nell'Ordine" : "Materiali in Bolla"}</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {/* Desktop View: Table */}
@@ -874,7 +876,7 @@ export default function PurchaseDetailPage() {
                                             </TableRow>
                                         ))}
                                         <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold text-lg">
-                                            <TableCell colSpan={5} className="text-right">TOTALE BOLLA</TableCell>
+                                            <TableCell colSpan={5} className="text-right">{isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}</TableCell>
                                             <TableCell className="text-right">
                                                 {(userRole === 'admin' || userRole === 'operativo') ? (
                                                     `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
@@ -1015,7 +1017,7 @@ export default function PurchaseDetailPage() {
                                     </div>
                                 ))}
                                 <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-md flex justify-between items-center font-bold text-sm">
-                                    <span>TOTALE BOLLA</span>
+                                    <span>{isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}</span>
                                     <span>
                                         {(userRole === 'admin' || userRole === 'operativo') ? (
                                             `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
@@ -1029,7 +1031,7 @@ export default function PurchaseDetailPage() {
                     </Card>
 
                     {/* Traceability Table */}
-                    <Card>
+                    {!isOrder && <Card>
                         <CardHeader>
                             <CardTitle>Tracciabilità Lotti</CardTitle>
                         </CardHeader>
@@ -1283,7 +1285,7 @@ export default function PurchaseDetailPage() {
                                 }
                             </div>
                         </CardContent>
-                    </Card>
+                    </Card>}
 
                     <Dialog open={isAddPopupOpen} onOpenChange={setIsAddPopupOpen}>
                         <DialogContent className="max-w-4xl">
