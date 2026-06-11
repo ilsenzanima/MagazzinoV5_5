@@ -65,7 +65,7 @@ export const invoicesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('invoices')
-                .select('*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity, inventory(name, model)))')
+                .select('*, suppliers(name), purchases(id, delivery_note_number, purchase_items(id, price, quantity, inventory(name, model)))')
                 .eq('id', id)
                 .single()
         );

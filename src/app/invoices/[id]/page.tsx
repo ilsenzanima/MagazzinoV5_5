@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     ArrowLeft, FileText, Calendar, User, Loader2, ExternalLink,
-    Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus
+    Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus, Lock, Unlock
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -31,6 +31,7 @@ function ItemPriceRow({
     onSaved: () => void;
 }) {
     const qty = item.quantity ?? 0;
+    const [editing, setEditing] = useState(false);
     const [price, setPrice] = useState(item.price != null ? item.price.toFixed(5) : "");
     const [total, setTotal] = useState(
         item.price != null && qty ? (item.price * qty).toFixed(2) : ""
@@ -70,12 +71,19 @@ function ItemPriceRow({
             setSaving(true);
             await purchasesApi.updateItem(item.id, { price: p });
             notify.success("Prezzo aggiornato");
+            setEditing(false);
             onSaved();
         } catch (e: any) {
             notify.error(`Errore: ${e.message}`);
         } finally {
             setSaving(false);
         }
+    };
+
+    const cancelEdit = () => {
+        setPrice(item.price != null ? item.price.toFixed(5) : "");
+        setTotal(item.price != null && qty ? (item.price * qty).toFixed(2) : "");
+        setEditing(false);
     };
 
     return (
@@ -85,12 +93,13 @@ function ItemPriceRow({
                 {item.itemModel && <span className="text-slate-400 ml-1">({item.itemModel})</span>}
             </td>
             <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-16">{qty}</td>
-            {canEdit ? (
+            {canEdit && editing ? (
                 <>
                     <td className="py-1 w-32 pl-2">
                         <div className="flex items-center gap-1">
                             <span className="text-slate-400 text-xs shrink-0">€</span>
                             <Input
+                                autoFocus
                                 type="number"
                                 inputMode="decimal"
                                 min="0"
@@ -101,7 +110,6 @@ function ItemPriceRow({
                                 className="h-7 text-right px-1 text-xs w-24"
                                 placeholder="0.00000"
                             />
-                            {saving && <Loader2 className="h-3 w-3 animate-spin text-slate-400 shrink-0" />}
                         </div>
                     </td>
                     <td className="py-1 w-32 pl-2">
@@ -120,15 +128,28 @@ function ItemPriceRow({
                             />
                         </div>
                     </td>
+                    <td className="py-1 w-10 pl-1">
+                        {saving
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                            : <button onClick={cancelEdit} title="Annulla" className="text-slate-400 hover:text-slate-600"><X className="h-3.5 w-3.5" /></button>
+                        }
+                    </td>
                 </>
             ) : (
                 <>
-                    <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-24 pr-1">
+                    <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-24 pr-1 font-mono text-xs">
                         {item.price != null ? `€ ${item.price.toFixed(5)}` : '—'}
                     </td>
                     <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-24 pr-1">
                         {item.price != null && qty ? `€ ${(item.price * qty).toFixed(2)}` : '—'}
                     </td>
+                    {canEdit && (
+                        <td className="py-1 w-10 pl-1">
+                            <button onClick={() => setEditing(true)} title="Modifica prezzo" className="text-slate-300 hover:text-blue-500 transition-colors">
+                                <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                        </td>
+                    )}
                 </>
             )}
         </tr>
@@ -466,7 +487,7 @@ export default function InvoiceDetailPage() {
                                                                         <tr className="text-slate-400 border-b border-slate-200 dark:border-slate-700">
                                                                             <th className="text-left py-1">Articolo</th>
                                                                             <th className="text-right py-1 w-16">Qtà</th>
-                                                                            {canSeeAmounts && <><th className="text-left py-1 w-32 pl-2">Prezzo Unit.</th><th className="text-left py-1 w-32 pl-2">Totale Riga</th></>}
+                                                                            {canSeeAmounts && <><th className="text-left py-1 w-32 pl-2">Prezzo Unit.</th><th className="text-left py-1 w-32 pl-2">Totale Riga</th><th className="w-10"></th></>}
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
