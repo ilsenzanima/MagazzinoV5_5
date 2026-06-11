@@ -39,6 +39,7 @@ export default function PurchaseDetailPage() {
 
     const [loading, setLoading] = useState(true);
     const [purchase, setPurchase] = useState<Purchase | null>(null);
+    const [sourceOrders, setSourceOrders] = useState<{ id: string; deliveryNoteNumber: string }[]>([]);
     const [items, setItems] = useState<PurchaseItem[]>([]);
     const [batchAvailability, setBatchAvailability] = useState<any[]>([]); // New state for traceability
     const [itemJobMovements, setItemJobMovements] = useState<Record<string, any[]>>({}); // Job movements per item
@@ -89,17 +90,19 @@ export default function PurchaseDetailPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData] = await Promise.all([
+            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData, sourceOrdersData] = await Promise.all([
                 purchasesApi.getById(id),
                 purchasesApi.getItems(id),
                 inventoryApi.getAll(),
                 jobsApi.getAll(),
                 purchasesApi.getPurchaseBatchAvailability(id),
                 suppliersApi.getAll(),
-                purchasesApi.getPurchaseItemJobMovements(id)
+                purchasesApi.getPurchaseItemJobMovements(id),
+                purchasesApi.getSourceOrders(id)
             ]);
 
             setPurchase(purchaseData);
+            setSourceOrders(sourceOrdersData);
             setItems(itemsData);
             setInventory(inventoryData);
             setJobs(jobsData.filter(j => j.status === 'active'));
@@ -626,9 +629,10 @@ export default function PurchaseDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Fattura o Ordine collegato */}
-                            {(purchase.invoiceId || purchase.convertedPurchaseId) && (
+                            {/* Fattura, ordine di origine o acquisto collegato */}
+                            {(purchase.invoiceId || purchase.convertedPurchaseId || sourceOrders.length > 0) && (
                                 <div className="md:col-span-2 border-t pt-4 mt-2 flex flex-wrap gap-3">
+                                    {/* Acquisto → Fattura */}
                                     {purchase.invoiceId && purchase.invoiceNumber && (
                                         <a
                                             href={`/invoices/${purchase.invoiceId}`}
@@ -641,6 +645,7 @@ export default function PurchaseDetailPage() {
                                             <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />
                                         </a>
                                     )}
+                                    {/* Ordine evaso → Acquisto risultante */}
                                     {purchase.convertedPurchaseId && purchase.convertedPurchaseNumber && (
                                         <a
                                             href={`/purchases/${purchase.convertedPurchaseId}`}
@@ -653,6 +658,20 @@ export default function PurchaseDetailPage() {
                                             <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />
                                         </a>
                                     )}
+                                    {/* Acquisto → Ordini sorgente */}
+                                    {sourceOrders.map(order => (
+                                        <a
+                                            key={order.id}
+                                            href={`/purchases/${order.id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-1.5"
+                                        >
+                                            <ClipboardList className="h-4 w-4" />
+                                            Ordine: {order.deliveryNoteNumber}
+                                            <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />
+                                        </a>
+                                    ))}
                                 </div>
                             )}
                         </CardContent>

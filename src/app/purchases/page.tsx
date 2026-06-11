@@ -193,7 +193,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                                 <span className="text-slate-400 dark:text-slate-500 italic text-sm">Riservato</span>
                               )}
                             </div>
-                            {isOrder && (userRole === 'admin' || userRole === 'operativo') && (
+                            {isOrder && !purchase.convertedPurchaseId && (userRole === 'admin' || userRole === 'operativo') && (
                               <button
                                 onClick={e => { e.preventDefault(); setConvertOrder(purchase); }}
                                 title="Converti in Acquisto"

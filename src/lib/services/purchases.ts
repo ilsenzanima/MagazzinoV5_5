@@ -298,6 +298,17 @@ export const purchasesApi = {
         if (error) throw error;
     },
 
+    // Fetch orders that have been converted into this purchase (reverse lookup)
+    getSourceOrders: async (purchaseId: string): Promise<{ id: string; deliveryNoteNumber: string }[]> => {
+        const { data, error } = await supabase
+            .from('purchases')
+            .select('id, delivery_note_number')
+            .eq('converted_purchase_id', purchaseId)
+            .eq('order_type', 'order');
+        if (error) throw error;
+        return (data ?? []).map((r: any) => ({ id: r.id, deliveryNoteNumber: r.delivery_note_number }));
+    },
+
     // Fetch full order data for conversion to purchase (includes item_id, coefficient, pieces)
     getOrdersForConversion: async (ids: string[]) => {
         const { data, error } = await supabase
