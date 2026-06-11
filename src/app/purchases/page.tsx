@@ -351,7 +351,12 @@ function InvoicesTab() {
 function PurchasesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const tab = (searchParams?.get("tab") ?? "acquisti") as "acquisti" | "ordini" | "fatture";
+  const { userRole } = useAuth();
+  const canSeeFatture = userRole === 'admin' || userRole === 'operativo';
+
+  const rawTab = (searchParams?.get("tab") ?? "acquisti") as "acquisti" | "ordini" | "fatture";
+  // Redirect user role away from fatture tab
+  const tab = rawTab === "fatture" && !canSeeFatture ? "acquisti" : rawTab;
 
   const handleTabChange = (value: string) => {
     const params = new URLSearchParams(searchParams?.toString() ?? "");
@@ -376,17 +381,19 @@ function PurchasesPageContent() {
               <ClipboardList className="h-4 w-4" />
               Ordini
             </TabsTrigger>
-            <TabsTrigger value="fatture" className="flex items-center gap-1.5 flex-1 sm:flex-none">
-              <Receipt className="h-4 w-4" />
-              Fatture
-            </TabsTrigger>
+            {canSeeFatture && (
+              <TabsTrigger value="fatture" className="flex items-center gap-1.5 flex-1 sm:flex-none">
+                <Receipt className="h-4 w-4" />
+                Fatture
+              </TabsTrigger>
+            )}
           </TabsList>
         </Tabs>
       </div>
 
       {tab === "acquisti" && <PurchasesTab orderType="purchase" />}
       {tab === "ordini" && <PurchasesTab orderType="order" />}
-      {tab === "fatture" && <InvoicesTab />}
+      {canSeeFatture && tab === "fatture" && <InvoicesTab />}
     </>
   );
 }

@@ -274,7 +274,19 @@ export default function InvoiceDetailPage() {
         </DashboardLayout>
     );
 
-    const canSeeAmounts = userRole === 'admin' || userRole === 'operativo';
+    if (userRole === 'user') return (
+        <DashboardLayout>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Accesso Negato</h2>
+                <p className="text-slate-500 mb-6">Non hai i permessi per visualizzare le fatture.</p>
+                <Link href="/purchases">
+                    <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" />Torna agli Acquisti</Button>
+                </Link>
+            </div>
+        </DashboardLayout>
+    );
+
+    const canSeeAmounts = true; // only admin/operativo reach this point
     const canEdit = userRole === 'admin' || userRole === 'operativo';
 
     // Current linked purchases, minus those marked for removal
