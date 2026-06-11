@@ -30,14 +30,41 @@ function ItemPriceRow({
     canEdit: boolean;
     onSaved: () => void;
 }) {
-    const [price, setPrice] = useState(item.price?.toFixed(2) ?? "");
-    const [saving, setSaving] = useState(false);
     const qty = item.quantity ?? 0;
-    const total = (parseFloat(price) || 0) * qty;
+    const [price, setPrice] = useState(item.price != null ? item.price.toFixed(5) : "");
+    const [total, setTotal] = useState(
+        item.price != null && qty ? (item.price * qty).toFixed(2) : ""
+    );
+    const [saving, setSaving] = useState(false);
 
-    const save = async () => {
+    const handlePriceChange = (val: string) => {
+        setPrice(val);
+        const p = parseFloat(val);
+        if (!isNaN(p) && qty) setTotal((p * qty).toFixed(2));
+    };
+
+    const handleTotalChange = (val: string) => {
+        setTotal(val);
+    };
+
+    const handleTotalBlur = () => {
+        const t = parseFloat(total);
+        if (isNaN(t) || !qty) return;
+        const newPrice = (t / qty).toFixed(5);
+        setPrice(newPrice);
+        setTotal(t.toFixed(2));
+        commitPrice(parseFloat(newPrice));
+    };
+
+    const handlePriceBlur = () => {
         const p = parseFloat(price);
         if (isNaN(p)) return;
+        if (qty) setTotal((p * qty).toFixed(2));
+        commitPrice(p);
+    };
+
+    const commitPrice = async (p: number) => {
+        if (isNaN(p) || p < 0) return;
         if (p === item.price) return;
         try {
             setSaving(true);
@@ -60,30 +87,49 @@ function ItemPriceRow({
             <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-16">{qty}</td>
             {canEdit ? (
                 <>
-                    <td className="py-1 w-28 pl-2">
+                    <td className="py-1 w-32 pl-2">
                         <div className="flex items-center gap-1">
-                            <span className="text-slate-400 text-xs">€</span>
+                            <span className="text-slate-400 text-xs shrink-0">€</span>
                             <Input
                                 type="number"
                                 inputMode="decimal"
                                 min="0"
                                 step="0.00001"
                                 value={price}
-                                onChange={e => setPrice(e.target.value)}
-                                onBlur={save}
-                                className="h-7 text-right px-1 text-xs w-20"
+                                onChange={e => handlePriceChange(e.target.value)}
+                                onBlur={handlePriceBlur}
+                                className="h-7 text-right px-1 text-xs w-24"
+                                placeholder="0.00000"
                             />
                             {saving && <Loader2 className="h-3 w-3 animate-spin text-slate-400 shrink-0" />}
                         </div>
                     </td>
-                    <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-24 pr-1">
-                        {!isNaN(total) ? `€ ${total.toFixed(2)}` : '—'}
+                    <td className="py-1 w-32 pl-2">
+                        <div className="flex items-center gap-1">
+                            <span className="text-slate-400 text-xs shrink-0">€</span>
+                            <Input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="0.01"
+                                value={total}
+                                onChange={e => handleTotalChange(e.target.value)}
+                                onBlur={handleTotalBlur}
+                                className="h-7 text-right px-1 text-xs w-24"
+                                placeholder="0.00"
+                            />
+                        </div>
                     </td>
                 </>
             ) : (
-                <td className="py-1.5 text-right text-slate-600 dark:text-slate-400" colSpan={2}>
-                    {item.price != null ? `€ ${item.price.toFixed(2)}` : '—'}
-                </td>
+                <>
+                    <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-24 pr-1">
+                        {item.price != null ? `€ ${item.price.toFixed(5)}` : '—'}
+                    </td>
+                    <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-24 pr-1">
+                        {item.price != null && qty ? `€ ${(item.price * qty).toFixed(2)}` : '—'}
+                    </td>
+                </>
             )}
         </tr>
     );
@@ -408,7 +454,7 @@ export default function InvoiceDetailPage() {
                                                                         <tr className="text-slate-400 border-b border-slate-200 dark:border-slate-700">
                                                                             <th className="text-left py-1">Articolo</th>
                                                                             <th className="text-right py-1 w-16">Qtà</th>
-                                                                            {canSeeAmounts && <><th className="text-right py-1 w-28 pl-2">Prezzo Unit.</th><th className="text-right py-1 w-24">Totale Riga</th></>}
+                                                                            {canSeeAmounts && <><th className="text-left py-1 w-32 pl-2">Prezzo Unit.</th><th className="text-left py-1 w-32 pl-2">Totale Riga</th></>}
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
