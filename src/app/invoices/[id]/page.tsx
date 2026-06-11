@@ -10,7 +10,7 @@ import {
     Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus, Lock, Unlock
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { invoicesApi, purchasesApi, suppliersApi, Invoice, Supplier } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
@@ -442,9 +442,8 @@ export default function InvoiceDetailPage() {
                                             const isExpanded = expandedPurchases.has(p.id);
                                             const hasItems = p.items && p.items.length > 0;
                                             return (
-                                                <>
+                                                <Fragment key={p.id}>
                                                     <tr
-                                                        key={p.id}
                                                         className={`border-b hover:bg-slate-50 dark:hover:bg-slate-800 ${hasItems && !isEditing ? 'cursor-pointer' : ''}`}
                                                         onClick={() => !isEditing && hasItems && togglePurchase(p.id)}
                                                     >
@@ -504,7 +503,7 @@ export default function InvoiceDetailPage() {
                                                             </td>
                                                         </tr>
                                                     )}
-                                                </>
+                                                </Fragment>
                                             );
                                         })}
                                     </tbody>

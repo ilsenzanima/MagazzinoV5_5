@@ -136,6 +136,7 @@ export const invoicesApi = {
                 .from('purchases')
                 .select('id, delivery_note_number, delivery_note_date, purchase_items(price, quantity)')
                 .eq('supplier_id', supplierId)
+                .eq('order_type', 'purchase')
                 .is('invoice_id', null)
                 .order('delivery_note_date', { ascending: false })
         );
