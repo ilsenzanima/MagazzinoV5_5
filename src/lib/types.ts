@@ -263,6 +263,7 @@ export interface Invoice {
     purchases?: {
         id: string;
         deliveryNoteNumber: string;
+        deliveryNoteDate?: string;
         totalAmount?: number;
         transportCost?: number;
         items?: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; transportApplied?: boolean; transportUnitCost?: number }[];

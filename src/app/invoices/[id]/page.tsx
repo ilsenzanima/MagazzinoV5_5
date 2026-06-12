@@ -364,6 +364,13 @@ export default function InvoiceDetailPage() {
     // Current linked purchases, minus those marked for removal
     const linkedPurchases = (invoice.purchases ?? []).filter(p => !toRemove.has(p.id));
 
+    // Totale calcolato dinamicamente dagli articoli (non da total_amount nel DB che può essere stale)
+    const totaleNetto = linkedPurchases.reduce((sum, p) => {
+        return sum + (p.items?.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 0), 0) ?? 0);
+    }, 0);
+    const iva = totaleNetto * 0.22;
+    const totaleConIva = totaleNetto + iva;
+
     return (
         <>
         <DashboardLayout>
@@ -448,10 +455,22 @@ export default function InvoiceDetailPage() {
                                         <p className="text-slate-500 mb-0.5 flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />Data Fattura</p>
                                         <p className="font-medium">{new Date(invoice.invoiceDate).toLocaleDateString('it-IT')}</p>
                                     </div>
-                                    {canSeeAmounts && invoice.totalAmount != null && (
-                                        <div>
-                                            <p className="text-slate-500 mb-0.5">Importo Totale</p>
-                                            <p className="font-bold text-lg">€ {Number(invoice.totalAmount).toFixed(2)}</p>
+                                    {canSeeAmounts && (
+                                        <div className="col-span-2 md:col-span-3 border-t pt-3 mt-1">
+                                            <div className="flex flex-col gap-1 text-sm max-w-xs ml-auto text-right">
+                                                <div className="flex justify-between gap-8">
+                                                    <span className="text-slate-500">Totale Netto</span>
+                                                    <span className="font-medium">€ {totaleNetto.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between gap-8">
+                                                    <span className="text-slate-500">IVA 22%</span>
+                                                    <span className="font-medium">€ {iva.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between gap-8 border-t pt-1 mt-0.5">
+                                                    <span className="font-bold text-slate-800 dark:text-white">Totale Fattura</span>
+                                                    <span className="font-bold text-lg">€ {totaleConIva.toFixed(2)}</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
                                     {invoice.notes && (
@@ -506,7 +525,14 @@ export default function InvoiceDetailPage() {
                                                                     : <ChevronRight className="h-4 w-4 text-slate-400" />
                                                             )}
                                                         </td>
-                                                        <td className="py-2.5 px-2 font-medium">{p.deliveryNoteNumber}</td>
+                                                        <td className="py-2.5 px-2 font-medium">
+                                            {p.deliveryNoteNumber}
+                                            {p.deliveryNoteDate && (
+                                                <span className="ml-1.5 text-xs font-normal text-slate-400">
+                                                    ({new Date(p.deliveryNoteDate).toLocaleDateString('it-IT')})
+                                                </span>
+                                            )}
+                                        </td>
                                                         {canSeeAmounts && (
                                                             <td className="py-2.5 px-4 text-right">
                                                                 {p.totalAmount !== undefined ? `€ ${p.totalAmount.toFixed(2)}` : '—'}
