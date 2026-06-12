@@ -197,7 +197,7 @@ export default function NewLoadNotePage() {
         const validLines = lines.filter(l => l.itemId && l.quantity);
         setIsLoading(true);
         try {
-            await loadNotesService.create({
+            const created = await loadNotesService.create({
                 date,
                 noteType,
                 jobId: selectedJob?.id,
@@ -211,7 +211,7 @@ export default function NewLoadNotePage() {
             });
 
             toast.success("Nota creata con successo");
-            router.push("/load-notes");
+            router.push(`/load-notes/${created.id}`);
         } catch (error: any) {
             console.error(error);
             toast.error(`Errore durante il salvataggio: ${error.message || "Errore sconosciuto"}`);

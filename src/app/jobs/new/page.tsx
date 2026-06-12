@@ -158,8 +158,8 @@ function NewJobForm() {
 
     try {
       setLoading(true);
-      await jobsApi.create(formData);
-      router.push("/jobs");
+      const created = await jobsApi.create(formData);
+      router.push(`/jobs/${created.id}`);
       router.refresh();
     } catch (error) {
       console.error("Error creating job:", error);

@@ -118,7 +118,7 @@ export default function NewInvoicePage() {
             await invoicesApi.updateTotal(invoice.id, totalAmount);
 
             notify.success("Fattura salvata con successo");
-            router.push('/purchases?tab=fatture');
+            router.push(`/invoices/${invoice.id}`);
         } catch (error: any) {
             console.error("Failed to save invoice", error);
             notify.error(`Errore durante il salvataggio: ${error.message || error.toString()}`);

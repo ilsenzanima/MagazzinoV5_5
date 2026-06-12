@@ -49,8 +49,8 @@ export default function NewClientPage() {
     e.preventDefault();
     try {
       setLoading(true);
-      await clientsApi.create(formData);
-      router.push("/clients");
+      const created = await clientsApi.create(formData);
+      router.push(`/clients/${created.id}`);
       router.refresh();
     } catch (error) {
       console.error("Error creating client:", error);

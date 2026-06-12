@@ -47,8 +47,8 @@ export default function NewSupplierPage() {
     e.preventDefault();
     try {
       setLoading(true);
-      await suppliersApi.create(formData);
-      router.push("/suppliers");
+      const created = await suppliersApi.create(formData);
+      router.push(`/suppliers/${created.id}`);
       router.refresh();
     } catch (error) {
       console.error("Error creating supplier:", error);

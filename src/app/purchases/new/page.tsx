@@ -448,7 +448,7 @@ function NewPurchaseContent() {
                 await purchasesApi.markOrdersAsConverted(fromOrderIds, purchase.id);
             }
 
-            router.push(fromOrderIds.length > 0 ? '/purchases?tab=ordini' : isOrder ? '/purchases?tab=ordini' : '/purchases');
+            router.push(`/purchases/${purchase.id}`);
         } catch (error: any) {
             console.error("Failed to save purchase", error);
             alert(`Errore durante il salvataggio: ${error.message || error.toString()}`);

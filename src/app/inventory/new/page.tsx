@@ -114,8 +114,8 @@ function NewInventoryItemContent() {
         image: imageUrl,
       };
 
-      await inventoryApi.create(newItem);
-      router.push("/inventory");
+      const created = await inventoryApi.create(newItem);
+      router.push(`/inventory/${created.id}`);
     } catch (error) {
       console.error("Failed to create item", error);
       notify.error("Errore durante la creazione dell'articolo");
