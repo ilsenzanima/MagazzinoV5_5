@@ -278,6 +278,11 @@ export default function PurchaseDetailPage() {
             const priceVal = newItem.price ? parseFloat(newItem.price) : 0;
             const piecesVal = newItem.pieces ? parseFloat(newItem.pieces) : undefined;
 
+            // Se alcune righe hanno già il trasporto applicato, lo revochiamo prima di aggiungere
+            if (items.some(i => i.transportApplied)) {
+                await purchasesApi.reverseTransportOnItems(items);
+            }
+
             await purchasesApi.addItem({
                 purchaseId: id,
                 itemId: newItem.itemId,
@@ -319,8 +324,13 @@ export default function PurchaseDetailPage() {
     const handleDeleteItem = async () => {
         if (!itemToDelete) return;
         try {
+            // Se alcune righe hanno già il trasporto applicato, lo revochiamo prima di eliminare
+            if (items.some(i => i.transportApplied)) {
+                await purchasesApi.reverseTransportOnItems(items.filter(i => i.id !== itemToDelete));
+            }
             await purchasesApi.deleteItem(itemToDelete);
-            setItems(items.filter(i => i.id !== itemToDelete));
+            const updatedItems = await purchasesApi.getItems(id);
+            setItems(updatedItems);
             setDeleteItemDialogOpen(false);
             setItemToDelete(null);
         } catch (error) {

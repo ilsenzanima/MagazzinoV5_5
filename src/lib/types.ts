@@ -284,6 +284,7 @@ export interface PurchaseItem {
     jobCode?: string;
     createdAt: string;
     transportApplied?: boolean;
+    transportUnitCost?: number;
 }
 
 // Delivery Notes (DDT)

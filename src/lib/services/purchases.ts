@@ -261,6 +261,7 @@ export const purchasesApi = {
             jobCode: item.jobs?.code,
             createdAt: item.created_at,
             transportApplied: item.transport_applied ?? false,
+            transportUnitCost: item.transport_unit_cost ?? 0,
         }));
     },
     addItem: async (item: Partial<PurchaseItem>) => {
@@ -358,7 +359,7 @@ export const purchasesApi = {
             const newPrice = parseFloat((item.price + transportPerUnit).toFixed(5));
             return supabase
                 .from('purchase_items')
-                .update({ price: newPrice, transport_applied: true })
+                .update({ price: newPrice, transport_applied: true, transport_unit_cost: transportPerUnit })
                 .eq('id', item.id);
         });
 
@@ -370,6 +371,20 @@ export const purchasesApi = {
             .update({ transport_cost: transportCost })
             .eq('id', purchaseId);
         if (error) throw error;
+    },
+
+    // Reverse transport on items that had it applied (restore original price)
+    reverseTransportOnItems: async (items: PurchaseItem[]) => {
+        const applied = items.filter(i => i.transportApplied && (i.transportUnitCost ?? 0) > 0);
+        if (applied.length === 0) return;
+        const updates = applied.map(item => {
+            const originalPrice = parseFloat((item.price - (item.transportUnitCost ?? 0)).toFixed(5));
+            return supabase
+                .from('purchase_items')
+                .update({ price: originalPrice, transport_applied: false, transport_unit_cost: 0 })
+                .eq('id', item.id);
+        });
+        await Promise.all(updates);
     },
 
     // Save transport cost without applying to items
