@@ -245,6 +245,7 @@ export interface Purchase {
     invoiceNumber?: string | null;
     convertedPurchaseId?: string | null;
     convertedPurchaseNumber?: string | null;
+    transportCost?: number;
 }
 
 // Invoices
@@ -282,6 +283,7 @@ export interface PurchaseItem {
     jobId?: string;
     jobCode?: string;
     createdAt: string;
+    transportApplied?: boolean;
 }
 
 // Delivery Notes (DDT)

@@ -30,6 +30,7 @@ export const mapDbToPurchase = (db: any): Purchase => ({
     invoiceNumber: db.invoices?.invoice_number ?? null,
     convertedPurchaseId: db.converted_purchase_id ?? null,
     convertedPurchaseNumber: db.converted_purchase?.delivery_note_number ?? null,
+    transportCost: db.transport_cost ?? 0,
 });
 
 
@@ -53,6 +54,8 @@ export const mapPurchaseToDb = (purchase: Partial<Purchase>) => {
     if ('jobId' in purchase) {
         dbPurchase.job_id = purchase.jobId || null;
     }
+
+    if (purchase.transportCost !== undefined) dbPurchase.transport_cost = purchase.transportCost;
 
     return dbPurchase;
 };
@@ -256,7 +259,8 @@ export const purchasesApi = {
             price: item.price,
             jobId: item.job_id,
             jobCode: item.jobs?.code,
-            createdAt: item.created_at
+            createdAt: item.created_at,
+            transportApplied: item.transport_applied ?? false,
         }));
     },
     addItem: async (item: Partial<PurchaseItem>) => {
@@ -279,6 +283,7 @@ export const purchasesApi = {
         if (item.pieces !== undefined) dbItem.pieces = item.pieces;
         if (item.price !== undefined) dbItem.price = item.price;
         if (item.jobId !== undefined) dbItem.job_id = item.jobId;
+        if (item.transportApplied !== undefined) dbItem.transport_applied = item.transportApplied;
 
         const { data, error } = await supabase.from('purchase_items').update(dbItem).eq('id', id).select().single();
         if (error) throw error;
@@ -337,6 +342,41 @@ export const purchasesApi = {
                 jobCode: i.jobs?.code ?? null,
             })),
         }));
+    },
+
+    // Save transport cost on the purchase and apply it to all item prices
+    applyTransportToAllItems: async (purchaseId: string, transportCost: number, items: PurchaseItem[]) => {
+        if (items.length === 0) return;
+
+        const transportPerRow = transportCost / items.length;
+
+        // Update each item: add transport per unit to price, mark transport_applied = true
+        const updates = items.map(item => {
+            const transportPerUnit = transportPerRow / item.quantity;
+            const newPrice = parseFloat((item.price + transportPerUnit).toFixed(5));
+            return supabase
+                .from('purchase_items')
+                .update({ price: newPrice, transport_applied: true })
+                .eq('id', item.id);
+        });
+
+        await Promise.all(updates);
+
+        // Save transport_cost on the purchase record
+        const { error } = await supabase
+            .from('purchases')
+            .update({ transport_cost: transportCost })
+            .eq('id', purchaseId);
+        if (error) throw error;
+    },
+
+    // Save transport cost without applying to items
+    saveTransportCost: async (purchaseId: string, transportCost: number) => {
+        const { error } = await supabase
+            .from('purchases')
+            .update({ transport_cost: transportCost })
+            .eq('id', purchaseId);
+        if (error) throw error;
     },
 
     // Get job movements for all items in a purchase

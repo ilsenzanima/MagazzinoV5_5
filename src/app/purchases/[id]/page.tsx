@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink, Truck, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -40,6 +40,10 @@ export default function PurchaseDetailPage() {
 
     const [loading, setLoading] = useState(true);
     const [purchase, setPurchase] = useState<Purchase | null>(null);
+    const [transportCost, setTransportCost] = useState(0);
+    const [transportInput, setTransportInput] = useState("0");
+    const [savingTransport, setSavingTransport] = useState(false);
+    const [applyingTransport, setApplyingTransport] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteItemDialogOpen, setDeleteItemDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -107,6 +111,9 @@ export default function PurchaseDetailPage() {
             ]);
 
             setPurchase(purchaseData);
+            const tc = purchaseData.transportCost ?? 0;
+            setTransportCost(tc);
+            setTransportInput(tc > 0 ? tc.toString() : "");
             setSourceOrders(sourceOrdersData);
             setItems(itemsData);
             setInventory(inventoryData);
@@ -479,6 +486,38 @@ export default function PurchaseDetailPage() {
         });
     };
 
+    const handleSaveTransportCost = async () => {
+        const val = parseFloat(transportInput) || 0;
+        try {
+            setSavingTransport(true);
+            await purchasesApi.saveTransportCost(id, val);
+            setTransportCost(val);
+        } catch (e) {
+            console.error(e);
+            alert("Errore nel salvataggio del costo trasporto");
+        } finally {
+            setSavingTransport(false);
+        }
+    };
+
+    const handleApplyTransport = async () => {
+        const val = parseFloat(transportInput) || 0;
+        if (val <= 0) { alert("Inserisci un costo trasporto valido"); return; }
+        const eligible = items.filter(i => !i.transportApplied);
+        if (eligible.length === 0) { alert("Il trasporto è già stato applicato a tutte le righe"); return; }
+        try {
+            setApplyingTransport(true);
+            await purchasesApi.applyTransportToAllItems(id, val, eligible);
+            setTransportCost(val);
+            await loadData();
+        } catch (e) {
+            console.error(e);
+            alert("Errore durante l'applicazione del trasporto");
+        } finally {
+            setApplyingTransport(false);
+        }
+    };
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -700,8 +739,50 @@ export default function PurchaseDetailPage() {
 
                     {/* Items List */}
                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
+                        <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-3">
                             <CardTitle>{isOrder ? "Materiali nell'Ordine" : "Materiali in Bolla"}</CardTitle>
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="flex items-center gap-1.5">
+                                        <Truck className="h-4 w-4 text-slate-400 shrink-0" />
+                                        <span className="text-sm text-slate-500 shrink-0">Costo trasporto €</span>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={transportInput}
+                                            onChange={e => setTransportInput(e.target.value)}
+                                            onBlur={handleSaveTransportCost}
+                                            className="w-24 h-8 text-sm"
+                                            placeholder="0.00"
+                                        />
+                                        {savingTransport && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />}
+                                    </div>
+                                    {transportCost > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            {items.some(i => !i.transportApplied) ? (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+                                                    onClick={handleApplyTransport}
+                                                    disabled={applyingTransport}
+                                                >
+                                                    {applyingTransport
+                                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                                                        : <Truck className="h-3.5 w-3.5 mr-1" />}
+                                                    Applica trasporto a tutte le righe
+                                                </Button>
+                                            ) : (
+                                                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                                    Trasporto applicato
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </CardHeader>
                         <CardContent>
                             {/* Desktop View: Table */}
@@ -713,8 +794,11 @@ export default function PurchaseDetailPage() {
                                             <TableHead className="text-right">Pezzi</TableHead>
                                             <TableHead className="text-right">Coeff.</TableHead>
                                             <TableHead className="text-right">Q.tà Tot.</TableHead>
-                                            <TableHead className="text-right">Prezzo Unit.</TableHead>
-                                            <TableHead className="text-right">Totale Riga</TableHead>
+                                            {transportCost > 0 && <TableHead className="text-right text-amber-600">Trasp./u.</TableHead>}
+                                            <TableHead className="text-right">{transportCost > 0 ? "P.U. Acquisto" : "Prezzo Unit."}</TableHead>
+                                            <TableHead className="text-right">{transportCost > 0 ? "Tot. Acquisto" : "Totale Riga"}</TableHead>
+                                            {transportCost > 0 && <TableHead className="text-right text-amber-600">P.U. c/Trasp.</TableHead>}
+                                            {transportCost > 0 && <TableHead className="text-right text-amber-600">Tot. c/Trasp.</TableHead>}
                                             <TableHead>Destinazione</TableHead>
                                             <TableHead></TableHead>
                                         </TableRow>
@@ -789,6 +873,16 @@ export default function PurchaseDetailPage() {
                                                             {item.coefficient || 1}
                                                         </TableCell>
                                                         <TableCell className="text-right">{item.quantity}</TableCell>
+                                                        {transportCost > 0 && (userRole === 'admin' || userRole === 'operativo') && (
+                                                            <TableCell className="text-right text-amber-600 text-xs">
+                                                                {item.quantity > 0
+                                                                    ? `€ ${(transportCost / items.length / item.quantity).toFixed(5)}`
+                                                                    : '—'}
+                                                            </TableCell>
+                                                        )}
+                                                        {transportCost > 0 && !(userRole === 'admin' || userRole === 'operativo') && (
+                                                            <TableCell className="text-right"><span className="text-slate-400 italic text-xs">Riservato</span></TableCell>
+                                                        )}
                                                         <TableCell className="text-right">
                                                             {(userRole === 'admin' || userRole === 'operativo') ? (
                                                                 item.price === 0 ? (
@@ -824,6 +918,26 @@ export default function PurchaseDetailPage() {
                                                         <span className="text-slate-400 italic text-xs">Riservato</span>
                                                     )}
                                                 </TableCell>
+                                                {transportCost > 0 && editingItemId !== item.id && (
+                                                    <>
+                                                        <TableCell className="text-right text-amber-700 font-medium">
+                                                            {(userRole === 'admin' || userRole === 'operativo') && item.quantity > 0
+                                                                ? `€ ${(item.price + transportCost / items.length / item.quantity).toFixed(5)}`
+                                                                : <span className="text-slate-400 italic text-xs">Riservato</span>}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-amber-700 font-bold">
+                                                            {(userRole === 'admin' || userRole === 'operativo') && item.quantity > 0
+                                                                ? `€ ${((item.price + transportCost / items.length / item.quantity) * item.quantity).toFixed(2)}`
+                                                                : <span className="text-slate-400 italic text-xs">Riservato</span>}
+                                                        </TableCell>
+                                                    </>
+                                                )}
+                                                {transportCost > 0 && editingItemId === item.id && (
+                                                    <>
+                                                        <TableCell />
+                                                        <TableCell />
+                                                    </>
+                                                )}
 
                                                 <TableCell>
                                                     {item.jobId ? (
@@ -876,7 +990,9 @@ export default function PurchaseDetailPage() {
                                             </TableRow>
                                         ))}
                                         <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold text-lg">
-                                            <TableCell colSpan={5} className="text-right">{isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}</TableCell>
+                                            <TableCell colSpan={transportCost > 0 ? 6 : 5} className="text-right">
+                                                {isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}
+                                            </TableCell>
                                             <TableCell className="text-right">
                                                 {(userRole === 'admin' || userRole === 'operativo') ? (
                                                     `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
@@ -884,6 +1000,21 @@ export default function PurchaseDetailPage() {
                                                     <span className="text-slate-400 italic text-sm">Riservato</span>
                                                 )}
                                             </TableCell>
+                                            {transportCost > 0 && (
+                                                <>
+                                                    <TableCell className="text-right text-amber-700">
+                                                        {/* P.U. c/Trasp. non ha un totale significativo */}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-amber-700">
+                                                        {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                            `€ ${items.reduce((acc, item) => {
+                                                                const tpu = item.quantity > 0 ? transportCost / items.length / item.quantity : 0;
+                                                                return acc + (item.price + tpu) * item.quantity;
+                                                            }, 0).toFixed(2)}`
+                                                        ) : ''}
+                                                    </TableCell>
+                                                </>
+                                            )}
                                             <TableCell></TableCell>
                                             <TableCell></TableCell>
                                         </TableRow>
@@ -1003,9 +1134,18 @@ export default function PurchaseDetailPage() {
                                                                 <AlertTriangle className="h-3 w-3 mr-1" /> MANCANTE
                                                             </span>
                                                         ) : (
-                                                            <div className="flex flex-col items-end">
-                                                                <span className="font-mono text-xs">€ {item.price.toFixed(5)}</span>
-                                                                <span className="font-bold text-slate-900 dark:text-white text-xs">Tot: € ${(item.quantity * item.price).toFixed(2)}</span>
+                                                            <div className="flex flex-col items-end gap-0.5">
+                                                                <span className="font-mono text-xs text-slate-500">P.U.: € {item.price.toFixed(5)}</span>
+                                                                <span className="font-bold text-slate-900 dark:text-white text-xs">Tot: € {(item.quantity * item.price).toFixed(2)}</span>
+                                                                {transportCost > 0 && item.quantity > 0 && (() => {
+                                                                    const tpu = transportCost / items.length / item.quantity;
+                                                                    return (
+                                                                        <>
+                                                                            <span className="text-[10px] text-amber-600">Trasp./u.: € {tpu.toFixed(5)}</span>
+                                                                            <span className="text-[10px] text-amber-700 font-semibold">Tot. c/Trasp.: € {((item.price + tpu) * item.quantity).toFixed(2)}</span>
+                                                                        </>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         )
                                                     ) : (
@@ -1018,13 +1158,21 @@ export default function PurchaseDetailPage() {
                                 ))}
                                 <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-md flex justify-between items-center font-bold text-sm">
                                     <span>{isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}</span>
-                                    <span>
-                                        {(userRole === 'admin' || userRole === 'operativo') ? (
-                                            `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
-                                        ) : (
-                                            <span className="text-slate-400 italic text-sm">Riservato</span>
-                                        )}
-                                    </span>
+                                    {(userRole === 'admin' || userRole === 'operativo') ? (
+                                        <div className="text-right">
+                                            <div>{`€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`}</div>
+                                            {transportCost > 0 && (
+                                                <div className="text-xs text-amber-700 font-semibold">
+                                                    c/Trasp.: € {items.reduce((acc, item) => {
+                                                        const tpu = item.quantity > 0 ? transportCost / items.length / item.quantity : 0;
+                                                        return acc + (item.price + tpu) * item.quantity;
+                                                    }, 0).toFixed(2)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-slate-400 italic text-sm">Riservato</span>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
