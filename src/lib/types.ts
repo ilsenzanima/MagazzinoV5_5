@@ -330,6 +330,7 @@ export interface DeliveryNote {
     created_at?: string;
     itemCount?: number;
     totalQuantity?: number;
+    itemNames?: string[];
 }
 
 // Sites (derived from Jobs)

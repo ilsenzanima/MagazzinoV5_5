@@ -271,13 +271,13 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                         </div>
 
                         <div className="space-y-2 text-xs sm:text-sm">
-                          <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-700">
-                            <span className="text-slate-500 dark:text-slate-400">Causale</span>
-                            <span className="font-medium truncate max-w-[120px] sm:max-w-[150px]">{movement.causal}</span>
+                          <div className="flex justify-between gap-3 py-1 border-b border-slate-50 dark:border-slate-700">
+                            <span className="text-slate-500 dark:text-slate-400 shrink-0">Causale</span>
+                            <span className="font-medium text-right break-words">{movement.causal}</span>
                           </div>
                           {(movement.jobCode || movement.jobName || movement.jobDescription) && (
-                            <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-700">
-                              <span className="text-slate-500 dark:text-slate-400">Commessa</span>
+                            <div className="flex justify-between gap-3 py-1 border-b border-slate-50 dark:border-slate-700">
+                              <span className="text-slate-500 dark:text-slate-400 shrink-0">Commessa</span>
                               {(() => {
                                 const displayName = movement.jobName || movement.jobDescription;
                                 const clientName = movement.jobClientName;
@@ -285,22 +285,29 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                                   ? `${displayName}${clientName ? ` - ${clientName}` : ''}`
                                   : movement.jobCode;
                                 return (
-                                  <span 
-                                    className="font-medium text-blue-600 dark:text-blue-400 text-right truncate max-w-[150px] sm:max-w-[200px]"
-                                    title={label}
-                                  >
+                                  <span className="font-medium text-blue-600 dark:text-blue-400 text-right break-words">
                                     {label}
                                   </span>
                                 );
                               })()}
                             </div>
                           )}
-                          <div className="flex justify-between py-1">
-                            <span className="text-slate-500 dark:text-slate-400">Articoli</span>
-                            <span className="font-medium">
-                              {/* Fallback per compatibilità con i dati che arrivano dal backend */}
-                              {movement.itemCount ?? movement.items?.length ?? 0} righe
-                            </span>
+                          <div className="py-1">
+                            <div className="flex justify-between mb-1">
+                              <span className="text-slate-500 dark:text-slate-400">Articoli</span>
+                              <span className="font-medium text-xs text-slate-500">
+                                {movement.itemCount ?? movement.items?.length ?? 0} righe
+                              </span>
+                            </div>
+                            {movement.itemNames && movement.itemNames.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {movement.itemNames.map((name, i) => (
+                                  <span key={i} className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded">
+                                    {name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </CardContent>

@@ -392,13 +392,13 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     <span className="text-slate-500 dark:text-slate-400">Causale</span>
                                     <span className="font-medium">{movement.causal}</span>
                                 </div>
-                                <div className="flex justify-between border-b dark:border-slate-700 pb-2">
-                                    <span className="text-slate-500 dark:text-slate-400">Luogo Ritiro</span>
-                                    <span className="font-medium truncate max-w-[200px]">{movement.pickupLocation}</span>
+                                <div className="flex justify-between gap-3 border-b dark:border-slate-700 pb-2">
+                                    <span className="text-slate-500 dark:text-slate-400 shrink-0">Luogo Ritiro</span>
+                                    <span className="font-medium text-right break-words">{movement.pickupLocation}</span>
                                 </div>
-                                <div className="flex justify-between border-b dark:border-slate-700 pb-2">
-                                    <span className="text-slate-500 dark:text-slate-400">Destinazione</span>
-                                    <span className="font-medium truncate max-w-[200px]">{movement.deliveryLocation}</span>
+                                <div className="flex justify-between gap-3 border-b dark:border-slate-700 pb-2">
+                                    <span className="text-slate-500 dark:text-slate-400 shrink-0">Destinazione</span>
+                                    <span className="font-medium text-right break-words">{movement.deliveryLocation}</span>
                                 </div>
                             </div>
                         )}

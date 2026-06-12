@@ -74,7 +74,7 @@ export const deliveryNotesApi = {
             const { data, error } = await fetchWithTimeout<any>(
                 supabase
                     .from('delivery_notes')
-                    .select('*, jobs(code, description, site_address, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity)')
+                    .select('*, jobs(code, description, site_address, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))')
                     .order('date', { ascending: false })
                     .order('number_int', { ascending: false })
             );
@@ -87,7 +87,8 @@ export const deliveryNotesApi = {
             return data.map((d: any) => ({
                 ...mapDbToDeliveryNote(d),
                 itemCount: d.delivery_note_items?.length || 0,
-                totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+                totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
+                itemNames: (d.delivery_note_items ?? []).map((i: any) => i.inventory?.name ? (i.inventory.model ? `${i.inventory.name} (${i.inventory.model})` : i.inventory.name) : null).filter(Boolean)
             }));
         } finally {
             console.timeEnd('deliveryNotesApi.getAll');
@@ -100,7 +101,7 @@ export const deliveryNotesApi = {
 
         let query = supabase
             .from('delivery_notes')
-            .select('*, jobs(code, description, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity)', { count: 'estimated' });
+            .select('*, jobs(code, description, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))', { count: 'estimated' });
 
         if (dateFrom) {
             query = query.gte('date', dateFrom);
@@ -159,7 +160,8 @@ export const deliveryNotesApi = {
             data: data.map((d: any) => ({
                 ...mapDbToDeliveryNote(d),
                 itemCount: d.delivery_note_items?.length || 0,
-                totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+                totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
+                itemNames: (d.delivery_note_items ?? []).map((i: any) => i.inventory?.name ? (i.inventory.model ? `${i.inventory.name} (${i.inventory.model})` : i.inventory.name) : null).filter(Boolean)
             })),
             total: count || 0
         };

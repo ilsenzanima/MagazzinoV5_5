@@ -20,7 +20,7 @@ export default async function MovementsPage() {
   // Fetch initial data (Page 1, Limit 12)
   const { data: dbMovements, error, count } = await supabase
     .from('delivery_notes')
-    .select('*, jobs(code, description, site_address, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity)', { count: 'estimated' })
+    .select('*, jobs(code, description, site_address, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))', { count: 'estimated' })
     .order('date', { ascending: false })
     .order('number_int', { ascending: false })
     .range(0, 11);
@@ -28,7 +28,8 @@ export default async function MovementsPage() {
   const initialMovements = dbMovements ? dbMovements.map((d: any) => ({
     ...mapDbToDeliveryNote(d),
     itemCount: d.delivery_note_items?.length || 0,
-    totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+    totalQuantity: d.delivery_note_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
+    itemNames: (d.delivery_note_items ?? []).map((i: any) => i.inventory?.name ? (i.inventory.model ? `${i.inventory.name} (${i.inventory.model})` : i.inventory.name) : null).filter(Boolean)
   })) : [];
 
   const initialTotalItems = count || 0;

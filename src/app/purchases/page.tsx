@@ -169,15 +169,15 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                               {purchase.invoiceId && (
                                 <span title="Fattura collegata"><Receipt className="h-4 w-4 text-blue-500" /></span>
                               )}
-                              {purchase.isExhausted ? (
+                              {!isOrder && (purchase.isExhausted ? (
                                 <span title="Materiale esaurito"><PackageX className="h-4 w-4 text-slate-400" /></span>
                               ) : (
                                 <span title="Materiale disponibile"><Package className="h-4 w-4 text-emerald-500" /></span>
-                              )}
+                              ))}
                               {purchase.documentUrl && (
                                 <span title="Documento allegato"><Paperclip className="h-4 w-4 text-violet-500" /></span>
                               )}
-                              {hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
+                              {!isOrder && hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
                                 <span title="Prezzo mancante"><AlertTriangle className="h-5 w-5 text-amber-500" /></span>
                               )}
                             </div>

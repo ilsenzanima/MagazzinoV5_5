@@ -612,8 +612,8 @@ export default function PurchaseDetailPage() {
                             <div className="md:col-span-2 border-t pt-4 mt-2">
                                 <Label className="text-slate-500 mb-1 block">Commessa (Generale)</Label>
                                 <div
-                                    className="flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 bg-white dark:bg-slate-800 max-w-md"
-                                    onClick={() => setIsHeaderJobSelectorOpen(true)}
+                                    className={`flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 bg-white dark:bg-slate-800 max-w-md ${isEditingHeader ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700" : "cursor-default opacity-70"}`}
+                                    onClick={() => isEditingHeader && setIsHeaderJobSelectorOpen(true)}
                                 >
                                     {selectedHeaderJob ? (
                                         <div className="flex flex-col overflow-hidden">
