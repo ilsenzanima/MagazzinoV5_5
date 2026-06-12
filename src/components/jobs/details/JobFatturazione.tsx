@@ -1,20 +1,18 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import {
-    Loader2, Plus, Pencil, Trash2, Paperclip, Euro, FileText,
-    ChevronDown, ChevronRight, Link2, X, CheckCircle2, TrendingUp
-} from "lucide-react"
-import { jobSalApprovatiApi, jobFattureCommittenteApi, jobSalFatturaLinksApi } from "@/lib/services/job-billing"
+import { Loader2, Plus, Pencil, Trash2, Paperclip, Euro, TrendingUp, X } from "lucide-react"
+import { jobSalApprovatiApi, jobFattureCommittenteApi } from "@/lib/services/job-billing"
 import { jobsApi } from "@/lib/api"
-import { JobSalApprovato, JobFatturaCommittente, JobSalFatturaLink } from "@/lib/types"
+import { JobSalApprovato, JobFatturaCommittente } from "@/lib/types"
 import { notify } from "@/lib/notify"
+import { format } from "date-fns"
+import { it } from "date-fns/locale"
 
 interface JobFatturazioneProps {
     jobId: string
@@ -22,256 +20,19 @@ interface JobFatturazioneProps {
     onJobUpdated: () => void
 }
 
-// ── Mini form per SAL e Fatture ───────────────────────────────────────────────
-
 interface EntryFormData {
     name: string
     amount: string
+    date: string
     notes: string
 }
 
-const emptyForm = (): EntryFormData => ({ name: "", amount: "", notes: "" })
-
-// ── Dialogo collegamento SAL ↔ Fattura ────────────────────────────────────────
-
-function LinkDialog({
-    open,
-    onClose,
-    sal,
-    fatture,
-    links,
-    onSave,
-}: {
-    open: boolean
-    onClose: () => void
-    sal: JobSalApprovato
-    fatture: JobFatturaCommittente[]
-    links: JobSalFatturaLink[]
-    onSave: (fatturaId: string, amount: number) => Promise<void>
-}) {
-    const [selectedFatturaId, setSelectedFatturaId] = useState("")
-    const [amount, setAmount] = useState("")
-    const [saving, setSaving] = useState(false)
-
-    const existingLinks = links.filter(l => l.salId === sal.id)
-    const alreadyLinkedIds = new Set(existingLinks.map(l => l.fatturaId))
-
-    const handleSave = async () => {
-        if (!selectedFatturaId) return
-        const amt = parseFloat(amount.replace(",", "."))
-        if (isNaN(amt) || amt <= 0) { notify.error("Inserisci un importo valido"); return }
-        setSaving(true)
-        try {
-            await onSave(selectedFatturaId, amt)
-            setSelectedFatturaId("")
-            setAmount("")
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={v => !v && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Link2 className="h-4 w-4 text-blue-600" />
-                        Collega fattura a {sal.name}
-                    </DialogTitle>
-                </DialogHeader>
-
-                {existingLinks.length > 0 && (
-                    <div className="space-y-1">
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Già collegati</p>
-                        {existingLinks.map(link => {
-                            const f = fatture.find(f => f.id === link.fatturaId)
-                            return (
-                                <div key={link.id} className="flex items-center justify-between text-sm bg-slate-50 dark:bg-slate-800 rounded px-3 py-1.5">
-                                    <span>{f?.name ?? link.fatturaId}</span>
-                                    <span className="font-medium text-blue-700 dark:text-blue-400">
-                                        € {link.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                                    </span>
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
-
-                <div className="space-y-3">
-                    <div>
-                        <Label className="text-xs">Fattura</Label>
-                        <select
-                            className="w-full mt-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={selectedFatturaId}
-                            onChange={e => setSelectedFatturaId(e.target.value)}
-                        >
-                            <option value="">Seleziona fattura...</option>
-                            {fatture.map(f => (
-                                <option key={f.id} value={f.id}>
-                                    {f.name} — € {f.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                                    {alreadyLinkedIds.has(f.id) ? " (già collegata)" : ""}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <Label className="text-xs">Importo coperto da questa fattura (€)</Label>
-                        <Input
-                            className="mt-1"
-                            placeholder="0,00"
-                            value={amount}
-                            onChange={e => setAmount(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>Annulla</Button>
-                    <Button onClick={handleSave} disabled={saving || !selectedFatturaId}>
-                        {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Collega
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-// ── Entry Row ─────────────────────────────────────────────────────────────────
-
-function EntryCard({
-    type,
-    entry,
-    links,
-    fatture,
-    onEdit,
-    onDelete,
-    onLink,
-    onDeleteLink,
-    canEdit,
-}: {
-    type: 'sal' | 'fattura'
-    entry: JobSalApprovato | JobFatturaCommittente
-    links: JobSalFatturaLink[]
-    fatture: JobFatturaCommittente[]
-    onEdit: () => void
-    onDelete: () => void
-    onLink: () => void
-    onDeleteLink: (salId: string, fatturaId: string) => void
-    canEdit: boolean
-}) {
-    const [expanded, setExpanded] = useState(false)
-    const isSal = type === 'sal'
-    const myLinks = isSal
-        ? links.filter(l => l.salId === entry.id)
-        : links.filter(l => l.fatturaId === entry.id)
-
-    const linkedAmount = myLinks.reduce((s, l) => s + l.amount, 0)
-    const remaining = entry.amount - linkedAmount
-    const fullyLinked = remaining <= 0.005
-
-    return (
-        <Card className="border-slate-200 dark:border-slate-700">
-            <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-slate-900 dark:text-white truncate">{entry.name}</span>
-                            {fullyLinked && (
-                                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border-0 text-xs">
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    Completo
-                                </Badge>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1">
-                            <span className="text-lg font-bold text-blue-700 dark:text-blue-400">
-                                € {entry.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                            </span>
-                            {myLinks.length > 0 && (
-                                <span className="text-xs text-slate-500">
-                                    Coperto: € {linkedAmount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                                    {!fullyLinked && (
-                                        <span className="text-amber-600 dark:text-amber-400 ml-1">
-                                            (residuo € {remaining.toLocaleString('it-IT', { minimumFractionDigits: 2 })})
-                                        </span>
-                                    )}
-                                </span>
-                            )}
-                        </div>
-                        {entry.notes && (
-                            <p className="text-xs text-slate-500 mt-0.5 truncate">{entry.notes}</p>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                        {entry.documentUrl && (
-                            <a href={entry.documentUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" title="Apri documento">
-                                    <Paperclip className="h-3.5 w-3.5 text-violet-500" />
-                                </Button>
-                            </a>
-                        )}
-                        {canEdit && isSal && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onLink} title="Collega fattura">
-                                <Link2 className="h-3.5 w-3.5 text-blue-500" />
-                            </Button>
-                        )}
-                        {myLinks.length > 0 && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpanded(v => !v)}>
-                                {expanded
-                                    ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                                    : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-                                }
-                            </Button>
-                        )}
-                        {canEdit && (
-                            <>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
-                                    <Pencil className="h-3.5 w-3.5 text-slate-400" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={onDelete}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                {expanded && myLinks.length > 0 && (
-                    <div className="mt-3 border-t dark:border-slate-700 pt-2 space-y-1">
-                        {myLinks.map(link => {
-                            const other = isSal
-                                ? fatture.find(f => f.id === link.fatturaId)
-                                : null
-                            return (
-                                <div key={link.id} className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 rounded px-2 py-1">
-                                    <span className="flex items-center gap-1">
-                                        <Link2 className="h-3 w-3 text-blue-400" />
-                                        {isSal ? (other?.name ?? link.fatturaId) : ""}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-medium">
-                                            € {link.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                                        </span>
-                                        {canEdit && isSal && (
-                                            <button
-                                                className="text-red-400 hover:text-red-600"
-                                                onClick={() => onDeleteLink(link.salId, link.fatturaId)}
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    )
-}
+const emptyForm = (): EntryFormData => ({
+    name: "",
+    amount: "",
+    date: new Date().toISOString().split("T")[0],
+    notes: "",
+})
 
 // ── Form dialog ───────────────────────────────────────────────────────────────
 
@@ -306,11 +67,7 @@ function EntryDialog({
         const amt = parseFloat(form.amount.replace(",", "."))
         if (isNaN(amt) || amt < 0) { notify.error("Inserisci un importo valido"); return }
         setSaving(true)
-        try {
-            await onSave(form)
-        } finally {
-            setSaving(false)
-        }
+        try { await onSave(form) } finally { setSaving(false) }
     }
 
     return (
@@ -329,14 +86,25 @@ function EntryDialog({
                             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                         />
                     </div>
-                    <div>
-                        <Label className="text-xs">Importo (€) *</Label>
-                        <Input
-                            className="mt-1"
-                            placeholder="0,00"
-                            value={form.amount}
-                            onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-                        />
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <Label className="text-xs">Importo (€) *</Label>
+                            <Input
+                                className="mt-1"
+                                placeholder="0,00"
+                                value={form.amount}
+                                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                            />
+                        </div>
+                        <div>
+                            <Label className="text-xs">Data emissione *</Label>
+                            <Input
+                                type="date"
+                                className="mt-1"
+                                value={form.date}
+                                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                            />
+                        </div>
                     </div>
                     <div>
                         <Label className="text-xs">Note</Label>
@@ -392,15 +160,76 @@ function EntryDialog({
     )
 }
 
+// ── Entry card (compact, for use in a column) ─────────────────────────────────
+
+function EntryCard({
+    entry,
+    color,
+    onEdit,
+    onDelete,
+}: {
+    entry: JobSalApprovato | JobFatturaCommittente
+    color: "emerald" | "blue"
+    onEdit: () => void
+    onDelete: () => void
+}) {
+    const borderClass = color === "emerald"
+        ? "border-l-4 border-l-emerald-500"
+        : "border-l-4 border-l-blue-500"
+    const amountClass = color === "emerald"
+        ? "text-emerald-700 dark:text-emerald-400"
+        : "text-blue-700 dark:text-blue-400"
+
+    const dateLabel = entry.date
+        ? format(new Date(entry.date + "T00:00:00"), "dd MMM yyyy", { locale: it })
+        : null
+
+    return (
+        <Card className={`${borderClass} border-slate-200 dark:border-slate-700 shadow-none`}>
+            <CardContent className="p-3">
+                <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm text-slate-900 dark:text-white truncate">{entry.name}</p>
+                        {dateLabel && (
+                            <p className="text-xs text-slate-400 mt-0.5">{dateLabel}</p>
+                        )}
+                        <p className={`text-base font-bold mt-1 ${amountClass}`}>
+                            € {entry.amount.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+                        </p>
+                        {entry.notes && (
+                            <p className="text-xs text-slate-400 mt-0.5 truncate">{entry.notes}</p>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                        {entry.documentUrl && (
+                            <a href={entry.documentUrl} target="_blank" rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Apri documento">
+                                    <Paperclip className="h-3 w-3 text-violet-500" />
+                                </Button>
+                            </a>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+                            <Pencil className="h-3 w-3 text-slate-400" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={onDelete}>
+                            <Trash2 className="h-3 w-3" />
+                        </Button>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazioneProps) {
     const [loading, setLoading] = useState(true)
     const [sals, setSals] = useState<JobSalApprovato[]>([])
     const [fatture, setFatture] = useState<JobFatturaCommittente[]>([])
-    const [links, setLinks] = useState<JobSalFatturaLink[]>([])
 
-    // Estimated cost
+    // Costo presunto
     const [editingCosto, setEditingCosto] = useState(false)
     const [costoValue, setCostoValue] = useState("")
     const [savingCosto, setSavingCosto] = useState(false)
@@ -421,36 +250,25 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
     const [uploadingFattura, setUploadingFattura] = useState(false)
     const fatturaFileRef = useRef<HTMLInputElement>(null)
 
-    // Link dialog
-    const [linkDialogSal, setLinkDialogSal] = useState<JobSalApprovato | null>(null)
-
     useEffect(() => { load() }, [jobId])
 
     const load = async () => {
         try {
             setLoading(true)
-            const [s, f, l] = await Promise.all([
+            const [s, f] = await Promise.all([
                 jobSalApprovatiApi.getByJobId(jobId),
                 jobFattureCommittenteApi.getByJobId(jobId),
-                jobSalFatturaLinksApi.getByJobId(jobId),
             ])
             setSals(s)
             setFatture(f)
-            setLinks(l)
-        } catch (err) {
-            console.error(err)
+        } catch {
             notify.error("Errore caricamento dati fatturazione")
         } finally {
             setLoading(false)
         }
     }
 
-    // ── Estimated cost ──────────────────────────────────────────────────────
-    const startEditCosto = () => {
-        setCostoValue(job.estimatedCost != null ? String(job.estimatedCost) : "")
-        setEditingCosto(true)
-    }
-
+    // ── Costo presunto ──────────────────────────────────────────────────────
     const saveCosto = async () => {
         const val = costoValue.trim() === "" ? null : parseFloat(costoValue.replace(",", "."))
         if (val !== null && isNaN(val)) { notify.error("Importo non valido"); return }
@@ -460,116 +278,91 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
             onJobUpdated()
             setEditingCosto(false)
             notify.success("Costo presunto aggiornato")
-        } catch {
-            notify.error("Errore salvataggio")
-        } finally {
-            setSavingCosto(false)
-        }
+        } catch { notify.error("Errore salvataggio") }
+        finally { setSavingCosto(false) }
     }
 
     // ── SAL handlers ────────────────────────────────────────────────────────
     const openNewSal = () => {
-        setEditingSal(null)
-        setSalForm(emptyForm())
-        setSalDocUrl(undefined)
-        setSalDialogOpen(true)
+        setEditingSal(null); setSalForm(emptyForm()); setSalDocUrl(undefined); setSalDialogOpen(true)
     }
-
     const openEditSal = (s: JobSalApprovato) => {
         setEditingSal(s)
-        setSalForm({ name: s.name, amount: String(s.amount), notes: s.notes ?? "" })
+        setSalForm({ name: s.name, amount: String(s.amount), date: s.date ?? emptyForm().date, notes: s.notes ?? "" })
         setSalDocUrl(s.documentUrl)
         setSalDialogOpen(true)
     }
-
     const handleSalFile = async (file: File) => {
         setUploadingSal(true)
-        try {
-            const url = await jobSalApprovatiApi.uploadDocument(file)
-            setSalDocUrl(url)
-        } catch { notify.error("Errore upload documento") }
+        try { setSalDocUrl(await jobSalApprovatiApi.uploadDocument(file)) }
+        catch { notify.error("Errore upload") }
         finally { setUploadingSal(false) }
     }
-
     const saveSal = async (form: EntryFormData) => {
         const amount = parseFloat(form.amount.replace(",", ".")) || 0
         if (editingSal) {
-            await jobSalApprovatiApi.update(editingSal.id, { name: form.name, amount, documentUrl: salDocUrl, notes: form.notes || null })
+            await jobSalApprovatiApi.update(editingSal.id, { name: form.name, amount, date: form.date || null, documentUrl: salDocUrl, notes: form.notes || null })
             notify.success("SAL aggiornato")
         } else {
-            await jobSalApprovatiApi.create(jobId, { name: form.name, amount, documentUrl: salDocUrl, notes: form.notes || undefined })
+            await jobSalApprovatiApi.create(jobId, { name: form.name, amount, date: form.date || undefined, documentUrl: salDocUrl, notes: form.notes || undefined })
             notify.success("SAL aggiunto")
         }
-        setSalDialogOpen(false)
-        load()
+        setSalDialogOpen(false); load()
     }
-
     const deleteSal = async (id: string) => {
-        if (!confirm("Eliminare questo SAL? Verranno rimossi anche i collegamenti alle fatture.")) return
-        await jobSalApprovatiApi.delete(id)
-        notify.success("SAL eliminato")
-        load()
+        if (!confirm("Eliminare questo SAL?")) return
+        await jobSalApprovatiApi.delete(id); notify.success("SAL eliminato"); load()
     }
 
     // ── Fattura handlers ────────────────────────────────────────────────────
     const openNewFattura = () => {
-        setEditingFattura(null)
-        setFatturaForm(emptyForm())
-        setFatturaDocUrl(undefined)
-        setFatturaDialogOpen(true)
+        setEditingFattura(null); setFatturaForm(emptyForm()); setFatturaDocUrl(undefined); setFatturaDialogOpen(true)
     }
-
     const openEditFattura = (f: JobFatturaCommittente) => {
         setEditingFattura(f)
-        setFatturaForm({ name: f.name, amount: String(f.amount), notes: f.notes ?? "" })
+        setFatturaForm({ name: f.name, amount: String(f.amount), date: f.date ?? emptyForm().date, notes: f.notes ?? "" })
         setFatturaDocUrl(f.documentUrl)
         setFatturaDialogOpen(true)
     }
-
     const handleFatturaFile = async (file: File) => {
         setUploadingFattura(true)
-        try {
-            const url = await jobFattureCommittenteApi.uploadDocument(file)
-            setFatturaDocUrl(url)
-        } catch { notify.error("Errore upload documento") }
+        try { setFatturaDocUrl(await jobFattureCommittenteApi.uploadDocument(file)) }
+        catch { notify.error("Errore upload") }
         finally { setUploadingFattura(false) }
     }
-
     const saveFattura = async (form: EntryFormData) => {
         const amount = parseFloat(form.amount.replace(",", ".")) || 0
         if (editingFattura) {
-            await jobFattureCommittenteApi.update(editingFattura.id, { name: form.name, amount, documentUrl: fatturaDocUrl, notes: form.notes || null })
+            await jobFattureCommittenteApi.update(editingFattura.id, { name: form.name, amount, date: form.date || null, documentUrl: fatturaDocUrl, notes: form.notes || null })
             notify.success("Fattura aggiornata")
         } else {
-            await jobFattureCommittenteApi.create(jobId, { name: form.name, amount, documentUrl: fatturaDocUrl, notes: form.notes || undefined })
+            await jobFattureCommittenteApi.create(jobId, { name: form.name, amount, date: form.date || undefined, documentUrl: fatturaDocUrl, notes: form.notes || undefined })
             notify.success("Fattura aggiunta")
         }
-        setFatturaDialogOpen(false)
-        load()
+        setFatturaDialogOpen(false); load()
     }
-
     const deleteFattura = async (id: string) => {
-        if (!confirm("Eliminare questa fattura? Verranno rimossi anche i collegamenti ai SAL.")) return
-        await jobFattureCommittenteApi.delete(id)
-        notify.success("Fattura eliminata")
-        load()
+        if (!confirm("Eliminare questa fattura?")) return
+        await jobFattureCommittenteApi.delete(id); notify.success("Fattura eliminata"); load()
     }
 
-    // ── Link handlers ───────────────────────────────────────────────────────
-    const handleLink = async (fatturaId: string, amount: number) => {
-        if (!linkDialogSal) return
-        await jobSalFatturaLinksApi.upsert(linkDialogSal.id, fatturaId, amount)
-        notify.success("Collegamento salvato")
-        setLinkDialogSal(null)
-        load()
-    }
+    // ── Timeline interleaved ────────────────────────────────────────────────
+    // Merge SAL e Fatture in una lista ordinata per data, poi per created_at
+    type TimelineRow =
+        | { kind: "sal"; sal: JobSalApprovato }
+        | { kind: "fattura"; fattura: JobFatturaCommittente }
 
-    const handleDeleteLink = async (salId: string, fatturaId: string) => {
-        if (!confirm("Rimuovere il collegamento?")) return
-        await jobSalFatturaLinksApi.delete(salId, fatturaId)
-        notify.success("Collegamento rimosso")
-        load()
-    }
+    const sortKey = (item: JobSalApprovato | JobFatturaCommittente) =>
+        item.date ? item.date + "_" + item.createdAt : "9999-99-99_" + item.createdAt
+
+    const rows: TimelineRow[] = [
+        ...sals.map(s => ({ kind: "sal" as const, sal: s })),
+        ...fatture.map(f => ({ kind: "fattura" as const, fattura: f })),
+    ].sort((a, b) => {
+        const ka = a.kind === "sal" ? sortKey(a.sal) : sortKey(a.fattura)
+        const kb = b.kind === "sal" ? sortKey(b.sal) : sortKey(b.fattura)
+        return ka.localeCompare(kb)
+    })
 
     // ── Totals ──────────────────────────────────────────────────────────────
     const totalSal = sals.reduce((s, x) => s + x.amount, 0)
@@ -615,11 +408,12 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                             <div className="flex items-center gap-2">
                                 <span className="text-xl font-bold text-slate-900 dark:text-white">
                                     {estimatedCost != null
-                                        ? `€ ${estimatedCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
+                                        ? `€ ${estimatedCost.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
                                         : <span className="text-slate-400 text-base font-normal italic">Non impostato</span>
                                     }
                                 </span>
-                                <button onClick={startEditCosto} className="text-slate-400 hover:text-slate-600">
+                                <button onClick={() => { setCostoValue(estimatedCost != null ? String(estimatedCost) : ""); setEditingCosto(true) }}
+                                    className="text-slate-400 hover:text-slate-600">
                                     <Pencil className="h-3.5 w-3.5" />
                                 </button>
                             </div>
@@ -627,12 +421,12 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                     </CardContent>
                 </Card>
 
-                {/* Totale SAL approvati */}
+                {/* Totale SAL */}
                 <Card className="border-slate-200 dark:border-slate-700">
                     <CardContent className="p-4">
                         <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">SAL Approvati</p>
                         <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
-                            € {totalSal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                            € {totalSal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
                         </p>
                         <p className="text-xs text-slate-400 mt-0.5">{sals.length} SAL</p>
                     </CardContent>
@@ -645,15 +439,15 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                             <div>
                                 <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Fatturato</p>
                                 <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
-                                    € {totalFatture.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                    € {totalFatture.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
                                 </p>
                                 <p className="text-xs text-slate-400 mt-0.5">{fatture.length} fatture</p>
                             </div>
                             {totalSal > 0 && (
                                 <div className="text-right">
                                     <p className="text-xs text-slate-500">Da fatturare</p>
-                                    <p className={`text-base font-bold ${totalSal - totalFatture > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                        € {(totalSal - totalFatture).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                    <p className={`text-base font-bold ${totalSal - totalFatture > 0.005 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                        € {(totalSal - totalFatture).toLocaleString("it-IT", { minimumFractionDigits: 2 })}
                                     </p>
                                 </div>
                             )}
@@ -662,77 +456,66 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 </Card>
             </div>
 
-            {/* ── SAL Approvati ── */}
-            <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            {/* ── Intestazioni colonne + pulsanti ── */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-sm">
                         <TrendingUp className="h-4 w-4 text-emerald-600" />
                         SAL Approvati
                     </h3>
-                    <Button size="sm" onClick={openNewSal} className="bg-emerald-600 hover:bg-emerald-700">
-                        <Plus className="h-3.5 w-3.5 mr-1" />Aggiungi SAL
+                    <Button size="sm" onClick={openNewSal}
+                        className="bg-emerald-600 hover:bg-emerald-700 h-7 px-2 text-xs">
+                        <Plus className="h-3.5 w-3.5 mr-1" />Aggiungi
                     </Button>
                 </div>
-
-                {sals.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg">
-                        <p className="text-sm">Nessun SAL approvato inserito</p>
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        {sals.map(sal => (
-                            <EntryCard
-                                key={sal.id}
-                                type="sal"
-                                entry={sal}
-                                links={links}
-                                fatture={fatture}
-                                canEdit={true}
-                                onEdit={() => openEditSal(sal)}
-                                onDelete={() => deleteSal(sal.id)}
-                                onLink={() => setLinkDialogSal(sal)}
-                                onDeleteLink={handleDeleteLink}
-                            />
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* ── Fatture Committente ── */}
-            <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-sm">
                         <Euro className="h-4 w-4 text-blue-600" />
                         Fatture Committente
                     </h3>
-                    <Button size="sm" onClick={openNewFattura} className="bg-blue-600 hover:bg-blue-700">
-                        <Plus className="h-3.5 w-3.5 mr-1" />Aggiungi Fattura
+                    <Button size="sm" onClick={openNewFattura}
+                        className="bg-blue-600 hover:bg-blue-700 h-7 px-2 text-xs">
+                        <Plus className="h-3.5 w-3.5 mr-1" />Aggiungi
                     </Button>
                 </div>
-
-                {fatture.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg">
-                        <p className="text-sm">Nessuna fattura committente inserita</p>
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        {fatture.map(f => (
-                            <EntryCard
-                                key={f.id}
-                                type="fattura"
-                                entry={f}
-                                links={links}
-                                fatture={fatture}
-                                canEdit={true}
-                                onEdit={() => openEditFattura(f)}
-                                onDelete={() => deleteFattura(f.id)}
-                                onLink={() => {}}
-                                onDeleteLink={handleDeleteLink}
-                            />
-                        ))}
-                    </div>
-                )}
             </div>
+
+            {/* ── Timeline a due colonne ── */}
+            {rows.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg">
+                    <p className="text-sm">Nessun SAL o fattura inserita</p>
+                    <p className="text-xs mt-1">Usa i pulsanti sopra per aggiungere</p>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {rows.map(row => (
+                        <div key={row.kind === "sal" ? row.sal.id : row.fattura.id}
+                            className="grid grid-cols-2 gap-4">
+                            {row.kind === "sal" ? (
+                                <>
+                                    <EntryCard
+                                        entry={row.sal}
+                                        color="emerald"
+                                        onEdit={() => openEditSal(row.sal)}
+                                        onDelete={() => deleteSal(row.sal.id)}
+                                    />
+                                    <div /> {/* cella vuota nella colonna fatture */}
+                                </>
+                            ) : (
+                                <>
+                                    <div /> {/* cella vuota nella colonna SAL */}
+                                    <EntryCard
+                                        entry={row.fattura}
+                                        color="blue"
+                                        onEdit={() => openEditFattura(row.fattura)}
+                                        onDelete={() => deleteFattura(row.fattura.id)}
+                                    />
+                                </>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* ── Dialogs ── */}
             <EntryDialog
@@ -746,7 +529,6 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 fileRef={salFileRef}
                 existingDocUrl={salDocUrl}
             />
-
             <EntryDialog
                 open={fatturaDialogOpen}
                 title={editingFattura ? "Modifica Fattura" : "Nuova Fattura Committente"}
@@ -758,17 +540,6 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 fileRef={fatturaFileRef}
                 existingDocUrl={fatturaDocUrl}
             />
-
-            {linkDialogSal && (
-                <LinkDialog
-                    open={!!linkDialogSal}
-                    onClose={() => setLinkDialogSal(null)}
-                    sal={linkDialogSal}
-                    fatture={fatture}
-                    links={links}
-                    onSave={handleLink}
-                />
-            )}
         </div>
     )
 }

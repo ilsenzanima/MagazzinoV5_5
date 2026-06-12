@@ -6,6 +6,7 @@ const mapSal = (db: any): JobSalApprovato => ({
     jobId: db.job_id,
     name: db.name,
     amount: Number(db.amount) || 0,
+    date: db.date ?? undefined,
     documentUrl: db.document_url ?? undefined,
     notes: db.notes ?? undefined,
     createdAt: db.created_at,
@@ -16,6 +17,7 @@ const mapFattura = (db: any): JobFatturaCommittente => ({
     jobId: db.job_id,
     name: db.name,
     amount: Number(db.amount) || 0,
+    date: db.date ?? undefined,
     documentUrl: db.document_url ?? undefined,
     notes: db.notes ?? undefined,
     createdAt: db.created_at,
@@ -42,13 +44,14 @@ export const jobSalApprovatiApi = {
         return (data || []).map(mapSal);
     },
 
-    create: async (jobId: string, payload: { name: string; amount: number; documentUrl?: string; notes?: string }): Promise<JobSalApprovato> => {
+    create: async (jobId: string, payload: { name: string; amount: number; date?: string; documentUrl?: string; notes?: string }): Promise<JobSalApprovato> => {
         const { data, error } = await supabase
             .from('job_sal_approvati')
             .insert({
                 job_id: jobId,
                 name: payload.name,
                 amount: payload.amount,
+                date: payload.date ?? null,
                 document_url: payload.documentUrl ?? null,
                 notes: payload.notes ?? null,
             })
@@ -58,10 +61,11 @@ export const jobSalApprovatiApi = {
         return mapSal(data);
     },
 
-    update: async (id: string, payload: { name?: string; amount?: number; documentUrl?: string | null; notes?: string | null }): Promise<void> => {
+    update: async (id: string, payload: { name?: string; amount?: number; date?: string | null; documentUrl?: string | null; notes?: string | null }): Promise<void> => {
         const updates: any = {};
         if (payload.name !== undefined) updates.name = payload.name;
         if (payload.amount !== undefined) updates.amount = payload.amount;
+        if ('date' in payload) updates.date = payload.date ?? null;
         if ('documentUrl' in payload) updates.document_url = payload.documentUrl ?? null;
         if ('notes' in payload) updates.notes = payload.notes ?? null;
         const { error } = await supabase.from('job_sal_approvati').update(updates).eq('id', id);
@@ -96,13 +100,14 @@ export const jobFattureCommittenteApi = {
         return (data || []).map(mapFattura);
     },
 
-    create: async (jobId: string, payload: { name: string; amount: number; documentUrl?: string; notes?: string }): Promise<JobFatturaCommittente> => {
+    create: async (jobId: string, payload: { name: string; amount: number; date?: string; documentUrl?: string; notes?: string }): Promise<JobFatturaCommittente> => {
         const { data, error } = await supabase
             .from('job_fatture_committente')
             .insert({
                 job_id: jobId,
                 name: payload.name,
                 amount: payload.amount,
+                date: payload.date ?? null,
                 document_url: payload.documentUrl ?? null,
                 notes: payload.notes ?? null,
             })
@@ -112,10 +117,11 @@ export const jobFattureCommittenteApi = {
         return mapFattura(data);
     },
 
-    update: async (id: string, payload: { name?: string; amount?: number; documentUrl?: string | null; notes?: string | null }): Promise<void> => {
+    update: async (id: string, payload: { name?: string; amount?: number; date?: string | null; documentUrl?: string | null; notes?: string | null }): Promise<void> => {
         const updates: any = {};
         if (payload.name !== undefined) updates.name = payload.name;
         if (payload.amount !== undefined) updates.amount = payload.amount;
+        if ('date' in payload) updates.date = payload.date ?? null;
         if ('documentUrl' in payload) updates.document_url = payload.documentUrl ?? null;
         if ('notes' in payload) updates.notes = payload.notes ?? null;
         const { error } = await supabase.from('job_fatture_committente').update(updates).eq('id', id);

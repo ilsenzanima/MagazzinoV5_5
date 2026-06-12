@@ -120,6 +120,7 @@ export interface JobSalApprovato {
     jobId: string;
     name: string;
     amount: number;
+    date?: string;
     documentUrl?: string;
     notes?: string;
     createdAt: string;
@@ -130,6 +131,7 @@ export interface JobFatturaCommittente {
     jobId: string;
     name: string;
     amount: number;
+    date?: string;
     documentUrl?: string;
     notes?: string;
     createdAt: string;
