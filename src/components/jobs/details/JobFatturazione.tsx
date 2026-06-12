@@ -419,18 +419,45 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                                 </Button>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl font-bold text-slate-900 dark:text-white">
-                                    {estimatedCost != null
-                                        ? `€ ${estimatedCost.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
-                                        : <span className="text-slate-400 text-base font-normal italic">Non impostato</span>
-                                    }
-                                </span>
-                                <button onClick={() => { setCostoValue(estimatedCost != null ? String(estimatedCost) : ""); setEditingCosto(true) }}
-                                    className="text-slate-400 hover:text-slate-600">
-                                    <Pencil className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                            <>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xl font-bold text-slate-900 dark:text-white">
+                                        {estimatedCost != null
+                                            ? `€ ${estimatedCost.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
+                                            : <span className="text-slate-400 text-base font-normal italic">Non impostato</span>
+                                        }
+                                    </span>
+                                    <button onClick={() => { setCostoValue(estimatedCost != null ? String(estimatedCost) : ""); setEditingCosto(true) }}
+                                        className="text-slate-400 hover:text-slate-600">
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                                {estimatedCost != null && (
+                                    <div className="mt-2 space-y-1">
+                                        {(() => {
+                                            const diffSal = totalSal - estimatedCost
+                                            const diffFat = totalFatture - estimatedCost
+                                            const fmt = (v: number) => `€ ${Math.abs(v).toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
+                                            return (
+                                                <>
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-slate-400">vs SAL</span>
+                                                        <span className={`font-semibold ${diffSal > 0.005 ? "text-red-500" : diffSal < -0.005 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                                                            {diffSal > 0.005 ? `+${fmt(diffSal)}` : diffSal < -0.005 ? `-${fmt(diffSal)}` : "—"}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-slate-400">vs Fatturato</span>
+                                                        <span className={`font-semibold ${diffFat > 0.005 ? "text-red-500" : diffFat < -0.005 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                                                            {diffFat > 0.005 ? `+${fmt(diffFat)}` : diffFat < -0.005 ? `-${fmt(diffFat)}` : "—"}
+                                                        </span>
+                                                    </div>
+                                                </>
+                                            )
+                                        })()}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </CardContent>
                 </Card>
