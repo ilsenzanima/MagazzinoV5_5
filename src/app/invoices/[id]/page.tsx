@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     ArrowLeft, FileText, Calendar, User, Loader2, ExternalLink,
-    Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus, Lock, Unlock
+    Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus, Lock, Unlock, Truck, CheckCircle2
 } from "lucide-react";
 import Link from "next/link";
 import { Fragment, useEffect, useState } from "react";
@@ -175,6 +175,10 @@ export default function InvoiceDetailPage() {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [editData, setEditData] = useState({ supplierId: "", invoiceNumber: "", invoiceDate: "", notes: "" });
 
+    // Transport cost state: purchaseId -> { input, applying }
+    const [transportInputs, setTransportInputs] = useState<Record<string, string>>({});
+    const [applyingTransport, setApplyingTransport] = useState<Record<string, boolean>>({});
+
     // Edit linked purchases state
     const [availablePurchases, setAvailablePurchases] = useState<{ id: string; deliveryNoteNumber: string; deliveryNoteDate: string; totalAmount: number }[]>([]);
     const [loadingAvailable, setLoadingAvailable] = useState(false);
@@ -193,9 +197,53 @@ export default function InvoiceDetailPage() {
                     invoiceDate: inv.invoiceDate,
                     notes: inv.notes ?? "",
                 });
+                // Initialize transport inputs from current purchase values
+                const inputs: Record<string, string> = {};
+                inv.purchases?.forEach(p => {
+                    inputs[p.id] = (p.transportCost ?? 0) > 0 ? (p.transportCost!).toString() : "";
+                });
+                setTransportInputs(inputs);
             })
             .catch(console.error)
             .finally(() => setLoading(false));
+    };
+
+    const handleApplyTransport = async (purchaseId: string) => {
+        const val = parseFloat(transportInputs[purchaseId] ?? "0") || 0;
+        if (val <= 0) return;
+        const purchase = invoice?.purchases?.find(p => p.id === purchaseId);
+        if (!purchase?.items) return;
+        try {
+            setApplyingTransport(prev => ({ ...prev, [purchaseId]: true }));
+            // Convert invoice items to PurchaseItem-compatible shape
+            const items = purchase.items.map(i => ({
+                id: i.id,
+                purchaseId,
+                itemId: '',
+                quantity: i.quantity ?? 1,
+                price: i.price ?? 0,
+                createdAt: '',
+                transportApplied: i.transportApplied ?? false,
+                transportUnitCost: i.transportUnitCost ?? 0,
+            }));
+            // Reverse any previously applied transport first
+            if (items.some(i => i.transportApplied)) {
+                await purchasesApi.reverseTransportOnItems(items);
+            }
+            const eligible = items.map(i => ({
+                ...i,
+                transportApplied: false,
+                transportUnitCost: 0,
+                price: i.transportApplied ? i.price - (i.transportUnitCost ?? 0) : i.price,
+            }));
+            await purchasesApi.applyTransportToAllItems(purchaseId, val, eligible);
+            notify.success("Trasporto applicato");
+            load();
+        } catch (e: any) {
+            notify.error(`Errore: ${e.message}`);
+        } finally {
+            setApplyingTransport(prev => ({ ...prev, [purchaseId]: false }));
+        }
     };
 
     useEffect(() => { load(); }, [id]);
@@ -482,7 +530,11 @@ export default function InvoiceDetailPage() {
                                                     </tr>
 
                                                     {/* Dropdown articoli con prezzi editabili */}
-                                                    {isExpanded && !isEditing && hasItems && (
+                                                    {isExpanded && !isEditing && hasItems && (() => {
+                                                        const allApplied = p.items!.every(i => i.transportApplied);
+                                                        const someApplied = p.items!.some(i => i.transportApplied);
+                                                        const isApplying = applyingTransport[p.id];
+                                                        return (
                                                         <tr key={`${p.id}-items`} className="border-b bg-slate-50 dark:bg-slate-800/50">
                                                             <td colSpan={canSeeAmounts ? 4 : 3} className="py-2 px-4">
                                                                 <table className="w-full text-xs">
@@ -504,9 +556,52 @@ export default function InvoiceDetailPage() {
                                                                         ))}
                                                                     </tbody>
                                                                 </table>
+
+                                                                {/* Sezione trasporto per questa bolla */}
+                                                                {canSeeAmounts && (
+                                                                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center gap-3 flex-wrap">
+                                                                        <Truck className="h-4 w-4 text-amber-500 shrink-0" />
+                                                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300 shrink-0">Costo Trasporto:</span>
+                                                                        {allApplied ? (
+                                                                            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                                                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                                Applicato (€ {(p.transportCost ?? 0).toFixed(2)})
+                                                                            </span>
+                                                                        ) : (
+                                                                            <>
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <span className="text-slate-400 text-xs">€</span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min="0"
+                                                                                        step="0.01"
+                                                                                        className="h-7 w-24 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-right text-xs"
+                                                                                        placeholder="0.00"
+                                                                                        value={transportInputs[p.id] ?? ""}
+                                                                                        onChange={e => setTransportInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                                                                    />
+                                                                                </div>
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white"
+                                                                                    disabled={isApplying || !(parseFloat(transportInputs[p.id] ?? "0") > 0)}
+                                                                                    onClick={() => handleApplyTransport(p.id)}
+                                                                                >
+                                                                                    {isApplying
+                                                                                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                                                        : "Applica a tutte le righe"}
+                                                                                </Button>
+                                                                                {someApplied && !allApplied && (
+                                                                                    <span className="text-xs text-amber-600">Applicato parzialmente</span>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                             </td>
                                                         </tr>
-                                                    )}
+                                                        );
+                                                    })()}
                                                 </Fragment>
                                             );
                                         })}

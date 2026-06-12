@@ -264,7 +264,8 @@ export interface Invoice {
         id: string;
         deliveryNoteNumber: string;
         totalAmount?: number;
-        items?: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number }[];
+        transportCost?: number;
+        items?: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; transportApplied?: boolean; transportUnitCost?: number }[];
     }[];
 }
 
