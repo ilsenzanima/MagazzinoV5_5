@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip, ExternalLink } from "lucide-react"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
+import { costAnalysisApi, CostAnalysisRow } from "@/lib/services/cost-analysis"
 import { createClient } from "@/lib/supabase/client"
 import { notify } from "@/lib/notify"
 import * as XLSX from "xlsx-js-style"
@@ -178,6 +179,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     const [salCosts, setSalCosts] = useState<SalCost[]>([])
     const [workerCosts, setWorkerCosts] = useState<WorkerCostRow[]>([])
     const [salNamesData, setSalNamesData] = useState<string[]>([])
+    const [analysisRows, setAnalysisRows] = useState<CostAnalysisRow[]>([])
     const [loading, setLoading] = useState(true)
 
     // ── Layout ────────────────────────────────────────────────────────────────
@@ -238,18 +240,20 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     const loadData = async () => {
         try {
             setLoading(true)
-            const [purData, salData, costData, wcData, namesData] = await Promise.all([
+            const [purData, salData, costData, wcData, namesData, analysisData] = await Promise.all([
                 purchasesApi.getByJobId(jobId),
                 salApi.getByJobId(jobId),
                 salCostsApi.getByJobId(jobId),
                 attendanceApi.getWorkerCostsByJobId(jobId),
                 salNamesApi.getByJobId(jobId),
+                costAnalysisApi.getByJobId(jobId),
             ])
             setPurchases(purData)
             setSalItems(salData)
             setSalCosts(costData)
             setWorkerCosts(wcData.rows)
             setSalNamesData(namesData)
+            setAnalysisRows(analysisData)
         } catch (e) {
             console.error('Failed to load SAL data', e)
         } finally {
@@ -265,6 +269,15 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
         const all = [...new Set([...salNamesData, ...fromItems])]
         return all.sort()
     }, [salItems, salNamesData])
+
+    // ── Derived: unit price override from Analisi Costi (itemId → unitPrice) ────
+    const analysisUnitPriceMap = useMemo(() => {
+        const map = new Map<string, number>()
+        for (const r of analysisRows) {
+            if (r.itemId && r.unitPrice !== null) map.set(r.itemId, r.unitPrice)
+        }
+        return map
+    }, [analysisRows])
 
     // ── Derived: tag map (itemType:itemId → salNames[]) ───────────────────────
     const salTagMap = useMemo(() => {
@@ -298,7 +311,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                     description: [m.itemName, m.itemModel].filter(Boolean).join(' — ') || m.itemCode || '—',
                     pieces: sign * Math.abs(rawPieces),
                     unit: m.itemUnit,
-                    amount: sign * Math.abs(m.quantity || 0) * (m.itemPrice || 0),
+                    amount: sign * Math.abs(m.quantity || 0) * (analysisUnitPriceMap.get(m.itemId) ?? m.itemPrice ?? 0),
                     salNames: salTagMap.get(`movement:${m.id}`) || [],
                     isFictitious: m.isFictitious === true,
                     // For exit rows: provenance info from the original purchase
@@ -332,7 +345,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                 description: [m.itemName, m.itemModel].filter(Boolean).join(' — ') || m.itemCode || '—',
                 pieces: m.pieces ?? (Math.abs(m.quantity || 0) * (m.coefficient || 1)),
                 unit: m.itemUnit,
-                amount: Math.abs(m.quantity || 0) * (m.itemPrice || 0),
+                amount: Math.abs(m.quantity || 0) * (analysisUnitPriceMap.get(m.itemId) ?? m.itemPrice ?? 0),
                 salNames: salTagMap.get(`movement:${m.id}`) || [],
                 isFictitious: false,
             }))
@@ -351,7 +364,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
         })
 
         return groups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    }, [movements, purchases, salTagMap])
+    }, [movements, purchases, salTagMap, analysisUnitPriceMap])
 
     // ── Derived: filtered groups (children filtered when TAG is active) ───────
     const filteredMaterialGroups: MaterialGroup[] = useMemo(() => {

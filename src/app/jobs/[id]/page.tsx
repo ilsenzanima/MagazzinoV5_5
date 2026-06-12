@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock, Euro, Recycle, ClipboardList, Receipt } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2 } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -25,6 +25,7 @@ import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
 import { JobEccedenze } from "@/components/jobs/details/JobEccedenze";
 import { JobOrdini } from "@/components/jobs/details/JobOrdini";
 import { JobFatturazione } from "@/components/jobs/details/JobFatturazione";
+import { JobAnalisiCosti } from "@/components/jobs/details/JobAnalisiCosti";
 
 export default function JobDetailsPage() {
     const { id } = useParams<{ id: string }>();
@@ -477,6 +478,15 @@ export default function JobDetailsPage() {
                                     <span className="hidden md:inline">Costi</span>
                                 </TabsTrigger>
                             )}
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                <TabsTrigger
+                                    value="analisi-costi"
+                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-emerald-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                                >
+                                    <BarChart2 className="h-4 w-4 md:mr-1 text-emerald-600" />
+                                    <span className="hidden md:inline">Analisi Costi</span>
+                                </TabsTrigger>
+                            )}
                             <TabsTrigger
                                 value="stock"
                                 className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
@@ -553,6 +563,12 @@ export default function JobDetailsPage() {
                         <TabsContent value="costi-sal" className="space-y-6 focus-visible:outline-none">
                             <JobCostiSAL jobId={job.id} jobCode={job.code} jobName={job.name} materialCost={totalCost} movements={movements} />
                         </TabsContent>
+
+                        {(userRole === 'admin' || userRole === 'operativo') && (
+                            <TabsContent value="analisi-costi" className="space-y-6 focus-visible:outline-none">
+                                <JobAnalisiCosti jobId={job.id} jobCode={job.code} jobName={job.name} movements={movements} />
+                            </TabsContent>
+                        )}
 
                         <TabsContent value="eccedenze" className="space-y-6 focus-visible:outline-none">
                             <JobEccedenze jobId={job.id} />
