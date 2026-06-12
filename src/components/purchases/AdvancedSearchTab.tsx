@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { suppliersApi, Supplier } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,12 @@ interface ScoredPurchase extends PurchaseWithItems {
     matchCount: number;
     matchedTerms: Set<string>;
     matchedItems: string[];
+}
+
+interface InventorySuggestion {
+    name: string;
+    model?: string;
+    label: string; // "name (model)" or just "name"
 }
 
 function scoreAndSort(purchases: PurchaseWithItems[], terms: string[]): ScoredPurchase[] {
@@ -53,6 +59,87 @@ function scoreAndSort(purchases: PurchaseWithItems[], terms: string[]): ScoredPu
         .filter(p => activeTerms.length === 0 || p.matchCount > 0)
         .sort((a, b) => b.matchCount - a.matchCount);
 }
+
+// ── Autocomplete input ──────────────────────────────────────────────────────
+
+interface AutocompleteInputProps {
+    value: string;
+    onChange: (v: string) => void;
+    onRemove: () => void;
+    showRemove: boolean;
+    suggestions: InventorySuggestion[];
+    disabled: boolean;
+    placeholder: string;
+}
+
+function AutocompleteInput({ value, onChange, onRemove, showRemove, suggestions, disabled, placeholder }: AutocompleteInputProps) {
+    const [open, setOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const filtered = useMemo(() => {
+        const q = value.trim().toLowerCase();
+        if (!q) return suggestions.slice(0, 12);
+        return suggestions
+            .filter(s => s.label.toLowerCase().includes(q))
+            .slice(0, 12);
+    }, [suggestions, value]);
+
+    // Close on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const select = (s: InventorySuggestion) => {
+        onChange(s.name);
+        setOpen(false);
+    };
+
+    return (
+        <div ref={containerRef} className="relative flex-1">
+            <Input
+                value={value}
+                onChange={e => { onChange(e.target.value); setOpen(true); }}
+                onFocus={() => setOpen(true)}
+                onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}
+                placeholder={placeholder}
+                className="h-8 text-sm pr-7"
+                disabled={disabled}
+                autoComplete="off"
+            />
+            {value && !disabled && (
+                <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
+                    onMouseDown={e => { e.preventDefault(); onChange(""); }}
+                >
+                    <X className="h-3 w-3" />
+                </button>
+            )}
+            {open && !disabled && filtered.length > 0 && (
+                <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-md shadow-lg max-h-52 overflow-y-auto text-sm">
+                    {filtered.map((s, i) => (
+                        <li
+                            key={i}
+                            className="px-3 py-1.5 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-baseline gap-1.5"
+                            onMouseDown={e => { e.preventDefault(); select(s); }}
+                        >
+                            <span className="font-medium text-slate-800 dark:text-slate-100">{s.name}</span>
+                            {s.model && <span className="text-xs text-slate-400">({s.model})</span>}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+// ── Main component ──────────────────────────────────────────────────────────
 
 export function AdvancedSearchTab() {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -90,6 +177,26 @@ export function AdvancedSearchTab() {
             });
     }, [supplierId]);
 
+    // Unique inventory items from all purchases of this supplier
+    const suggestions = useMemo<InventorySuggestion[]>(() => {
+        const seen = new Set<string>();
+        const result: InventorySuggestion[] = [];
+        for (const p of purchases) {
+            for (const item of p.items) {
+                const key = item.model ? `${item.name}||${item.model}` : item.name;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    result.push({
+                        name: item.name,
+                        model: item.model,
+                        label: item.model ? `${item.name} (${item.model})` : item.name,
+                    });
+                }
+            }
+        }
+        return result.sort((a, b) => a.label.localeCompare(b.label));
+    }, [purchases]);
+
     const results = useMemo(() => scoreAndSort(purchases, terms), [purchases, terms]);
 
     const addTerm = () => setTerms(prev => [...prev, ""]);
@@ -120,17 +227,22 @@ export function AdvancedSearchTab() {
 
                 <div>
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
-                        Articoli (anche parziale)
+                        Articoli
+                        {suggestions.length > 0 && (
+                            <span className="ml-1.5 text-xs font-normal text-slate-400">({suggestions.length} disponibili)</span>
+                        )}
                     </label>
                     <div className="space-y-2">
                         {terms.map((term, idx) => (
                             <div key={idx} className="flex items-center gap-1.5">
-                                <Input
+                                <AutocompleteInput
                                     value={term}
-                                    onChange={e => updateTerm(idx, e.target.value)}
-                                    placeholder={`Es. "tubo", "vite M6"…`}
-                                    className="h-8 text-sm"
+                                    onChange={v => updateTerm(idx, v)}
+                                    onRemove={() => removeTerm(idx)}
+                                    showRemove={terms.length > 1 || !!term}
+                                    suggestions={suggestions}
                                     disabled={!supplierId}
+                                    placeholder={suggestions.length > 0 ? "Digita o scegli dall'elenco…" : `Es. "tubo", "vite M6"…`}
                                 />
                                 {(terms.length > 1 || term) && (
                                     <button
