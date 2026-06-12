@@ -360,24 +360,6 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
         await jobFattureCommittenteApi.delete(id); notify.success("Fattura eliminata"); load()
     }
 
-    // ── Timeline interleaved ────────────────────────────────────────────────
-    // Merge SAL e Fatture in una lista ordinata per data, poi per created_at
-    type TimelineRow =
-        | { kind: "sal"; sal: JobSalApprovato }
-        | { kind: "fattura"; fattura: JobFatturaCommittente }
-
-    const sortKey = (item: JobSalApprovato | JobFatturaCommittente) =>
-        item.date ? item.date + "_" + item.createdAt : "9999-99-99_" + item.createdAt
-
-    const rows: TimelineRow[] = [
-        ...sals.map(s => ({ kind: "sal" as const, sal: s })),
-        ...fatture.map(f => ({ kind: "fattura" as const, fattura: f })),
-    ].sort((a, b) => {
-        const ka = a.kind === "sal" ? sortKey(a.sal) : sortKey(a.fattura)
-        const kb = b.kind === "sal" ? sortKey(b.sal) : sortKey(b.fattura)
-        return ka.localeCompare(kb)
-    })
-
     // ── Totals ──────────────────────────────────────────────────────────────
     const totalSal = sals.reduce((s, x) => s + x.amount, 0)
     const totalFatture = fatture.reduce((s, x) => s + x.amount, 0)
@@ -400,7 +382,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 {/* Costo presunto */}
                 <Card className="border-slate-200 dark:border-slate-700">
                     <CardContent className="p-4">
-                        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Costo Presunto</p>
+                        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Importo Commessa</p>
                         {editingCosto ? (
                             <div className="flex items-center gap-2">
                                 <Input
@@ -432,31 +414,6 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                                         <Pencil className="h-3.5 w-3.5" />
                                     </button>
                                 </div>
-                                {estimatedCost != null && (
-                                    <div className="mt-2 space-y-1">
-                                        {(() => {
-                                            const diffSal = totalSal - estimatedCost
-                                            const diffFat = totalFatture - estimatedCost
-                                            const fmt = (v: number) => `€ ${Math.abs(v).toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
-                                            return (
-                                                <>
-                                                    <div className="flex items-center justify-between text-xs">
-                                                        <span className="text-slate-400">vs SAL</span>
-                                                        <span className={`font-semibold ${diffSal > 0.005 ? "text-red-500" : diffSal < -0.005 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
-                                                            {diffSal > 0.005 ? `+${fmt(diffSal)}` : diffSal < -0.005 ? `-${fmt(diffSal)}` : "—"}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-xs">
-                                                        <span className="text-slate-400">vs Fatturato</span>
-                                                        <span className={`font-semibold ${diffFat > 0.005 ? "text-red-500" : diffFat < -0.005 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
-                                                            {diffFat > 0.005 ? `+${fmt(diffFat)}` : diffFat < -0.005 ? `-${fmt(diffFat)}` : "—"}
-                                                        </span>
-                                                    </div>
-                                                </>
-                                            )
-                                        })()}
-                                    </div>
-                                )}
                             </>
                         )}
                     </CardContent>
@@ -521,40 +478,50 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 </div>
             </div>
 
-            {/* ── Timeline a due colonne ── */}
-            {rows.length === 0 ? (
+            {/* ── Due colonne indipendenti ── */}
+            {sals.length === 0 && fatture.length === 0 ? (
                 <div className="text-center py-12 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg">
                     <p className="text-sm">Nessun SAL o fattura inserita</p>
                     <p className="text-xs mt-1">Usa i pulsanti sopra per aggiungere</p>
                 </div>
             ) : (
-                <div className="space-y-2">
-                    {rows.map(row => (
-                        <div key={row.kind === "sal" ? row.sal.id : row.fattura.id}
-                            className="grid grid-cols-2 gap-4">
-                            {row.kind === "sal" ? (
-                                <>
-                                    <EntryCard
-                                        entry={row.sal}
-                                        color="emerald"
-                                        onEdit={() => openEditSal(row.sal)}
-                                        onDelete={() => deleteSal(row.sal.id)}
-                                    />
-                                    <div /> {/* cella vuota nella colonna fatture */}
-                                </>
-                            ) : (
-                                <>
-                                    <div /> {/* cella vuota nella colonna SAL */}
-                                    <EntryCard
-                                        entry={row.fattura}
-                                        color="blue"
-                                        onEdit={() => openEditFattura(row.fattura)}
-                                        onDelete={() => deleteFattura(row.fattura.id)}
-                                    />
-                                </>
-                            )}
-                        </div>
-                    ))}
+                <div className="grid grid-cols-2 gap-4 items-start">
+                    {/* Colonna SAL */}
+                    <div className="space-y-2">
+                        {sals.length === 0 ? (
+                            <div className="text-center py-6 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg text-xs">
+                                Nessun SAL inserito
+                            </div>
+                        ) : (
+                            sals.map(sal => (
+                                <EntryCard
+                                    key={sal.id}
+                                    entry={sal}
+                                    color="emerald"
+                                    onEdit={() => openEditSal(sal)}
+                                    onDelete={() => deleteSal(sal.id)}
+                                />
+                            ))
+                        )}
+                    </div>
+                    {/* Colonna Fatture */}
+                    <div className="space-y-2">
+                        {fatture.length === 0 ? (
+                            <div className="text-center py-6 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg text-xs">
+                                Nessuna fattura inserita
+                            </div>
+                        ) : (
+                            fatture.map(f => (
+                                <EntryCard
+                                    key={f.id}
+                                    entry={f}
+                                    color="blue"
+                                    onEdit={() => openEditFattura(f)}
+                                    onDelete={() => deleteFattura(f.id)}
+                                />
+                            ))
+                        )}
+                    </div>
                 </div>
             )}
 
