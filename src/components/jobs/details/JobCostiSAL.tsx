@@ -10,9 +10,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download } from "lucide-react"
+import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip, ExternalLink } from "lucide-react"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
+import { createClient } from "@/lib/supabase/client"
 import { notify } from "@/lib/notify"
 import * as XLSX from "xlsx-js-style"
 
@@ -170,6 +171,7 @@ function WorkerHoursTable({ data }: { data: WorkerHoursSalData }) {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALProps) {
+    const supabase = createClient()
     // ── Data ──────────────────────────────────────────────────────────────────
     const [purchases, setPurchases] = useState<Purchase[]>([])
     const [salItems, setSalItems] = useState<SalItem[]>([])
@@ -219,9 +221,11 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     const [newCostDesc, setNewCostDesc] = useState('')
     const [newCostAmount, setNewCostAmount] = useState('')
     const [newCostSal, setNewCostSal] = useState('__none__')
+    const [newCostFiles, setNewCostFiles] = useState<File[]>([])
     const [costSaving, setCostSaving] = useState(false)
     const [editingCostSal, setEditingCostSal] = useState<string | null>(null)
     const [editCostSalValue, setEditCostSalValue] = useState('')
+    const [uploadingCostId, setUploadingCostId] = useState<string | null>(null)
 
     // ── Manage SAL dialog ─────────────────────────────────────────────────────
     const [isManageSalOpen, setIsManageSalOpen] = useState(false)
@@ -349,12 +353,14 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
         return groups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     }, [movements, purchases, salTagMap])
 
-    // ── Derived: filtered groups (children filtered when SAL is active) ───────
+    // ── Derived: filtered groups (children filtered when TAG is active) ───────
     const filteredMaterialGroups: MaterialGroup[] = useMemo(() => {
         if (activeFilter === 'all') return allMaterialGroups
         return allMaterialGroups
             .map(g => {
-                const children = g.children.filter(c => c.salNames.includes(activeFilter))
+                const children = activeFilter === '__no_tag__'
+                    ? g.children.filter(c => c.salNames.length === 0)
+                    : g.children.filter(c => c.salNames.includes(activeFilter))
                 return {
                     ...g,
                     children,
@@ -373,7 +379,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
 
     // ── Derived: filtered worker rows ─────────────────────────────────────────
     const filteredWorkerRows = useMemo(() => {
-        if (activeFilter === 'all') return workerCosts
+        if (activeFilter === 'all' || activeFilter === '__no_tag__') return workerCosts
         // Aggregate from worker_hours SAL items for this SAL
         const whItems = salItems.filter(s => s.itemType === 'worker_hours' && s.salName === activeFilter)
         const wMap = new Map<string, WorkerCostRow>()
@@ -406,6 +412,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     // ── Derived: filtered other costs ─────────────────────────────────────────
     const filteredCosts = useMemo(() => {
         if (activeFilter === 'all') return salCosts
+        if (activeFilter === '__no_tag__') return salCosts.filter(c => !c.salName)
         return salCosts.filter(c => c.salName === activeFilter)
     }, [salCosts, activeFilter])
 
@@ -687,10 +694,10 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             setIsAddSalOpen(false)
             setSelectedIds(new Set())
             await loadData()
-            notify.success(`${items.length} voci aggiunte al SAL "${name}"`)
+            notify.success(`${items.length} voci aggiunte al TAG "${name}"`)
         } catch (e) {
             console.error(e)
-            notify.error("Errore durante l'aggiunta al SAL")
+            notify.error("Errore durante l'aggiunta al TAG")
         } finally {
             setIsSaving(false)
         }
@@ -701,7 +708,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             await loadData()
         } catch (e) {
             console.error(e)
-            notify.error("Errore durante la rimozione dal SAL")
+            notify.error("Errore durante la rimozione dal TAG")
         }
     }
 
@@ -752,14 +759,14 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
         }
     }
     const handleSaveWorkerHours = async () => {
-        if (!whPreview || !whSalName.trim()) return
+        if (!whPreview) return
         try {
             setWhSaving(true)
             await salApi.addWorkerHours(jobId, whSalName.trim(), whPreview)
             setIsWorkerHoursOpen(false)
             setWhPreview(null); setWhDateFrom(''); setWhDateTo(''); setWhSalName('')
             await loadData()
-            notify.success("Ore operai aggiunte al SAL")
+            notify.success("Ore operai aggiunte al TAG")
         } catch (e) {
             console.error(e)
             notify.error("Errore durante il salvataggio delle ore operai")
@@ -776,6 +783,20 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             const range = await attendanceApi.getJobPresenceDateRange(jobId)
             setWhDateHint(range)
         } catch { /* non bloccante */ }
+    }
+
+    // ── Worker hours: edit TAG inline ─────────────────────────────────────────
+    const [editingWhTag, setEditingWhTag] = useState<string | null>(null)
+    const [editWhTagValue, setEditWhTagValue] = useState('')
+    const handleUpdateWhTag = async (itemId: string) => {
+        try {
+            await salApi.updateItemSalName(itemId, editWhTagValue === '__none__' ? null : editWhTagValue)
+            setEditingWhTag(null)
+            await loadData()
+        } catch (e) {
+            console.error(e)
+            notify.error("Errore durante l'aggiornamento del TAG")
+        }
     }
 
     // ── Worker: click row to view hours ───────────────────────────────────────
@@ -830,9 +851,13 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
         try {
             setCostSaving(true)
             const salNameVal = newCostSal === '__none__' ? null : newCostSal
-            await salCostsApi.add(jobId, desc, amount, salNameVal)
+            const cost = await salCostsApi.add(jobId, desc, amount, salNameVal)
+            if (newCostFiles.length > 0) {
+                const urls = await Promise.all(newCostFiles.map(f => salCostsApi.uploadDocument(f)))
+                await salCostsApi.updateDocumentUrls(cost.id, urls)
+            }
             setIsAddCostOpen(false)
-            setNewCostDesc(''); setNewCostAmount(''); setNewCostSal('__none__')
+            setNewCostDesc(''); setNewCostAmount(''); setNewCostSal('__none__'); setNewCostFiles([])
             await loadData()
             notify.success("Costo aggiunto")
         } catch (e) {
@@ -849,7 +874,42 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             await loadData()
         } catch (e) {
             console.error(e)
-            notify.error("Errore durante l'aggiornamento del SAL")
+            notify.error("Errore durante l'aggiornamento del TAG")
+        }
+    }
+    const handleUploadCostDoc = async (costId: string, existingUrls: string[], file: File) => {
+        try {
+            setUploadingCostId(costId)
+            const url = await salCostsApi.uploadDocument(file)
+            await salCostsApi.updateDocumentUrls(costId, [...existingUrls, url])
+            await loadData()
+        } catch (e) {
+            console.error(e)
+            notify.error("Errore durante il caricamento del documento")
+        } finally {
+            setUploadingCostId(null)
+        }
+    }
+    const handleDeleteCostDoc = async (costId: string, existingUrls: string[], url: string) => {
+        try {
+            const path = url.split('/public/documents/')[1] || url.split('/documents/')[1]
+            if (path) await supabase.storage.from('documents').remove([path])
+            await salCostsApi.updateDocumentUrls(costId, existingUrls.filter(u => u !== url))
+            await loadData()
+        } catch (e) {
+            console.error(e)
+            notify.error("Errore durante la rimozione del documento")
+        }
+    }
+    const openDocument = async (url: string) => {
+        try {
+            const path = url.split('/public/documents/')[1] || url.split('/documents/')[1]
+            if (!path) { window.open(url, '_blank'); return }
+            const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+            if (error || !data?.signedUrl) { window.open(url, '_blank'); return }
+            window.open(data.signedUrl, '_blank')
+        } catch {
+            window.open(url, '_blank')
         }
     }
     const handleDeleteCost = async (costId: string) => {
@@ -871,7 +931,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             await salNamesApi.create(jobId, name)
             setNewSalInput('')
             await loadData()
-            notify.success(`SAL "${name}" creato`)
+            notify.success(`TAG "${name}" creato`)
         } catch (e) {
             console.error(e)
             notify.error("Errore durante la creazione del SAL")
@@ -900,7 +960,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
         }
     }
     const handleDeleteSal = async (name: string) => {
-        if (!confirm(`Eliminare il SAL "${name}" e tutte le sue voci?`)) return
+        if (!confirm(`Eliminare il TAG "${name}" e tutte le sue voci?`)) return
         try {
             setManageSaving(name)
             await Promise.all([
@@ -927,9 +987,9 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     return (
         <div className="space-y-4">
 
-            {/* ── SAL filter bar ─────────────────────────────────────────── */}
+            {/* ── TAG filter bar ─────────────────────────────────────────── */}
             <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-slate-500 mr-1">SAL:</span>
+                <span className="text-xs text-slate-500 mr-1">TAG:</span>
                 <Button
                     key="all"
                     variant={activeFilter === 'all' ? "default" : "outline"}
@@ -950,6 +1010,15 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                         {f}
                     </Button>
                 ))}
+                <Button
+                    key="__no_tag__"
+                    variant={activeFilter === '__no_tag__' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => { setActiveFilter('__no_tag__'); setSelectedIds(new Set()) }}
+                    className={activeFilter === '__no_tag__' ? "bg-slate-600" : ""}
+                >
+                    senza TAG
+                </Button>
                 <div className="flex items-center gap-2 ml-auto">
                     <Button
                         size="sm"
@@ -961,7 +1030,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                         }}
                     >
                         <Settings className="h-4 w-4 mr-1" />
-                        Gestisci SAL
+                        Gestisci TAG
                     </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -978,7 +1047,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                             {salNames.length > 0 && <DropdownMenuSeparator />}
                             {salNames.map(name => (
                                 <DropdownMenuItem key={name} onClick={() => handleExport(name)}>
-                                    Solo SAL: {name}
+                                    Solo TAG: {name}
                                 </DropdownMenuItem>
                             ))}
                         </DropdownMenuContent>
@@ -1002,7 +1071,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                             className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 h-8 text-xs"
                         >
                             <Tag className="h-3.5 w-3.5 mr-1" />
-                            Aggiungi al SAL
+                            Aggiungi al TAG
                             {selectedIds.size > 0 && <span className="ml-1 opacity-80">({selectedIds.size})</span>}
                         </Button>
                     </div>
@@ -1010,7 +1079,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             >
                 {filteredMaterialGroups.length === 0 ? (
                     <p className="text-sm text-slate-400 text-center py-6">
-                        {activeFilter === 'all' ? 'Nessun materiale trovato.' : `Nessun materiale per il SAL "${activeFilter}".`}
+                        {activeFilter === 'all' ? 'Nessun materiale trovato.' : activeFilter === '__no_tag__' ? 'Nessun materiale senza TAG.' : `Nessun materiale per il TAG "${activeFilter}".`}
                     </p>
                 ) : (() => {
                     const allIds = allVisibleChildRows.map(r => r.id)
@@ -1034,7 +1103,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                                         <th className="text-left p-2 font-medium text-slate-500">Descrizione</th>
                                         <th className="text-right p-2 font-medium text-slate-500">Pezzi</th>
                                         <th className="text-right p-2 font-medium text-slate-500">Importo</th>
-                                        <th className="text-left p-2 font-medium text-slate-500">SAL</th>
+                                        <th className="text-left p-2 font-medium text-slate-500">TAG</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1195,20 +1264,20 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                         className="h-8 text-xs"
                     >
                         <Clock className="h-3.5 w-3.5 mr-1" />
-                        Aggiungi al SAL
+                        Calcola ore operai
                     </Button>
                 }
             >
                 {(() => {
                     const whItems = salItems.filter(s =>
                         s.itemType === 'worker_hours' &&
-                        (activeFilter === 'all' || s.salName === activeFilter)
+                        (activeFilter === 'all' || (activeFilter === '__no_tag__' ? !s.salName : s.salName === activeFilter))
                     )
 
                     if (filteredWorkerRows.length === 0 && whItems.length === 0) {
                         return (
                             <p className="text-sm text-slate-400 text-center py-6">
-                                {activeFilter === 'all' ? 'Nessuna presenza registrata.' : `Nessuna ore operai per il SAL "${activeFilter}".`}
+                                {activeFilter === 'all' || activeFilter === '__no_tag__' ? 'Nessuna presenza registrata.' : `Nessuna ore operai per il TAG "${activeFilter}".`}
                             </p>
                         )
                     }
@@ -1258,9 +1327,29 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                                                         ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
                                                         : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
                                                     }
-                                                    <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 rounded px-1.5 py-0.5 font-medium shrink-0">
-                                                        {item.salName}
-                                                    </span>
+                                                    {editingWhTag === item.id ? (
+                                                        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                                                            <Select value={editWhTagValue} onValueChange={setEditWhTagValue}>
+                                                                <SelectTrigger className="h-7 text-xs w-36">
+                                                                    <SelectValue placeholder="Nessun TAG" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="__none__">Nessun TAG</SelectItem>
+                                                                    {salNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <Button size="sm" className="h-7 text-xs px-2" onClick={() => handleUpdateWhTag(item.id)}>OK</Button>
+                                                            <Button size="sm" variant="ghost" className="h-7 text-xs px-1" onClick={() => setEditingWhTag(null)}>✕</Button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 rounded px-1.5 py-0.5 font-medium shrink-0 hover:bg-blue-200"
+                                                            title="Clicca per cambiare TAG"
+                                                            onClick={e => { e.stopPropagation(); setEditingWhTag(item.id); setEditWhTagValue(item.salName || '__none__') }}
+                                                        >
+                                                            {item.salName || <span className="italic opacity-60">senza TAG</span>}
+                                                        </button>
+                                                    )}
                                                     <span className="text-xs text-slate-500">
                                                         {item.dateFrom && item.dateTo
                                                             ? `${new Date(item.dateFrom).toLocaleDateString('it-IT')} – ${new Date(item.dateTo).toLocaleDateString('it-IT')}`
@@ -1317,7 +1406,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             >
                 {filteredCosts.length === 0 ? (
                     <p className="text-sm text-slate-400 text-center py-6">
-                        {activeFilter === 'all' ? 'Nessun costo aggiuntivo.' : `Nessun costo per il SAL "${activeFilter}".`}
+                        {activeFilter === 'all' ? 'Nessun costo aggiuntivo.' : activeFilter === '__no_tag__' ? 'Nessun costo senza TAG.' : `Nessun costo per il TAG "${activeFilter}".`}
                     </p>
                 ) : (
                     <div className="overflow-x-auto">
@@ -1325,8 +1414,9 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                             <thead>
                                 <tr className="border-b bg-slate-50 dark:bg-slate-800/50">
                                     <th className="text-left p-2 font-medium text-slate-500">Descrizione</th>
-                                    <th className="text-left p-2 font-medium text-slate-500">SAL</th>
+                                    <th className="text-left p-2 font-medium text-slate-500">TAG</th>
                                     <th className="text-right p-2 font-medium text-slate-500">Importo</th>
+                                    <th className="text-left p-2 font-medium text-slate-500">Allegati</th>
                                     <th className="w-8 p-2"></th>
                                 </tr>
                             </thead>
@@ -1339,10 +1429,10 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                                                 <div className="flex items-center gap-1">
                                                     <Select value={editCostSalValue} onValueChange={setEditCostSalValue}>
                                                         <SelectTrigger className="h-7 text-xs w-32">
-                                                            <SelectValue placeholder="Nessun SAL" />
+                                                            <SelectValue placeholder="Nessun TAG" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="__none__">Nessun SAL</SelectItem>
+                                                            <SelectItem value="__none__">Nessun TAG</SelectItem>
                                                             {salNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
                                                         </SelectContent>
                                                     </Select>
@@ -1353,7 +1443,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                                                 <button
                                                     className="text-xs rounded px-1.5 py-0.5 hover:bg-slate-100"
                                                     onClick={() => { setEditingCostSal(cost.id); setEditCostSalValue(cost.salName || '__none__') }}
-                                                    title="Clicca per cambiare SAL"
+                                                    title="Clicca per cambiare TAG"
                                                 >
                                                     {cost.salName
                                                         ? <span className="bg-blue-100 text-blue-800 rounded px-1.5 py-0.5">{cost.salName}</span>
@@ -1362,6 +1452,44 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                                             )}
                                         </td>
                                         <td className="p-2 text-right font-mono font-medium">€ {fmt(cost.amount)}</td>
+                                        <td className="p-2">
+                                            <div className="flex items-center gap-1 flex-wrap">
+                                                {cost.documentUrls.map((url, i) => (
+                                                    <div key={i} className="flex items-center gap-0.5">
+                                                        <button
+                                                            onClick={() => openDocument(url)}
+                                                            className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
+                                                            title={`Documento ${i + 1}`}
+                                                        >
+                                                            <Paperclip className="h-3 w-3" />
+                                                            <span>{i + 1}</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteCostDoc(cost.id, cost.documentUrls, url)}
+                                                            className="text-slate-300 hover:text-red-500"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <label className="cursor-pointer text-slate-400 hover:text-blue-600" title="Allega documento">
+                                                    {uploadingCostId === cost.id
+                                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        : <Paperclip className="h-3.5 w-3.5" />
+                                                    }
+                                                    <input
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                                        onChange={e => {
+                                                            const f = e.target.files?.[0]
+                                                            if (f) handleUploadCostDoc(cost.id, cost.documentUrls, f)
+                                                            e.target.value = ''
+                                                        }}
+                                                    />
+                                                </label>
+                                            </div>
+                                        </td>
                                         <td className="p-2">
                                             <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-300 hover:text-red-500">
                                                 <X className="h-3.5 w-3.5" />
@@ -1378,7 +1506,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             {/* ── 4. Totali ──────────────────────────────────────────────── */}
             <Section
                 icon={<Euro className="h-5 w-5" />}
-                title={activeFilter === 'all' ? 'Totali' : `Totali — ${activeFilter}`}
+                title={activeFilter === 'all' ? 'Totali' : activeFilter === '__no_tag__' ? 'Totali — senza TAG' : `Totali — ${activeFilter}`}
                 expanded={expanded.totali}
                 onToggle={() => toggle('totali')}
             >
@@ -1414,32 +1542,32 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
 
             {/* ── Dialogs ─────────────────────────────────────────────────── */}
 
-            {/* Add to SAL */}
+            {/* Add to TAG */}
             <Dialog open={isAddSalOpen} onOpenChange={setIsAddSalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Aggiungi al SAL</DialogTitle>
-                        <DialogDescription>Assegna le {selectedIds.size} voci selezionate a un SAL.</DialogDescription>
+                        <DialogTitle>Aggiungi al TAG</DialogTitle>
+                        <DialogDescription>Assegna le {selectedIds.size} voci selezionate a un TAG.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         {salNames.length > 0 && (
                             <div className="flex gap-2">
-                                <Button variant={addSalMode === 'existing' ? 'default' : 'outline'} size="sm" onClick={() => setAddSalMode('existing')}>SAL esistente</Button>
-                                <Button variant={addSalMode === 'new' ? 'default' : 'outline'} size="sm" onClick={() => setAddSalMode('new')}>Nuovo SAL</Button>
+                                <Button variant={addSalMode === 'existing' ? 'default' : 'outline'} size="sm" onClick={() => setAddSalMode('existing')}>TAG esistente</Button>
+                                <Button variant={addSalMode === 'new' ? 'default' : 'outline'} size="sm" onClick={() => setAddSalMode('new')}>Nuovo TAG</Button>
                             </div>
                         )}
                         {addSalMode === 'existing' && salNames.length > 0 ? (
                             <div className="space-y-2">
-                                <Label>Seleziona SAL</Label>
+                                <Label>Seleziona TAG</Label>
                                 <Select value={addSalName} onValueChange={setAddSalName}>
-                                    <SelectTrigger><SelectValue placeholder="Seleziona un SAL" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder="Seleziona un TAG" /></SelectTrigger>
                                     <SelectContent>{salNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                <Label>Nome SAL</Label>
-                                <Input placeholder="Es. SAL 1, SAL Luglio, ..." value={addSalName} onChange={e => setAddSalName(e.target.value)} />
+                                <Label>Nome TAG</Label>
+                                <Input placeholder="Es. TAG 1, Fase Luglio, ..." value={addSalName} onChange={e => setAddSalName(e.target.value)} />
                             </div>
                         )}
                     </div>
@@ -1456,8 +1584,8 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             <Dialog open={isWorkerHoursOpen} onOpenChange={setIsWorkerHoursOpen}>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>Aggiungi Ore Operai al SAL</DialogTitle>
-                        <DialogDescription>Seleziona il periodo e il SAL di riferimento, poi carica le presenze.</DialogDescription>
+                        <DialogTitle>Calcola ore operai</DialogTitle>
+                        <DialogDescription>Seleziona il periodo, carica le presenze e assegna un TAG (opzionale).</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         {whDateHint?.first && (
@@ -1487,16 +1615,16 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label>SAL di destinazione</Label>
+                            <Label>TAG (opzionale)</Label>
                             <div className="flex gap-2">
                                 <Select value={whSalName} onValueChange={setWhSalName}>
-                                    <SelectTrigger className="flex-1"><SelectValue placeholder="Seleziona o digita un SAL" /></SelectTrigger>
+                                    <SelectTrigger className="flex-1"><SelectValue placeholder="Seleziona o digita un TAG" /></SelectTrigger>
                                     <SelectContent>
                                         {salNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                                 <Input
-                                    placeholder="Nuovo nome SAL..."
+                                    placeholder="Nuovo nome TAG..."
                                     value={salNames.includes(whSalName) ? '' : whSalName}
                                     onChange={e => setWhSalName(e.target.value)}
                                     className="flex-1"
@@ -1511,8 +1639,8 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsWorkerHoursOpen(false)}>Annulla</Button>
-                        <Button onClick={handleSaveWorkerHours} disabled={!whPreview || !whSalName.trim() || whSaving || whPreview.workers.length === 0}>
-                            {whSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva nel SAL
+                        <Button onClick={handleSaveWorkerHours} disabled={!whPreview || whSaving || whPreview.workers.length === 0}>
+                            {whSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva nel TAG
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1550,14 +1678,39 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                             <Input type="number" step="0.01" min="0" placeholder="0.00" value={newCostAmount} onChange={e => setNewCostAmount(e.target.value)} />
                         </div>
                         <div className="space-y-2">
-                            <Label>SAL (opzionale)</Label>
+                            <Label>TAG (opzionale)</Label>
                             <Select value={newCostSal} onValueChange={setNewCostSal}>
-                                <SelectTrigger><SelectValue placeholder="Nessun SAL" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Nessun TAG" /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="__none__">Nessun SAL</SelectItem>
+                                    <SelectItem value="__none__">Nessun TAG</SelectItem>
                                     {salNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
                                 </SelectContent>
                             </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Allegati (opzionale)</Label>
+                            <label className="flex items-center gap-2 cursor-pointer border border-dashed border-slate-300 rounded-md p-3 hover:border-blue-400 hover:bg-blue-50/40 transition-colors">
+                                <Paperclip className="h-4 w-4 text-slate-400 shrink-0" />
+                                <span className="text-sm text-slate-500">
+                                    {newCostFiles.length === 0 ? 'Clicca per allegare documenti…' : `${newCostFiles.length} file selezionati`}
+                                </span>
+                                <input
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                    onChange={e => setNewCostFiles(Array.from(e.target.files || []))}
+                                />
+                            </label>
+                            {newCostFiles.length > 0 && (
+                                <ul className="text-xs text-slate-500 space-y-0.5 pl-1">
+                                    {newCostFiles.map((f, i) => (
+                                        <li key={i} className="flex items-center gap-1">
+                                            <Paperclip className="h-3 w-3" />{f.name}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
@@ -1569,20 +1722,20 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                 </DialogContent>
             </Dialog>
 
-            {/* Gestisci SAL */}
+            {/* Gestisci TAG */}
             <Dialog open={isManageSalOpen} onOpenChange={setIsManageSalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Gestisci SAL</DialogTitle>
-                        <DialogDescription>Crea, rinomina o elimina i SAL.</DialogDescription>
+                        <DialogTitle>Gestisci TAG</DialogTitle>
+                        <DialogDescription>Crea, rinomina o elimina i TAG.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
-                        {/* Crea nuovo SAL */}
+                        {/* Crea nuovo TAG */}
                         <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Crea nuovo SAL</Label>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Crea nuovo TAG</Label>
                             <div className="flex gap-2">
                                 <Input
-                                    placeholder="Es. SAL 1, SAL Luglio…"
+                                    placeholder="Es. TAG 1, Fase Luglio…"
                                     value={newSalInput}
                                     onChange={e => setNewSalInput(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleCreateSal()}
@@ -1602,10 +1755,10 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                             )}
                         </div>
 
-                        {/* Elenco SAL esistenti */}
+                        {/* Elenco TAG esistenti */}
                         {salNames.length > 0 && (
                             <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">SAL esistenti</Label>
+                                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">TAG esistenti</Label>
                                 {salNames.map(name => (
                                     <div key={name} className="flex items-center gap-2">
                                         <Input
@@ -1627,7 +1780,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                             </div>
                         )}
                         {salNames.length === 0 && (
-                            <p className="text-sm text-slate-400 text-center py-2">Nessun SAL creato.</p>
+                            <p className="text-sm text-slate-400 text-center py-2">Nessun TAG creato.</p>
                         )}
                     </div>
                     <DialogFooter>

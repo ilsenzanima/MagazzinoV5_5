@@ -6,13 +6,14 @@ export interface SalCost {
     salName: string | null;
     description: string;
     amount: number;
+    documentUrls: string[];
     createdAt: string;
 }
 
 export interface SalItem {
     id: string;
     jobId: string;
-    salName: string;
+    salName: string | null;
     itemType: 'movement' | 'purchase' | 'worker_hours';
     itemId?: string;
     workerHoursData?: WorkerHoursSalData;
@@ -115,12 +116,12 @@ export const salApi = {
         if (error) throw error;
     },
 
-    addWorkerHours: async (jobId: string, salName: string, data: WorkerHoursSalData): Promise<SalItem> => {
+    addWorkerHours: async (jobId: string, salName: string | null, data: WorkerHoursSalData): Promise<SalItem> => {
         const { data: result, error } = await supabase
             .from('job_sal_items')
             .insert({
                 job_id: jobId,
-                sal_name: salName,
+                sal_name: salName || null,
                 item_type: 'worker_hours',
                 worker_hours_data: data,
                 date_from: data.dateFrom,
@@ -134,6 +135,11 @@ export const salApi = {
 
     deleteItem: async (id: string): Promise<void> => {
         const { error } = await supabase.from('job_sal_items').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    updateItemSalName: async (id: string, salName: string | null): Promise<void> => {
+        const { error } = await supabase.from('job_sal_items').update({ sal_name: salName || null }).eq('id', id);
         if (error) throw error;
     },
 
@@ -212,6 +218,7 @@ const mapCostDb = (db: any): SalCost => ({
     salName: db.sal_name,
     description: db.description,
     amount: Number(db.amount),
+    documentUrls: db.document_urls || [],
     createdAt: db.created_at,
 });
 
@@ -256,5 +263,22 @@ export const salCostsApi = {
             .eq('job_id', jobId)
             .eq('sal_name', oldName);
         if (error) throw error;
+    },
+
+    updateDocumentUrls: async (id: string, documentUrls: string[]): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_costs')
+            .update({ document_urls: documentUrls })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    uploadDocument: async (file: File): Promise<string> => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `sal_costs/${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, file);
+        if (uploadError) throw uploadError;
+        const { data } = supabase.storage.from('documents').getPublicUrl(fileName);
+        return data.publicUrl;
     },
 };

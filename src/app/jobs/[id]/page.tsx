@@ -474,7 +474,7 @@ export default function JobDetailsPage() {
                                     className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
                                 >
                                     <Euro className="h-4 w-4 md:mr-1" />
-                                    <span className="hidden md:inline">Costi e SAL</span>
+                                    <span className="hidden md:inline">Costi</span>
                                 </TabsTrigger>
                             )}
                             <TabsTrigger

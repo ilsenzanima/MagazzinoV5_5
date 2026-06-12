@@ -1,0 +1,1 @@
+ALTER TABLE job_sal_items ALTER COLUMN sal_name DROP NOT NULL;
