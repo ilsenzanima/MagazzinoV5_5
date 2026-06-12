@@ -1,5 +1,19 @@
 import { supabase } from '@/lib/supabase';
 
+export interface CostAnalysisParams {
+    jobId: string;
+    sfrido: number;
+    sconto: number;
+    trasporto: number;
+    posa: number;
+    ricarico: number;
+    margineTrattativa: number;
+}
+
+const DEFAULT_PARAMS: Omit<CostAnalysisParams, 'jobId'> = {
+    sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 30,
+};
+
 export interface CostAnalysisRow {
     id: string;
     jobId: string;
@@ -92,6 +106,40 @@ export const costAnalysisApi = {
             .limit(1);
         if (error) throw error;
         return data && data.length > 0 ? Number(data[0].price) : null;
+    },
+
+    getParams: async (jobId: string): Promise<CostAnalysisParams> => {
+        const { data } = await supabase
+            .from('job_cost_analysis_params')
+            .select('*')
+            .eq('job_id', jobId)
+            .single();
+        if (!data) return { jobId, ...DEFAULT_PARAMS };
+        return {
+            jobId: data.job_id,
+            sfrido: Number(data.sfrido),
+            sconto: Number(data.sconto),
+            trasporto: Number(data.trasporto),
+            posa: Number(data.posa),
+            ricarico: Number(data.ricarico),
+            margineTrattativa: Number(data.margine_trattativa),
+        };
+    },
+
+    upsertParams: async (jobId: string, p: Omit<CostAnalysisParams, 'jobId'>): Promise<void> => {
+        const { error } = await supabase
+            .from('job_cost_analysis_params')
+            .upsert({
+                job_id: jobId,
+                sfrido: p.sfrido,
+                sconto: p.sconto,
+                trasporto: p.trasporto,
+                posa: p.posa,
+                ricarico: p.ricarico,
+                margine_trattativa: p.margineTrattativa,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'job_id' });
+        if (error) throw error;
     },
 
     // Prezzi massimi per più articoli in una sola query
