@@ -68,11 +68,9 @@ function EditCell({ value, onSave, placeholder = '0', prefix }: {
 function MaterialTable({
     rows,
     onUpdate,
-    onDelete,
 }: {
     rows: CostAnalysisRow[]
     onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void
-    onDelete: (id: string) => void
 }) {
     const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
 
@@ -86,7 +84,6 @@ function MaterialTable({
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo unit.</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà presunta</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. presunto</th>
-                        <th className="w-6 p-2"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -115,11 +112,6 @@ function MaterialTable({
                                 <td className="p-2 text-right font-mono text-xs text-slate-700 dark:text-slate-300 font-medium">
                                     {row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}
                                 </td>
-                                <td className="p-2">
-                                    <button onClick={() => onDelete(row.id)} className="text-slate-300 hover:text-red-500">
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
-                                </td>
                             </tr>
                         )
                     })}
@@ -129,7 +121,6 @@ function MaterialTable({
                         <tr className="border-t-2 border-slate-200 bg-slate-50 dark:bg-slate-800/50 font-semibold text-sm">
                             <td colSpan={4} className="p-2 text-slate-600">Totale presunto</td>
                             <td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td>
-                            <td></td>
                         </tr>
                     </tfoot>
                 )}
@@ -148,8 +139,8 @@ function GenericTable({
     onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName'>>) => void
     onDelete: (id: string) => void
 }) {
+    const [pendingDelete, setPendingDelete] = useState<string | null>(null)
     const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
-    const totalEff = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyActual, 0)
 
     return (
         <div className="overflow-x-auto">
@@ -184,10 +175,24 @@ function GenericTable({
                                 <td className="p-2 text-right font-mono text-xs font-medium text-slate-700 dark:text-slate-300">
                                     {row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}
                                 </td>
-                                <td className="p-2">
-                                    <button onClick={() => onDelete(row.id)} className="text-slate-300 hover:text-red-500">
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
+                                <td className="p-2 text-right whitespace-nowrap">
+                                    {pendingDelete === row.id ? (
+                                        <span className="flex items-center gap-1 justify-end">
+                                            <span className="text-xs text-slate-500">Eliminare?</span>
+                                            <button
+                                                onClick={() => { onDelete(row.id); setPendingDelete(null) }}
+                                                className="text-xs font-medium text-red-600 hover:text-red-700 px-1"
+                                            >Sì</button>
+                                            <button
+                                                onClick={() => setPendingDelete(null)}
+                                                className="text-xs text-slate-400 hover:text-slate-600 px-1"
+                                            >No</button>
+                                        </span>
+                                    ) : (
+                                        <button onClick={() => setPendingDelete(row.id)} className="text-slate-300 hover:text-red-500">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
                                 </td>
                             </tr>
                         )
@@ -447,7 +452,6 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
                         <MaterialTable
                             rows={inventoryRows}
                             onUpdate={handleUpdate}
-                            onDelete={handleDelete}
                         />
                     )}
                 </CardContent>
