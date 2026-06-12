@@ -318,7 +318,7 @@ export const purchasesApi = {
     getOrdersForConversion: async (ids: string[]) => {
         const { data, error } = await supabase
             .from('purchases')
-            .select('id, supplier_id, suppliers(name), job_id, jobs(code), purchase_items(item_id, price, quantity, pieces, coefficient, job_id, jobs(code), inventory(id, name, model, code, unit, coefficient))')
+            .select('id, supplier_id, transport_cost, suppliers(name), job_id, jobs(code), purchase_items(item_id, price, quantity, pieces, coefficient, job_id, transport_applied, jobs(code), inventory(id, name, model, code, unit, coefficient))')
             .in('id', ids)
             .eq('order_type', 'order');
         if (error) throw error;
@@ -328,6 +328,7 @@ export const purchasesApi = {
             supplierName: p.suppliers?.name,
             jobId: p.job_id ?? null,
             jobCode: p.jobs?.code ?? null,
+            transportCost: p.transport_cost ?? 0,
             items: (p.purchase_items ?? []).map((i: any) => ({
                 itemId: i.item_id,
                 itemName: i.inventory?.name ?? '',
@@ -340,6 +341,7 @@ export const purchasesApi = {
                 price: i.price,
                 jobId: i.job_id ?? null,
                 jobCode: i.jobs?.code ?? null,
+                transportApplied: i.transport_applied ?? false,
             })),
         }));
     },

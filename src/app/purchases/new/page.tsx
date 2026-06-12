@@ -44,6 +44,7 @@ interface PurchaseLine {
     isJob: boolean;
     jobId?: string;
     jobCode?: string;
+    transportApplied?: boolean;
 }
 
 const emptyLine = (): PurchaseLine => ({
@@ -76,6 +77,7 @@ function NewPurchaseContent() {
     const { userRole } = useAuth();
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
+    const [fromOrdersTransportCost, setFromOrdersTransportCost] = useState(0);
     const [itemsLoading, setItemsLoading] = useState(false);
     const [jobsLoading, setJobsLoading] = useState(false);
 
@@ -198,9 +200,16 @@ function NewPurchaseContent() {
                             isJob: !!item.jobId,
                             jobId: item.jobId ?? undefined,
                             jobCode: item.jobCode ?? undefined,
+                            transportApplied: item.transportApplied ?? false,
                         }))
                     );
                     setLines(ensureTrailingEmpty(orderLines));
+
+                    // Somma i costi trasporto degli ordini sorgente
+                    const totalTransport = orders.reduce((sum: number, o: any) => sum + (o.transportCost ?? 0), 0);
+                    if (totalTransport > 0) {
+                        setFromOrdersTransportCost(totalTransport);
+                    }
                 }
                 return; // skip presetJobId logic below
             }
@@ -426,12 +435,16 @@ function NewPurchaseContent() {
                     pieces: !isNaN(pieces) ? pieces : (line.coefficient === 1 ? qty : undefined),
                     coefficient: line.coefficient,
                     price: parseFloat(line.price),
-                    jobId: line.jobId
+                    jobId: line.jobId,
+                    transportApplied: line.transportApplied ?? false,
                 });
             }
 
-            // Se creato da ordini, segna gli ordini come evasi
+            // Se creato da ordini, porta il costo trasporto e segna gli ordini come evasi
             if (fromOrderIds.length > 0) {
+                if (fromOrdersTransportCost > 0) {
+                    await purchasesApi.saveTransportCost(purchase.id, fromOrdersTransportCost);
+                }
                 await purchasesApi.markOrdersAsConverted(fromOrderIds, purchase.id);
             }
 
