@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, PlusCircle, X, Download, RefreshCw, Package, FileText } from "lucide-react"
+import { Loader2, PlusCircle, X, Download, Package, FileText } from "lucide-react"
 import { costAnalysisApi, CostAnalysisRow } from "@/lib/services/cost-analysis"
 import { inventoryApi } from "@/lib/api"
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
@@ -75,7 +75,6 @@ function MaterialTable({
     onDelete: (id: string) => void
 }) {
     const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
-    const totalEff = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyActual, 0)
 
     return (
         <div className="overflow-x-auto">
@@ -86,16 +85,13 @@ function MaterialTable({
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo max acq.</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo unit.</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà presunta</th>
-                        <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà effettiva</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. presunto</th>
-                        <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. effettivo</th>
                         <th className="w-6 p-2"></th>
                     </tr>
                 </thead>
                 <tbody>
                     {rows.map(row => {
                         const totEst = (row.unitPrice ?? 0) * row.qtyEstimated
-                        const totEff = (row.unitPrice ?? 0) * row.qtyActual
                         const unitLabel = row.itemUnit ? `€/${row.itemUnit}` : '€/u.'
                         return (
                             <tr key={row.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-800/20">
@@ -116,14 +112,8 @@ function MaterialTable({
                                 <td className="p-2 text-right">
                                     <EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />
                                 </td>
-                                <td className="p-2 text-right">
-                                    <EditCell value={row.qtyActual || null} onSave={v => onUpdate(row.id, { qtyActual: v ?? 0 })} />
-                                </td>
-                                <td className="p-2 text-right font-mono text-xs text-slate-600">
+                                <td className="p-2 text-right font-mono text-xs text-slate-700 dark:text-slate-300 font-medium">
                                     {row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}
-                                </td>
-                                <td className="p-2 text-right font-mono text-xs font-medium text-slate-700 dark:text-slate-300">
-                                    {row.unitPrice !== null ? `€ ${fmt(totEff)}` : '—'}
                                 </td>
                                 <td className="p-2">
                                     <button onClick={() => onDelete(row.id)} className="text-slate-300 hover:text-red-500">
@@ -137,9 +127,8 @@ function MaterialTable({
                 {rows.length > 0 && (
                     <tfoot>
                         <tr className="border-t-2 border-slate-200 bg-slate-50 dark:bg-slate-800/50 font-semibold text-sm">
-                            <td colSpan={5} className="p-2 text-slate-600">Totale</td>
-                            <td className="p-2 text-right font-mono text-slate-600">€ {fmt(totalEst)}</td>
-                            <td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEff)}</td>
+                            <td colSpan={4} className="p-2 text-slate-600">Totale presunto</td>
+                            <td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -168,19 +157,15 @@ function GenericTable({
                 <thead>
                     <tr className="border-b bg-slate-50 dark:bg-slate-800/50">
                         <th className="text-left p-2 font-medium text-slate-500">Voce</th>
-                        <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo max acq.</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo unit.</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà presunta</th>
-                        <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà effettiva</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. presunto</th>
-                        <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. effettivo</th>
                         <th className="w-6 p-2"></th>
                     </tr>
                 </thead>
                 <tbody>
                     {rows.map(row => {
                         const totEst = (row.unitPrice ?? 0) * row.qtyEstimated
-                        const totEff = (row.unitPrice ?? 0) * row.qtyActual
                         return (
                             <tr key={row.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-800/20">
                                 <td className="p-2 min-w-[160px]">
@@ -191,22 +176,13 @@ function GenericTable({
                                     />
                                 </td>
                                 <td className="p-2 text-right">
-                                    <span className="text-xs text-slate-300 italic">—</span>
-                                </td>
-                                <td className="p-2 text-right">
                                     <EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} prefix="€ " />
                                 </td>
                                 <td className="p-2 text-right">
                                     <EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />
                                 </td>
-                                <td className="p-2 text-right">
-                                    <EditCell value={row.qtyActual || null} onSave={v => onUpdate(row.id, { qtyActual: v ?? 0 })} />
-                                </td>
-                                <td className="p-2 text-right font-mono text-xs text-slate-600">
-                                    {row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}
-                                </td>
                                 <td className="p-2 text-right font-mono text-xs font-medium text-slate-700 dark:text-slate-300">
-                                    {row.unitPrice !== null ? `€ ${fmt(totEff)}` : '—'}
+                                    {row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}
                                 </td>
                                 <td className="p-2">
                                     <button onClick={() => onDelete(row.id)} className="text-slate-300 hover:text-red-500">
@@ -220,9 +196,8 @@ function GenericTable({
                 {rows.length > 0 && (
                     <tfoot>
                         <tr className="border-t-2 border-slate-200 bg-slate-50 dark:bg-slate-800/50 font-semibold text-sm">
-                            <td colSpan={5} className="p-2 text-slate-600">Totale</td>
-                            <td className="p-2 text-right font-mono text-slate-600">€ {fmt(totalEst)}</td>
-                            <td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEff)}</td>
+                            <td colSpan={3} className="p-2 text-slate-600">Totale presunto</td>
+                            <td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -255,7 +230,6 @@ function InlineTextEdit({ value, onSave, placeholder }: { value: string; onSave:
 export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnalisiCostiProps) {
     const [rows, setRows] = useState<CostAnalysisRow[]>([])
     const [loading, setLoading] = useState(true)
-    const [importing, setImporting] = useState(false)
     const [selectorOpen, setSelectorOpen] = useState(false)
     const [inventory, setInventory] = useState<InventoryItem[]>([])
     const [invLoading, setInvLoading] = useState(false)
@@ -265,10 +239,47 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
 
+    const autoImported = useRef(false)
+
     const loadRows = async () => {
         try {
             setLoading(true)
-            setRows(await costAnalysisApi.getByJobId(jobId))
+            const existing = await costAnalysisApi.getByJobId(jobId)
+            setRows(existing)
+
+            // Auto-import articoli dai movimenti (solo al primo caricamento)
+            if (!autoImported.current) {
+                autoImported.current = true
+                const existingIds = new Set(existing.filter(r => r.type === 'inventory').map(r => r.itemId).filter(Boolean))
+                const uniqueItems = new Map<string, Movement>()
+                for (const m of movements) {
+                    if (!m.itemId || existingIds.has(m.itemId) || uniqueItems.has(m.itemId)) continue
+                    if (m.type === 'exit' || m.type === 'entry' || m.type === 'purchase') {
+                        uniqueItems.set(m.itemId, m)
+                    }
+                }
+                if (uniqueItems.size > 0) {
+                    const priceMap = await costAnalysisApi.getMaxPurchasePrices([...uniqueItems.keys()])
+                    let sortBase = existing.filter(r => r.type === 'inventory').length
+                    const added: CostAnalysisRow[] = []
+                    for (const m of [...uniqueItems.values()]) {
+                        const row = await costAnalysisApi.add(jobId, {
+                            type: 'inventory',
+                            itemId: m.itemId,
+                            itemName: m.itemName || m.itemCode || '',
+                            itemModel: m.itemModel || '',
+                            itemUnit: m.itemUnit || '',
+                            maxPurchasePrice: priceMap.get(m.itemId) ?? null,
+                            unitPrice: null,
+                            qtyEstimated: 0,
+                            qtyActual: 0,
+                            sortOrder: sortBase++,
+                        })
+                        added.push(row)
+                    }
+                    if (added.length > 0) setRows(prev => [...prev, ...added])
+                }
+            }
         } catch { notify.error("Errore nel caricamento dell'analisi costi") }
         finally { setLoading(false) }
     }
@@ -308,48 +319,6 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
             })
             setRows(prev => [...prev, newRow])
         } catch { notify.error("Errore durante l'aggiunta dell'articolo") }
-    }
-
-    // ── Importa articoli dai movimenti della commessa ─────────────────────────
-    const handleImportFromMovements = async () => {
-        // Raccoglie itemId unici dai movimenti (exit, entry, purchase) non già presenti
-        const existingIds = new Set(inventoryRows.map(r => r.itemId).filter(Boolean))
-        const uniqueItems = new Map<string, Movement>()
-        for (const m of movements) {
-            if (!m.itemId || existingIds.has(m.itemId) || uniqueItems.has(m.itemId)) continue
-            if (m.type === 'exit' || m.type === 'entry' || m.type === 'purchase') {
-                uniqueItems.set(m.itemId, m)
-            }
-        }
-        if (uniqueItems.size === 0) {
-            notify.error("Nessun articolo nuovo da importare")
-            return
-        }
-        setImporting(true)
-        try {
-            const priceMap = await costAnalysisApi.getMaxPurchasePrices([...uniqueItems.keys()])
-            let sortBase = inventoryRows.length
-            const toAdd = [...uniqueItems.values()]
-            const added: CostAnalysisRow[] = []
-            for (const m of toAdd) {
-                const row = await costAnalysisApi.add(jobId, {
-                    type: 'inventory',
-                    itemId: m.itemId,
-                    itemName: m.itemName || m.itemCode || '',
-                    itemModel: m.itemModel || '',
-                    itemUnit: m.itemUnit || '',
-                    maxPurchasePrice: priceMap.get(m.itemId) ?? null,
-                    unitPrice: null,
-                    qtyEstimated: 0,
-                    qtyActual: 0,
-                    sortOrder: sortBase++,
-                })
-                added.push(row)
-            }
-            setRows(prev => [...prev, ...added])
-            notify.success(`${added.length} articoli importati`)
-        } catch { notify.error("Errore durante l'importazione") }
-        finally { setImporting(false) }
     }
 
     // ── Aggiungi voce generica ────────────────────────────────────────────────
@@ -401,7 +370,7 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
         const tot = (v: any) => xc(v, { fill: { patternType: 'solid', fgColor: { rgb: 'FF1E3A5F' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } } })
 
         // Sheet 1 — Materiali
-        const matHdr = ['Articolo', 'Variante', '€/U.M.', 'Prezzo max acq.', 'Prezzo unitario', 'Qtà presunta', 'Qtà effettiva', 'Tot. presunto', 'Tot. effettivo']
+        const matHdr = ['Articolo', 'Variante', '€/U.M.', 'Prezzo max acq.', 'Prezzo unitario', 'Qtà presunta', 'Tot. presunto']
         const matData: any[][] = [matHdr.map(hdr)]
         for (const r of inventoryRows) {
             matData.push([
@@ -409,35 +378,31 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
                 xc(r.itemUnit ? `€/${r.itemUnit}` : '€/u.'),
                 xc(r.maxPurchasePrice !== null ? fmtN(r.maxPurchasePrice) : ''),
                 xc(r.unitPrice !== null ? fmtN(r.unitPrice) : ''),
-                xc(fmtN(r.qtyEstimated)), xc(fmtN(r.qtyActual)),
+                xc(fmtN(r.qtyEstimated)),
                 xc(r.unitPrice !== null ? fmtN(r.unitPrice * r.qtyEstimated) : ''),
-                xc(r.unitPrice !== null ? fmtN(r.unitPrice * r.qtyActual) : ''),
             ])
         }
         const invTotEst = inventoryRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
-        const invTotEff = inventoryRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyActual, 0)
-        matData.push([xc(''), xc(''), xc(''), xc(''), xc(''), xc(''), tot('TOTALE'), tot(fmtN(invTotEst)), tot(fmtN(invTotEff))])
+        matData.push([xc(''), xc(''), xc(''), xc(''), xc(''), tot('TOTALE'), tot(fmtN(invTotEst))])
         const ws1 = XLSX.utils.aoa_to_sheet(matData)
-        ws1['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }]
+        ws1['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 14 }]
         XLSX.utils.book_append_sheet(wb, ws1, 'Materiali')
 
         // Sheet 2 — Voci Generiche
-        const genHdr = ['Voce', 'Prezzo unitario', 'Qtà presunta', 'Qtà effettiva', 'Tot. presunto', 'Tot. effettivo']
+        const genHdr = ['Voce', 'Prezzo unitario', 'Qtà presunta', 'Tot. presunto']
         const genData: any[][] = [genHdr.map(hdr)]
         for (const r of genericRows) {
             genData.push([
                 xc(r.itemName),
                 xc(r.unitPrice !== null ? fmtN(r.unitPrice) : ''),
-                xc(fmtN(r.qtyEstimated)), xc(fmtN(r.qtyActual)),
+                xc(fmtN(r.qtyEstimated)),
                 xc(r.unitPrice !== null ? fmtN(r.unitPrice * r.qtyEstimated) : ''),
-                xc(r.unitPrice !== null ? fmtN(r.unitPrice * r.qtyActual) : ''),
             ])
         }
         const genTotEst = genericRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
-        const genTotEff = genericRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyActual, 0)
-        genData.push([xc(''), tot('TOTALE'), xc(''), xc(''), tot(fmtN(genTotEst)), tot(fmtN(genTotEff))])
+        genData.push([xc(''), tot('TOTALE'), xc(''), tot(fmtN(genTotEst))])
         const ws2 = XLSX.utils.aoa_to_sheet(genData)
-        ws2['!cols'] = [{ wch: 35 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }]
+        ws2['!cols'] = [{ wch: 35 }, { wch: 14 }, { wch: 12 }, { wch: 14 }]
         XLSX.utils.book_append_sheet(wb, ws2, 'Voci Generiche')
 
         XLSX.writeFile(wb, `${[jobSlug, 'Analisi_Costi', today].filter(Boolean).join('_')}.xlsx`)
@@ -464,33 +429,19 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
                 <div className="flex items-center gap-3 p-4 border-b">
                     <Package className="h-5 w-5 text-blue-600" />
                     <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Materiali da Magazzino</span>
-                    <div className="flex gap-2">
-                        <Button
-                            size="sm" variant="outline"
-                            onClick={handleImportFromMovements}
-                            disabled={importing}
-                            className="h-8 text-xs"
-                        >
-                            {importing
-                                ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                                : <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                            }
-                            Importa da movimenti
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={() => setSelectorOpen(true)}
-                            className="bg-blue-600 hover:bg-blue-700 h-8 text-xs"
-                        >
-                            <PlusCircle className="h-3.5 w-3.5 mr-1" />
-                            Aggiungi articolo
-                        </Button>
-                    </div>
+                    <Button
+                        size="sm"
+                        onClick={() => setSelectorOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-700 h-8 text-xs"
+                    >
+                        <PlusCircle className="h-3.5 w-3.5 mr-1" />
+                        Aggiungi articolo
+                    </Button>
                 </div>
                 <CardContent className="pt-0 pb-4 px-4">
                     {inventoryRows.length === 0 ? (
                         <p className="text-sm text-slate-400 text-center py-6">
-                            Nessun materiale. Usa "Aggiungi articolo" o "Importa da movimenti".
+                            Nessun materiale. Usa "Aggiungi articolo" per aggiungerne uno manualmente.
                         </p>
                     ) : (
                         <MaterialTable
