@@ -532,6 +532,8 @@ export default function PurchaseDetailPage() {
 
     const isOrder = purchase.orderType === 'order';
     const hasMissingPrices = items.some(i => i.price === 0);
+    // Mostra colonne trasporto solo se il trasporto è impostato ma non ancora applicato a tutte le righe
+    const showTransportCols = transportCost > 0 && items.length > 0 && items.some(i => !i.transportApplied);
 
     return (
         <>
@@ -794,11 +796,11 @@ export default function PurchaseDetailPage() {
                                             <TableHead className="text-right">Pezzi</TableHead>
                                             <TableHead className="text-right">Coeff.</TableHead>
                                             <TableHead className="text-right">Q.tà Tot.</TableHead>
-                                            {transportCost > 0 && <TableHead className="text-right text-amber-600">Trasp./u.</TableHead>}
-                                            <TableHead className="text-right">{transportCost > 0 ? "P.U. Acquisto" : "Prezzo Unit."}</TableHead>
-                                            <TableHead className="text-right">{transportCost > 0 ? "Tot. Acquisto" : "Totale Riga"}</TableHead>
-                                            {transportCost > 0 && <TableHead className="text-right text-amber-600">P.U. c/Trasp.</TableHead>}
-                                            {transportCost > 0 && <TableHead className="text-right text-amber-600">Tot. c/Trasp.</TableHead>}
+                                            {showTransportCols && <TableHead className="text-right text-amber-600">Trasp./u.</TableHead>}
+                                            <TableHead className="text-right">Prezzo Unit.</TableHead>
+                                            <TableHead className="text-right">Totale Riga</TableHead>
+                                            {showTransportCols && <TableHead className="text-right text-amber-600">P.U. c/Trasp.</TableHead>}
+                                            {showTransportCols && <TableHead className="text-right text-amber-600">Tot. c/Trasp.</TableHead>}
                                             <TableHead>Destinazione</TableHead>
                                             <TableHead></TableHead>
                                         </TableRow>
@@ -873,14 +875,14 @@ export default function PurchaseDetailPage() {
                                                             {item.coefficient || 1}
                                                         </TableCell>
                                                         <TableCell className="text-right">{item.quantity}</TableCell>
-                                                        {transportCost > 0 && (userRole === 'admin' || userRole === 'operativo') && (
+                                                        {showTransportCols && (userRole === 'admin' || userRole === 'operativo') && (
                                                             <TableCell className="text-right text-amber-600 text-xs">
                                                                 {item.quantity > 0
                                                                     ? `€ ${(transportCost / items.length / item.quantity).toFixed(5)}`
                                                                     : '—'}
                                                             </TableCell>
                                                         )}
-                                                        {transportCost > 0 && !(userRole === 'admin' || userRole === 'operativo') && (
+                                                        {showTransportCols && !(userRole === 'admin' || userRole === 'operativo') && (
                                                             <TableCell className="text-right"><span className="text-slate-400 italic text-xs">Riservato</span></TableCell>
                                                         )}
                                                         <TableCell className="text-right">
@@ -918,7 +920,7 @@ export default function PurchaseDetailPage() {
                                                         <span className="text-slate-400 italic text-xs">Riservato</span>
                                                     )}
                                                 </TableCell>
-                                                {transportCost > 0 && editingItemId !== item.id && (
+                                                {showTransportCols && editingItemId !== item.id && (
                                                     <>
                                                         <TableCell className="text-right text-amber-700 font-medium">
                                                             {(userRole === 'admin' || userRole === 'operativo') && item.quantity > 0
@@ -932,7 +934,7 @@ export default function PurchaseDetailPage() {
                                                         </TableCell>
                                                     </>
                                                 )}
-                                                {transportCost > 0 && editingItemId === item.id && (
+                                                {showTransportCols && editingItemId === item.id && (
                                                     <>
                                                         <TableCell />
                                                         <TableCell />
@@ -990,7 +992,7 @@ export default function PurchaseDetailPage() {
                                             </TableRow>
                                         ))}
                                         <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold text-lg">
-                                            <TableCell colSpan={transportCost > 0 ? 6 : 5} className="text-right">
+                                            <TableCell colSpan={showTransportCols ? 6 : 5} className="text-right">
                                                 {isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -1000,7 +1002,7 @@ export default function PurchaseDetailPage() {
                                                     <span className="text-slate-400 italic text-sm">Riservato</span>
                                                 )}
                                             </TableCell>
-                                            {transportCost > 0 && (
+                                            {showTransportCols && (
                                                 <>
                                                     <TableCell className="text-right text-amber-700">
                                                         {/* P.U. c/Trasp. non ha un totale significativo */}
@@ -1137,7 +1139,7 @@ export default function PurchaseDetailPage() {
                                                             <div className="flex flex-col items-end gap-0.5">
                                                                 <span className="font-mono text-xs text-slate-500">P.U.: € {item.price.toFixed(5)}</span>
                                                                 <span className="font-bold text-slate-900 dark:text-white text-xs">Tot: € {(item.quantity * item.price).toFixed(2)}</span>
-                                                                {transportCost > 0 && item.quantity > 0 && (() => {
+                                                                {showTransportCols && item.quantity > 0 && (() => {
                                                                     const tpu = transportCost / items.length / item.quantity;
                                                                     return (
                                                                         <>
@@ -1161,7 +1163,7 @@ export default function PurchaseDetailPage() {
                                     {(userRole === 'admin' || userRole === 'operativo') ? (
                                         <div className="text-right">
                                             <div>{`€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`}</div>
-                                            {transportCost > 0 && (
+                                            {showTransportCols && (
                                                 <div className="text-xs text-amber-700 font-semibold">
                                                     c/Trasp.: € {items.reduce((acc, item) => {
                                                         const tpu = item.quantity > 0 ? transportCost / items.length / item.quantity : 0;
