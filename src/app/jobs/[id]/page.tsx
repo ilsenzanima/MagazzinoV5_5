@@ -126,8 +126,8 @@ export default function JobDetailsPage() {
         const purSalMap = new Map<string, string>(); // purchaseId → salName
         salItems.forEach(s => {
             if (!s.itemId) return;
-            if (s.itemType === 'movement') movSalMap.set(s.itemId, s.salName);
-            if (s.itemType === 'purchase') purSalMap.set(s.itemId, s.salName);
+            if (s.itemType === 'movement') movSalMap.set(s.itemId, s.salName || '');
+            if (s.itemType === 'purchase') purSalMap.set(s.itemId, s.salName || '');
         });
 
         const matRows = movements
@@ -196,7 +196,7 @@ export default function JobDetailsPage() {
                         if (d.normalHours > 0 || d.transferHours > 0) {
                             const key = `${w.workerId}_${d.date}`;
                             const prev = attSalMap.get(key);
-                            attSalMap.set(key, prev ? `${prev},${s.salName}` : s.salName);
+                            attSalMap.set(key, prev ? `${prev},${s.salName || ''}` : (s.salName || ''));
                         }
                     });
                 });

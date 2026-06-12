@@ -78,16 +78,16 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
 
     const salTagMap = useMemo(() => {
         const map = new Map<string, string[]>()
-        salItems.filter(s => s.itemType !== 'worker_hours' && s.itemId).forEach(s => {
+        salItems.filter(s => s.itemType !== 'worker_hours' && s.itemId && s.salName).forEach(s => {
             const key = `${s.itemType}:${s.itemId}`
             const existing = map.get(key) || []
-            if (!existing.includes(s.salName)) map.set(key, [...existing, s.salName])
+            if (!existing.includes(s.salName!)) map.set(key, [...existing, s.salName!])
         })
         return map
     }, [salItems])
 
     const salNames = useMemo(() => {
-        const names = [...new Set(salItems.map(s => s.salName))]
+        const names = [...new Set(salItems.map(s => s.salName).filter((n): n is string => n !== null))]
         return names.sort()
     }, [salItems])
 

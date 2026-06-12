@@ -261,7 +261,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
 
     // ── Derived: SAL names (union of items + standalone names) ────────────────
     const salNames = useMemo(() => {
-        const fromItems = salItems.map(s => s.salName)
+        const fromItems = salItems.map(s => s.salName).filter((n): n is string => n !== null)
         const all = [...new Set([...salNamesData, ...fromItems])]
         return all.sort()
     }, [salItems, salNamesData])
@@ -269,10 +269,10 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     // ── Derived: tag map (itemType:itemId → salNames[]) ───────────────────────
     const salTagMap = useMemo(() => {
         const map = new Map<string, string[]>()
-        salItems.filter(s => s.itemType !== 'worker_hours' && s.itemId).forEach(s => {
+        salItems.filter(s => s.itemType !== 'worker_hours' && s.itemId && s.salName).forEach(s => {
             const key = `${s.itemType}:${s.itemId}`
             const existing = map.get(key) || []
-            if (!existing.includes(s.salName)) map.set(key, [...existing, s.salName])
+            if (!existing.includes(s.salName!)) map.set(key, [...existing, s.salName!])
         })
         return map
     }, [salItems])
