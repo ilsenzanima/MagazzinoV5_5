@@ -11,7 +11,7 @@ export interface CostAnalysisParams {
 }
 
 const DEFAULT_PARAMS: Omit<CostAnalysisParams, 'jobId'> = {
-    sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 30,
+    sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10,
 };
 
 export interface CostAnalysisRow {

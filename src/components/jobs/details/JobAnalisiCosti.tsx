@@ -218,7 +218,7 @@ function GenericTable({ rows, onUpdate, onDelete }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 const DEFAULT_PARAMS: Omit<CostAnalysisParams, 'jobId'> = {
-    sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 30,
+    sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10,
 }
 
 export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnalisiCostiProps) {
