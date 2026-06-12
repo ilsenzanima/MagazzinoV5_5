@@ -13,6 +13,7 @@ import { JobSalApprovato, JobFatturaCommittente } from "@/lib/types"
 import { notify } from "@/lib/notify"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
+import { createClient } from "@/lib/supabase/client"
 
 interface JobFatturazioneProps {
     jobId: string
@@ -133,10 +134,10 @@ function EntryDialog({
                                 {uploading ? "Caricamento..." : "Allega file"}
                             </Button>
                             {existingDocUrl && (
-                                <a href={existingDocUrl} target="_blank" rel="noopener noreferrer"
+                                <button onClick={() => openDocument(existingDocUrl)}
                                     className="text-xs text-blue-600 hover:underline truncate">
                                     Documento allegato
-                                </a>
+                                </button>
                             )}
                         </div>
                         <input
@@ -158,6 +159,21 @@ function EntryDialog({
             </DialogContent>
         </Dialog>
     )
+}
+
+// ── Apri documento con signed URL ────────────────────────────────────────────
+
+async function openDocument(url: string) {
+    try {
+        const supabase = createClient()
+        const path = url.split('/public/documents/')[1]
+        if (!path) { window.open(url, '_blank'); return }
+        const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+        if (error || !data?.signedUrl) { window.open(url, '_blank'); return }
+        window.open(data.signedUrl, '_blank')
+    } catch {
+        window.open(url, '_blank')
+    }
 }
 
 // ── Entry card (compact, for use in a column) ─────────────────────────────────
@@ -202,12 +218,10 @@ function EntryCard({
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
                         {entry.documentUrl && (
-                            <a href={entry.documentUrl} target="_blank" rel="noopener noreferrer"
-                                onClick={e => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Apri documento">
-                                    <Paperclip className="h-3 w-3 text-violet-500" />
-                                </Button>
-                            </a>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Apri documento"
+                                onClick={e => { e.stopPropagation(); openDocument(entry.documentUrl!) }}>
+                                <Paperclip className="h-3 w-3 text-violet-500" />
+                            </Button>
                         )}
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
                             <Pencil className="h-3 w-3 text-slate-400" />
