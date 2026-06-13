@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, Loader2, MapPin, Navigation, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, Loader2, MapPin, Pencil, Trash2 } from "lucide-react"
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals"
 import { clientsApi } from "@/lib/api"
 import { jobsApi } from "@/lib/api"
@@ -254,7 +254,6 @@ export default function ProposalDetailPage() {
             <Tabs defaultValue="info">
                 <TabsList className="mb-6">
                     <TabsTrigger value="info"><FileText className="h-4 w-4 mr-2" />Info</TabsTrigger>
-                    <TabsTrigger value="distanza"><Navigation className="h-4 w-4 mr-2" />Distanza</TabsTrigger>
                     <TabsTrigger value="costi"><Calculator className="h-4 w-4 mr-2" />Analisi Costi</TabsTrigger>
                     <TabsTrigger value="documenti"><BarChart2 className="h-4 w-4 mr-2" />Documenti</TabsTrigger>
                 </TabsList>
@@ -390,12 +389,9 @@ export default function ProposalDetailPage() {
                                 </div>
                             </CardContent>
                         </Card>
+                        {/* Distanza */}
+                        <ProposalDistanza siteAddress={siteAddress} />
                     </div>
-                </TabsContent>
-
-                {/* ── DISTANZA ─────────────────────────────────────── */}
-                <TabsContent value="distanza">
-                    <ProposalDistanza siteAddress={siteAddress} />
                 </TabsContent>
 
                 {/* ── ANALISI COSTI ─────────────────────────────────── */}

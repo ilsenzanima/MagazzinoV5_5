@@ -26,15 +26,10 @@ async function geocode(address: string): Promise<[number, number] | null> {
 }
 
 async function calcRoute(from: [number, number], to: [number, number]): Promise<RouteResult> {
-    const url = `https://router.project-osrm.org/route/v1/driving/${from[0]},${from[1]};${to[0]},${to[1]}?overview=false`
-    const res = await fetch(url)
+    const res = await fetch(`/api/route-distance?from=${from[0]},${from[1]}&to=${to[0]},${to[1]}`)
     const data = await res.json()
-    if (data.code !== "Ok" || !data.routes?.length) throw new Error("Percorso non trovato")
-    const route = data.routes[0]
-    return {
-        distanceKm: Math.round(route.distance / 100) / 10,
-        durationMin: Math.round(route.duration / 60),
-    }
+    if (!res.ok) throw new Error(data.error || "Percorso non trovato")
+    return data
 }
 
 export function ProposalDistanza({ siteAddress }: Props) {
