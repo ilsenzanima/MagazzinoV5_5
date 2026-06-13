@@ -59,6 +59,37 @@ export default function ProposalDetailPage() {
         siteStreet: "", siteStreetNumber: "", sitePostalCode: "", siteCity: "", siteProvince: "",
     })
 
+    // Inline edit state
+    const [inlineEdit, setInlineEdit] = useState<"status" | "value" | "description" | null>(null)
+    const [inlineStatus, setInlineStatus] = useState<ProposalStatus>("draft")
+    const [inlineValue, setInlineValue] = useState("")
+    const [inlineDesc, setInlineDesc] = useState("")
+    const [inlineSaving, setInlineSaving] = useState(false)
+
+    const openInline = (field: "status" | "value" | "description") => {
+        if (!proposal) return
+        if (field === "status") setInlineStatus(proposal.status)
+        if (field === "value") setInlineValue(proposal.estimatedValue !== null ? String(proposal.estimatedValue) : "")
+        if (field === "description") setInlineDesc(proposal.description)
+        setInlineEdit(field)
+    }
+
+    const saveInline = async (field: "status" | "value" | "description") => {
+        if (!proposal) return
+        try {
+            setInlineSaving(true)
+            const patch: Partial<ClientProposal> = {}
+            if (field === "status") patch.status = inlineStatus
+            if (field === "value") patch.estimatedValue = inlineValue ? Number(inlineValue) : null
+            if (field === "description") patch.description = inlineDesc
+            await clientProposalsApi.update(proposalId, patch)
+            const updated = await clientProposalsApi.getById(proposalId)
+            setProposal(updated)
+            setInlineEdit(null)
+        } catch { notify.error("Errore durante il salvataggio") }
+        finally { setInlineSaving(false) }
+    }
+
     useEffect(() => {
         Promise.all([
             clientProposalsApi.getById(proposalId),
@@ -229,31 +260,112 @@ export default function ProposalDetailPage() {
                 {/* ── INFO ─────────────────────────────────────────────── */}
                 <TabsContent value="info">
                     <div className="max-w-2xl space-y-4">
+
+                        {/* Stato — inline */}
                         <Card>
-                            <CardHeader><CardTitle className="text-base">Dettagli Proposta</CardTitle></CardHeader>
-                            <CardContent className="space-y-4 text-sm">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <span className="text-xs uppercase tracking-wide text-slate-500">Stato</span>
-                                        <p className="mt-0.5"><Badge className={`text-xs ${STATUS_COLORS[proposal.status]}`} variant="secondary">{STATUS_LABELS[proposal.status]}</Badge></p>
-                                    </div>
-                                    {proposal.date && (
-                                        <div>
-                                            <span className="text-xs uppercase tracking-wide text-slate-500">Data</span>
-                                            <p className="font-medium mt-0.5">{format(new Date(proposal.date), "d MMMM yyyy", { locale: it })}</p>
+                            <CardContent className="py-4 px-5">
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="text-xs uppercase tracking-wide text-slate-500 shrink-0">Stato</span>
+                                    {inlineEdit === "status" ? (
+                                        <div className="flex items-center gap-2 flex-1 justify-end">
+                                            <Select value={inlineStatus} onValueChange={v => setInlineStatus(v as ProposalStatus)}>
+                                                <SelectTrigger className="w-40 h-8 text-sm"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button size="sm" className="h-8" onClick={() => saveInline("status")} disabled={inlineSaving}>
+                                                {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="h-8" onClick={() => setInlineEdit(null)}>Annulla</Button>
                                         </div>
-                                    )}
-                                    {proposal.estimatedValue !== null && (
-                                        <div>
-                                            <span className="text-xs uppercase tracking-wide text-slate-500">Valore Stimato</span>
-                                            <p className="font-medium mt-0.5">€ {proposal.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <Badge className={`text-xs ${STATUS_COLORS[proposal.status]}`} variant="secondary">{STATUS_LABELS[proposal.status]}</Badge>
+                                            {canEdit && <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-400 hover:text-slate-700" onClick={() => openInline("status")}><Pencil className="h-3 w-3 mr-1" />Modifica</Button>}
                                         </div>
                                     )}
                                 </div>
-                                {proposal.description && (
-                                    <div>
-                                        <span className="text-xs uppercase tracking-wide text-slate-500">Descrizione</span>
-                                        <p className="mt-0.5 whitespace-pre-wrap">{proposal.description}</p>
+                            </CardContent>
+                        </Card>
+
+                        {/* Valore Stimato — inline */}
+                        <Card>
+                            <CardContent className="py-4 px-5">
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="text-xs uppercase tracking-wide text-slate-500 shrink-0">Valore Stimato</span>
+                                    {inlineEdit === "value" ? (
+                                        <div className="flex items-center gap-2 flex-1 justify-end">
+                                            <div className="relative w-44">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                                                <Input
+                                                    type="number"
+                                                    className="pl-6 h-8 text-sm"
+                                                    value={inlineValue}
+                                                    onChange={e => setInlineValue(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === "Enter") saveInline("value"); if (e.key === "Escape") setInlineEdit(null) }}
+                                                    autoFocus
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                            <Button size="sm" className="h-8" onClick={() => saveInline("value")} disabled={inlineSaving}>
+                                                {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="h-8" onClick={() => setInlineEdit(null)}>Annulla</Button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-medium">
+                                                {proposal.estimatedValue !== null
+                                                    ? `€ ${proposal.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
+                                                    : <span className="text-slate-400 italic">Non impostato</span>}
+                                            </span>
+                                            {canEdit && <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-400 hover:text-slate-700" onClick={() => openInline("value")}><Pencil className="h-3 w-3 mr-1" />Modifica</Button>}
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Descrizione — inline */}
+                        <Card>
+                            <CardContent className="py-4 px-5 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs uppercase tracking-wide text-slate-500">Descrizione</span>
+                                    {canEdit && inlineEdit !== "description" && (
+                                        <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-400 hover:text-slate-700" onClick={() => openInline("description")}><Pencil className="h-3 w-3 mr-1" />Modifica</Button>
+                                    )}
+                                </div>
+                                {inlineEdit === "description" ? (
+                                    <div className="space-y-2">
+                                        <textarea
+                                            className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            value={inlineDesc}
+                                            onChange={e => setInlineDesc(e.target.value)}
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-2 justify-end">
+                                            <Button size="sm" variant="ghost" onClick={() => setInlineEdit(null)}>Annulla</Button>
+                                            <Button size="sm" onClick={() => saveInline("description")} disabled={inlineSaving}>
+                                                {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap min-h-[1.5rem]">
+                                        {proposal.description || <span className="text-slate-400 italic">Nessuna descrizione</span>}
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Info aggiuntive (readonly) */}
+                        <Card>
+                            <CardContent className="py-4 px-5 space-y-3 text-sm">
+                                {proposal.date && (
+                                    <div className="flex justify-between">
+                                        <span className="text-xs uppercase tracking-wide text-slate-500">Data</span>
+                                        <span className="font-medium">{format(new Date(proposal.date), "d MMMM yyyy", { locale: it })}</span>
                                     </div>
                                 )}
                                 {siteAddress && (
