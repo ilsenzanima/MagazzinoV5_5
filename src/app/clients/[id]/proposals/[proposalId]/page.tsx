@@ -260,137 +260,140 @@ export default function ProposalDetailPage() {
 
                 {/* ── INFO ─────────────────────────────────────────────── */}
                 <TabsContent value="info">
-                    <div className="max-w-2xl space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
-                        {/* Stato — inline */}
-                        <Card>
-                            <CardContent className="py-4 px-5">
-                                <div className="flex items-center justify-between gap-4">
-                                    <span className="text-xs uppercase tracking-wide text-slate-500 shrink-0">Stato</span>
-                                    {inlineEdit === "status" ? (
-                                        <div className="flex items-center gap-2 flex-1 justify-end">
-                                            <Select value={inlineStatus} onValueChange={v => setInlineStatus(v as ProposalStatus)}>
-                                                <SelectTrigger className="w-40 h-8 text-sm"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                            <Button size="sm" className="h-8" onClick={() => saveInline("status")} disabled={inlineSaving}>
-                                                {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
-                                            </Button>
-                                            <Button size="sm" variant="ghost" className="h-8" onClick={() => setInlineEdit(null)}>Annulla</Button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-3">
-                                            <Badge className={`text-xs ${STATUS_COLORS[proposal.status]}`} variant="secondary">{STATUS_LABELS[proposal.status]}</Badge>
-                                            {canEdit && <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-400 hover:text-slate-700" onClick={() => openInline("status")}><Pencil className="h-3 w-3 mr-1" />Modifica</Button>}
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {/* Colonna sinistra */}
+                        <div className="space-y-4">
 
-                        {/* Valore Stimato — inline */}
-                        <Card>
-                            <CardContent className="py-4 px-5">
-                                <div className="flex items-center justify-between gap-4">
-                                    <span className="text-xs uppercase tracking-wide text-slate-500 shrink-0">Valore Stimato</span>
-                                    {inlineEdit === "value" ? (
-                                        <div className="flex items-center gap-2 flex-1 justify-end">
-                                            <div className="relative w-44">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
-                                                <Input
-                                                    type="number"
-                                                    className="pl-6 h-8 text-sm"
-                                                    value={inlineValue}
-                                                    onChange={e => setInlineValue(e.target.value)}
-                                                    onKeyDown={e => { if (e.key === "Enter") saveInline("value"); if (e.key === "Escape") setInlineEdit(null) }}
-                                                    autoFocus
-                                                    placeholder="0.00"
-                                                />
+                            {/* Riga compatta: Stato + Valore + Data */}
+                            <Card>
+                                <CardContent className="py-3 px-4 space-y-3">
+
+                                    {/* Stato */}
+                                    <div className="flex items-center justify-between gap-2 min-h-[2rem]">
+                                        <span className="text-xs uppercase tracking-wide text-slate-500 w-24 shrink-0">Stato</span>
+                                        {inlineEdit === "status" ? (
+                                            <div className="flex items-center gap-2 flex-1 justify-end">
+                                                <Select value={inlineStatus} onValueChange={v => setInlineStatus(v as ProposalStatus)}>
+                                                    <SelectTrigger className="w-36 h-7 text-xs"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button size="sm" className="h-7 text-xs" onClick={() => saveInline("status")} disabled={inlineSaving}>
+                                                    {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setInlineEdit(null)}>✕</Button>
                                             </div>
-                                            <Button size="sm" className="h-8" onClick={() => saveInline("value")} disabled={inlineSaving}>
-                                                {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
-                                            </Button>
-                                            <Button size="sm" variant="ghost" className="h-8" onClick={() => setInlineEdit(null)}>Annulla</Button>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <Badge className={`text-xs ${STATUS_COLORS[proposal.status]}`} variant="secondary">{STATUS_LABELS[proposal.status]}</Badge>
+                                                {canEdit && <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => openInline("status")}><Pencil className="h-3 w-3" /></Button>}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="border-t dark:border-slate-700" />
+
+                                    {/* Valore Stimato */}
+                                    <div className="flex items-center justify-between gap-2 min-h-[2rem]">
+                                        <span className="text-xs uppercase tracking-wide text-slate-500 w-24 shrink-0">Valore</span>
+                                        {inlineEdit === "value" ? (
+                                            <div className="flex items-center gap-2 flex-1 justify-end">
+                                                <div className="relative w-36">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
+                                                    <Input type="number" className="pl-5 h-7 text-xs" value={inlineValue}
+                                                        onChange={e => setInlineValue(e.target.value)}
+                                                        onKeyDown={e => { if (e.key === "Enter") saveInline("value"); if (e.key === "Escape") setInlineEdit(null) }}
+                                                        autoFocus placeholder="0.00" />
+                                                </div>
+                                                <Button size="sm" className="h-7 text-xs" onClick={() => saveInline("value")} disabled={inlineSaving}>
+                                                    {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setInlineEdit(null)}>✕</Button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                                    {proposal.estimatedValue !== null
+                                                        ? `€ ${proposal.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
+                                                        : <span className="text-slate-400 font-normal italic text-xs">Non impostato</span>}
+                                                </span>
+                                                {canEdit && <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => openInline("value")}><Pencil className="h-3 w-3" /></Button>}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {proposal.date && <>
+                                        <div className="border-t dark:border-slate-700" />
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-xs uppercase tracking-wide text-slate-500 w-24 shrink-0">Data</span>
+                                            <span className="text-sm font-medium">{format(new Date(proposal.date), "d MMM yyyy", { locale: it })}</span>
+                                        </div>
+                                    </>}
+
+                                    {siteAddress && <>
+                                        <div className="border-t dark:border-slate-700" />
+                                        <div>
+                                            <span className="text-xs uppercase tracking-wide text-slate-500">Cantiere</span>
+                                            <div className="flex items-start gap-1.5 mt-1">
+                                                <MapPin className="h-3.5 w-3.5 text-slate-400 mt-0.5 shrink-0" />
+                                                <p className="text-xs text-slate-700 dark:text-slate-300">{siteAddress}</p>
+                                            </div>
+                                        </div>
+                                    </>}
+
+                                    {proposal.notes && <>
+                                        <div className="border-t dark:border-slate-700" />
+                                        <div>
+                                            <span className="text-xs uppercase tracking-wide text-slate-500">Note</span>
+                                            <p className="text-xs mt-1 whitespace-pre-wrap text-slate-600 dark:text-slate-400">{proposal.notes}</p>
+                                        </div>
+                                    </>}
+
+                                    <div className="border-t dark:border-slate-700 pt-1">
+                                        <span className="text-xs text-slate-400">Creata il {format(new Date(proposal.createdAt), "d MMM yyyy", { locale: it })}</span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Descrizione */}
+                            <Card>
+                                <CardContent className="py-3 px-4 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs uppercase tracking-wide text-slate-500">Descrizione</span>
+                                        {canEdit && inlineEdit !== "description" && (
+                                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => openInline("description")}><Pencil className="h-3 w-3" /></Button>
+                                        )}
+                                    </div>
+                                    {inlineEdit === "description" ? (
+                                        <div className="space-y-2">
+                                            <textarea
+                                                className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                value={inlineDesc}
+                                                onChange={e => setInlineDesc(e.target.value)}
+                                                autoFocus
+                                            />
+                                            <div className="flex gap-2 justify-end">
+                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setInlineEdit(null)}>Annulla</Button>
+                                                <Button size="sm" className="h-7 text-xs" onClick={() => saveInline("description")} disabled={inlineSaving}>
+                                                    {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
+                                                </Button>
+                                            </div>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-sm font-medium">
-                                                {proposal.estimatedValue !== null
-                                                    ? `€ ${proposal.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
-                                                    : <span className="text-slate-400 italic">Non impostato</span>}
-                                            </span>
-                                            {canEdit && <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-400 hover:text-slate-700" onClick={() => openInline("value")}><Pencil className="h-3 w-3 mr-1" />Modifica</Button>}
-                                        </div>
+                                        <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap min-h-[1.25rem]">
+                                            {proposal.description || <span className="text-slate-400 italic text-xs">Nessuna descrizione</span>}
+                                        </p>
                                     )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
+                        </div>
 
-                        {/* Descrizione — inline */}
-                        <Card>
-                            <CardContent className="py-4 px-5 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs uppercase tracking-wide text-slate-500">Descrizione</span>
-                                    {canEdit && inlineEdit !== "description" && (
-                                        <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-400 hover:text-slate-700" onClick={() => openInline("description")}><Pencil className="h-3 w-3 mr-1" />Modifica</Button>
-                                    )}
-                                </div>
-                                {inlineEdit === "description" ? (
-                                    <div className="space-y-2">
-                                        <textarea
-                                            className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                            value={inlineDesc}
-                                            onChange={e => setInlineDesc(e.target.value)}
-                                            autoFocus
-                                        />
-                                        <div className="flex gap-2 justify-end">
-                                            <Button size="sm" variant="ghost" onClick={() => setInlineEdit(null)}>Annulla</Button>
-                                            <Button size="sm" onClick={() => saveInline("description")} disabled={inlineSaving}>
-                                                {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap min-h-[1.5rem]">
-                                        {proposal.description || <span className="text-slate-400 italic">Nessuna descrizione</span>}
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Info aggiuntive (readonly) */}
-                        <Card>
-                            <CardContent className="py-4 px-5 space-y-3 text-sm">
-                                {proposal.date && (
-                                    <div className="flex justify-between">
-                                        <span className="text-xs uppercase tracking-wide text-slate-500">Data</span>
-                                        <span className="font-medium">{format(new Date(proposal.date), "d MMMM yyyy", { locale: it })}</span>
-                                    </div>
-                                )}
-                                {siteAddress && (
-                                    <div>
-                                        <span className="text-xs uppercase tracking-wide text-slate-500">Indirizzo Cantiere</span>
-                                        <div className="flex items-start gap-2 mt-0.5">
-                                            <MapPin className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
-                                            <p>{siteAddress}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {proposal.notes && (
-                                    <div>
-                                        <span className="text-xs uppercase tracking-wide text-slate-500">Note</span>
-                                        <p className="mt-0.5 whitespace-pre-wrap text-slate-600 dark:text-slate-400">{proposal.notes}</p>
-                                    </div>
-                                )}
-                                <div className="pt-2 border-t dark:border-slate-700">
-                                    <span className="text-xs text-slate-400">Creata il {format(new Date(proposal.createdAt), "d MMMM yyyy", { locale: it })}</span>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        {/* Distanza */}
-                        <ProposalDistanza siteAddress={siteAddress} />
+                        {/* Colonna destra: Distanza */}
+                        <div>
+                            <ProposalDistanza siteAddress={siteAddress} />
+                        </div>
                     </div>
                 </TabsContent>
 
