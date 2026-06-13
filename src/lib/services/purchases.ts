@@ -207,7 +207,18 @@ export const purchasesApi = {
         return mapDbToPurchase(data);
     },
     delete: async (id: string) => {
-        // Verifica che l'acquisto non abbia articoli già movimentati in bolle
+        // Blocca se l'acquisto è collegato a una fattura
+        const { data: purchaseData } = await supabase
+            .from('purchases')
+            .select('invoice_id, invoices(invoice_number)')
+            .eq('id', id)
+            .single();
+        if (purchaseData?.invoice_id) {
+            const invoiceNum = (purchaseData as any).invoices?.invoice_number || purchaseData.invoice_id;
+            throw new Error(`Impossibile eliminare l'acquisto: è collegato alla fattura ${invoiceNum}. Scollegarlo prima dalla fattura.`);
+        }
+
+        // Blocca se ci sono articoli già movimentati in bolle
         const { data: items } = await supabase.from('purchase_items').select('id').eq('purchase_id', id);
         const itemIds = (items || []).map((i: any) => i.id);
         if (itemIds.length > 0) {
