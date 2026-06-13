@@ -273,7 +273,7 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title="Elimina documento"
-        description={`Il documento "${docToDelete?.fileName || 'selezionato'}" verrà eliminato definitivamente e non potrà essere recuperato.`}
+        description={`Il documento "${docToDelete?.name || 'selezionato'}" verrà eliminato definitivamente e non potrà essere recuperato.`}
         onConfirm={handleDelete}
       />
     </div>
