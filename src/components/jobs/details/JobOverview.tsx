@@ -104,9 +104,9 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
     try {
       await jobsApi.delete(job.id)
       router.push('/jobs')
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete job", error)
-      notify.error("Errore durante l'eliminazione della commessa")
+      notify.error(error?.message || "Errore durante l'eliminazione della commessa")
     }
   }
 
@@ -453,7 +453,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
             <DialogDescription>
               Sei sicuro di voler eliminare la commessa <strong>{job.description}</strong>?
               <br />
-              La commessa verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni.
+              La commessa verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni. L'eliminazione è bloccata se la commessa ha movimenti o acquisti collegati.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

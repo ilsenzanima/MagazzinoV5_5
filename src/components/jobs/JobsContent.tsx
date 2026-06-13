@@ -109,14 +109,13 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     if (!jobToDelete) return;
     try {
       await jobsApi.delete(jobToDelete.id);
-      // Refresh data
       loadJobs();
       router.refresh();
       setIsDeleteDialogOpen(false);
       setJobToDelete(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete job:", error);
-      notify.error("Errore durante l'eliminazione della commessa");
+      notify.error(error?.message || "Errore durante l'eliminazione della commessa");
     }
   };
 
@@ -294,7 +293,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
             <DialogDescription>
               Sei sicuro di voler eliminare la commessa <strong>{jobToDelete?.description}</strong>?
               <br />
-              La commessa verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni.
+              La commessa verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni. L'eliminazione è bloccata se la commessa ha movimenti o acquisti collegati.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

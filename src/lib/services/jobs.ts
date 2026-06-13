@@ -269,6 +269,25 @@ export const jobsApi = {
         return mapDbToJob(data);
     },
     delete: async (id: string) => {
+        // Blocca se ci sono movimenti (delivery_notes) collegati alla commessa
+        const { count: movCount } = await supabase
+            .from('delivery_notes')
+            .select('*', { count: 'estimated', head: true })
+            .eq('job_id', id);
+        if (movCount && movCount > 0) {
+            throw new Error(`Impossibile eliminare la commessa: ha ${movCount} ${movCount === 1 ? 'movimento' : 'movimenti'} collegati. Eliminare prima i movimenti.`);
+        }
+
+        // Blocca se ci sono acquisti collegati alla commessa
+        const { count: purCount } = await supabase
+            .from('purchases')
+            .select('*', { count: 'estimated', head: true })
+            .eq('job_id', id)
+            .is('deleted_at', null);
+        if (purCount && purCount > 0) {
+            throw new Error(`Impossibile eliminare la commessa: ha ${purCount} ${purCount === 1 ? 'acquisto collegato' : 'acquisti collegati'}. Eliminare prima gli acquisti.`);
+        }
+
         const payload = await getSoftDeletePayload();
         const { error } = await supabase.from('jobs').update(payload).eq('id', id);
         if (error) throw error;
