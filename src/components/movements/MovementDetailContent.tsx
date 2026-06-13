@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import MoveItemsDialog from "@/components/movements/MoveItemsDialog";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 // jsPDF and autoTable are loaded dynamically on demand to reduce bundle size
 import { useAuth } from "@/components/auth-provider";
 interface MovementDetailContentProps {
@@ -35,6 +36,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     const router = useRouter();
 
     const [loading, setLoading] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [movement, setMovement] = useState<DeliveryNote>(initialMovement);
 
     // Inventory Selection State
@@ -135,8 +137,6 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     };
 
     const handleDelete = async () => {
-        if (!confirm("Sei sicuro di voler eliminare questo movimento? Questa azione è irreversibile.")) return;
-
         try {
             setLoading(true);
             await deliveryNotesApi.delete(initialMovement.id);
@@ -325,7 +325,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                             </Button>
                                         )
                                     )}
-                                    <Button variant="destructive" onClick={handleDelete} className="flex-1 md:flex-none px-2">
+                                    <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} className="flex-1 md:flex-none px-2">
                                         <Trash2 className="h-4 w-4 md:mr-2" />
                                         <span className="hidden md:inline">Elimina</span>
                                     </Button>
@@ -699,6 +699,15 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                 sourceType={movement.type}
                 selectedItemIds={Array.from(selectedItemIds)}
                 onSuccess={handleMoveSuccess}
+            />
+
+            <ConfirmDeleteDialog
+                open={deleteDialogOpen}
+                onOpenChange={setDeleteDialogOpen}
+                title="Elimina movimento"
+                description="Questa azione è irreversibile. Il movimento verrà eliminato definitivamente e le quantità in magazzino verranno ripristinate automaticamente."
+                loading={loading}
+                onConfirm={handleDelete}
             />
         </div>
     );
