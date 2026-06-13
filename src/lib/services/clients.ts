@@ -15,6 +15,7 @@ const mapDbToClient = (db: any): Client => {
         address: db.address,
         email: db.email,
         phone: db.phone,
+        notes: db.notes || '',
         createdAt: db.created_at
     };
 };
@@ -30,7 +31,8 @@ const mapClientToDb = (client: Partial<Client>) => ({
     // Also populate address for backward compatibility if needed
     address: client.address || `${client.street || ''} ${client.streetNumber || ''}, ${client.postalCode || ''} ${client.city || ''} ${client.province ? '(' + client.province + ')' : ''}`.trim().replace(/^,/, '').trim(),
     email: client.email,
-    phone: client.phone
+    phone: client.phone,
+    notes: (client as any).notes ?? undefined,
 });
 
 export const clientsApi = {

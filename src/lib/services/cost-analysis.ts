@@ -113,7 +113,7 @@ export const costAnalysisApi = {
             .from('job_cost_analysis_params')
             .select('*')
             .eq('job_id', jobId)
-            .single();
+            .maybeSingle();
         if (!data) return { jobId, ...DEFAULT_PARAMS };
         return {
             jobId: data.job_id,

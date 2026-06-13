@@ -92,6 +92,7 @@ export interface Client {
     address?: string;
     email: string;
     phone: string;
+    notes?: string;
     createdAt?: string;
 }
 
