@@ -680,7 +680,7 @@ export default function InvoiceDetailPage() {
             open={deleteDialogOpen}
             onOpenChange={setDeleteDialogOpen}
             title="Elimina fattura"
-            description={`La fattura ${invoice?.invoiceNumber} verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni. Le bolle rimangono collegate e il collegamento si mantiene anche dopo il ripristino.`}
+            description={`La fattura ${invoice?.invoiceNumber} verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni. Per procedere è necessario scollegare prima tutte le bolle associate.`}
             loading={deleting}
             onConfirm={handleDelete}
         />

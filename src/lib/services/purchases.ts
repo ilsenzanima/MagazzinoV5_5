@@ -230,6 +230,19 @@ export const purchasesApi = {
                 throw new Error("Impossibile eliminare l'acquisto: alcuni articoli sono già stati movimentati in bolle di uscita/vendita. Eliminare prima le bolle collegate.");
             }
         }
+
+        // Se ci sono ordini sorgente che puntano a questo acquisto, pulisce il link
+        // (gli ordini tornano allo stato "non convertito" e possono essere riconvertiti)
+        const { data: sourceOrders } = await supabase
+            .from('purchases')
+            .select('id')
+            .eq('converted_purchase_id', id)
+            .eq('order_type', 'order');
+        if (sourceOrders && sourceOrders.length > 0) {
+            const orderIds = sourceOrders.map((o: any) => o.id);
+            await supabase.from('purchases').update({ converted_purchase_id: null }).in('id', orderIds);
+        }
+
         const payload = await getSoftDeletePayload();
         const { error } = await supabase.from('purchases').update(payload).eq('id', id);
         if (error) throw error;

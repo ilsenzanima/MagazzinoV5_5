@@ -169,6 +169,15 @@ export const invoicesApi = {
     },
 
     delete: async (id: string) => {
+        // Blocca se ci sono bolle collegate — devono essere scollegate prima
+        const { count } = await supabase
+            .from('purchases')
+            .select('*', { count: 'estimated', head: true })
+            .eq('invoice_id', id)
+            .is('deleted_at', null);
+        if (count && count > 0) {
+            throw new Error(`Impossibile eliminare la fattura: ${count} ${count === 1 ? 'bolla collegata' : 'bolle collegate'}. Scollegarle prima dalla fattura.`);
+        }
         const payload = await getSoftDeletePayload();
         const { error } = await supabase.from('invoices').update(payload).eq('id', id);
         if (error) throw error;
