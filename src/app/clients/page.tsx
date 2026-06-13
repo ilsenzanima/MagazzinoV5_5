@@ -1,6 +1,5 @@
 "use client"
 
-import { notify } from "@/lib/notify";
 import { useState, useEffect, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,7 @@ import Link from "next/link";
 import { Client, clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
-import { ClientCard, ClientEditDialog, ClientDeleteDialog } from "@/components/clients";
+import { ClientCard } from "@/components/clients";
 export default function ClientsPage() {
   const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
@@ -29,12 +28,6 @@ export default function ClientsPage() {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const LIMIT = 12;
-
-  // Dialog State
-  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   useEffect(() => {
     setPage(1);
@@ -61,29 +54,6 @@ export default function ClientsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDeleteClient = async () => {
-    if (!clientToDelete) return;
-    try {
-      await clientsApi.delete(clientToDelete.id);
-      await loadClients();
-      setIsDeleteDialogOpen(false);
-      setClientToDelete(null);
-    } catch (error) {
-      console.error("Failed to delete client:", error);
-      notify.error("Errore durante l'eliminazione del committente");
-    }
-  };
-
-  const openEditDialog = (client: Client) => {
-    setClientToEdit(client);
-    setIsEditDialogOpen(true);
-  };
-
-  const openDeleteDialog = (client: Client) => {
-    setClientToDelete(client);
-    setIsDeleteDialogOpen(true);
   };
 
   const canEdit = userRole === 'admin' || userRole === 'operativo';
@@ -147,9 +117,6 @@ export default function ClientsPage() {
                 <ClientCard
                   key={client.id}
                   client={client}
-                  canEdit={canEdit}
-                  onEdit={openEditDialog}
-                  onDelete={openDeleteDialog}
                 />
               ))
             )}
@@ -182,20 +149,6 @@ export default function ClientsPage() {
         </>
       )}
 
-      {/* Dialogs */}
-      <ClientDeleteDialog
-        client={clientToDelete}
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        onConfirm={handleDeleteClient}
-      />
-
-      <ClientEditDialog
-        client={clientToEdit}
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        onSaved={loadClients}
-      />
     </DashboardLayout>
   );
 }
