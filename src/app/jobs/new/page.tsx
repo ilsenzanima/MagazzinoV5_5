@@ -58,10 +58,17 @@ function NewJobForm() {
     status: "active" as const,
     startDate: new Date().toISOString().split('T')[0], // Default to today
     endDate: "",
-    siteAddress: "",
     siteManager: "",
     cig: "",
     cup: ""
+  });
+
+  const [siteFields, setSiteFields] = useState({
+    street: "",
+    streetNumber: "",
+    postalCode: "",
+    city: "",
+    province: "",
   });
 
   useEffect(() => {
@@ -94,7 +101,6 @@ function NewJobForm() {
           clientId: job.clientId || "",
           name: job.name || "",
           description: job.description || "",
-          siteAddress: job.siteAddress || "",
           siteManager: job.siteManager || "",
           status: "active",
           startDate: "",
@@ -115,7 +121,13 @@ function NewJobForm() {
     if (useClientAddress && formData.clientId) {
       const selectedClient = clients.find(c => c.id === formData.clientId);
       if (selectedClient) {
-        setFormData(prev => ({ ...prev, siteAddress: selectedClient.address || "" }));
+        setSiteFields({
+          street: selectedClient.street || "",
+          streetNumber: selectedClient.streetNumber || "",
+          postalCode: selectedClient.postalCode || "",
+          city: selectedClient.city || "",
+          province: selectedClient.province || "",
+        });
       }
     }
   }, [useClientAddress, formData.clientId, clients]);
@@ -138,7 +150,6 @@ function NewJobForm() {
       ...prev,
       clientId,
       code: newCode || prev.code,
-      siteAddress: useClientAddress && selectedClient ? (selectedClient.address || "") : (prev.siteAddress || "")
     }));
   };
 
@@ -158,7 +169,15 @@ function NewJobForm() {
 
     try {
       setLoading(true);
-      const created = await jobsApi.create(formData);
+      const siteAddressParts = [
+        siteFields.street && `${siteFields.street}${siteFields.streetNumber ? " " + siteFields.streetNumber : ""}`,
+        (siteFields.postalCode || siteFields.city) && `${siteFields.postalCode} ${siteFields.city}`.trim(),
+        siteFields.province && `(${siteFields.province.toUpperCase()})`,
+      ].filter(Boolean);
+      const created = await jobsApi.create({
+        ...formData,
+        siteAddress: siteAddressParts.join(", "),
+      });
       router.push(`/jobs/${created.id}`);
       router.refresh();
     } catch (error) {
@@ -332,14 +351,57 @@ function NewJobForm() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="siteAddress">Indirizzo Completo</Label>
-                  <Input
-                    id="siteAddress"
-                    value={formData.siteAddress}
-                    onChange={(e) => setFormData({ ...formData, siteAddress: e.target.value })}
-                    placeholder="Via Roma 1, 00100 Milano (MI)"
-                  />
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="col-span-3 space-y-2">
+                    <Label htmlFor="siteStreet">Via / Piazza</Label>
+                    <Input
+                      id="siteStreet"
+                      value={siteFields.street}
+                      onChange={(e) => setSiteFields({ ...siteFields, street: e.target.value })}
+                      placeholder="Via Roma"
+                    />
+                  </div>
+                  <div className="col-span-1 space-y-2">
+                    <Label htmlFor="siteStreetNumber">N. Civico</Label>
+                    <Input
+                      id="siteStreetNumber"
+                      value={siteFields.streetNumber}
+                      onChange={(e) => setSiteFields({ ...siteFields, streetNumber: e.target.value })}
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="md:col-span-1 space-y-2">
+                    <Label htmlFor="sitePostalCode">CAP</Label>
+                    <Input
+                      id="sitePostalCode"
+                      value={siteFields.postalCode}
+                      onChange={(e) => setSiteFields({ ...siteFields, postalCode: e.target.value })}
+                      placeholder="00100"
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <Label htmlFor="siteCity">Città</Label>
+                    <Input
+                      id="siteCity"
+                      value={siteFields.city}
+                      onChange={(e) => setSiteFields({ ...siteFields, city: e.target.value })}
+                      placeholder="Milano"
+                    />
+                  </div>
+                  <div className="md:col-span-1 space-y-2">
+                    <Label htmlFor="siteProvince">Provincia</Label>
+                    <Input
+                      id="siteProvince"
+                      value={siteFields.province}
+                      onChange={(e) => setSiteFields({ ...siteFields, province: e.target.value.toUpperCase() })}
+                      placeholder="MI"
+                      maxLength={2}
+                      className="uppercase"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
