@@ -135,7 +135,7 @@ export const inventoryApi = {
         }
 
         // Fallback alla query standard per "Tutti" senza ricerca (più veloce se non serve join)
-        let query = supabase.from('inventory').select('*', { count: 'estimated' });
+        let query = supabase.from('inventory').select('*', { count: 'estimated' }).is('deleted_at', null);
         query = query.order('name');
         query = query.range(from, from + options.limit - 1);
 
@@ -202,8 +202,19 @@ export const inventoryApi = {
         return mapDbItemToInventoryItem(data);
     },
 
-    // Soft-delete item
+    // Soft-delete item — blocked if item still has stock or active lots
     delete: async (id: string) => {
+        const { data: item } = await supabase.from('inventory').select('quantity').eq('id', id).single();
+        if (item && (item.quantity ?? 0) > 0) {
+            throw new Error(`Impossibile eliminare: l'articolo ha ancora ${item.quantity} unità in magazzino. Azzerare prima lo stock.`);
+        }
+        const { count: batchCount } = await supabase
+            .from('purchase_batch_availability')
+            .select('*', { count: 'estimated', head: true })
+            .eq('item_id', id);
+        if (batchCount && batchCount > 0) {
+            throw new Error("Impossibile eliminare: l'articolo ha lotti con quantità residua. Movimentare o eliminare prima gli acquisti collegati.");
+        }
         const payload = await getSoftDeletePayload();
         const { error } = await supabase.from('inventory').update(payload).eq('id', id);
         if (error) throw error;
@@ -358,17 +369,16 @@ export const inventoryApi = {
                     id,
                     delivery_note_number,
                     delivery_note_date,
-                    job_id
+                    job_id,
+                    deleted_at
                 )
             `)
             .eq('item_id', itemId);
 
         if (piError) throw piError;
 
-        // Filter out direct-to-job purchases (job_id not null on purchase header)
-        // UPDATE 2026-01-28: We now INCLUDE direct purchases to allow "phantom" lots for return logic
-        // But we must handle their initial quantity as 0 in warehouse.
-        const warehousePurchases = purchaseItems; // Removed filter: .filter((pi: any) => !pi.purchases.job_id);
+        // Exclude lots from soft-deleted purchases
+        const warehousePurchases = (purchaseItems || []).filter((pi: any) => !pi.purchases.deleted_at);
 
         // For each purchase item, calculate remaining quantity
         const lotsWithRemaining = await Promise.all(warehousePurchases.map(async (pi: any) => {

@@ -324,11 +324,7 @@ export default function InventoryDetailPage() {
       router.push('/inventory');
     } catch (error: any) {
       console.error("Failed to delete item", error);
-      if (error?.code === '23503' || error?.message?.includes('foreign key constraint')) {
-        alert("Impossibile eliminare: articolo utilizzato in movimenti o acquisti.");
-      } else {
-        alert("Errore durante l'eliminazione.");
-      }
+      alert(error?.message || "Errore durante l'eliminazione.");
     } finally {
       setDeleteDialogOpen(false);
     }
@@ -1210,7 +1206,7 @@ export default function InventoryDetailPage() {
       open={deleteDialogOpen}
       onOpenChange={setDeleteDialogOpen}
       title="Elimina articolo"
-      description={`Stai per eliminare definitivamente l'articolo "${item?.name}${item?.model ? ` (${item.model})` : ''}". Questa azione non può essere annullata. Se l'articolo ha movimenti o acquisti collegati, l'eliminazione sarà bloccata.`}
+      description={`L'articolo "${item?.name}${item?.model ? ` (${item.model})` : ''}" verrà spostato nel Cestino e potrà essere ripristinato dagli admin entro 30 giorni. L'eliminazione è bloccata se l'articolo ha ancora stock o lotti attivi.`}
       onConfirm={handleDelete}
     />
     </>
