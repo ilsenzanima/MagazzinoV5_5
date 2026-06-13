@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, Calendar, User, Pencil, Trash2, CheckCircle2, Circle } from "lucide-react"
@@ -23,6 +24,8 @@ export function JobJournal({ jobId }: JobJournalProps) {
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingLog, setEditingLog] = useState<JobLog | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [logToDelete, setLogToDelete] = useState<string | null>(null)
 
   const [newLog, setNewLog] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -73,10 +76,12 @@ export function JobJournal({ jobId }: JobJournalProps) {
     }
   }
 
-  const handleDelete = async (logId: string) => {
-    if (!confirm("Sicuro di voler eliminare questa annotazione?")) return
+  const handleDelete = async () => {
+    if (!logToDelete) return
     try {
-      await jobLogsApi.delete(logId)
+      await jobLogsApi.delete(logToDelete)
+      setDeleteDialogOpen(false)
+      setLogToDelete(null)
       loadLogs()
     } catch (error) {
       console.error("Failed to delete log", error)
@@ -140,7 +145,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
         ) : (
           <div className="space-y-4">
             {incompleteLogs.map((log) => (
-              <LogCard key={log.id} log={log} canEdit={canEdit} onEdit={openEdit} onDelete={handleDelete} onToggle={handleToggleCompleted} />
+              <LogCard key={log.id} log={log} canEdit={canEdit} onEdit={openEdit} onDelete={(id) => { setLogToDelete(id); setDeleteDialogOpen(true); }} onToggle={handleToggleCompleted} />
             ))}
 
             {completedLogs.length > 0 && (
@@ -153,7 +158,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
                   </div>
                 )}
                 {completedLogs.map((log) => (
-                  <LogCard key={log.id} log={log} canEdit={canEdit} onEdit={openEdit} onDelete={handleDelete} onToggle={handleToggleCompleted} />
+                  <LogCard key={log.id} log={log} canEdit={canEdit} onEdit={openEdit} onDelete={(id) => { setLogToDelete(id); setDeleteDialogOpen(true); }} onToggle={handleToggleCompleted} />
                 ))}
               </>
             )}
@@ -215,6 +220,14 @@ export function JobJournal({ jobId }: JobJournalProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Elimina annotazione"
+        description="L'annotazione verrà eliminata definitivamente e non potrà essere recuperata."
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

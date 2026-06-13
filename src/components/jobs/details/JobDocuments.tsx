@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 
 interface JobDocumentsProps {
   jobId: string
@@ -30,6 +31,8 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
   const [documents, setDocuments] = useState<JobDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [docToDelete, setDocToDelete] = useState<JobDocument | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [fileToUpload, setFileToUpload] = useState<File | null>(null)
   const [uploadCategory, setUploadCategory] = useState("project")
@@ -114,22 +117,15 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     }
   };
 
-  const handleDelete = async (doc: JobDocument) => {
-    if (!confirm("Sei sicuro di voler eliminare questo documento?")) return
+  const handleDelete = async () => {
+    if (!docToDelete) return
 
     try {
-      // Note: We are only deleting the record from DB for now. 
-      // Ideally we should also delete from Storage, but we need the path.
-      // The publicUrl might contain the path.
-
-      await jobDocumentsApi.delete(doc.id)
-
-      // Try to delete from storage if possible (optional for now)
-      // const path = doc.fileUrl.split('/documents/')[1]
-      // if (path) await supabase.storage.from('documents').remove([path])
-
+      await jobDocumentsApi.delete(docToDelete.id)
+      setDeleteDialogOpen(false)
+      setDocToDelete(null)
       toast.success("Documento eliminato")
-      setDocuments(documents.filter(d => d.id !== doc.id))
+      setDocuments(documents.filter(d => d.id !== docToDelete.id))
     } catch (error) {
       console.error("Delete failed", error)
       toast.error("Errore durante l'eliminazione")
@@ -249,7 +245,7 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenDocument(doc.fileUrl)}>
                         <Download className="h-3 w-3 text-slate-500" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(doc)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setDocToDelete(doc); setDeleteDialogOpen(true); }}>
                         <Trash2 className="h-3 w-3 text-red-500" />
                       </Button>
                     </div>
@@ -272,6 +268,14 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
           ))}
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Elimina documento"
+        description={`Il documento "${docToDelete?.fileName || 'selezionato'}" verrà eliminato definitivamente e non potrà essere recuperato.`}
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

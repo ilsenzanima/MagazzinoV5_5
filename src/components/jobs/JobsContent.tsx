@@ -294,7 +294,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
             <DialogDescription>
               Sei sicuro di voler eliminare la commessa <strong>{jobToDelete?.description}</strong>?
               <br />
-              Questa azione è irreversibile e potrebbe eliminare i dati associati (movimenti, logs, ecc.).
+              La commessa verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

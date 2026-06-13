@@ -453,7 +453,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
             <DialogDescription>
               Sei sicuro di voler eliminare la commessa <strong>{job.description}</strong>?
               <br />
-              Questa azione è irreversibile e cancellerà tutti i dati associati.
+              La commessa verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
