@@ -131,7 +131,6 @@ interface SectionState {
 
 export default function CestinoPage() {
   const { userRole } = useAuth();
-  const router = useRouter();
 
   const [sections, setSections] = useState<Record<SectionKey, SectionState>>(() => ({
     purchases: { items: [], loading: false },
