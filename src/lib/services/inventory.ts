@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { InventoryItem, InventorySupplierCode, Brand, ItemType, Unit } from '@/lib/types';
-import { fetchWithTimeout } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 
 // Mappers
 export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
@@ -96,6 +96,7 @@ export const inventoryApi = {
             supabase
                 .from('inventory')
                 .select('*')
+                .is('deleted_at', null)
                 .order('created_at', { ascending: false })
         );
 
@@ -201,14 +202,33 @@ export const inventoryApi = {
         return mapDbItemToInventoryItem(data);
     },
 
-    // Delete item
+    // Soft-delete item
     delete: async (id: string) => {
+        const payload = await getSoftDeletePayload();
+        const { error } = await supabase.from('inventory').update(payload).eq('id', id);
+        if (error) throw error;
+    },
+
+    restore: async (id: string) => {
         const { error } = await supabase
             .from('inventory')
-            .delete()
+            .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
             .eq('id', id);
-
         if (error) throw error;
+    },
+
+    getDeleted: async () => {
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('*')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            ...mapDbItemToInventoryItem(d),
+            deletedAt: d.deleted_at as string,
+            deletedByName: d.deleted_by_name as string | null,
+        }));
     },
 
     // Upload image to Storage

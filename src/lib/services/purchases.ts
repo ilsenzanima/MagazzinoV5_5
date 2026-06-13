@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Purchase, PurchaseItem } from '@/lib/types';
-import { fetchWithTimeout } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 
 export const mapDbToPurchase = (db: any): Purchase => ({
     id: db.id,
@@ -66,6 +66,7 @@ export const purchasesApi = {
             supabase
                 .from('purchases')
                 .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model))')
+                .is('deleted_at', null)
                 .order('delivery_note_date', { ascending: false })
         );
         if (error) throw error;
@@ -78,7 +79,8 @@ export const purchasesApi = {
         let query = supabase
             .from('purchases')
             .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model)), invoices(invoice_number), converted_purchase:converted_purchase_id(delivery_note_number)', { count: 'estimated' })
-            .eq('order_type', orderType);
+            .eq('order_type', orderType)
+            .is('deleted_at', null);
 
         if (supplierId) {
             query = query.eq('supplier_id', supplierId);
@@ -147,6 +149,7 @@ export const purchasesApi = {
                 .from('purchases')
                 .select('*, suppliers(name), purchase_items(price, quantity), profiles(full_name)')
                 .eq('job_id', jobId)
+                .is('deleted_at', null)
                 .order('delivery_note_date', { ascending: false })
         );
         if (error) throw error;
@@ -204,8 +207,43 @@ export const purchasesApi = {
         return mapDbToPurchase(data);
     },
     delete: async (id: string) => {
-        const { error } = await supabase.from('purchases').delete().eq('id', id);
+        // Verifica che l'acquisto non abbia articoli già movimentati in bolle
+        const { data: items } = await supabase.from('purchase_items').select('id').eq('purchase_id', id);
+        const itemIds = (items || []).map((i: any) => i.id);
+        if (itemIds.length > 0) {
+            const { count } = await supabase
+                .from('delivery_note_items')
+                .select('id', { count: 'estimated', head: true })
+                .in('purchase_item_id', itemIds);
+            if (count && count > 0) {
+                throw new Error("Impossibile eliminare l'acquisto: alcuni articoli sono già stati movimentati in bolle di uscita/vendita. Eliminare prima le bolle collegate.");
+            }
+        }
+        const payload = await getSoftDeletePayload();
+        const { error } = await supabase.from('purchases').update(payload).eq('id', id);
         if (error) throw error;
+    },
+
+    restore: async (id: string) => {
+        const { error } = await supabase
+            .from('purchases')
+            .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    getDeleted: async () => {
+        const { data, error } = await supabase
+            .from('purchases')
+            .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model))')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            ...mapDbToPurchase(d),
+            deletedAt: d.deleted_at as string,
+            deletedByName: d.deleted_by_name as string | null,
+        }));
     },
     // Get batch availability for a specific purchase (all items)
     getPurchaseBatchAvailability: async (purchaseId: string) => {

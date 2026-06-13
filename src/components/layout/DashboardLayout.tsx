@@ -21,7 +21,8 @@ import {
   HardHat,
   Calendar,
   Scissors,
-  Receipt
+  Receipt,
+  Trash2
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -117,6 +118,16 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
         },
       ]
     },
+    ...(userRole === 'admin' ? [{
+      items: [
+        {
+          label: "Cestino",
+          icon: Trash2,
+          href: "/cestino",
+          active: pathname === "/cestino",
+        },
+      ]
+    }] : []),
   ];
 
   return (

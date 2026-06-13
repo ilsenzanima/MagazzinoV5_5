@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { LoadNote, LoadNoteItem } from "@/lib/types";
+import { getSoftDeletePayload } from './utils';
 
 export interface LoadNoteInput {
     date: string;
@@ -268,15 +269,48 @@ export const loadNotesService = {
     },
 
     delete: async (id: string): Promise<void> => {
+        const payload = await getSoftDeletePayload();
         const { error } = await supabase
             .from('load_notes')
-            .delete()
+            .update(payload)
             .eq('id', id);
 
         if (error) {
-            console.error('Error deleting load note:', error);
+            console.error('Error soft-deleting load note:', error);
             throw error;
         }
+    },
+
+    restore: async (id: string): Promise<void> => {
+        const { error } = await supabase
+            .from('load_notes')
+            .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    getDeleted: async (): Promise<Array<LoadNote & { deletedAt: string; deletedByName: string | null }>> => {
+        const { data, error } = await supabase
+            .from('load_notes')
+            .select('*, jobs(code, description)')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((n: any) => ({
+            id: n.id,
+            date: n.date,
+            noteType: n.note_type,
+            jobId: n.job_id,
+            jobCode: n.jobs?.code,
+            jobDescription: n.jobs?.description,
+            notes: n.notes,
+            status: n.status,
+            items: [],
+            createdBy: n.created_by,
+            createdAt: n.created_at,
+            deletedAt: n.deleted_at as string,
+            deletedByName: n.deleted_by_name as string | null,
+        }));
     },
 
     toggleStatus: async (id: string, currentStatus: string): Promise<LoadNote> => {

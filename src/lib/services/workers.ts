@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Worker } from '@/lib/types';
-import { fetchWithTimeout } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 
 export const mapDbToWorker = (db: any): Worker => ({
     id: db.id,
@@ -38,6 +38,7 @@ export const workersApi = {
             supabase
                 .from('workers')
                 .select('*')
+                .is('deleted_at', null)
                 .order('last_name', { ascending: true })
         );
         if (error) throw error;
@@ -77,10 +78,30 @@ export const workersApi = {
     },
 
     delete: async (id: string) => {
+        const payload = await getSoftDeletePayload();
+        const { error } = await supabase.from('workers').update(payload).eq('id', id);
+        if (error) throw error;
+    },
+
+    restore: async (id: string) => {
         const { error } = await supabase
             .from('workers')
-            .delete()
+            .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
             .eq('id', id);
         if (error) throw error;
-    }
+    },
+
+    getDeleted: async () => {
+        const { data, error } = await supabase
+            .from('workers')
+            .select('*')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            ...mapDbToWorker(d),
+            deletedAt: d.deleted_at as string,
+            deletedByName: d.deleted_by_name as string | null,
+        }));
+    },
 };

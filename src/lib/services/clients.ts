@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Client } from '@/lib/types';
-import { fetchWithTimeout } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 
 const mapDbToClient = (db: any): Client => {
     return {
@@ -39,6 +39,7 @@ export const clientsApi = {
             supabase
                 .from('clients')
                 .select('*')
+                .is('deleted_at', null)
                 .order('name')
         );
         if (error) throw error;
@@ -46,7 +47,7 @@ export const clientsApi = {
     },
 
     getPaginated: async (options: { page: number; limit: number; search?: string }) => {
-        let query = supabase.from('clients').select('*', { count: 'estimated' });
+        let query = supabase.from('clients').select('*', { count: 'estimated' }).is('deleted_at', null);
 
         // Multi-word fuzzy search
         if (options.search) {
@@ -94,35 +95,30 @@ export const clientsApi = {
         return mapDbToClient(data);
     },
     delete: async (id: string) => {
-        // Note: jobsApi.delete cascade logic was in api.ts. 
-        // Ideally we should handle this via DB constraints or keep the logic here.
-        // In api.ts it imported jobsApi and iterated. 
-        // Here we might just delete and let DB fail if constraint, or we need to import jobsApi from jobs.ts 
-        // BUT circular check. If jobs.ts imports clientsApi? 
-        // jobsApi doesn't import clientsApi in api.ts, it queries `clients` table.
-        // So safe to import jobsApi here?
-        // Let's rely on DB cascade if possible or manual delete.
-        // api.ts manual logic:
-        const { data: jobs } = await supabase.from('jobs').select('id').eq('client_id', id);
-        if (jobs && jobs.length > 0) {
-            // We can't easily import jobsApi without circular dependency if jobsApi imports clientsApi.
-            // But jobsApi does NOT import clientsApi. So we can import it.
-            // However, to be safe, I will implement a simplified delete or use direct DB delete if cascade is configured.
-            // The original code manually deleted jobs. 
-            // I'll assume for now we can just delete from clients and if it fails user sees error.
-            // OR I re-implement the loop manually using supabase here without importing jobsApi methods to avoid circular deps.
-
-            // Manual delete of jobs (and their dependencies!) is complex.
-            // Better to suggest enabling Cascade Delete on DB.
-            // But adhering to original logic:
-            for (const job of jobs) {
-                // We'd need to duplicate jobsApi.delete logic or import it.
-                // I'll just delete the job and hope cascading is fine or implement imports later.
-                // For refactoring safety: import { jobsApi } from './jobs' is SAFE if jobs.ts doesn't import clients.ts.
-            }
-        }
-
-        const { error } = await supabase.from('clients').delete().eq('id', id);
+        const payload = await getSoftDeletePayload();
+        const { error } = await supabase.from('clients').update(payload).eq('id', id);
         if (error) throw error;
-    }
+    },
+
+    restore: async (id: string) => {
+        const { error } = await supabase
+            .from('clients')
+            .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    getDeleted: async () => {
+        const { data, error } = await supabase
+            .from('clients')
+            .select('*')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            ...mapDbToClient(d),
+            deletedAt: d.deleted_at as string,
+            deletedByName: d.deleted_by_name as string | null,
+        }));
+    },
 };

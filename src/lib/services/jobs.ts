@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Job, JobLog, JobDocument, Site } from '@/lib/types';
-import { fetchWithTimeout } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 
 // Mappers
 export const mapDbToJob = (db: any): Job => ({
@@ -117,7 +117,8 @@ export const jobsApi = {
             supabase
                 .from('jobs')
                 .select('*, clients(*)')
-                .order('status', { ascending: true })  // 'active' comes before 'completed'
+                .is('deleted_at', null)
+                .order('status', { ascending: true })
                 .order('created_at', { ascending: false })
         );
         if (error) throw error;
@@ -129,7 +130,8 @@ export const jobsApi = {
 
         let query = supabase
             .from('jobs')
-            .select('*, clients!inner(name)', { count: 'estimated' });
+            .select('*, clients!inner(name)', { count: 'estimated' })
+            .is('deleted_at', null);
 
         if (clientId) {
             query = query.eq('client_id', clientId);
@@ -196,7 +198,8 @@ export const jobsApi = {
                     .from('jobs')
                     .select('*, clients(name, address, street, street_number, postal_code, city, province)')
                     .eq('client_id', clientId)
-                    .order('status', { ascending: true })  // 'active' comes before 'completed'
+                    .is('deleted_at', null)
+                    .order('status', { ascending: true })
                     .order('created_at', { ascending: false })
             );
 
@@ -266,25 +269,31 @@ export const jobsApi = {
         return mapDbToJob(data);
     },
     delete: async (id: string) => {
-        await supabase.from('job_logs').delete().eq('job_id', id);
-        await supabase.from('job_documents').delete().eq('job_id', id);
-        await supabase.from('sites').delete().eq('job_id', id);
-        await supabase.from('job_inventory').delete().eq('job_id', id);
-
-        const { data: notes } = await supabase.from('delivery_notes').select('id').eq('job_id', id);
-
-        if (notes && notes.length > 0) {
-            const noteIds = notes.map(n => n.id);
-            await supabase.from('delivery_note_items').delete().in('delivery_note_id', noteIds);
-        }
-
-        await supabase.from('movements').delete().eq('job_id', id);
-        await supabase.from('delivery_notes').delete().eq('job_id', id);
-        await supabase.from('purchases').update({ job_id: null }).eq('job_id', id);
-        await supabase.from('purchase_items').update({ job_id: null }).eq('job_id', id);
-
-        const { error } = await supabase.from('jobs').delete().eq('id', id);
+        const payload = await getSoftDeletePayload();
+        const { error } = await supabase.from('jobs').update(payload).eq('id', id);
         if (error) throw error;
+    },
+
+    restore: async (id: string) => {
+        const { error } = await supabase
+            .from('jobs')
+            .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    getDeleted: async () => {
+        const { data, error } = await supabase
+            .from('jobs')
+            .select('*, clients(name)')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            ...mapDbToJob(d),
+            deletedAt: d.deleted_at as string,
+            deletedByName: d.deleted_by_name as string | null,
+        }));
     },
     getCost: async (id: string) => {
         const { data, error } = await supabase

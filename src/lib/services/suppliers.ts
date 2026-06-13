@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Supplier } from '@/lib/types';
-import { fetchWithTimeout } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 
 export const mapDbToSupplier = (db: any): Supplier => ({
     id: db.id,
@@ -26,13 +26,14 @@ export const suppliersApi = {
             supabase
                 .from('suppliers')
                 .select('*')
+                .is('deleted_at', null)
                 .order('name')
         );
         if (error) throw error;
         return data.map(mapDbToSupplier);
     },
     getPaginated: async ({ page = 1, limit = 10, search = '' }) => {
-        let query = supabase.from('suppliers').select('*', { count: 'estimated' });
+        let query = supabase.from('suppliers').select('*', { count: 'estimated' }).is('deleted_at', null);
 
         if (search) {
             query = query.ilike('name', `%${search}%`);
@@ -78,7 +79,30 @@ export const suppliersApi = {
         return mapDbToSupplier(data);
     },
     delete: async (id: string) => {
-        const { error } = await supabase.from('suppliers').delete().eq('id', id);
+        const payload = await getSoftDeletePayload();
+        const { error } = await supabase.from('suppliers').update(payload).eq('id', id);
         if (error) throw error;
-    }
+    },
+
+    restore: async (id: string) => {
+        const { error } = await supabase
+            .from('suppliers')
+            .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    getDeleted: async () => {
+        const { data, error } = await supabase
+            .from('suppliers')
+            .select('*')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            ...mapDbToSupplier(d),
+            deletedAt: d.deleted_at as string,
+            deletedByName: d.deleted_by_name as string | null,
+        }));
+    },
 };

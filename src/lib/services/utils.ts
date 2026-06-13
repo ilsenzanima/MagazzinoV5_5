@@ -1,3 +1,16 @@
+import { supabase } from '@/lib/supabase';
+
+export async function getSoftDeletePayload() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Utente non autenticato');
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+    return {
+        deleted_at: new Date().toISOString(),
+        deleted_by: user.id,
+        deleted_by_name: profile?.full_name || user.email || 'Utente sconosciuto',
+    };
+}
+
 export function fetchWithTimeout<T>(promise: PromiseLike<T>, ms: number = 30000): Promise<T> {
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {

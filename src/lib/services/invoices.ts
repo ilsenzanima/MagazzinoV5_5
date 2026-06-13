@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
-import { fetchWithTimeout } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 
 const mapDbToInvoice = (db: any): Invoice => ({
     id: db.id,
@@ -52,6 +52,7 @@ export const invoicesApi = {
                 '*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity))',
                 { count: 'estimated' }
             )
+            .is('deleted_at', null)
             .order('invoice_date', { ascending: false })
             .range(from, to);
 
@@ -142,6 +143,7 @@ export const invoicesApi = {
                 .eq('supplier_id', supplierId)
                 .eq('order_type', 'purchase')
                 .is('invoice_id', null)
+                .is('deleted_at', null)
                 .order('delivery_note_date', { ascending: false })
         );
         if (error) throw error;
@@ -167,9 +169,30 @@ export const invoicesApi = {
     },
 
     delete: async (id: string) => {
-        // Unlink all purchases first
-        await supabase.from('purchases').update({ invoice_id: null }).eq('invoice_id', id);
-        const { error } = await supabase.from('invoices').delete().eq('id', id);
+        const payload = await getSoftDeletePayload();
+        const { error } = await supabase.from('invoices').update(payload).eq('id', id);
         if (error) throw error;
+    },
+
+    restore: async (id: string) => {
+        const { error } = await supabase
+            .from('invoices')
+            .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    getDeleted: async () => {
+        const { data, error } = await supabase
+            .from('invoices')
+            .select('*, suppliers(name)')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            ...mapDbToInvoice(d),
+            deletedAt: d.deleted_at as string,
+            deletedByName: d.deleted_by_name as string | null,
+        }));
     },
 };
