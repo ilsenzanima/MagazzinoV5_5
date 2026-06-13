@@ -976,26 +976,24 @@ export default function PurchaseDetailPage() {
                                                             <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500" onClick={cancelEdit}>
                                                                 X
                                                             </Button>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
                                                         </div>
                                                     ) : (
                                                         (userRole === 'admin' || userRole === 'operativo') && (
-                                                            <div className="flex justify-end gap-1">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => startEditing(item)}
-                                                                >
-                                                                    Modifica
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}
-                                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => startEditing(item)}
+                                                            >
+                                                                Modifica
+                                                            </Button>
                                                         )
                                                     )}
                                                 </TableCell>
@@ -1074,16 +1072,14 @@ export default function PurchaseDetailPage() {
                                                             <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-500" onClick={cancelEdit}>
                                                                 <X className="h-3.5 w-3.5" />
                                                             </Button>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" onClick={() => startEditing(item)}>
-                                                                <Edit className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}>
+                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}>
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </>
+                                                    ) : (
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" onClick={() => startEditing(item)}>
+                                                            <Edit className="h-3.5 w-3.5" />
+                                                        </Button>
                                                     )}
                                                 </div>
                                             )}
@@ -1608,7 +1604,7 @@ export default function PurchaseDetailPage() {
             open={deleteItemDialogOpen}
             onOpenChange={setDeleteItemDialogOpen}
             title="Elimina riga"
-            description="Sei sicuro di voler eliminare questa riga dall'acquisto?"
+            description="Eliminare questa riga è un'azione definitiva e non può essere annullata. Procedere solo se la riga è stata inserita per errore."
             onConfirm={handleDeleteItem}
         />
         </>

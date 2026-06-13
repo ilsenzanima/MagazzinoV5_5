@@ -207,6 +207,16 @@ export const purchasesApi = {
         return mapDbToPurchase(data);
     },
     delete: async (id: string) => {
+        // Blocca se è un ordine già convertito in acquisto (storicità da preservare)
+        const { data: orderData } = await supabase
+            .from('purchases')
+            .select('order_type, converted_purchase_id')
+            .eq('id', id)
+            .single();
+        if (orderData?.order_type === 'order' && orderData?.converted_purchase_id) {
+            throw new Error("Impossibile eliminare l'ordine: è già stato convertito in un acquisto. La storicità deve essere preservata.");
+        }
+
         // Blocca se l'acquisto è collegato a una fattura
         const { data: purchaseData } = await supabase
             .from('purchases')
