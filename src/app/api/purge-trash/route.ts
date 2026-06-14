@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
@@ -12,7 +12,7 @@ function extractStoragePaths(urls: (string | null | undefined)[]): string[] {
         .filter(Boolean) as string[]
 }
 
-async function deleteStorageFiles(admin: ReturnType<typeof createClient>, paths: string[]) {
+async function deleteStorageFiles(admin: SupabaseClient, paths: string[]) {
     if (!paths.length) return
     for (let i = 0; i < paths.length; i += 200) {
         await admin.storage.from('documents').remove(paths.slice(i, i + 200))
