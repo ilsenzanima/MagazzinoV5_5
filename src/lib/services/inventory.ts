@@ -370,15 +370,18 @@ export const inventoryApi = {
                     delivery_note_number,
                     delivery_note_date,
                     job_id,
-                    deleted_at
+                    deleted_at,
+                    order_type
                 )
             `)
             .eq('item_id', itemId);
 
         if (piError) throw piError;
 
-        // Exclude lots from soft-deleted purchases
-        const warehousePurchases = (purchaseItems || []).filter((pi: any) => !pi.purchases.deleted_at);
+        // Exclude lots from soft-deleted purchases and from orders (not yet received)
+        const warehousePurchases = (purchaseItems || []).filter((pi: any) =>
+            !pi.purchases.deleted_at && pi.purchases.order_type !== 'order'
+        );
 
         // For each purchase item, calculate remaining quantity
         const lotsWithRemaining = await Promise.all(warehousePurchases.map(async (pi: any) => {
