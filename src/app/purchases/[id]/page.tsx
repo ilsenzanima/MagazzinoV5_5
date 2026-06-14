@@ -1595,7 +1595,7 @@ export default function PurchaseDetailPage() {
             open={deleteDialogOpen}
             onOpenChange={setDeleteDialogOpen}
             title={`Elimina ${purchase?.orderType === 'order' ? 'ordine' : 'acquisto'}`}
-            description={`${purchase?.orderType === 'order' ? "L'ordine" : "L'acquisto"} ${purchase?.deliveryNoteNumber} verrà spostato nel Cestino e potrà essere ripristinato dagli admin entro 30 giorni. L'eliminazione è bloccata se ci sono bolle collegate o se l'acquisto è agganciato a una fattura.`}
+            description={`${purchase?.orderType === 'order' ? "L'ordine" : "L'acquisto"} ${purchase?.deliveryNoteNumber} verrà spostato nel Cestino e potrà essere ripristinato dagli admin entro 30 giorni. L'eliminazione è bloccata se: è agganciato a una fattura, è collegato a una commessa, o ha articoli già movimentati in bolle.`}
             loading={deleting}
             onConfirm={handleDeletePurchase}
         />

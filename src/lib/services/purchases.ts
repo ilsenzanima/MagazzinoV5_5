@@ -217,15 +217,19 @@ export const purchasesApi = {
             throw new Error("Impossibile eliminare l'ordine: è già stato convertito in un acquisto. La storicità deve essere preservata.");
         }
 
-        // Blocca se l'acquisto è collegato a una fattura
+        // Blocca se l'acquisto è collegato a una fattura o a una commessa
         const { data: purchaseData } = await supabase
             .from('purchases')
-            .select('invoice_id, invoices(invoice_number)')
+            .select('invoice_id, job_id, invoices(invoice_number), jobs(code)')
             .eq('id', id)
             .single();
         if (purchaseData?.invoice_id) {
             const invoiceNum = (purchaseData as any).invoices?.invoice_number || purchaseData.invoice_id;
             throw new Error(`Impossibile eliminare l'acquisto: è collegato alla fattura ${invoiceNum}. Scollegarlo prima dalla fattura.`);
+        }
+        if (purchaseData?.job_id) {
+            const jobCode = (purchaseData as any).jobs?.code || purchaseData.job_id;
+            throw new Error(`Impossibile eliminare l'acquisto: è collegato alla commessa ${jobCode}. Rimuovere prima il collegamento alla commessa.`);
         }
 
         // Blocca se ci sono articoli già movimentati in bolle
