@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
 
     const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } })
 
-    // Usa service role per bypassare RLS sulla tabella users/profiles
-    const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single()
+    // Usa service role per bypassare RLS sulla tabella profiles
+    const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') return NextResponse.json({ error: 'Solo gli admin possono eliminare definitivamente' }, { status: 403 })
 
     const { section, id } = await req.json()
