@@ -110,8 +110,12 @@ function ItemPriceRow({
                                 onBlur={handlePriceBlur}
                                 className="h-7 text-right px-1 text-xs w-24"
                                 placeholder="0.00000"
+                                title="Prezzo unitario. In alternativa inserisci il Totale Riga nel campo accanto."
                             />
                         </div>
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight whitespace-nowrap">
+                            Oppure usa Totale Riga →
+                        </p>
                     </td>
                     <td className="py-1 w-32 pl-2">
                         <div className="flex items-center gap-1">
