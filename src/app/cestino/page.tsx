@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Trash2, RotateCcw, Loader2, ShoppingCart, Receipt, ClipboardList,
-  Users, Building2, Package, Briefcase, HardHat, Info, ShieldAlert
+  Users, Building2, Package, Briefcase, HardHat, Info, ShieldAlert, X
 } from "lucide-react";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { purchasesApi } from "@/lib/services/purchases";
@@ -44,11 +45,14 @@ interface TrashTableProps {
   items: TrashItem[];
   loading: boolean;
   onRestore: (id: string) => Promise<void>;
+  onHardDelete: (id: string) => Promise<void>;
   emptyMessage: string;
 }
 
-function TrashTable({ items, loading, onRestore, emptyMessage }: TrashTableProps) {
+function TrashTable({ items, loading, onRestore, onHardDelete, emptyMessage }: TrashTableProps) {
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [hardDeleting, setHardDeleting] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const handleRestore = async (id: string) => {
     setRestoring(id);
@@ -56,6 +60,17 @@ function TrashTable({ items, loading, onRestore, emptyMessage }: TrashTableProps
       await onRestore(id);
     } finally {
       setRestoring(null);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!confirmId) return;
+    setHardDeleting(confirmId);
+    setConfirmId(null);
+    try {
+      await onHardDelete(confirmId);
+    } finally {
+      setHardDeleting(null);
     }
   };
 
@@ -101,23 +116,48 @@ function TrashTable({ items, loading, onRestore, emptyMessage }: TrashTableProps
                 </Badge>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleRestore(item.id)}
-              disabled={restoring === item.id}
-              className="shrink-0 gap-1.5"
-            >
-              {restoring === item.id ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RotateCcw className="h-3.5 w-3.5" />
-              )}
-              Ripristina
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRestore(item.id)}
+                disabled={restoring === item.id || hardDeleting === item.id}
+                className="gap-1.5"
+              >
+                {restoring === item.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-3.5 w-3.5" />
+                )}
+                Ripristina
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmId(item.id)}
+                disabled={restoring === item.id || hardDeleting === item.id}
+                className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+              >
+                {hardDeleting === item.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <X className="h-3.5 w-3.5" />
+                )}
+                Elimina
+              </Button>
+            </div>
           </div>
         );
       })}
+
+      <ConfirmDeleteDialog
+        open={!!confirmId}
+        onOpenChange={(open) => { if (!open) setConfirmId(null); }}
+        title="Elimina definitivamente"
+        description={`Questo elemento verrà eliminato in modo permanente e non potrà essere ripristinato. I file allegati verranno rimossi dallo storage. Azione irreversibile.`}
+        loading={!!hardDeleting}
+        onConfirm={handleHardDelete}
+      />
     </div>
   );
 }
@@ -263,6 +303,20 @@ export default function CestinoPage() {
       await loadSection(key);
     };
 
+  const makeHardDeleter = (key: SectionKey) =>
+    async (id: string) => {
+      const res = await fetch('/api/hard-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section: key, id }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Errore durante l\'eliminazione definitiva');
+      }
+      await loadSection(key);
+    };
+
   if (userRole !== "admin") {
     return (
       <DashboardLayout>
@@ -337,6 +391,7 @@ export default function CestinoPage() {
               items={sections.purchases.items}
               loading={sections.purchases.loading}
               onRestore={makeRestorer("purchases", purchasesApi.restore)}
+              onHardDelete={makeHardDeleter("purchases")}
               emptyMessage="Nessun acquisto nel cestino"
             />
           </TabsContent>
@@ -346,6 +401,7 @@ export default function CestinoPage() {
               items={sections.invoices.items}
               loading={sections.invoices.loading}
               onRestore={makeRestorer("invoices", invoicesApi.restore)}
+              onHardDelete={makeHardDeleter("invoices")}
               emptyMessage="Nessuna fattura nel cestino"
             />
           </TabsContent>
@@ -355,6 +411,7 @@ export default function CestinoPage() {
               items={sections["load-notes"].items}
               loading={sections["load-notes"].loading}
               onRestore={makeRestorer("load-notes", loadNotesService.restore)}
+              onHardDelete={makeHardDeleter("load-notes")}
               emptyMessage="Nessuna nota di carico nel cestino"
             />
           </TabsContent>
@@ -364,6 +421,7 @@ export default function CestinoPage() {
               items={sections.clients.items}
               loading={sections.clients.loading}
               onRestore={makeRestorer("clients", clientsApi.restore)}
+              onHardDelete={makeHardDeleter("clients")}
               emptyMessage="Nessun cliente nel cestino"
             />
           </TabsContent>
@@ -373,6 +431,7 @@ export default function CestinoPage() {
               items={sections.suppliers.items}
               loading={sections.suppliers.loading}
               onRestore={makeRestorer("suppliers", suppliersApi.restore)}
+              onHardDelete={makeHardDeleter("suppliers")}
               emptyMessage="Nessun fornitore nel cestino"
             />
           </TabsContent>
@@ -382,6 +441,7 @@ export default function CestinoPage() {
               items={sections.inventory.items}
               loading={sections.inventory.loading}
               onRestore={makeRestorer("inventory", inventoryApi.restore)}
+              onHardDelete={makeHardDeleter("inventory")}
               emptyMessage="Nessun articolo nel cestino"
             />
           </TabsContent>
@@ -391,6 +451,7 @@ export default function CestinoPage() {
               items={sections.jobs.items}
               loading={sections.jobs.loading}
               onRestore={makeRestorer("jobs", jobsApi.restore)}
+              onHardDelete={makeHardDeleter("jobs")}
               emptyMessage="Nessuna commessa nel cestino"
             />
           </TabsContent>
@@ -400,6 +461,7 @@ export default function CestinoPage() {
               items={sections.workers.items}
               loading={sections.workers.loading}
               onRestore={makeRestorer("workers", workersApi.restore)}
+              onHardDelete={makeHardDeleter("workers")}
               emptyMessage="Nessun operaio nel cestino"
             />
           </TabsContent>
