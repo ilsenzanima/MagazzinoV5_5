@@ -874,6 +874,7 @@ export default function PurchaseDetailPage() {
                                                                 className="w-24 ml-auto text-right h-8"
                                                                 value={editValues.price}
                                                                 step="0.00001"
+                                                                title="Inserisci il prezzo unitario. Se hai solo il totale riga, dividi per la quantità."
                                                                 onChange={(e) => {
                                                                     const price = parseFloat(e.target.value);
                                                                     const quantity = parseFloat(editValues.quantity);
@@ -1131,6 +1132,9 @@ export default function PurchaseDetailPage() {
                                                         value={editValues.price}
                                                         onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
                                                     />
+                                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight">
+                                                        Totale riga ÷ qtà se hai solo il totale.
+                                                    </p>
                                                 </div>
                                             </div>
                                         ) : (
@@ -1508,6 +1512,9 @@ export default function PurchaseDetailPage() {
                                             onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
                                             placeholder="0"
                                         />
+                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight">
+                                            Usa il totale riga ÷ quantità se hai solo il totale in fattura.
+                                        </p>
                                     </div>
                                     <div className="md:col-span-2 flex items-center gap-2 pb-2">
                                         <div className="flex items-center space-x-2">
