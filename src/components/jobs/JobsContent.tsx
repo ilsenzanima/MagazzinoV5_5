@@ -206,10 +206,10 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                             key={status}
                             disabled={updatingStatus === job.id}
                             onClick={() => handleStatusChange(job, status)}
-                            className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors disabled:opacity-50 ${
+                            className={`rounded-full font-medium transition-all disabled:opacity-50 ${
                               job.status === status
-                                ? STATUS_CONFIG[status].active
-                                : STATUS_CONFIG[status].inactive
+                                ? `text-sm px-3 py-1 ${STATUS_CONFIG[status].active}`
+                                : `text-xs px-2 py-0.5 ${STATUS_CONFIG[status].inactive}`
                             }`}
                           >
                             {STATUS_CONFIG[status].label}
