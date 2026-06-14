@@ -874,7 +874,6 @@ export default function PurchaseDetailPage() {
                                                                 className="w-24 ml-auto text-right h-8"
                                                                 value={editValues.price}
                                                                 step="0.00001"
-                                                                title="Inserisci il prezzo unitario. Se hai solo il totale riga, dividi per la quantità."
                                                                 onChange={(e) => {
                                                                     const price = parseFloat(e.target.value);
                                                                     const quantity = parseFloat(editValues.quantity);
@@ -882,6 +881,9 @@ export default function PurchaseDetailPage() {
                                                                     setEditValues({ ...editValues, price: e.target.value, total: total });
                                                                 }}
                                                             />
+                                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight text-right">
+                                                                Usa Totale Riga →
+                                                            </p>
                                                         </TableCell>
                                                     </>
                                                 ) : (
