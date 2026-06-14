@@ -121,6 +121,8 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     if (!docToDelete) return
 
     try {
+      const path = docToDelete.fileUrl?.split('/public/documents/')[1]
+      if (path) await supabase.storage.from('documents').remove([path])
       await jobDocumentsApi.delete(docToDelete.id)
       setDeleteDialogOpen(false)
       setDocToDelete(null)

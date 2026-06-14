@@ -125,6 +125,8 @@ export function ProposalDocuments({ proposalId }: Props) {
     const handleDelete = async () => {
         if (!activeDoc) return
         try {
+            const path = activeDoc.fileUrl?.split('/public/documents/')[1]
+            if (path) await supabase.storage.from('documents').remove([path])
             await proposalDocumentsApi.delete(activeDoc.id)
             setDocuments(d => d.filter(x => x.id !== activeDoc.id))
             setDeleteOpen(false)

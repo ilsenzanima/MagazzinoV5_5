@@ -927,6 +927,13 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     }
     const handleDeleteCost = async (costId: string) => {
         try {
+            const cost = salCosts.find(c => c.id === costId)
+            if (cost?.documentUrls?.length) {
+                const paths = cost.documentUrls
+                    .map(u => u.split('/public/documents/')[1] || u.split('/documents/')[1])
+                    .filter(Boolean) as string[]
+                if (paths.length) await supabase.storage.from('documents').remove(paths)
+            }
             await salCostsApi.delete(costId)
             await loadData()
         } catch (e) {
