@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Trash2, RotateCcw, Loader2, ShoppingCart, Receipt, ClipboardList,
-  Users, Building2, Package, Briefcase, HardHat, Info
+  Users, Building2, Package, Briefcase, HardHat, Info, ShieldAlert
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/auth-provider";
@@ -235,6 +235,31 @@ export default function CestinoPage() {
     keys.forEach(loadSection);
   }, [userRole, loadSection]);
 
+  const [purging, setPurging] = useState(false)
+  const [purgeResult, setPurgeResult] = useState<string | null>(null)
+
+  const handlePurge = async () => {
+    if (!confirm("Eliminare definitivamente tutti gli elementi scaduti (>30 giorni)? I file allegati verranno rimossi da storage. Azione irreversibile.")) return
+    setPurging(true)
+    setPurgeResult(null)
+    try {
+      const res = await fetch('/api/purge-trash', {
+        method: 'POST',
+        headers: { 'x-purge-secret': process.env.NEXT_PUBLIC_PURGE_SECRET || '' }
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      const total = data.total ?? 0
+      setPurgeResult(total === 0 ? "Nessun elemento scaduto da eliminare." : `Eliminati definitivamente ${total} elementi.`)
+      const keys: SectionKey[] = ["purchases", "invoices", "load-notes", "clients", "suppliers", "inventory", "jobs", "workers"]
+      keys.forEach(loadSection)
+    } catch (e: any) {
+      setPurgeResult("Errore: " + e.message)
+    } finally {
+      setPurging(false)
+    }
+  }
+
   const makeRestorer = (key: SectionKey, restoreFn: (id: string) => Promise<void>) =>
     async (id: string) => {
       await restoreFn(id);
@@ -280,6 +305,19 @@ export default function CestinoPage() {
             <Info className="h-3.5 w-3.5" />
             Gli elementi vengono eliminati definitivamente dopo 30 giorni. Solo gli admin possono ripristinarli.
           </p>
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-600 border-red-200 hover:bg-red-50 gap-1.5"
+              onClick={handlePurge}
+              disabled={purging}
+            >
+              {purging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+              Purga elementi scaduti
+            </Button>
+            {purgeResult && <span className="text-xs text-slate-500">{purgeResult}</span>}
+          </div>
         </div>
 
         <Tabs defaultValue="purchases">
