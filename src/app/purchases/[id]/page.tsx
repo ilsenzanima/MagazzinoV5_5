@@ -695,16 +695,23 @@ export default function PurchaseDetailPage() {
                                 <div className="md:col-span-2 border-t pt-4 mt-2 flex flex-wrap gap-3">
                                     {/* Acquisto → Fattura */}
                                     {purchase.invoiceId && purchase.invoiceNumber && (
-                                        <a
-                                            href={`/invoices/${purchase.invoiceId}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md px-3 py-1.5"
-                                        >
-                                            <Receipt className="h-4 w-4" />
-                                            Fattura: {purchase.invoiceNumber}
-                                            <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />
-                                        </a>
+                                        (userRole === 'admin' || userRole === 'operativo') ? (
+                                            <a
+                                                href={`/invoices/${purchase.invoiceId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md px-3 py-1.5"
+                                            >
+                                                <Receipt className="h-4 w-4" />
+                                                Fattura: {purchase.invoiceNumber}
+                                                <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />
+                                            </a>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5">
+                                                <Receipt className="h-4 w-4" />
+                                                Fattura: {purchase.invoiceNumber}
+                                            </span>
+                                        )
                                     )}
                                     {/* Ordine evaso → Acquisto risultante */}
                                     {purchase.convertedPurchaseId && purchase.convertedPurchaseNumber && (
