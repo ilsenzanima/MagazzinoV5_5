@@ -243,10 +243,7 @@ export default function CestinoPage() {
     setPurging(true)
     setPurgeResult(null)
     try {
-      const res = await fetch('/api/purge-trash', {
-        method: 'POST',
-        headers: { 'x-purge-secret': process.env.NEXT_PUBLIC_PURGE_SECRET || '' }
-      })
+      const res = await fetch('/api/purge-trash', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       const total = data.total ?? 0
