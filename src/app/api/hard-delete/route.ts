@@ -36,17 +36,18 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') return NextResponse.json({ error: 'Solo gli admin possono eliminare definitivamente' }, { status: 403 })
-
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!serviceKey) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurata' }, { status: 500 })
+
+    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } })
+
+    // Usa service role per bypassare RLS sulla tabella users/profiles
+    const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') return NextResponse.json({ error: 'Solo gli admin possono eliminare definitivamente' }, { status: 403 })
 
     const { section, id } = await req.json()
     const table = TABLE_MAP[section]
     if (!table || !id) return NextResponse.json({ error: 'Parametri non validi' }, { status: 400 })
-
-    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } })
 
     // Cleanup file storage per acquisti e fatture
     if (section === "purchases") {
