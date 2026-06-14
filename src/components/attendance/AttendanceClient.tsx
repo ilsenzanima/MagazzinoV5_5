@@ -412,14 +412,16 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 <div className="flex items-center flex-wrap gap-2">
                     {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
 
-                    <Button
-                        variant="outline"
-                        onClick={() => generateMonthlyReport(currentDate, initialWorkers, mergedAttendanceList)}
-                        className="gap-2"
-                    >
-                        <FileDown className="h-4 w-4" />
-                        PDF
-                    </Button>
+                    {canEdit && (
+                        <Button
+                            variant="outline"
+                            onClick={() => generateMonthlyReport(currentDate, initialWorkers, mergedAttendanceList)}
+                            className="gap-2"
+                        >
+                            <FileDown className="h-4 w-4" />
+                            PDF
+                        </Button>
+                    )}
 
                     <Link href="/attendance/request">
                         <Button variant="outline" className="gap-2">

@@ -392,7 +392,7 @@ export default function InvoiceDetailPage() {
                                 <Pencil className="h-4 w-4 mr-1" />Modifica
                             </Button>
                         )}
-                        {userRole === 'admin' && !isEditing && (
+                        {(userRole === 'admin' || userRole === 'operativo') && !isEditing && (
                             <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)} disabled={deleting}>
                                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" />Elimina</>}
                             </Button>
@@ -541,9 +541,12 @@ export default function InvoiceDetailPage() {
                                                         <td className="py-2.5 px-2">
                                                             {isEditing ? (
                                                                 <button
-                                                                    title="Rimuovi bolla"
+                                                                    title="Rimuovi collegamento bolla"
                                                                     className="text-red-400 hover:text-red-600"
-                                                                    onClick={() => setToRemove(prev => { const n = new Set(prev); n.add(p.id); return n; })}
+                                                                    onClick={() => {
+                                                                        if (!confirm(`Rimuovere il collegamento alla bolla "${p.deliveryNoteNumber || 'senza numero'}"?\nLa bolla non verrà eliminata, verrà solo scollegata da questa fattura.`)) return;
+                                                                        setToRemove(prev => { const n = new Set(prev); n.add(p.id); return n; });
+                                                                    }}
                                                                 >
                                                                     <X className="h-4 w-4" />
                                                                 </button>

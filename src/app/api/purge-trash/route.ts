@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     // Record senza file
     const tableLabels: Record<string, string> = {
         clients: 'committenti', suppliers: 'fornitori', inventory: 'inventario',
-        jobs: 'commesse', workers: 'operai', load_notes: 'note_carico'
+        jobs: 'commesse', workers: 'operai', load_notes: 'note_carico', client_proposals: 'proposte'
     }
     for (const [table, label] of Object.entries(tableLabels)) {
         const { data } = await admin.from(table).select('id')

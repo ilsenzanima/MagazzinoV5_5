@@ -19,6 +19,8 @@ import { suppliersApi } from "@/lib/services/suppliers";
 import { inventoryApi } from "@/lib/services/inventory";
 import { jobsApi } from "@/lib/services/jobs";
 import { workersApi } from "@/lib/services/workers";
+import { clientProposalsApi } from "@/lib/services/client-proposals";
+import { FileText } from "lucide-react";
 
 function daysUntilDeletion(deletedAt: string): number {
   const deletedDate = new Date(deletedAt);
@@ -162,7 +164,7 @@ function TrashTable({ items, loading, onRestore, onHardDelete, emptyMessage }: T
   );
 }
 
-type SectionKey = "purchases" | "invoices" | "load-notes" | "clients" | "suppliers" | "inventory" | "jobs" | "workers";
+type SectionKey = "purchases" | "invoices" | "load-notes" | "clients" | "suppliers" | "inventory" | "jobs" | "workers" | "proposals";
 
 interface SectionState {
   items: TrashItem[];
@@ -181,6 +183,7 @@ export default function CestinoPage() {
     inventory: { items: [], loading: false },
     jobs: { items: [], loading: false },
     workers: { items: [], loading: false },
+    proposals: { items: [], loading: false },
   }));
 
   const loadSection = useCallback(async (key: SectionKey) => {
@@ -260,6 +263,14 @@ export default function CestinoPage() {
           deletedAt: w.deletedAt,
           deletedByName: w.deletedByName,
         }));
+      } else if (key === "proposals") {
+        const data = await clientProposalsApi.getDeleted();
+        items = data.map((p: any) => ({
+          id: p.id,
+          label: p.title,
+          sublabel: p.clientName || undefined,
+          deletedAt: p.deletedAt,
+        }));
       }
 
       setSections((prev: Record<SectionKey, SectionState>) => ({ ...prev, [key]: { items, loading: false } }));
@@ -271,7 +282,7 @@ export default function CestinoPage() {
 
   useEffect(() => {
     if (userRole !== "admin") return;
-    const keys: SectionKey[] = ["purchases", "invoices", "load-notes", "clients", "suppliers", "inventory", "jobs", "workers"];
+    const keys: SectionKey[] = ["purchases", "invoices", "load-notes", "clients", "suppliers", "inventory", "jobs", "workers", "proposals"];
     keys.forEach(loadSection);
   }, [userRole, loadSection]);
 
@@ -288,7 +299,7 @@ export default function CestinoPage() {
       if (!res.ok) throw new Error(data.error)
       const total = data.total ?? 0
       setPurgeResult(total === 0 ? "Nessun elemento scaduto da eliminare." : `Eliminati definitivamente ${total} elementi.`)
-      const keys: SectionKey[] = ["purchases", "invoices", "load-notes", "clients", "suppliers", "inventory", "jobs", "workers"]
+      const keys: SectionKey[] = ["purchases", "invoices", "load-notes", "clients", "suppliers", "inventory", "jobs", "workers", "proposals"]
       keys.forEach(loadSection)
     } catch (e: any) {
       setPurgeResult("Errore: " + e.message)
@@ -337,6 +348,7 @@ export default function CestinoPage() {
     { key: "inventory" as SectionKey, label: "Inventario", icon: Package },
     { key: "jobs" as SectionKey, label: "Commesse", icon: Briefcase },
     { key: "workers" as SectionKey, label: "Operai", icon: HardHat },
+    { key: "proposals" as SectionKey, label: "Proposte", icon: FileText },
   ];
 
   const totalCount = Object.values(sections).reduce((sum, s) => sum + s.items.length, 0);
@@ -463,6 +475,16 @@ export default function CestinoPage() {
               onRestore={makeRestorer("workers", workersApi.restore)}
               onHardDelete={makeHardDeleter("workers")}
               emptyMessage="Nessun operaio nel cestino"
+            />
+          </TabsContent>
+
+          <TabsContent value="proposals" className="mt-4">
+            <TrashTable
+              items={sections.proposals.items}
+              loading={sections.proposals.loading}
+              onRestore={makeRestorer("proposals", clientProposalsApi.restore)}
+              onHardDelete={makeHardDeleter("proposals")}
+              emptyMessage="Nessuna proposta nel cestino"
             />
           </TabsContent>
         </Tabs>

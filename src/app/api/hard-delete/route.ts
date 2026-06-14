@@ -12,6 +12,7 @@ const TABLE_MAP: Record<string, string> = {
     inventory: "inventory",
     jobs: "jobs",
     workers: "workers",
+    proposals: "client_proposals",
 }
 
 function extractStoragePaths(urls: (string | null | undefined)[]): string[] {

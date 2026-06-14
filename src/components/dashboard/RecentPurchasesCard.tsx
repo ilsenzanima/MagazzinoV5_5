@@ -3,6 +3,7 @@ import { ShoppingCart, Clock, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import Link from "next/link";
+import { useAuth } from "@/components/auth-provider";
 
 interface Purchase {
   id: string;
@@ -19,6 +20,8 @@ interface RecentPurchasesCardProps {
 }
 
 export function RecentPurchasesCard({ data }: RecentPurchasesCardProps) {
+  const { userRole } = useAuth();
+  const canSeePrices = userRole === 'admin' || userRole === 'operativo';
   const purchases = data ?? [];
 
   const formatEur = (v: number) =>
@@ -78,7 +81,7 @@ export function RecentPurchasesCard({ data }: RecentPurchasesCardProps) {
 
                 <div className="flex flex-col items-end shrink-0 ml-2 gap-1">
                   <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                    {formatEur(purchase.totalAmount)}
+                    {canSeePrices ? formatEur(purchase.totalAmount) : "—"}
                   </span>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-0.5 whitespace-nowrap">
                     <Clock className="h-2.5 w-2.5" />

@@ -46,6 +46,7 @@ export const clientProposalsApi = {
             .from('client_proposals')
             .select('*')
             .eq('client_id', clientId)
+            .is('deleted_at', null)
             .order('created_at', { ascending: false });
         if (error) throw error;
         return (data || []).map(map);
@@ -56,9 +57,28 @@ export const clientProposalsApi = {
             .from('client_proposals')
             .select('*')
             .eq('id', id)
+            .is('deleted_at', null)
             .maybeSingle();
         if (error) throw error;
         return data ? map(data) : null;
+    },
+
+    getDeleted: async (): Promise<(ClientProposal & { deletedAt: string })[]> => {
+        const { data, error } = await supabase
+            .from('client_proposals')
+            .select('*, clients(name)')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(d => ({ ...map(d), deletedAt: d.deleted_at, clientName: d.clients?.name || '' }));
+    },
+
+    restore: async (id: string): Promise<void> => {
+        const { error } = await supabase
+            .from('client_proposals')
+            .update({ deleted_at: null, deleted_by: null })
+            .eq('id', id);
+        if (error) throw error;
     },
 
     create: async (clientId: string, proposal: Omit<ClientProposal, 'id' | 'clientId' | 'convertedJobId' | 'createdAt' | 'updatedAt'>): Promise<ClientProposal> => {
@@ -113,7 +133,11 @@ export const clientProposalsApi = {
     },
 
     delete: async (id: string): Promise<void> => {
-        const { error } = await supabase.from('client_proposals').delete().eq('id', id);
+        const { data: { user } } = await supabase.auth.getUser();
+        const { error } = await supabase
+            .from('client_proposals')
+            .update({ deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null })
+            .eq('id', id);
         if (error) throw error;
     },
 };

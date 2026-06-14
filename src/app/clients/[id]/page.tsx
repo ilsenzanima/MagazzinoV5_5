@@ -207,7 +207,7 @@ export default function ClientDetailPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
           <TabsTrigger value="anagrafica"><Building2 className="h-4 w-4 mr-2" />Anagrafica</TabsTrigger>
-          <TabsTrigger value="proposte"><Plus className="h-4 w-4 mr-2" />Proposte</TabsTrigger>
+          {canEdit && <TabsTrigger value="proposte"><Plus className="h-4 w-4 mr-2" />Proposte</TabsTrigger>}
           <TabsTrigger value="commesse"><Briefcase className="h-4 w-4 mr-2" />Commesse</TabsTrigger>
         </TabsList>
 
