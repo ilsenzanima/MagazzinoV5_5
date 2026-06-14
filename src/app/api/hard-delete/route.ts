@@ -65,7 +65,16 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    const { error } = await admin.from(table).delete().eq('id', id)
+    let error: any
+    if (section === "purchases") {
+        // Usa RPC per evitare che il CASCADE trigger sottragga inventario
+        // (l'inventario è già stato corretto al momento del soft-delete)
+        const { error: rpcError } = await admin.rpc('hard_delete_purchase', { p_id: id })
+        error = rpcError
+    } else {
+        const { error: delError } = await admin.from(table).delete().eq('id', id)
+        error = delError
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({ ok: true })
