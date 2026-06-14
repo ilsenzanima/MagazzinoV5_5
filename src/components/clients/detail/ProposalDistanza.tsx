@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, MapPin, Navigation, AlertCircle, Fuel, TriangleAlert } from "lucide-react"
+import { Loader2, MapPin, Navigation, AlertCircle, Fuel, TriangleAlert, Zap } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { warehousesApi } from "@/lib/services/warehouses"
 import type { Warehouse } from "@/lib/types"
 
@@ -49,7 +50,9 @@ export function ProposalDistanza({ siteAddress }: Props) {
     const [days, setDays] = useState("1")
     const [fuelPrice, setFuelPrice] = useState("1.85")
     const [consumption, setConsumption] = useState("12")   // L/100km
-    const [tolls, setTolls] = useState("")                  // € manuale
+    const [tolls, setTolls] = useState("")                  // € manuale per tratta
+    const [autoToll, setAutoToll] = useState(false)         // stima automatica €/km
+    const [tollPerKm, setTollPerKm] = useState("0.10")     // €/km autostrada
 
     useEffect(() => {
         warehousesApi.getAll().then(whs => {
@@ -87,13 +90,13 @@ export function ProposalDistanza({ siteAddress }: Props) {
     const d = Number(days) || 1
     const fp = Number(fuelPrice) || 0
     const cons = Number(consumption) || 0
-    const tollCost = Number(tolls) || 0
-
     const kmRoundTrip = result ? result.distanceKm * 2 : 0
     const totalKm = kmRoundTrip * d * v
     const fuelLiters = (totalKm * cons) / 100
     const fuelCost = fuelLiters * fp
-    const tollTotal = tollCost * d * v * 2  // A/R per ogni mezzo per ogni giorno
+    const tollTotal = autoToll
+        ? totalKm * (Number(tollPerKm) || 0)
+        : (Number(tolls) || 0) * d * v * 2  // manuale: A/R per mezzo per giorno
     const totalCost = fuelCost + tollTotal
 
     if (loadingWh) return (
@@ -167,14 +170,35 @@ export function ProposalDistanza({ siteAddress }: Props) {
                 </div>
 
                 {/* Pedaggi */}
-                <div className="space-y-0.5">
-                    <label className="text-xs text-slate-500 flex items-center gap-1">
-                        <TriangleAlert className="h-3 w-3 text-amber-500" />
-                        Pedaggi stimati €/tratta (opzionale — inserisci manualmente)
-                    </label>
-                    <Input type="number" step="0.50" className="h-8 text-xs" value={tolls}
-                        onChange={e => setTolls(e.target.value)} placeholder="es. 3.50" />
-                    <p className="text-xs text-slate-400">Il rilevamento automatico pedaggi non è disponibile con il servizio gratuito.</p>
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <label className="text-xs text-slate-500 flex items-center gap-1">
+                            <TriangleAlert className="h-3 w-3 text-amber-500" />Pedaggi
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-slate-400">Stima €/km</span>
+                            <Switch checked={autoToll} onCheckedChange={setAutoToll} className="scale-75" />
+                        </div>
+                    </div>
+                    {autoToll ? (
+                        <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                                <Input type="number" step="0.01" className="h-8 text-xs" value={tollPerKm}
+                                    onChange={e => setTollPerKm(e.target.value)} placeholder="0.10" />
+                                <span className="text-xs text-slate-500 shrink-0">€/km</span>
+                            </div>
+                            <p className="text-xs text-slate-400 flex items-center gap-1">
+                                <Zap className="h-3 w-3 text-yellow-500 shrink-0" />
+                                Applicato su km totali A/R. Usa ~0.10 €/km come stima media autostrade italiane.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-0.5">
+                            <Input type="number" step="0.50" className="h-8 text-xs" value={tolls}
+                                onChange={e => setTolls(e.target.value)} placeholder="es. 3.50" />
+                            <p className="text-xs text-slate-400">Importo per singola tratta (verrà moltiplicato × A/R × giorni × mezzi).</p>
+                        </div>
+                    )}
                 </div>
 
                 <Button className="w-full h-8 text-sm bg-blue-600 hover:bg-blue-700" onClick={calculate}
@@ -211,7 +235,10 @@ export function ProposalDistanza({ siteAddress }: Props) {
                             </div>
                             {tollTotal > 0 && (
                                 <div className="flex justify-between px-3 py-2">
-                                    <span className="text-xs text-slate-500 flex items-center gap-1"><TriangleAlert className="h-3 w-3 text-amber-500" />Pedaggi stimati</span>
+                                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                                        <TriangleAlert className="h-3 w-3 text-amber-500" />
+                                        {autoToll ? `Pedaggi stimati (${tollPerKm} €/km)` : "Pedaggi stimati"}
+                                    </span>
                                     <span className="text-xs font-medium">€ {fmt(tollTotal)}</span>
                                 </div>
                             )}

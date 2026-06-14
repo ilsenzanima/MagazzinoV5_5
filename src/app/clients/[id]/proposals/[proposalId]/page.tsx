@@ -419,6 +419,21 @@ export default function ProposalDetailPage() {
                                     )}
                                 </CardContent>
                             </Card>
+
+                            {/* Card collegamento commessa (solo se convertita) */}
+                            {proposal.convertedJobId && (
+                                <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-3 flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-xs uppercase tracking-wide text-green-600 mb-0.5">Convertita in commessa</p>
+                                        <p className="text-xs text-slate-500">Questa proposta è stata accettata e trasformata in commessa.</p>
+                                    </div>
+                                    <Link href={`/jobs/${proposal.convertedJobId}`}>
+                                        <Button size="sm" variant="outline" className="shrink-0 text-green-700 border-green-300">
+                                            Vai alla Commessa
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
                         </div>
 
                         {/* Colonna destra: Distanza */}

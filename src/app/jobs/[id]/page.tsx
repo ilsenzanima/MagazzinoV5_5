@@ -26,6 +26,7 @@ import { JobEccedenze } from "@/components/jobs/details/JobEccedenze";
 import { JobOrdini } from "@/components/jobs/details/JobOrdini";
 import { JobFatturazione } from "@/components/jobs/details/JobFatturazione";
 import { JobAnalisiCosti } from "@/components/jobs/details/JobAnalisiCosti";
+import { clientProposalsApi, ClientProposal } from "@/lib/services/client-proposals";
 
 export default function JobDetailsPage() {
     const { id } = useParams<{ id: string }>();
@@ -36,6 +37,7 @@ export default function JobDetailsPage() {
     const [totalCost, setTotalCost] = useState(0);
     const [totalHours, setTotalHours] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [linkedProposal, setLinkedProposal] = useState<ClientProposal | null>(null);
 
     // Ref for printing
     const printRef = useRef<HTMLDivElement>(null);
@@ -404,6 +406,8 @@ export default function JobDetailsPage() {
             setMovements(movementsData);
             setTotalCost(costData);
             setTotalHours(hoursData);
+            // Cerca proposta collegata (se creata da conversione)
+            clientProposalsApi.getByConvertedJobId(id).then(p => setLinkedProposal(p)).catch(() => {});
         } catch (error) {
             console.error("Error loading job details:", error);
         } finally {
@@ -542,6 +546,20 @@ export default function JobDetailsPage() {
 
                         <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">
                             <JobOverview job={job} totalCost={totalCost} totalHours={totalHours} onJobUpdated={loadData} />
+                            {linkedProposal && (
+                                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-xs uppercase tracking-wide text-blue-500 mb-0.5">Creata da proposta</p>
+                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{linkedProposal.title}</p>
+                                        {linkedProposal.date && <p className="text-xs text-slate-500">{format(new Date(linkedProposal.date), "d MMM yyyy", { locale: it })}</p>}
+                                    </div>
+                                    <Link href={`/clients/${linkedProposal.clientId}/proposals/${linkedProposal.id}`}>
+                                        <Button size="sm" variant="outline" className="shrink-0 text-blue-600 border-blue-300">
+                                            Vai alla Proposta
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
                         </TabsContent>
 
                         <TabsContent value="stock" className="space-y-6 focus-visible:outline-none">

@@ -102,6 +102,16 @@ export const clientProposalsApi = {
         if (error) throw error;
     },
 
+    getByConvertedJobId: async (jobId: string): Promise<ClientProposal | null> => {
+        const { data, error } = await supabase
+            .from('client_proposals')
+            .select('*')
+            .eq('converted_job_id', jobId)
+            .maybeSingle();
+        if (error) throw error;
+        return data ? map(data) : null;
+    },
+
     delete: async (id: string): Promise<void> => {
         const { error } = await supabase.from('client_proposals').delete().eq('id', id);
         if (error) throw error;
