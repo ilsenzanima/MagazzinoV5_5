@@ -264,7 +264,7 @@ export default function ProposalDetailPage() {
                     </div>
                     {canEdit && (
                         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-                            {proposal.status !== "accepted" && !proposal.convertedJobId && (
+                            {!proposal.convertedJobId && (
                                 <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={() => setConvertOpen(true)}>
                                     <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa
                                 </Button>
@@ -308,7 +308,7 @@ export default function ProposalDetailPage() {
                                                 <Select value={inlineStatus} onValueChange={v => setInlineStatus(v as ProposalStatus)}>
                                                     <SelectTrigger className="w-36 h-7 text-xs"><SelectValue /></SelectTrigger>
                                                     <SelectContent>
-                                                        {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                                                        {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).filter(([k]) => k !== "accepted").map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                                                     </SelectContent>
                                                 </Select>
                                                 <Button size="sm" className="h-7 text-xs" onClick={() => saveInline("status")} disabled={inlineSaving}>
@@ -469,7 +469,7 @@ export default function ProposalDetailPage() {
                                 <Select value={form.status} onValueChange={v => setForm({ ...form, status: v as ProposalStatus })}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                                        {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).filter(([k]) => k !== "accepted").map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>

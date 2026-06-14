@@ -407,7 +407,9 @@ export default function JobDetailsPage() {
             setTotalCost(costData);
             setTotalHours(hoursData);
             // Cerca proposta collegata (se creata da conversione)
-            clientProposalsApi.getByConvertedJobId(id).then(p => setLinkedProposal(p)).catch(() => {});
+            clientProposalsApi.getByConvertedJobId(id)
+                .then(p => setLinkedProposal(p))
+                .catch(e => console.error("getByConvertedJobId error:", e));
         } catch (error) {
             console.error("Error loading job details:", error);
         } finally {
