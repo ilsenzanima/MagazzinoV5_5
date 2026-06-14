@@ -18,6 +18,8 @@ import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, Loader2, MapP
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals"
 import { clientsApi } from "@/lib/api"
 import { jobsApi } from "@/lib/api"
+import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
+import { costAnalysisApi } from "@/lib/services/cost-analysis"
 import { Client } from "@/lib/types"
 import { notify } from "@/lib/notify"
 import { format } from "date-fns"
@@ -190,7 +192,36 @@ export default function ProposalDetailPage() {
                 estimatedCost: proposal.estimatedValue,
             })
             await clientProposalsApi.update(proposalId, { status: "accepted", convertedJobId: job.id })
-            notify.success("Commessa creata con successo!")
+
+            // Copia analisi costi dalla proposta alla commessa
+            const [rows, params] = await Promise.all([
+                proposalCostAnalysisApi.getByProposalId(proposalId),
+                proposalCostAnalysisApi.getParams(proposalId),
+            ])
+            await Promise.all([
+                ...rows.map(row => costAnalysisApi.add(job.id, {
+                    type: row.type,
+                    itemId: row.itemId,
+                    itemName: row.itemName,
+                    itemModel: row.itemModel,
+                    itemUnit: row.itemUnit,
+                    maxPurchasePrice: row.maxPurchasePrice,
+                    unitPrice: row.unitPrice,
+                    qtyEstimated: row.qtyEstimated,
+                    qtyActual: row.qtyActual,
+                    sortOrder: row.sortOrder,
+                })),
+                costAnalysisApi.upsertParams(job.id, {
+                    sfrido: params.sfrido,
+                    sconto: params.sconto,
+                    trasporto: params.trasporto,
+                    posa: params.posa,
+                    ricarico: params.ricarico,
+                    margineTrattativa: params.margineTrattativa,
+                }),
+            ])
+
+            notify.success("Commessa creata con analisi costi copiata!")
             router.push(`/jobs/${job.id}`)
         } catch { notify.error("Errore durante la conversione") }
         finally { setConverting(false) }
