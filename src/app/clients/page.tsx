@@ -16,10 +16,14 @@ import { Client, clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { ClientCard } from "@/components/clients";
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
 export default function ClientsPage() {
   const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDeferredValue(searchTerm);
+  const [activeLetter, setActiveLetter] = useState<string | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,15 +31,15 @@ export default function ClientsPage() {
   // Pagination
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const LIMIT = 12;
+  const LIMIT = 24;
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, activeLetter]);
 
   useEffect(() => {
     loadClients();
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, activeLetter]);
 
   const loadClients = async () => {
     try {
@@ -44,7 +48,8 @@ export default function ClientsPage() {
       const { data, total } = await clientsApi.getPaginated({
         page,
         limit: LIMIT,
-        search: debouncedSearch
+        search: debouncedSearch,
+        letter: activeLetter || undefined,
       });
       setClients(data);
       setTotalItems(total);
@@ -54,6 +59,11 @@ export default function ClientsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLetterClick = (letter: string) => {
+    setActiveLetter(prev => prev === letter ? null : letter);
+    setSearchTerm("");
   };
 
   const canEdit = userRole === 'admin' || userRole === 'operativo';
@@ -81,7 +91,10 @@ export default function ClientsPage() {
             placeholder="Cerca Committente (Nome, P.IVA, Email...)"
             className="pl-9 bg-slate-100 dark:bg-muted border-none"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              if (e.target.value) setActiveLetter(null);
+            }}
           />
         </div>
       </div>
@@ -104,51 +117,75 @@ export default function ClientsPage() {
           </Button>
         </div>
       ) : (
-        <>
+        <div className="flex gap-3">
           {/* Client Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex-1 min-w-0">
             {clients.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
+              <div className="text-center py-10 text-slate-400 dark:text-slate-500">
                 <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                <p>Nessun committente trovato</p>
+                <p>Nessun committente trovato{activeLetter ? ` con la lettera "${activeLetter}"` : ''}</p>
               </div>
             ) : (
-              clients.map((client) => (
-                <ClientCard
-                  key={client.id}
-                  client={client}
-                />
-              ))
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {clients.map((client) => (
+                  <ClientCard key={client.id} client={client} />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1 || loading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  Pagina {page} di {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages || loading}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             )}
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-8">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1 || loading}
+          {/* Alphabet Sidebar */}
+          <div className="hidden sm:flex flex-col gap-0.5 sticky top-40 h-fit self-start shrink-0">
+            {activeLetter && (
+              <button
+                onClick={() => setActiveLetter(null)}
+                className="w-7 h-5 text-[10px] font-semibold rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors mb-1"
+                title="Rimuovi filtro"
               >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                Pagina {page} di {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages || loading}
+                ✕
+              </button>
+            )}
+            {ALPHABET.map(letter => (
+              <button
+                key={letter}
+                onClick={() => handleLetterClick(letter)}
+                className={`w-7 h-6 text-xs font-semibold rounded transition-colors ${
+                  activeLetter === letter
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600'
+                }`}
               >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </>
+                {letter}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
-
     </DashboardLayout>
   );
 }

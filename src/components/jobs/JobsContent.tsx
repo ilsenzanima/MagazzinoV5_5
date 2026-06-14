@@ -5,7 +5,6 @@ import { useState, useEffect, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Search,
   Plus,
@@ -14,26 +13,29 @@ import {
   Calendar,
   Building,
   MapPin,
-  Trash2,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Job, jobsApi } from "@/lib/api";
 import { useSearchParams, useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useAuth } from "@/components/auth-provider";
+
 interface JobsContentProps {
   initialJobs: Job[];
   initialTotal: number;
 }
+
+const STATUS_ORDER: Record<string, number> = { active: 0, suspended: 1, completed: 2 };
+
+const STATUS_CONFIG = {
+  active:    { label: 'Attiva',     active: 'bg-green-500 hover:bg-green-600 text-white border-green-500',    inactive: 'border border-green-300 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20' },
+  suspended: { label: 'Sospesa',    active: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500',    inactive: 'border border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20' },
+  completed: { label: 'Completata', active: 'bg-slate-500 hover:bg-slate-600 text-white border-slate-500',   inactive: 'border border-slate-300 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800' },
+} as const;
+
+type JobStatus = keyof typeof STATUS_CONFIG;
 
 export default function JobsContent({ initialJobs, initialTotal }: JobsContentProps) {
   const router = useRouter();
@@ -45,8 +47,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -71,9 +72,6 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
 
   // Load Jobs (Server Side Search & Pagination)
   useEffect(() => {
-    // Skip initial load if data matches props (prevent double fetch)
-    // ONLY if we actually have data. If we have 0 jobs, it might be the server-side auth failing,
-    // so we want to try fetching client-side just in case.
     if (page === 1 && !deferredSearchTerm && !filterClientId && jobs === initialJobs && initialJobs.length > 0) {
       return;
     }
@@ -93,6 +91,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         clientId: filterClientId || ''
       });
 
+      // Sort: active → suspended → completed
+      data.sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
+
       setJobs(data);
       setTotalItems(total);
       setTotalPages(Math.ceil(total / limit) || 1);
@@ -105,35 +106,34 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     }
   };
 
-  const handleDeleteJob = async () => {
-    if (!jobToDelete) return;
+  const handleStatusChange = async (job: Job, newStatus: JobStatus) => {
+    if (job.status === newStatus) return;
+    setUpdatingStatus(job.id);
     try {
-      await jobsApi.delete(jobToDelete.id);
-      loadJobs();
-      router.refresh();
-      setIsDeleteDialogOpen(false);
-      setJobToDelete(null);
-    } catch (error: any) {
-      console.error("Failed to delete job:", error);
-      notify.error(error?.message || "Errore durante l'eliminazione della commessa");
+      await jobsApi.update(job.id, { status: newStatus });
+      setJobs(prev => {
+        const updated = prev.map(j => j.id === job.id ? { ...j, status: newStatus } : j);
+        updated.sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
+        return updated;
+      });
+    } catch (err: any) {
+      notify.error(err?.message || "Errore durante l'aggiornamento dello stato");
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active': return <Badge className="bg-green-600">Attiva</Badge>;
-      case 'completed': return <Badge variant="secondary">Completata</Badge>;
-      case 'suspended': return <Badge variant="destructive">Sospesa</Badge>;
-      default: return <Badge variant="outline">{status}</Badge>;
-    }
-  };
+  const canEdit = userRole === 'admin' || userRole === 'operativo';
+
+  // Sort initial jobs too
+  const sortedJobs = [...jobs].sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
 
   return (
     <>
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Commesse</h1>
-          {(userRole === 'admin' || userRole === 'operativo') && (
+          {canEdit && (
             <Link href="/jobs/new">
               <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
@@ -174,44 +174,62 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {jobs.length === 0 ? (
+            {sortedJobs.length === 0 ? (
               <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />
                 <p>Nessuna commessa trovata</p>
               </div>
             ) : (
-              jobs.map((job) => (
+              sortedJobs.map((job) => (
                 <Card
                   key={job.id}
-                  className="hover:shadow-md transition-shadow flex flex-col h-full cursor-pointer relative group"
+                  className="hover:shadow-md transition-shadow flex flex-col h-full cursor-pointer"
                   onClick={() => router.push(`/jobs/${job.id}`)}
                 >
                   <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-2">
-                    <div className="flex justify-between items-start">
-                      <div className="min-w-0 pr-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0">
                         <div className="text-xs font-mono text-slate-500 dark:text-muted-foreground mb-1">{job.code}</div>
                         <CardTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-white break-words" title={job.name}>{job.name}</CardTitle>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        {getStatusBadge(job.status)}
-                        {(userRole === 'admin' || userRole === 'operativo') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                            aria-label="Elimina commessa"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setJobToDelete(job);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
                     </div>
+
+                    {/* Status buttons */}
+                    {canEdit ? (
+                      <div
+                        className="flex gap-1.5 mt-2 flex-wrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {(Object.keys(STATUS_CONFIG) as JobStatus[]).map((status) => (
+                          <button
+                            key={status}
+                            disabled={updatingStatus === job.id}
+                            onClick={() => handleStatusChange(job, status)}
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors disabled:opacity-50 ${
+                              job.status === status
+                                ? STATUS_CONFIG[status].active
+                                : STATUS_CONFIG[status].inactive
+                            }`}
+                          >
+                            {STATUS_CONFIG[status].label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <Badge
+                          className={
+                            job.status === 'active' ? 'bg-green-600' :
+                            job.status === 'suspended' ? 'bg-amber-500' :
+                            ''
+                          }
+                          variant={job.status === 'completed' ? 'secondary' : undefined}
+                        >
+                          {STATUS_CONFIG[job.status as JobStatus]?.label ?? job.status}
+                        </Badge>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 text-sm space-y-3 text-slate-600 dark:text-muted-foreground flex-1">
                     <div className="flex items-center gap-2">
@@ -285,23 +303,6 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
           )}
         </>
       )}
-
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Elimina Commessa</DialogTitle>
-            <DialogDescription>
-              Sei sicuro di voler eliminare la commessa <strong>{jobToDelete?.description}</strong>?
-              <br />
-              La commessa verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni. L'eliminazione è bloccata se la commessa ha movimenti o acquisti collegati.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Annulla</Button>
-            <Button variant="destructive" onClick={handleDeleteJob}>Elimina</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

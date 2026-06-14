@@ -48,7 +48,7 @@ export const clientsApi = {
         return data.map(mapDbToClient);
     },
 
-    getPaginated: async (options: { page: number; limit: number; search?: string }) => {
+    getPaginated: async (options: { page: number; limit: number; search?: string; letter?: string }) => {
         let query = supabase.from('clients').select('*', { count: 'estimated' }).is('deleted_at', null);
 
         // Multi-word fuzzy search
@@ -60,6 +60,11 @@ export const clientsApi = {
             for (const word of words) {
                 query = query.or(`name.ilike.%${word}%,vat_number.ilike.%${word}%,email.ilike.%${word}%,city.ilike.%${word}%`);
             }
+        }
+
+        // Alphabet filter
+        if (options.letter) {
+            query = query.ilike('name', `${options.letter}%`);
         }
 
         // Sort by name
