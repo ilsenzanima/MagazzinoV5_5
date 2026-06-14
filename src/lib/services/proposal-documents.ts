@@ -54,6 +54,17 @@ export const proposalDocumentsApi = {
         return map(data);
     },
 
+    update: async (id: string, patch: Partial<Pick<ProposalDocument, 'name' | 'notes' | 'fileUrl' | 'fileType'>>): Promise<ProposalDocument> => {
+        const update: any = {};
+        if (patch.name !== undefined) update.name = patch.name;
+        if (patch.notes !== undefined) update.notes = patch.notes || null;
+        if (patch.fileUrl !== undefined) update.file_url = patch.fileUrl;
+        if (patch.fileType !== undefined) update.file_type = patch.fileType;
+        const { data, error } = await supabase.from('proposal_documents').update(update).eq('id', id).select().single();
+        if (error) throw error;
+        return map(data);
+    },
+
     delete: async (id: string): Promise<void> => {
         const { error } = await supabase.from('proposal_documents').delete().eq('id', id);
         if (error) throw error;

@@ -297,7 +297,7 @@ export default function ProposalDetailPage() {
 
                                     {/* Valore Stimato */}
                                     <div className="flex items-center justify-between gap-2 min-h-[2rem]">
-                                        <span className="text-xs uppercase tracking-wide text-slate-500 w-24 shrink-0">Valore</span>
+                                        <span className="text-xs uppercase tracking-wide text-slate-500 w-36 shrink-0">Valore stimato proposta</span>
                                         {inlineEdit === "value" ? (
                                             <div className="flex items-center gap-2 flex-1 justify-end">
                                                 <div className="relative w-36">
