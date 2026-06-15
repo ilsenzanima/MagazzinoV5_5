@@ -19,6 +19,8 @@ import { ConvertOrdersModal } from "@/components/purchases/ConvertOrdersModal";
 import { AdvancedSearchTab } from "@/components/purchases/AdvancedSearchTab";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
+import { PageSizeSelector } from "@/components/ui/page-size-selector";
+import { usePageSize } from "@/hooks/usePageSize";
 
 // ── Shared filter bar ─────────────────────────────────────────────────────────
 
@@ -76,22 +78,22 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
   const debouncedSearch = useDeferredValue(searchTerm);
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const LIMIT = 12;
   const [convertOrder, setConvertOrder] = useState<Purchase | null>(null);
   const [viewMode, setViewMode] = useViewMode(orderType === 'order' ? 'ordini' : 'acquisti');
+  const [pageSize, setPageSize] = usePageSize(orderType === 'order' ? 'ordini' : 'acquisti');
 
   const isOrder = orderType === 'order';
   const newHref = isOrder ? "/purchases/new?type=order" : "/purchases/new";
   const newLabel = isOrder ? "Nuovo Ordine" : "Nuovo Acquisto";
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo, initialSupplierId]);
-  useEffect(() => { load(); }, [page, debouncedSearch, dateFrom, dateTo, initialSupplierId, orderType]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo, initialSupplierId, pageSize]);
+  useEffect(() => { load(); }, [page, debouncedSearch, dateFrom, dateTo, initialSupplierId, orderType, pageSize]);
 
   const load = async () => {
     try {
       setLoading(true);
       const { data, total } = await purchasesApi.getPaginated({
-        page, limit: LIMIT, search: debouncedSearch,
+        page, limit: pageSize, search: debouncedSearch,
         supplierId: initialSupplierId || '',
         dateFrom, dateTo, orderType,
       });
@@ -104,7 +106,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
     }
   };
 
-  const totalPages = Math.ceil(totalItems / LIMIT);
+  const totalPages = Math.ceil(totalItems / pageSize);
 
   return (
     <>
@@ -123,6 +125,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
             placeholder={isOrder ? "Cerca Ordine (Numero, Fornitore, Commessa, Articolo... usa virgola per OR)" : "Cerca Acquisto (Bolla, Fornitore, Commessa, Articolo... usa virgola per OR)"}
           />
         </div>
+        <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
         <ViewToggle mode={viewMode} onChange={setViewMode} />
       </div>
 
@@ -331,17 +334,17 @@ function InvoicesTab() {
   const debouncedSearch = useDeferredValue(searchTerm);
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const LIMIT = 12;
   const [viewMode, setViewMode] = useViewMode('fatture');
+  const [pageSize, setPageSize] = usePageSize('fatture');
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo]);
-  useEffect(() => { loadInvoices(); }, [page, debouncedSearch, dateFrom, dateTo]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo, pageSize]);
+  useEffect(() => { loadInvoices(); }, [page, debouncedSearch, dateFrom, dateTo, pageSize]);
 
   const loadInvoices = async () => {
     try {
       setLoading(true);
       const { data, total } = await invoicesApi.getPaginated({
-        page, limit: LIMIT, search: debouncedSearch, dateFrom, dateTo,
+        page, limit: pageSize, search: debouncedSearch, dateFrom, dateTo,
       });
       setInvoices(data);
       setTotalItems(total);
@@ -352,7 +355,7 @@ function InvoicesTab() {
     }
   };
 
-  const totalPages = Math.ceil(totalItems / LIMIT);
+  const totalPages = Math.ceil(totalItems / pageSize);
 
   return (
     <>
@@ -365,6 +368,7 @@ function InvoicesTab() {
             placeholder="Cerca per numero fattura o fornitore..."
           />
         </div>
+        <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
         <ViewToggle mode={viewMode} onChange={setViewMode} />
       </div>
 

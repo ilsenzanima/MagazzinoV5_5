@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
+import { PageSizeSelector } from "@/components/ui/page-size-selector";
+import { usePageSize } from "@/hooks/usePageSize";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Job, jobsApi } from "@/lib/api";
@@ -45,6 +47,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const searchParams = useSearchParams();
   const filterClientId = searchParams.get('clientId');
 
+  const [viewMode, setViewMode] = useViewMode('commesse');
+  const [pageSize, setPageSize] = usePageSize('commesse');
+
   const [searchTerm, setSearchTerm] = useState("");
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [loading, setLoading] = useState(false);
@@ -53,17 +58,17 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
 
   // Pagination
   const [page, setPage] = useState(1);
-  const [limit] = useState(12);
+  const limit = pageSize;
   const [totalItems, setTotalItems] = useState(initialTotal);
   const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / 12) || 1);
 
   // Search Debounce
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  // Reset page on search
+  // Reset page on search or page size change
   useEffect(() => {
     setPage(1);
-  }, [deferredSearchTerm, filterClientId]);
+  }, [deferredSearchTerm, filterClientId, pageSize]);
 
   // Sync state with props when validation/refresh happens
   useEffect(() => {
@@ -126,7 +131,6 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   };
 
   const canEdit = userRole === 'admin' || userRole === 'operativo';
-  const [viewMode, setViewMode] = useViewMode('commesse');
 
   // Sort initial jobs too
   const sortedJobs = [...jobs].sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
@@ -157,6 +161,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
               aria-label="Cerca commessa"
             />
           </div>
+          <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
       </div>

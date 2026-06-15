@@ -17,8 +17,13 @@ import { useAuth } from "@/components/auth-provider";
 import { SupplierCard, SupplierDeleteDialog } from "@/components/suppliers";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
+import { PageSizeSelector } from "@/components/ui/page-size-selector";
+import { usePageSize } from "@/hooks/usePageSize";
 export default function SuppliersPage() {
   const { userRole } = useAuth();
+  const [viewMode, setViewMode] = useViewMode('fornitori');
+  const [pageSize, setPageSize] = usePageSize('fornitori');
+
   const [searchTerm, setSearchTerm] = useState("");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,12 +34,11 @@ export default function SuppliersPage() {
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const ITEMS_PER_PAGE = 12;
 
   // Initial load
   useEffect(() => {
     loadSuppliers(1, "");
-  }, []);
+  }, [pageSize]);
 
   // Debounced Search
   useEffect(() => {
@@ -50,11 +54,11 @@ export default function SuppliersPage() {
       setError(null);
       const { data, total } = await suppliersApi.getPaginated({
         page,
-        limit: ITEMS_PER_PAGE,
+        limit: pageSize,
         search
       });
       setSuppliers(data);
-      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
+      setTotalPages(Math.ceil(total / pageSize));
       setCurrentPage(page);
     } catch (error: any) {
       console.error("Failed to load suppliers:", error);
@@ -90,7 +94,6 @@ export default function SuppliersPage() {
   };
 
   const canEdit = userRole === 'admin' || userRole === 'operativo';
-  const [viewMode, setViewMode] = useViewMode('fornitori');
 
   return (
     <DashboardLayout>
@@ -118,6 +121,7 @@ export default function SuppliersPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); loadSuppliers(1, searchTerm); }} />
           <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
       </div>

@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
+import { PageSizeSelector } from "@/components/ui/page-size-selector";
+import { usePageSize } from "@/hooks/usePageSize";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -84,6 +86,7 @@ function InventoryItemImage({ item, typeInfo }: { item: InventoryItem; typeInfo?
 export default function InventoryClient({ initialItems, initialTotal, initialTypes }: InventoryClientProps) {
   const { userRole } = useAuth();
   const [viewMode, setViewMode] = useViewMode('magazzino');
+  const [pageSize, setPageSize] = usePageSize('magazzino');
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "all";
 
@@ -103,7 +106,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
   // Pagination state
   const [page, setPage] = useState(1);
-  const [limit] = useState(12); // Grid layout: 1, 2, 3, 4 cols
+  const limit = pageSize;
   const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / 12) || 1);
   const [totalItems, setTotalItems] = useState(initialTotal);
 
@@ -164,7 +167,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType]);
+  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, pageSize]);
 
   const loadItems = async () => {
     try {
@@ -350,6 +353,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
           <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR" aria-label="Scansiona Barcode/QR">
             <ScanLine className="h-4 w-4" />
           </Button>
+          <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
 

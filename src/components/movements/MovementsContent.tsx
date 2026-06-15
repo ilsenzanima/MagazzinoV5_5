@@ -16,6 +16,8 @@ import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
+import { PageSizeSelector } from "@/components/ui/page-size-selector";
+import { usePageSize } from "@/hooks/usePageSize";
 interface MovementsContentProps {
   initialMovements: DeliveryNote[];
   initialTotalItems: number;
@@ -24,7 +26,8 @@ interface MovementsContentProps {
 export default function MovementsContent({ initialMovements, initialTotalItems }: MovementsContentProps) {
   const { userRole } = useAuth();
   const [viewMode, setViewMode] = useViewMode('movimentazioni');
-  const ITEMS_PER_PAGE = 12;
+  const [pageSize, setPageSize] = usePageSize('movimentazioni');
+  const ITEMS_PER_PAGE = pageSize;
   const initialTotalPages = Math.ceil(initialTotalItems / ITEMS_PER_PAGE);
 
   const [movements, setMovements] = useState<DeliveryNote[]>(initialMovements);
@@ -44,7 +47,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
 
   useEffect(() => {
     setPage(1);
-  }, [deferredSearch, dateFrom, dateTo]);
+  }, [deferredSearch, dateFrom, dateTo, pageSize]);
 
   useEffect(() => {
     // Skip the first load if we are on page 1 and search/date filters are empty (we have initial data)
@@ -149,6 +152,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
               onChange={handleSearchChange}
             />
           </div>
+          <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <ViewToggle mode={viewMode} onChange={setViewMode} />
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
