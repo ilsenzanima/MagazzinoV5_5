@@ -224,7 +224,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                             </div>
 
                             {articleNames && (
-                              <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed line-clamp-2">
+                              <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
                                 {articleNames}
                               </p>
                             )}
@@ -263,7 +263,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                           <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0">
                             {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}
                           </span>
-                          <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 truncate hidden md:block">
+                          <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 break-words hidden md:block">
                             {articleNames || '—'}
                           </span>
                           <div className="flex items-center gap-2 shrink-0 ml-auto">

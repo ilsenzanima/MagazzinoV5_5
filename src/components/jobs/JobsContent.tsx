@@ -79,12 +79,12 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
 
   // Load Jobs (Server Side Search & Pagination)
   useEffect(() => {
-    if (page === 1 && !deferredSearchTerm && !filterClientId && jobs === initialJobs && initialJobs.length > 0) {
+    if (page === 1 && !deferredSearchTerm && !filterClientId && jobs === initialJobs && initialJobs.length > 0 && pageSize === 12) {
       return;
     }
     loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, deferredSearchTerm, filterClientId]);
+  }, [page, deferredSearchTerm, filterClientId, pageSize]);
 
   const loadJobs = async () => {
     try {

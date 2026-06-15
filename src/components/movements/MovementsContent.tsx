@@ -50,15 +50,15 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   }, [deferredSearch, dateFrom, dateTo, pageSize]);
 
   useEffect(() => {
-    // Skip the first load if we are on page 1 and search/date filters are empty (we have initial data)
-    if (isFirstRender && page === 1 && deferredSearch === "" && !dateFrom && !dateTo) {
+    // Skip the first load only if we have SSR data AND the page size matches what was pre-fetched (12)
+    if (isFirstRender && page === 1 && deferredSearch === "" && !dateFrom && !dateTo && pageSize === 12) {
       setIsFirstRender(false);
       return;
     }
 
     loadMovements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, deferredSearch, dateFrom, dateTo]);
+  }, [page, deferredSearch, dateFrom, dateTo, pageSize]);
 
   // Helper to extract numeric part from delivery note number (e.g., "4/PP26" -> 4)
   const extractBollaNumber = (number: string): number => {
@@ -239,7 +239,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                           {jobLabel}
                         </span>
                       )}
-                      <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 truncate hidden lg:block">
+                      <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 break-words hidden lg:block">
                         {movement.itemNames?.join(', ') || '—'}
                       </span>
                       <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 ml-auto">
