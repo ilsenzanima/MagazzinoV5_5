@@ -99,12 +99,19 @@ export const purchasesApi = {
 
             // Helper: resolve foreign-key IDs for a single term
             const resolveIds = async (term: string) => {
-                const [suppliersRes, jobsRes] = await Promise.all([
+                const [suppliersRes, jobsRes, clientsRes] = await Promise.all([
                     supabase.from('suppliers').select('id').ilike('name', `%${term}%`),
-                    supabase.from('jobs').select('id').ilike('code', `%${term}%`),
+                    supabase.from('jobs').select('id').or(`code.ilike.%${term}%,name.ilike.%${term}%,description.ilike.%${term}%`),
+                    supabase.from('clients').select('id').ilike('name', `%${term}%`),
                 ]);
                 const sIds = (suppliersRes.data || []).map((s: any) => s.id);
-                const jIds = (jobsRes.data || []).map((j: any) => j.id);
+                let jIds = (jobsRes.data || []).map((j: any) => j.id);
+                // Add jobs matching by client name
+                if (clientsRes.data && clientsRes.data.length > 0) {
+                    const clientIds = clientsRes.data.map((c: any) => c.id);
+                    const { data: jobsByClient } = await supabase.from('jobs').select('id').in('client_id', clientIds);
+                    if (jobsByClient) jIds = [...new Set([...jIds, ...jobsByClient.map((j: any) => j.id)])];
+                }
 
                 // Also search by inventory item names
                 let pIds: string[] = [];

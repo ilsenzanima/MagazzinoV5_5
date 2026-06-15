@@ -121,7 +121,14 @@ export const deliveryNotesApi = {
                     const { data: jobs } = await supabase
                         .from('jobs')
                         .select('id')
-                        .or(`code.ilike.%${term}%,description.ilike.%${term}%`);
+                        .or(`code.ilike.%${term}%,name.ilike.%${term}%,description.ilike.%${term}%`);
+                    // Also search by client name
+                    const { data: clients } = await supabase.from('clients').select('id').ilike('name', `%${term}%`);
+                    if (clients && clients.length > 0) {
+                        const clientIds = clients.map((c: any) => c.id);
+                        const { data: jobsByClient } = await supabase.from('jobs').select('id').in('client_id', clientIds);
+                        if (jobsByClient) jIds = [...new Set([...jIds, ...jobsByClient.map((j: any) => j.id)])];
+                    }
                     jIds = (jobs || []).map((j: any) => j.id);
                 }
 
