@@ -17,6 +17,8 @@ import { purchasesApi, invoicesApi, Purchase, Invoice } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { ConvertOrdersModal } from "@/components/purchases/ConvertOrdersModal";
 import { AdvancedSearchTab } from "@/components/purchases/AdvancedSearchTab";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { useViewMode } from "@/hooks/useViewMode";
 
 // ── Shared filter bar ─────────────────────────────────────────────────────────
 
@@ -76,6 +78,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
   const [totalItems, setTotalItems] = useState(0);
   const LIMIT = 12;
   const [convertOrder, setConvertOrder] = useState<Purchase | null>(null);
+  const [viewMode, setViewMode] = useViewMode(orderType === 'order' ? 'ordini' : 'acquisti');
 
   const isOrder = orderType === 'order';
   const newHref = isOrder ? "/purchases/new?type=order" : "/purchases/new";
@@ -111,12 +114,17 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
         </div>
       )}
 
-      <FilterBar
-        searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-        dateFrom={dateFrom} setDateFrom={setDateFrom}
-        dateTo={dateTo} setDateTo={setDateTo}
-        placeholder={isOrder ? "Cerca Ordine (Numero, Fornitore, Commessa, Articolo... usa virgola per OR)" : "Cerca Acquisto (Bolla, Fornitore, Commessa, Articolo... usa virgola per OR)"}
-      />
+      <div className="flex items-start gap-2">
+        <div className="flex-1">
+          <FilterBar
+            searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+            dateFrom={dateFrom} setDateFrom={setDateFrom}
+            dateTo={dateTo} setDateTo={setDateTo}
+            placeholder={isOrder ? "Cerca Ordine (Numero, Fornitore, Commessa, Articolo... usa virgola per OR)" : "Cerca Acquisto (Bolla, Fornitore, Commessa, Articolo... usa virgola per OR)"}
+          />
+        </div>
+        <ViewToggle mode={viewMode} onChange={setViewMode} />
+      </div>
 
       <div className="mt-4">
         {loading ? (
@@ -128,101 +136,169 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {items.length === 0 ? (
-                <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
-                  <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                  <p>{isOrder ? "Nessun ordine trovato" : "Nessun acquisto trovato"}</p>
-                </div>
-              ) : (
-                items.map((purchase) => {
-                  const hasMissingPrices = purchase.items?.some(item => item.price === 0) || purchase.totalAmount === 0;
-                  const articleNames = purchase.items
-                    ?.filter(i => i.itemName)
-                    .map(i => i.itemModel ? `${i.itemName} (${i.itemModel})` : i.itemName!)
-                    .filter((v, idx, arr) => arr.indexOf(v) === idx)
-                    .join(', ');
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {items.length === 0 ? (
+                  <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
+                    <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                    <p>{isOrder ? "Nessun ordine trovato" : "Nessun acquisto trovato"}</p>
+                  </div>
+                ) : (
+                  items.map((purchase) => {
+                    const hasMissingPrices = purchase.items?.some(item => item.price === 0) || purchase.totalAmount === 0;
+                    const articleNames = purchase.items
+                      ?.filter(i => i.itemName)
+                      .map(i => i.itemModel ? `${i.itemName} (${i.itemModel})` : i.itemName!)
+                      .filter((v, idx, arr) => arr.indexOf(v) === idx)
+                      .join(', ');
 
-                  return (
-                    <Link href={`/purchases/${purchase.id}`} key={purchase.id}>
-                      <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200 dark:border-slate-700">
-                        <CardContent className="p-5">
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="min-w-0 flex-1">
-                              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-blue-600 shrink-0" />
-                                <span className="truncate">
-                                  {isOrder ? "Ordine: " : "Bolla: "}{purchase.deliveryNoteNumber}
-                                </span>
-                              </h3>
-                              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 truncate">
-                                <User className="h-3 w-3 shrink-0" />
-                                {purchase.supplierName || 'Fornitore Sconosciuto'}
+                    return (
+                      <Link href={`/purchases/${purchase.id}`} key={purchase.id}>
+                        <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200 dark:border-slate-700">
+                          <CardContent className="p-5">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="min-w-0 flex-1">
+                                <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                                  <span className="truncate">
+                                    {isOrder ? "Ordine: " : "Bolla: "}{purchase.deliveryNoteNumber}
+                                  </span>
+                                </h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 truncate">
+                                  <User className="h-3 w-3 shrink-0" />
+                                  {purchase.supplierName || 'Fornitore Sconosciuto'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                {isOrder && purchase.convertedPurchaseId && (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                    Evaso
+                                  </span>
+                                )}
+                                {purchase.invoiceId && (
+                                  <span title="Fattura collegata"><Receipt className="h-4 w-4 text-blue-500" /></span>
+                                )}
+                                {!isOrder && (purchase.isExhausted ? (
+                                  <span title="Materiale esaurito"><PackageX className="h-4 w-4 text-slate-400" /></span>
+                                ) : (
+                                  <span title="Materiale disponibile"><Package className="h-4 w-4 text-emerald-500" /></span>
+                                ))}
+                                {purchase.documentUrl && (
+                                  <span title="Documento allegato"><Paperclip className="h-4 w-4 text-violet-500" /></span>
+                                )}
+                                {!isOrder && hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
+                                  <span title="Prezzo mancante"><AlertTriangle className="h-5 w-5 text-amber-500" /></span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <div>
+                                {(userRole === 'admin' || userRole === 'operativo') ? (
+                                  <div className="font-bold text-lg text-slate-900 dark:text-white">
+                                    {purchase.totalAmount !== undefined && purchase.totalAmount !== null
+                                      ? `€ ${purchase.totalAmount.toFixed(2)}` : '-'}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 dark:text-slate-500 italic text-sm">Riservato</span>
+                                )}
+                              </div>
+                              {isOrder && !purchase.convertedPurchaseId && (userRole === 'admin' || userRole === 'operativo') && (
+                                <button
+                                  onClick={e => { e.preventDefault(); setConvertOrder(purchase); }}
+                                  title="Converti in Acquisto"
+                                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 border border-blue-200 dark:border-blue-800 rounded px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shrink-0"
+                                >
+                                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                                  Converti
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2 mb-2">
+                              <Calendar className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                              <span>{new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}</span>
+                            </div>
+
+                            {articleNames && (
+                              <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed line-clamp-2">
+                                {articleNames}
                               </p>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              {isOrder && purchase.convertedPurchaseId && (
-                                <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                  Evaso
-                                </span>
-                              )}
-                              {purchase.invoiceId && (
-                                <span title="Fattura collegata"><Receipt className="h-4 w-4 text-blue-500" /></span>
-                              )}
-                              {!isOrder && (purchase.isExhausted ? (
-                                <span title="Materiale esaurito"><PackageX className="h-4 w-4 text-slate-400" /></span>
-                              ) : (
-                                <span title="Materiale disponibile"><Package className="h-4 w-4 text-emerald-500" /></span>
-                              ))}
-                              {purchase.documentUrl && (
-                                <span title="Documento allegato"><Paperclip className="h-4 w-4 text-violet-500" /></span>
-                              )}
-                              {!isOrder && hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
-                                <span title="Prezzo mancante"><AlertTriangle className="h-5 w-5 text-amber-500" /></span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <div>
-                              {(userRole === 'admin' || userRole === 'operativo') ? (
-                                <div className="font-bold text-lg text-slate-900 dark:text-white">
-                                  {purchase.totalAmount !== undefined && purchase.totalAmount !== null
-                                    ? `€ ${purchase.totalAmount.toFixed(2)}` : '-'}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 dark:text-slate-500 italic text-sm">Riservato</span>
-                              )}
-                            </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {items.length === 0 ? (
+                  <div className="text-center py-10 text-slate-400 dark:text-slate-500">
+                    <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                    <p>{isOrder ? "Nessun ordine trovato" : "Nessun acquisto trovato"}</p>
+                  </div>
+                ) : (
+                  items.map((purchase) => {
+                    const hasMissingPrices = purchase.items?.some(item => item.price === 0) || purchase.totalAmount === 0;
+                    const articleNames = purchase.items
+                      ?.filter(i => i.itemName)
+                      .map(i => i.itemModel ? `${i.itemName} (${i.itemModel})` : i.itemName!)
+                      .filter((v, idx, arr) => arr.indexOf(v) === idx)
+                      .join(', ');
+                    return (
+                      <Link href={`/purchases/${purchase.id}`} key={purchase.id}>
+                        <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                          <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span className="font-semibold text-slate-900 dark:text-white w-32 shrink-0 truncate text-sm">
+                            {purchase.deliveryNoteNumber}
+                          </span>
+                          <span className="text-slate-500 dark:text-slate-400 w-40 shrink-0 truncate text-sm">
+                            {purchase.supplierName || '—'}
+                          </span>
+                          <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0">
+                            {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}
+                          </span>
+                          <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 truncate hidden md:block">
+                            {articleNames || '—'}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0 ml-auto">
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                              <span className="font-semibold text-sm text-slate-900 dark:text-white">
+                                {purchase.totalAmount != null ? `€ ${purchase.totalAmount.toFixed(2)}` : '—'}
+                              </span>
+                            )}
+                            {isOrder && purchase.convertedPurchaseId && (
+                              <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Evaso</span>
+                            )}
+                            {purchase.invoiceId && <span title="Fattura collegata"><Receipt className="h-4 w-4 text-blue-500" /></span>}
+                            {!isOrder && (purchase.isExhausted
+                              ? <span title="Esaurito"><PackageX className="h-4 w-4 text-slate-400" /></span>
+                              : <span title="Disponibile"><Package className="h-4 w-4 text-emerald-500" /></span>
+                            )}
+                            {purchase.documentUrl && <span title="Allegato"><Paperclip className="h-4 w-4 text-violet-500" /></span>}
+                            {!isOrder && hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
+                              <span title="Prezzo mancante"><AlertTriangle className="h-4 w-4 text-amber-500" /></span>
+                            )}
                             {isOrder && !purchase.convertedPurchaseId && (userRole === 'admin' || userRole === 'operativo') && (
                               <button
                                 onClick={e => { e.preventDefault(); setConvertOrder(purchase); }}
                                 title="Converti in Acquisto"
-                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 border border-blue-200 dark:border-blue-800 rounded px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shrink-0"
+                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 border border-blue-200 dark:border-blue-800 rounded px-2 py-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                               >
-                                <ArrowRightLeft className="h-3.5 w-3.5" />
+                                <ArrowRightLeft className="h-3 w-3" />
                                 Converti
                               </button>
                             )}
                           </div>
-
-                          <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2 mb-2">
-                            <Calendar className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                            <span>{new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}</span>
-                          </div>
-
-                          {articleNames && (
-                            <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed line-clamp-2">
-                              {articleNames}
-                            </p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  );
-                })
-              )}
-            </div>
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+            )}
             <PaginationControls
               page={page} totalPages={totalPages} loading={loading}
               onPageChange={setPage}
@@ -256,6 +332,7 @@ function InvoicesTab() {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const LIMIT = 12;
+  const [viewMode, setViewMode] = useViewMode('fatture');
 
   useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo]);
   useEffect(() => { loadInvoices(); }, [page, debouncedSearch, dateFrom, dateTo]);
@@ -279,12 +356,17 @@ function InvoicesTab() {
 
   return (
     <>
-      <FilterBar
-        searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-        dateFrom={dateFrom} setDateFrom={setDateFrom}
-        dateTo={dateTo} setDateTo={setDateTo}
-        placeholder="Cerca per numero fattura..."
-      />
+      <div className="flex items-start gap-2">
+        <div className="flex-1">
+          <FilterBar
+            searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+            dateFrom={dateFrom} setDateFrom={setDateFrom}
+            dateTo={dateTo} setDateTo={setDateTo}
+            placeholder="Cerca per numero fattura o fornitore..."
+          />
+        </div>
+        <ViewToggle mode={viewMode} onChange={setViewMode} />
+      </div>
 
       <div className="mt-4">
         {loading ? (
@@ -294,56 +376,99 @@ function InvoicesTab() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {invoices.length === 0 ? (
-                <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
-                  <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                  <p>Nessuna fattura trovata</p>
-                </div>
-              ) : (
-                invoices.map((invoice) => (
-                  <Link href={`/invoices/${invoice.id}`} key={invoice.id}>
-                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200 dark:border-slate-700">
-                      <CardContent className="p-5">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-blue-600 shrink-0" />
-                              <span className="truncate">Fattura: {invoice.invoiceNumber}</span>
-                            </h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 truncate">
-                              <User className="h-3 w-3 shrink-0" />
-                              {invoice.supplierName || 'Fornitore Sconosciuto'}
-                            </p>
-                          </div>
-                          {invoice.documentUrls && invoice.documentUrls.length > 0 && (
-                            <span title="Documento allegato"><Paperclip className="h-4 w-4 text-violet-500 shrink-0 ml-2" /></span>
-                          )}
-                        </div>
-                        <div className="mb-2">
-                          {(userRole === 'admin' || userRole === 'operativo') ? (
-                            <div className="font-bold text-lg text-slate-900 dark:text-white">
-                              {invoice.totalAmount != null ? `€ ${Number(invoice.totalAmount).toFixed(2)}` : '—'}
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {invoices.length === 0 ? (
+                  <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
+                    <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                    <p>Nessuna fattura trovata</p>
+                  </div>
+                ) : (
+                  invoices.map((invoice) => (
+                    <Link href={`/invoices/${invoice.id}`} key={invoice.id}>
+                      <Card className="hover:shadow-md transition-shadow cursor-pointer h-full border-slate-200 dark:border-slate-700">
+                        <CardContent className="p-5">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                                <span className="truncate">Fattura: {invoice.invoiceNumber}</span>
+                              </h3>
+                              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 truncate">
+                                <User className="h-3 w-3 shrink-0" />
+                                {invoice.supplierName || 'Fornitore Sconosciuto'}
+                              </p>
                             </div>
-                          ) : (
-                            <span className="text-slate-400 italic text-sm">Riservato</span>
+                            {invoice.documentUrls && invoice.documentUrls.length > 0 && (
+                              <span title="Documento allegato"><Paperclip className="h-4 w-4 text-violet-500 shrink-0 ml-2" /></span>
+                            )}
+                          </div>
+                          <div className="mb-2">
+                            {(userRole === 'admin' || userRole === 'operativo') ? (
+                              <div className="font-bold text-lg text-slate-900 dark:text-white">
+                                {invoice.totalAmount != null ? `€ ${Number(invoice.totalAmount).toFixed(2)}` : '—'}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-sm">Riservato</span>
+                            )}
+                          </div>
+                          {invoice.purchases && invoice.purchases.length > 0 && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                              {invoice.purchases.length} boll{invoice.purchases.length === 1 ? 'a' : 'e'} collegate
+                            </p>
+                          )}
+                          <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                            <span>{new Date(invoice.invoiceDate).toLocaleDateString('it-IT')}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {invoices.length === 0 ? (
+                  <div className="text-center py-10 text-slate-400 dark:text-slate-500">
+                    <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                    <p>Nessuna fattura trovata</p>
+                  </div>
+                ) : (
+                  invoices.map((invoice) => (
+                    <Link href={`/invoices/${invoice.id}`} key={invoice.id}>
+                      <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                        <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                        <span className="font-semibold text-slate-900 dark:text-white w-36 shrink-0 truncate text-sm">
+                          {invoice.invoiceNumber}
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400 w-44 shrink-0 truncate text-sm">
+                          {invoice.supplierName || '—'}
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0">
+                          {new Date(invoice.invoiceDate).toLocaleDateString('it-IT')}
+                        </span>
+                        {invoice.purchases && invoice.purchases.length > 0 && (
+                          <span className="text-slate-400 dark:text-slate-500 text-xs hidden md:block">
+                            {invoice.purchases.length} boll{invoice.purchases.length === 1 ? 'a' : 'e'}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-2 ml-auto shrink-0">
+                          {(userRole === 'admin' || userRole === 'operativo') && (
+                            <span className="font-semibold text-sm text-slate-900 dark:text-white">
+                              {invoice.totalAmount != null ? `€ ${Number(invoice.totalAmount).toFixed(2)}` : '—'}
+                            </span>
+                          )}
+                          {invoice.documentUrls && invoice.documentUrls.length > 0 && (
+                            <span title="Allegato"><Paperclip className="h-4 w-4 text-violet-500" /></span>
                           )}
                         </div>
-                        {invoice.purchases && invoice.purchases.length > 0 && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                            {invoice.purchases.length} boll{invoice.purchases.length === 1 ? 'a' : 'e'} collegate
-                          </p>
-                        )}
-                        <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                          <span>{new Date(invoice.invoiceDate).toLocaleDateString('it-IT')}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))
-              )}
-            </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
             <PaginationControls
               page={page} totalPages={totalPages} loading={loading}
               onPageChange={setPage} itemLabel="fatture"

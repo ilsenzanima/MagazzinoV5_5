@@ -15,6 +15,8 @@ import { Supplier, suppliersApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { SupplierCard, SupplierDeleteDialog } from "@/components/suppliers";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { useViewMode } from "@/hooks/useViewMode";
 export default function SuppliersPage() {
   const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
@@ -88,6 +90,7 @@ export default function SuppliersPage() {
   };
 
   const canEdit = userRole === 'admin' || userRole === 'operativo';
+  const [viewMode, setViewMode] = useViewMode('fornitori');
 
   return (
     <DashboardLayout>
@@ -105,14 +108,17 @@ export default function SuppliersPage() {
           )}
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            placeholder="Cerca Fornitore (Nome, P.IVA, Email...)"
-            className="pl-9 bg-slate-100 dark:bg-muted border-none"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <Input
+              placeholder="Cerca Fornitore (Nome, P.IVA, Email...)"
+              className="pl-9 bg-slate-100 dark:bg-muted border-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
       </div>
 
@@ -135,8 +141,56 @@ export default function SuppliersPage() {
         </div>
       ) : (
         <>
+          {viewMode === 'list' && (
+            <div className="space-y-1.5 mb-6">
+              {suppliers.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 dark:text-slate-500">
+                  <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>Nessun fornitore trovato</p>
+                </div>
+              ) : suppliers.map((supplier) => (
+                <Link href={`/suppliers/${supplier.id}`} key={supplier.id}>
+                  <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                    <Building2 className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span className="font-semibold text-slate-900 dark:text-white text-sm w-48 shrink-0 truncate">
+                      {supplier.name}
+                    </span>
+                    {supplier.vatNumber && (
+                      <span className="text-slate-400 dark:text-slate-500 text-xs w-32 shrink-0 truncate hidden sm:block">
+                        P.IVA {supplier.vatNumber}
+                      </span>
+                    )}
+                    {supplier.phone && (
+                      <span className="text-slate-500 dark:text-slate-400 text-xs w-32 shrink-0 truncate hidden md:block">
+                        {supplier.phone}
+                      </span>
+                    )}
+                    {supplier.email && (
+                      <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden lg:block">
+                        {supplier.email}
+                      </span>
+                    )}
+                    {supplier.address && (
+                      <span className="text-slate-400 dark:text-slate-500 text-xs w-48 shrink-0 truncate hidden xl:block">
+                        {supplier.address}
+                      </span>
+                    )}
+                    {canEdit && (
+                      <button
+                        className="ml-auto shrink-0 text-xs text-red-500 hover:text-red-700 px-2 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        onClick={e => { e.preventDefault(); openDeleteDialog(supplier); }}
+                      >
+                        Elimina
+                      </button>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
           {/* Supplier Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6" : "hidden"}>
             {suppliers.length === 0 ? (
               <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />

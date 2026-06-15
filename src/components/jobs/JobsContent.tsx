@@ -16,6 +16,8 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { useViewMode } from "@/hooks/useViewMode";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Job, jobsApi } from "@/lib/api";
@@ -124,6 +126,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   };
 
   const canEdit = userRole === 'admin' || userRole === 'operativo';
+  const [viewMode, setViewMode] = useViewMode('commesse');
 
   // Sort initial jobs too
   const sortedJobs = [...jobs].sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
@@ -143,15 +146,18 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
           )}
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            placeholder="Cerca Commessa (Codice, Nome, CIG, CUP, Indirizzo...)"
-            className="pl-9 bg-slate-100 dark:bg-muted border-none"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            aria-label="Cerca commessa"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <Input
+              placeholder="Cerca Commessa (Codice, Nome, CIG, CUP, Indirizzo...)"
+              className="pl-9 bg-slate-100 dark:bg-muted border-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Cerca commessa"
+            />
+          </div>
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
       </div>
 
@@ -173,7 +179,63 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {viewMode === 'list' && (
+            <div className="space-y-1.5 mb-4">
+              {sortedJobs.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 dark:text-slate-500">
+                  <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>Nessuna commessa trovata</p>
+                </div>
+              ) : sortedJobs.map((job) => {
+                const statusCfg = STATUS_CONFIG[job.status as JobStatus];
+                const statusColor = job.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : job.status === 'suspended' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
+                return (
+                  <div
+                    key={job.id}
+                    className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer"
+                    onClick={() => router.push(`/jobs/${job.id}`)}
+                  >
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusColor}`}>
+                      {statusCfg?.label ?? job.status}
+                    </span>
+                    <span className="font-mono text-xs text-slate-500 dark:text-slate-400 w-24 shrink-0 truncate">
+                      {job.code}
+                    </span>
+                    <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 truncate">
+                      {job.name}
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400 text-sm w-36 shrink-0 truncate hidden sm:block">
+                      {job.clientName || '—'}
+                    </span>
+                    <span className="text-slate-400 dark:text-slate-500 text-xs w-28 shrink-0 truncate hidden md:block">
+                      {job.siteAddress || '—'}
+                    </span>
+                    {canEdit && (
+                      <div className="flex gap-1 shrink-0 ml-auto" onClick={e => e.stopPropagation()}>
+                        {(Object.keys(STATUS_CONFIG) as JobStatus[]).map((status) => (
+                          <button
+                            key={status}
+                            disabled={updatingStatus === job.id}
+                            onClick={() => handleStatusChange(job, status)}
+                            className={`rounded-full text-[10px] font-medium transition-all disabled:opacity-50 ${
+                              job.status === status
+                                ? `px-2 py-0.5 ${STATUS_CONFIG[status].active}`
+                                : `px-1.5 py-0.5 ${STATUS_CONFIG[status].inactive}`
+                            }`}
+                          >
+                            {STATUS_CONFIG[status].label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "hidden"}>
             {sortedJobs.length === 0 ? (
               <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />

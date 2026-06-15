@@ -17,6 +17,8 @@ import {
   ScanLine,
   Loader2
 } from "lucide-react";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { useViewMode } from "@/hooks/useViewMode";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -81,6 +83,7 @@ function InventoryItemImage({ item, typeInfo }: { item: InventoryItem; typeInfo?
 
 export default function InventoryClient({ initialItems, initialTotal, initialTypes }: InventoryClientProps) {
   const { userRole } = useAuth();
+  const [viewMode, setViewMode] = useViewMode('magazzino');
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "all";
 
@@ -347,6 +350,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
           <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR" aria-label="Scansiona Barcode/QR">
             <ScanLine className="h-4 w-4" />
           </Button>
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
 
         {/* Tabs */}
@@ -378,7 +382,45 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {viewMode === 'list' && (
+            <div className="space-y-1.5 mb-4">
+              {items.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 dark:text-slate-500">
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>Nessun articolo trovato</p>
+                </div>
+              ) : items.map((item) => {
+                const qtyColor = item.quantity === 0 ? 'text-red-600 border-red-200 bg-red-50 dark:bg-red-900/20'
+                  : item.quantity <= item.minStock ? 'text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-900/20'
+                  : 'text-slate-600 dark:text-slate-400';
+                const pending = pendingMap?.get(item.id);
+                return (
+                  <Link href={`/inventory/${item.id}`} key={item.id}>
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                      <span className="font-mono text-xs text-slate-400 dark:text-slate-500 w-20 shrink-0 truncate">{item.code}</span>
+                      <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 truncate">
+                        {item.name}
+                        {item.model && <span className="text-slate-500 font-normal ml-1">({item.model})</span>}
+                      </span>
+                      <span className="text-slate-500 dark:text-slate-400 text-xs w-24 shrink-0 truncate hidden sm:block">{item.brand}</span>
+                      <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0 truncate hidden md:block">{item.type}</span>
+                      <div className="flex items-center gap-1.5 ml-auto shrink-0">
+                        {pending?.uscita && pending.uscita > 0 && (
+                          <span className="text-[10px] text-amber-600 border border-amber-300 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-full">
+                            ↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                        <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full ${qtyColor}`}>
+                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+          <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "hidden"}>
             {items.length === 0 ? (
               <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />

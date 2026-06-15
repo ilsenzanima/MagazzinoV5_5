@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { useViewMode } from "@/hooks/useViewMode";
 interface MovementsContentProps {
   initialMovements: DeliveryNote[];
   initialTotalItems: number;
@@ -21,6 +23,7 @@ interface MovementsContentProps {
 
 export default function MovementsContent({ initialMovements, initialTotalItems }: MovementsContentProps) {
   const { userRole } = useAuth();
+  const [viewMode, setViewMode] = useViewMode('movimentazioni');
   const ITEMS_PER_PAGE = 12;
   const initialTotalPages = Math.ceil(initialTotalItems / ITEMS_PER_PAGE);
 
@@ -146,6 +149,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
               onChange={handleSearchChange}
             />
           </div>
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
               <span className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Dal</span>
@@ -200,7 +204,50 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {viewMode === 'list' && (
+            <div className="space-y-1.5 mb-4">
+              {movements.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 dark:text-slate-500">
+                  <Truck className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>Nessun movimento trovato</p>
+                </div>
+              ) : movements.map((movement) => {
+                const typeConfig = getTypeConfig(movement);
+                const Icon = typeConfig.icon;
+                const jobLabel = movement.jobName || movement.jobDescription || movement.jobCode;
+                return (
+                  <Link href={`/movements/${movement.id}`} key={movement.id}>
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                      <Badge variant="secondary" className={`${typeConfig.color} text-[10px] px-1.5 py-0.5 shrink-0 flex items-center gap-1`}>
+                        <Icon className="h-3 w-3" />{typeConfig.label}
+                      </Badge>
+                      <span className="font-semibold text-slate-900 dark:text-white w-28 shrink-0 truncate text-sm">
+                        {movement.number}
+                      </span>
+                      <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0">
+                        {format(new Date(movement.date), 'dd/MM/yyyy', { locale: it })}
+                      </span>
+                      <span className="text-slate-500 dark:text-slate-400 text-sm w-36 shrink-0 truncate hidden sm:block">
+                        {movement.causal}
+                      </span>
+                      {jobLabel && (
+                        <span className="text-blue-600 dark:text-blue-400 text-xs w-36 shrink-0 truncate hidden md:block">
+                          {jobLabel}
+                        </span>
+                      )}
+                      <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 truncate hidden lg:block">
+                        {movement.itemNames?.join(', ') || '—'}
+                      </span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 ml-auto">
+                        {movement.itemCount ?? movement.items?.length ?? 0} art.
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+          <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "hidden"}>
             {movements.length === 0 ? (
               <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Truck className="h-12 w-12 mx-auto mb-2 opacity-20" />
