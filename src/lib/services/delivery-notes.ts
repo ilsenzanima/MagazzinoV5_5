@@ -168,19 +168,14 @@ export const deliveryNotesApi = {
                 if (allDnIds.length > 0) allOrConditions.push(`id.in.(${allDnIds.join(',')})`);
                 query = query.or(allOrConditions.join(','));
             } else {
-                // Space = AND: each word must match somewhere
+                // Space = AND: each word must match — resolve IDs per-word to avoid cross-contamination
                 const words = commaTerms[0].split(/\s+/).filter(w => w.length > 0);
-                let jobIds: string[] = [], dnIds: string[] = [];
-                for (const word of words) {
-                    const { jIds, dnIds: dIds } = await resolveIds(word);
-                    jobIds = [...new Set([...jobIds, ...jIds])];
-                    dnIds = [...new Set([...dnIds, ...dIds])];
-                }
                 for (const word of words) {
                     if (word.includes('/')) {
                         query = query.ilike('number', `%${word}%`);
                         continue;
                     }
+                    const { jIds, dnIds } = await resolveIds(word);
                     const orConditions: string[] = [
                         `number.ilike.%${word}%`,
                         `causal.ilike.%${word}%`,
@@ -188,7 +183,7 @@ export const deliveryNotesApi = {
                         `pickup_location.ilike.%${word}%`,
                         `delivery_location.ilike.%${word}%`,
                     ];
-                    if (jobIds.length > 0) orConditions.push(`job_id.in.(${jobIds.join(',')})`);
+                    if (jIds.length > 0) orConditions.push(`job_id.in.(${jIds.join(',')})`);
                     if (dnIds.length > 0) orConditions.push(`id.in.(${dnIds.join(',')})`);
                     query = query.or(orConditions.join(','));
                 }

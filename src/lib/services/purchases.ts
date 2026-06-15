@@ -142,20 +142,14 @@ export const purchasesApi = {
                 if (allPIds.length > 0) allOrConditions.push(`id.in.(${allPIds.join(',')})`);
                 query = query.or(allOrConditions.join(','));
             } else {
-                // Space = AND: each word must match somewhere
+                // Space = AND: each word must match — resolve IDs per-word to avoid cross-contamination
                 const words = commaTerms[0].split(/\s+/).filter(w => w.length > 0);
-                let supplierIds: string[] = [], jobIds: string[] = [], purchaseIds: string[] = [];
                 for (const word of words) {
                     const { sIds, jIds, pIds } = await resolveIds(word);
-                    supplierIds = [...new Set([...supplierIds, ...sIds])];
-                    jobIds = [...new Set([...jobIds, ...jIds])];
-                    purchaseIds = [...new Set([...purchaseIds, ...pIds])];
-                }
-                for (const word of words) {
                     const orConditions = [`delivery_note_number.ilike.%${word}%`, `notes.ilike.%${word}%`];
-                    if (supplierIds.length > 0) orConditions.push(`supplier_id.in.(${supplierIds.join(',')})`);
-                    if (jobIds.length > 0) orConditions.push(`job_id.in.(${jobIds.join(',')})`);
-                    if (purchaseIds.length > 0) orConditions.push(`id.in.(${purchaseIds.join(',')})`);
+                    if (sIds.length > 0) orConditions.push(`supplier_id.in.(${sIds.join(',')})`);
+                    if (jIds.length > 0) orConditions.push(`job_id.in.(${jIds.join(',')})`);
+                    if (pIds.length > 0) orConditions.push(`id.in.(${pIds.join(',')})`);
                     query = query.or(orConditions.join(','));
                 }
             }
