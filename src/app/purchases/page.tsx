@@ -115,7 +115,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
         searchTerm={searchTerm} setSearchTerm={setSearchTerm}
         dateFrom={dateFrom} setDateFrom={setDateFrom}
         dateTo={dateTo} setDateTo={setDateTo}
-        placeholder={isOrder ? "Cerca Ordine (Numero, Fornitore...)" : "Cerca Acquisto (Bolla, Fornitore...)"}
+        placeholder={isOrder ? "Cerca Ordine (Numero, Fornitore, Commessa, Articolo... usa virgola per OR)" : "Cerca Acquisto (Bolla, Fornitore, Commessa, Articolo... usa virgola per OR)"}
       />
 
       <div className="mt-4">

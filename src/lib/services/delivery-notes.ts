@@ -111,39 +111,80 @@ export const deliveryNotesApi = {
         }
 
         if (search) {
-            // Split search into words for fuzzy matching
-            const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
+            const commaTerms = search.split(',').map(t => t.trim()).filter(t => t.length > 0);
 
-            // Find matching jobs (skip words with '/' to avoid PostgREST filter parsing issues)
-            let jobIds: string[] = [];
-            for (const word of words) {
-                if (word.includes('/')) continue;
-                const { data: jobs } = await supabase
-                    .from('jobs')
-                    .select('id')
-                    .or(`code.ilike."%${word}%",description.ilike."%${word}%"`);
-                if (jobs) {
-                    jobIds = [...new Set([...jobIds, ...jobs.map(j => j.id)])];
-                }
-            }
-
-            // For each word, apply OR conditions (chained = AND between words)
-            for (const word of words) {
-                // Words containing '/' are bolla numbers — use direct ilike to avoid
-                // PostgREST raw filter string issues with the '/' character
-                if (word.includes('/')) {
-                    query = query.ilike('number', `%${word}%`);
-                    continue;
+            // Helper: resolve job IDs and delivery_note IDs (by item name) for a single term
+            const resolveIds = async (term: string) => {
+                const hasSlash = term.includes('/');
+                let jIds: string[] = [];
+                if (!hasSlash) {
+                    const { data: jobs } = await supabase
+                        .from('jobs')
+                        .select('id')
+                        .or(`code.ilike.%${term}%,description.ilike.%${term}%`);
+                    jIds = (jobs || []).map((j: any) => j.id);
                 }
 
-                const orConditions: string[] = [
-                    `number.ilike."%${word}%"`,
-                    `causal.ilike."%${word}%"`,
-                ];
-                if (jobIds.length > 0) {
-                    orConditions.push(`job_id.in.(${jobIds.join(',')})`);
+                // Search by inventory item names
+                let dnIds: string[] = [];
+                if (term.length > 2 && !hasSlash) {
+                    const { data: inv } = await supabase.from('inventory').select('id').ilike('name', `%${term}%`);
+                    if (inv && inv.length > 0) {
+                        const { data: dni } = await supabase
+                            .from('delivery_note_items')
+                            .select('delivery_note_id')
+                            .in('inventory_id', inv.map((i: any) => i.id));
+                        dnIds = [...new Set((dni || []).map((d: any) => d.delivery_note_id))];
+                    }
                 }
-                query = query.or(orConditions.join(','));
+                return { jIds, dnIds, hasSlash };
+            };
+
+            if (commaTerms.length > 1) {
+                // Comma = OR: any term can match any field
+                const allOrConditions: string[] = [];
+                let allJIds: string[] = [], allDnIds: string[] = [];
+
+                for (const term of commaTerms) {
+                    const { jIds, dnIds, hasSlash } = await resolveIds(term);
+                    allJIds = [...new Set([...allJIds, ...jIds])];
+                    allDnIds = [...new Set([...allDnIds, ...dnIds])];
+                    allOrConditions.push(
+                        `number.ilike.%${term}%`,
+                        `causal.ilike.%${term}%`,
+                        `notes.ilike.%${term}%`,
+                        `pickup_location.ilike.%${term}%`,
+                        `delivery_location.ilike.%${term}%`,
+                    );
+                }
+                if (allJIds.length > 0) allOrConditions.push(`job_id.in.(${allJIds.join(',')})`);
+                if (allDnIds.length > 0) allOrConditions.push(`id.in.(${allDnIds.join(',')})`);
+                query = query.or(allOrConditions.join(','));
+            } else {
+                // Space = AND: each word must match somewhere
+                const words = commaTerms[0].split(/\s+/).filter(w => w.length > 0);
+                let jobIds: string[] = [], dnIds: string[] = [];
+                for (const word of words) {
+                    const { jIds, dnIds: dIds } = await resolveIds(word);
+                    jobIds = [...new Set([...jobIds, ...jIds])];
+                    dnIds = [...new Set([...dnIds, ...dIds])];
+                }
+                for (const word of words) {
+                    if (word.includes('/')) {
+                        query = query.ilike('number', `%${word}%`);
+                        continue;
+                    }
+                    const orConditions: string[] = [
+                        `number.ilike.%${word}%`,
+                        `causal.ilike.%${word}%`,
+                        `notes.ilike.%${word}%`,
+                        `pickup_location.ilike.%${word}%`,
+                        `delivery_location.ilike.%${word}%`,
+                    ];
+                    if (jobIds.length > 0) orConditions.push(`job_id.in.(${jobIds.join(',')})`);
+                    if (dnIds.length > 0) orConditions.push(`id.in.(${dnIds.join(',')})`);
+                    query = query.or(orConditions.join(','));
+                }
             }
         }
 

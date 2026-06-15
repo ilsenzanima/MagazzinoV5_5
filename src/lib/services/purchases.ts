@@ -95,31 +95,62 @@ export const purchasesApi = {
         }
 
         if (search) {
-            // Split search into words for fuzzy matching
-            const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
+            const commaTerms = search.split(',').map(t => t.trim()).filter(t => t.length > 0);
 
-            // Find matching suppliers
-            let supplierIds: string[] = [];
-            for (const word of words) {
-                const { data: suppliers } = await supabase
-                    .from('suppliers')
-                    .select('id')
-                    .ilike('name', `%${word}%`);
-                if (suppliers) {
-                    supplierIds = [...new Set([...supplierIds, ...suppliers.map(s => s.id)])];
-                }
-            }
+            // Helper: resolve foreign-key IDs for a single term
+            const resolveIds = async (term: string) => {
+                const [suppliersRes, jobsRes] = await Promise.all([
+                    supabase.from('suppliers').select('id').ilike('name', `%${term}%`),
+                    supabase.from('jobs').select('id').ilike('code', `%${term}%`),
+                ]);
+                const sIds = (suppliersRes.data || []).map((s: any) => s.id);
+                const jIds = (jobsRes.data || []).map((j: any) => j.id);
 
-            // For each word, apply OR conditions (chained = AND between words)
-            for (const word of words) {
-                let orConditions = [
-                    `delivery_note_number.ilike.%${word}%`,
-                    `notes.ilike.%${word}%`
-                ];
-                if (supplierIds.length > 0) {
-                    orConditions.push(`supplier_id.in.(${supplierIds.join(',')})`);
+                // Also search by inventory item names
+                let pIds: string[] = [];
+                if (term.length > 2) {
+                    const { data: inv } = await supabase.from('inventory').select('id').ilike('name', `%${term}%`);
+                    if (inv && inv.length > 0) {
+                        const { data: pi } = await supabase.from('purchase_items').select('purchase_id').in('item_id', inv.map((i: any) => i.id));
+                        pIds = [...new Set((pi || []).map((p: any) => p.purchase_id))];
+                    }
                 }
-                query = query.or(orConditions.join(','));
+                return { sIds, jIds, pIds };
+            };
+
+            if (commaTerms.length > 1) {
+                // Comma = OR: any term can match any field
+                const allOrConditions: string[] = [];
+                let allSIds: string[] = [], allJIds: string[] = [], allPIds: string[] = [];
+
+                for (const term of commaTerms) {
+                    const { sIds, jIds, pIds } = await resolveIds(term);
+                    allSIds = [...new Set([...allSIds, ...sIds])];
+                    allJIds = [...new Set([...allJIds, ...jIds])];
+                    allPIds = [...new Set([...allPIds, ...pIds])];
+                    allOrConditions.push(`delivery_note_number.ilike.%${term}%`, `notes.ilike.%${term}%`);
+                }
+                if (allSIds.length > 0) allOrConditions.push(`supplier_id.in.(${allSIds.join(',')})`);
+                if (allJIds.length > 0) allOrConditions.push(`job_id.in.(${allJIds.join(',')})`);
+                if (allPIds.length > 0) allOrConditions.push(`id.in.(${allPIds.join(',')})`);
+                query = query.or(allOrConditions.join(','));
+            } else {
+                // Space = AND: each word must match somewhere
+                const words = commaTerms[0].split(/\s+/).filter(w => w.length > 0);
+                let supplierIds: string[] = [], jobIds: string[] = [], purchaseIds: string[] = [];
+                for (const word of words) {
+                    const { sIds, jIds, pIds } = await resolveIds(word);
+                    supplierIds = [...new Set([...supplierIds, ...sIds])];
+                    jobIds = [...new Set([...jobIds, ...jIds])];
+                    purchaseIds = [...new Set([...purchaseIds, ...pIds])];
+                }
+                for (const word of words) {
+                    const orConditions = [`delivery_note_number.ilike.%${word}%`, `notes.ilike.%${word}%`];
+                    if (supplierIds.length > 0) orConditions.push(`supplier_id.in.(${supplierIds.join(',')})`);
+                    if (jobIds.length > 0) orConditions.push(`job_id.in.(${jobIds.join(',')})`);
+                    if (purchaseIds.length > 0) orConditions.push(`id.in.(${purchaseIds.join(',')})`);
+                    query = query.or(orConditions.join(','));
+                }
             }
         }
 
