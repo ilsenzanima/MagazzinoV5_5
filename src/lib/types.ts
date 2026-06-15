@@ -238,6 +238,8 @@ export interface Purchase {
     quantity?: number;
     jobId?: string;
     jobCode?: string;
+    jobName?: string;
+    jobClientName?: string;
     documentUrl?: string | null;
     documentUrls?: string[];
     totalAmount?: number;
@@ -285,6 +287,7 @@ export interface PurchaseItem {
     price: number;
     jobId?: string;
     jobCode?: string;
+    jobName?: string;
     createdAt: string;
     transportApplied?: boolean;
     transportUnitCost?: number;

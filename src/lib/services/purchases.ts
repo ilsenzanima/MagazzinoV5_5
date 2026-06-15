@@ -21,6 +21,8 @@ export const mapDbToPurchase = (db: any): Purchase => ({
     orderType: db.order_type ?? 'purchase',
     jobId: db.job_id,
     jobCode: db.jobs?.code,
+    jobName: db.jobs?.name,
+    jobClientName: db.jobs?.clients?.name,
     documentUrl: db.document_url,
     documentUrls: (db.document_urls && db.document_urls.length > 0)
         ? db.document_urls
@@ -78,7 +80,7 @@ export const purchasesApi = {
 
         let query = supabase
             .from('purchases')
-            .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model)), invoices(invoice_number), converted_purchase:converted_purchase_id(delivery_note_number)', { count: 'estimated' })
+            .select('*, suppliers(name), jobs(code, name, clients(name)), purchase_items(price, quantity, inventory(name, model)), invoices(invoice_number), converted_purchase:converted_purchase_id(delivery_note_number)', { count: 'estimated' })
             .eq('order_type', orderType)
             .is('deleted_at', null);
 
@@ -348,7 +350,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchase_items')
-                .select('*, inventory(name, code, model, unit), jobs(code)')
+                .select('*, inventory(name, code, model, unit), jobs(code, name)')
                 .eq('purchase_id', purchaseId)
         );
 
@@ -367,6 +369,7 @@ export const purchasesApi = {
             price: item.price,
             jobId: item.job_id,
             jobCode: item.jobs?.code,
+            jobName: item.jobs?.name,
             createdAt: item.created_at,
             transportApplied: item.transport_applied ?? false,
             transportUnitCost: item.transport_unit_cost ?? 0,

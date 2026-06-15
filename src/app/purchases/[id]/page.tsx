@@ -668,10 +668,8 @@ export default function PurchaseDetailPage() {
                                 >
                                     {selectedHeaderJob ? (
                                         <div className="flex flex-col overflow-hidden">
-                                            <span className="font-medium text-sm truncate">{selectedHeaderJob.code}</span>
-                                            {selectedHeaderJob.clientName && (
-                                                <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.clientName}</span>
-                                            )}
+                                            <span className="font-medium text-sm truncate">{selectedHeaderJob.name || selectedHeaderJob.code}</span>
+                                            <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.code}{selectedHeaderJob.clientName ? ` · ${selectedHeaderJob.clientName}` : ''}</span>
                                         </div>
                                     ) : (
                                         <span className="text-sm text-slate-500 truncate">Seleziona per applicare a nuovi articoli...</span>
@@ -964,7 +962,7 @@ export default function PurchaseDetailPage() {
                                                 <TableCell>
                                                     {item.jobId ? (
                                                         <span className="text-blue-600 font-medium text-sm">
-                                                            Commessa: {item.jobCode}
+                                                            Commessa: {item.jobName || item.jobCode}
                                                         </span>
                                                     ) : (
                                                         <span className="text-green-600 font-medium text-sm">
@@ -1058,7 +1056,7 @@ export default function PurchaseDetailPage() {
                                                     <span className="text-xs font-mono text-slate-500">{item.itemCode}</span>
                                                     {item.jobId ? (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
-                                                            {item.jobCode}
+                                                            {item.jobName || item.jobCode}
                                                         </span>
                                                     ) : (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 font-medium">

@@ -541,10 +541,8 @@ function NewPurchaseContent() {
                                 >
                                     {selectedHeaderJob ? (
                                         <div className="flex flex-col overflow-hidden">
-                                            <span className="font-medium text-sm truncate">{selectedHeaderJob.code}</span>
-                                            {selectedHeaderJob.clientName && (
-                                                <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.clientName}</span>
-                                            )}
+                                            <span className="font-medium text-sm truncate">{selectedHeaderJob.name || selectedHeaderJob.code}</span>
+                                            <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.code}{selectedHeaderJob.clientName ? ` · ${selectedHeaderJob.clientName}` : ''}</span>
                                         </div>
                                     ) : (
                                         <span className="text-sm text-slate-500 truncate">Seleziona per intero acquisto...</span>
