@@ -22,7 +22,8 @@ import {
   Calendar,
   Scissors,
   Receipt,
-  Trash2
+  Trash2,
+  FileText
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -106,6 +107,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/clients",
           active: pathname === "/clients" || pathname.startsWith("/clients/"),
         },
+        ...(userRole === "admin" || userRole === "operativo" ? [{
+          label: "Proposte",
+          icon: FileText,
+          href: "/proposals",
+          active: pathname === "/proposals",
+        }] : []),
       ]
     },
     {

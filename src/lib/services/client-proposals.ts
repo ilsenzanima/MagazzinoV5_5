@@ -122,6 +122,16 @@ export const clientProposalsApi = {
         if (error) throw error;
     },
 
+    getAll: async (): Promise<(ClientProposal & { clientName: string })[]> => {
+        const { data, error } = await supabase
+            .from('client_proposals')
+            .select('*, clients(name)')
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(d => ({ ...map(d), clientName: d.clients?.name || '' }));
+    },
+
     getByConvertedJobId: async (jobId: string): Promise<ClientProposal | null> => {
         const { data, error } = await supabase
             .from('client_proposals')
