@@ -20,6 +20,7 @@ export default async function AttendancePage() {
             .from('jobs')
             .select('*, clients(name, street, city)')
             .eq('status', 'active')
+            .is('deleted_at', null)
             .order('code')
     ]);
 
