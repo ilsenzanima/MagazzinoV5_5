@@ -23,7 +23,8 @@ import {
   Scissors,
   Receipt,
   Trash2,
-  FileText
+  FileText,
+  ShieldCheck
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -62,6 +63,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           icon: ShoppingCart,
           href: "/purchases",
           active: pathname === "/purchases" || pathname.startsWith("/purchases/"),
+        },
+        {
+          label: "Gestione conformità",
+          icon: ShieldCheck,
+          href: "/compliance",
+          active: pathname === "/compliance",
         },
         {
           label: "Movimentazione",
