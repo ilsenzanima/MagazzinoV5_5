@@ -1123,18 +1123,31 @@ export default function PurchaseDetailPage() {
                                                         }}
                                                     />
                                                 </div>
-                                                <div className="col-span-2">
+                                                <div className="col-span-1">
                                                     <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Prezzo</Label>
                                                     <Input
                                                         type="number"
                                                         step="0.00001"
                                                         className="h-7 text-sm"
                                                         value={editValues.price}
-                                                        onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
+                                                        onChange={(e) => {
+                                                            const price = parseFloat(e.target.value);
+                                                            const quantity = parseFloat(editValues.quantity);
+                                                            const total = !isNaN(price) && !isNaN(quantity) ? (price * quantity).toFixed(2) : editValues.total;
+                                                            setEditValues({ ...editValues, price: e.target.value, total });
+                                                        }}
                                                     />
-                                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight">
-                                                        Totale riga ÷ qtà se hai solo il totale.
-                                                    </p>
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Totale Riga</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="h-7 text-sm"
+                                                        value={editValues.total}
+                                                        onChange={(e) => handleEditTotalChange(e.target.value)}
+                                                        onBlur={handleEditTotalBlur}
+                                                    />
                                                 </div>
                                             </div>
                                         ) : (
