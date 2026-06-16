@@ -221,28 +221,26 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                 const jobLabel = movement.jobName || movement.jobDescription || movement.jobCode;
                 return (
                   <Link href={`/movements/${movement.id}`} key={movement.id}>
-                    <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
-                      <Badge variant="secondary" className={`${typeConfig.color} text-[10px] px-1.5 py-0.5 shrink-0 flex items-center gap-1`}>
+                    <div className="flex items-start gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                      <Badge variant="secondary" className={`${typeConfig.color} text-[10px] px-1.5 py-0.5 shrink-0 flex items-center gap-1 mt-0.5`}>
                         <Icon className="h-3 w-3" />{typeConfig.label}
                       </Badge>
                       <span className="font-semibold text-slate-900 dark:text-white w-28 shrink-0 truncate text-sm">
                         {movement.number}
                       </span>
-                      <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0">
+                      <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0 pt-0.5">
                         {format(new Date(movement.date), 'dd/MM/yyyy', { locale: it })}
                       </span>
-                      <span className="text-slate-500 dark:text-slate-400 text-sm w-36 shrink-0 truncate hidden sm:block">
-                        {movement.causal}
+                      <span className="text-slate-500 dark:text-slate-400 text-xs w-36 shrink-0 break-words hidden sm:block">
+                        {movement.causal || '—'}
                       </span>
-                      {jobLabel && (
-                        <span className="text-blue-600 dark:text-blue-400 text-xs w-36 shrink-0 truncate hidden md:block">
-                          {jobLabel}
-                        </span>
-                      )}
+                      <span className="text-blue-600 dark:text-blue-400 text-xs w-36 shrink-0 break-words hidden md:block">
+                        {jobLabel || '—'}
+                      </span>
                       <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 break-words hidden lg:block">
                         {movement.itemNames?.join(', ') || '—'}
                       </span>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 ml-auto">
+                      <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 ml-auto pt-0.5">
                         {movement.itemCount ?? movement.items?.length ?? 0} art.
                       </span>
                     </div>

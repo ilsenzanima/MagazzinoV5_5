@@ -452,11 +452,11 @@ function InvoicesTab() {
                         <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0">
                           {new Date(invoice.invoiceDate).toLocaleDateString('it-IT')}
                         </span>
-                        {invoice.purchases && invoice.purchases.length > 0 && (
-                          <span className="text-slate-400 dark:text-slate-500 text-xs hidden md:block">
-                            {invoice.purchases.length} boll{invoice.purchases.length === 1 ? 'a' : 'e'}
-                          </span>
-                        )}
+                        <span className="text-slate-400 dark:text-slate-500 text-xs w-16 shrink-0 hidden md:block">
+                          {invoice.purchases && invoice.purchases.length > 0
+                            ? `${invoice.purchases.length} boll${invoice.purchases.length === 1 ? 'a' : 'e'}`
+                            : '—'}
+                        </span>
                         <div className="flex items-center gap-2 ml-auto shrink-0">
                           {(userRole === 'admin' || userRole === 'operativo') && (
                             <span className="font-semibold text-sm text-slate-900 dark:text-white">

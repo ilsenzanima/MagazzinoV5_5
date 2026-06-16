@@ -120,11 +120,9 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                             <span className="font-semibold text-slate-900 dark:text-white text-sm w-40 shrink-0 truncate capitalize">
                                 {worker.firstName} {worker.lastName}
                             </span>
-                            {worker.email && (
-                                <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden sm:block">
-                                    {worker.email}
-                                </span>
-                            )}
+                            <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden sm:block">
+                                {worker.email || '—'}
+                            </span>
                             <div className="flex items-center gap-2 ml-auto shrink-0" onClick={e => e.stopPropagation()}>
                                 <Badge className={cn(
                                     "text-xs px-1.5 py-0 pointer-events-none",

@@ -159,26 +159,18 @@ export default function SuppliersPage() {
                     <span className="font-semibold text-slate-900 dark:text-white text-sm w-48 shrink-0 truncate">
                       {supplier.name}
                     </span>
-                    {supplier.vatNumber && (
-                      <span className="text-slate-400 dark:text-slate-500 text-xs w-32 shrink-0 truncate hidden sm:block">
-                        P.IVA {supplier.vatNumber}
-                      </span>
-                    )}
-                    {supplier.phone && (
-                      <span className="text-slate-500 dark:text-slate-400 text-xs w-32 shrink-0 truncate hidden md:block">
-                        {supplier.phone}
-                      </span>
-                    )}
-                    {supplier.email && (
-                      <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden lg:block">
-                        {supplier.email}
-                      </span>
-                    )}
-                    {supplier.address && (
-                      <span className="text-slate-400 dark:text-slate-500 text-xs w-48 shrink-0 truncate hidden xl:block">
-                        {supplier.address}
-                      </span>
-                    )}
+                    <span className="text-slate-400 dark:text-slate-500 text-xs w-36 shrink-0 truncate hidden sm:block">
+                      {supplier.vatNumber ? `P.IVA ${supplier.vatNumber}` : '—'}
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400 text-xs w-32 shrink-0 truncate hidden md:block">
+                      {supplier.phone || '—'}
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden lg:block">
+                      {supplier.email || '—'}
+                    </span>
+                    <span className="text-slate-400 dark:text-slate-500 text-xs w-48 shrink-0 truncate hidden xl:block">
+                      {supplier.address || '—'}
+                    </span>
                     {canEdit && (
                       <button
                         className="ml-auto shrink-0 text-xs text-red-500 hover:text-red-700 px-2 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
