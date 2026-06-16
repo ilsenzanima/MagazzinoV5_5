@@ -430,7 +430,7 @@ export const purchasesApi = {
     getOrdersForConversion: async (ids: string[]) => {
         const { data, error } = await supabase
             .from('purchases')
-            .select('id, supplier_id, transport_cost, suppliers(name), job_id, jobs(code), purchase_items(item_id, price, quantity, pieces, coefficient, job_id, transport_applied, jobs(code), inventory(id, name, model, code, unit, coefficient))')
+            .select('id, supplier_id, transport_cost, suppliers(name), job_id, jobs(code), purchase_items(item_id, price, quantity, pieces, coefficient, job_id, transport_applied, transport_unit_cost, jobs(code), inventory(id, name, model, code, unit, coefficient))')
             .in('id', ids)
             .eq('order_type', 'order');
         if (error) throw error;
@@ -441,20 +441,28 @@ export const purchasesApi = {
             jobId: p.job_id ?? null,
             jobCode: p.jobs?.code ?? null,
             transportCost: p.transport_cost ?? 0,
-            items: (p.purchase_items ?? []).map((i: any) => ({
-                itemId: i.item_id,
-                itemName: i.inventory?.name ?? '',
-                itemModel: i.inventory?.model,
-                itemCode: i.inventory?.code,
-                itemUnit: i.inventory?.unit ?? 'PZ',
-                coefficient: Number(i.inventory?.coefficient ?? i.coefficient ?? 1),
-                quantity: i.quantity,
-                pieces: i.pieces,
-                price: i.price,
-                jobId: i.job_id ?? null,
-                jobCode: i.jobs?.code ?? null,
-                transportApplied: i.transport_applied ?? false,
-            })),
+            items: (p.purchase_items ?? []).map((i: any) => {
+                const transportApplied = i.transport_applied ?? false;
+                const transportUnitCost = i.transport_unit_cost ?? 0;
+                // Se il trasporto era già applicato al prezzo, lo sottraiamo per avere il prezzo netto
+                const netPrice = transportApplied && transportUnitCost > 0
+                    ? parseFloat((i.price - transportUnitCost).toFixed(5))
+                    : i.price;
+                return {
+                    itemId: i.item_id,
+                    itemName: i.inventory?.name ?? '',
+                    itemModel: i.inventory?.model,
+                    itemCode: i.inventory?.code,
+                    itemUnit: i.inventory?.unit ?? 'PZ',
+                    coefficient: Number(i.inventory?.coefficient ?? i.coefficient ?? 1),
+                    quantity: i.quantity,
+                    pieces: i.pieces,
+                    price: netPrice,
+                    jobId: i.job_id ?? null,
+                    jobCode: i.jobs?.code ?? null,
+                    transportApplied: false, // sempre falso: il nuovo acquisto parte senza trasporto applicato
+                };
+            }),
         }));
     },
 
