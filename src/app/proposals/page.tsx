@@ -8,10 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, MapPin, FileText } from "lucide-react";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { Loader2, Search, MapPin, FileText, Users } from "lucide-react";
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals";
 import { notify } from "@/lib/notify";
 import { useAuth } from "@/components/auth-provider";
+import { useViewMode } from "@/hooks/useViewMode";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -31,6 +33,7 @@ type ProposalWithClient = ClientProposal & { clientName: string };
 export default function ProposalsPage() {
   const { userRole } = useAuth();
   const router = useRouter();
+  const [viewMode, setViewMode] = useViewMode("proposte");
 
   const [proposals, setProposals] = useState<ProposalWithClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,8 +86,8 @@ export default function ProposalsPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Tutte le proposte di tutti i committenti</p>
         </div>
 
-        {/* Filtri */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* Filtri + toggle */}
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
@@ -116,6 +119,7 @@ export default function ProposalsPage() {
               ))}
             </SelectContent>
           </Select>
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
 
         {/* Conteggio */}
@@ -126,7 +130,7 @@ export default function ProposalsPage() {
           </p>
         )}
 
-        {/* Lista */}
+        {/* Contenuto */}
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -135,6 +139,40 @@ export default function ProposalsPage() {
           <div className="text-center py-20 text-slate-400">
             <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
             <p>{proposals.length === 0 ? "Nessuna proposta presente." : "Nessuna proposta corrisponde ai filtri."}</p>
+          </div>
+        ) : viewMode === "list" ? (
+          <div className="space-y-1.5">
+            {filtered.map(p => (
+              <Link key={p.id} href={`/clients/${p.clientId}/proposals/${p.id}`}>
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                  <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                  <span className="font-medium text-slate-900 dark:text-white text-sm flex-1 min-w-0 truncate">
+                    {p.title}
+                  </span>
+                  <span className="text-blue-700 dark:text-blue-400 text-xs w-44 shrink-0 truncate hidden sm:flex items-center gap-1">
+                    <Users className="h-3 w-3 shrink-0" />{p.clientName}
+                  </span>
+                  {p.estimatedValue !== null && (
+                    <span className="text-slate-600 dark:text-slate-300 text-xs w-28 shrink-0 text-right hidden md:block">
+                      € {p.estimatedValue.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                  {(p.siteCity || p.siteStreet) && (
+                    <span className="text-slate-400 text-xs w-36 shrink-0 truncate hidden lg:flex items-center gap-1">
+                      <MapPin className="h-3 w-3 shrink-0" />{[p.siteStreet, p.siteCity].filter(Boolean).join(", ")}
+                    </span>
+                  )}
+                  {p.date && (
+                    <span className="text-slate-400 text-xs w-24 shrink-0 hidden xl:block">
+                      {format(new Date(p.date), "d MMM yyyy", { locale: it })}
+                    </span>
+                  )}
+                  <Badge className={`text-xs shrink-0 ${PROP_STATUS_COLORS[p.status]}`} variant="secondary">
+                    {PROP_STATUS_LABELS[p.status]}
+                  </Badge>
+                </div>
+              </Link>
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
