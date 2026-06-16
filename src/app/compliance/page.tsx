@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { suppliersApi } from "@/lib/services/suppliers";
 import { brandsApi } from "@/lib/services/inventory";
+import { createClient } from "@/lib/supabase/client";
 import {
     complianceApi,
     ComplianceDocument,
@@ -397,6 +398,20 @@ function DocumentCard({
     onEdit: (doc: ComplianceDocument) => void;
     onDelete: (doc: ComplianceDocument) => void;
 }) {
+    const supabase = createClient();
+
+    const openDocument = async () => {
+        try {
+            const path = doc.fileUrl.split('/public/documents/')[1];
+            if (!path) { window.open(doc.fileUrl, '_blank'); return; }
+            const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600);
+            if (error || !data?.signedUrl) { window.open(doc.fileUrl, '_blank'); return; }
+            window.open(data.signedUrl, '_blank');
+        } catch {
+            window.open(doc.fileUrl, '_blank');
+        }
+    };
+
     return (
         <Card className="group">
             <CardContent className="p-4">
@@ -428,15 +443,8 @@ function DocumentCard({
                         </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            asChild
-                        >
-                            <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" title="Apri documento">
-                                <ExternalLink className="h-4 w-4" />
-                            </a>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openDocument} title="Apri documento">
+                            <ExternalLink className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(doc)} title="Modifica">
                             <Pencil className="h-4 w-4" />
