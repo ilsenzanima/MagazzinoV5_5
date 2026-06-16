@@ -376,15 +376,17 @@ export const purchasesApi = {
         }));
     },
     addItem: async (item: Partial<PurchaseItem>) => {
-        const dbItem = {
+        const dbItem: any = {
             purchase_id: item.purchaseId,
             item_id: item.itemId,
             quantity: item.quantity,
             pieces: item.pieces,
             coefficient: item.coefficient,
             price: item.price,
-            job_id: item.jobId
+            job_id: item.jobId,
         };
+        if (item.transportApplied !== undefined) dbItem.transport_applied = item.transportApplied;
+        if (item.transportUnitCost !== undefined) dbItem.transport_unit_cost = item.transportUnitCost;
         const { data, error } = await supabase.from('purchase_items').insert(dbItem).select().single();
         if (error) throw error;
         return data;
@@ -430,7 +432,7 @@ export const purchasesApi = {
     getOrdersForConversion: async (ids: string[]) => {
         const { data, error } = await supabase
             .from('purchases')
-            .select('id, supplier_id, transport_cost, suppliers(name), job_id, jobs(code), purchase_items(item_id, price, quantity, pieces, coefficient, job_id, transport_applied, jobs(code), inventory(id, name, model, code, unit, coefficient))')
+            .select('id, supplier_id, transport_cost, suppliers(name), job_id, jobs(code), purchase_items(item_id, price, quantity, pieces, coefficient, job_id, transport_applied, transport_unit_cost, jobs(code), inventory(id, name, model, code, unit, coefficient))')
             .in('id', ids)
             .eq('order_type', 'order');
         if (error) throw error;
@@ -454,6 +456,7 @@ export const purchasesApi = {
                 jobId: i.job_id ?? null,
                 jobCode: i.jobs?.code ?? null,
                 transportApplied: i.transport_applied ?? false,
+                transportUnitCost: i.transport_unit_cost ?? 0,
             })),
         }));
     },

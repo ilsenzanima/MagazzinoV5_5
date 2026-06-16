@@ -45,6 +45,7 @@ interface PurchaseLine {
     jobId?: string;
     jobCode?: string;
     transportApplied?: boolean;
+    transportUnitCost?: number;
 }
 
 const emptyLine = (): PurchaseLine => ({
@@ -201,6 +202,7 @@ function NewPurchaseContent() {
                             jobId: item.jobId ?? undefined,
                             jobCode: item.jobCode ?? undefined,
                             transportApplied: item.transportApplied ?? false,
+                            transportUnitCost: item.transportUnitCost ?? 0,
                         }))
                     );
                     setLines(ensureTrailingEmpty(orderLines));
@@ -437,6 +439,7 @@ function NewPurchaseContent() {
                     price: parseFloat(line.price),
                     jobId: line.jobId,
                     transportApplied: line.transportApplied ?? false,
+                    transportUnitCost: line.transportUnitCost ?? undefined,
                 });
             }
 
