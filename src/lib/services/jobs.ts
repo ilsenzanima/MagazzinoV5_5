@@ -118,7 +118,7 @@ export const jobsApi = {
                 .from('jobs')
                 .select('*, clients(*)')
                 .is('deleted_at', null)
-                .order('status', { ascending: true })
+                .order('status_sort_order', { ascending: true })
                 .order('created_at', { ascending: false })
         );
         if (error) throw error;
@@ -176,7 +176,7 @@ export const jobsApi = {
 
         query = query.select('*, clients(*)');
         query = query
-            .order('status', { ascending: true })  // 'active' comes before 'completed'
+            .order('status_sort_order', { ascending: true })
             .order('created_at', { ascending: false })
             .range(from, to);
 
@@ -199,7 +199,7 @@ export const jobsApi = {
                     .select('*, clients(name, address, street, street_number, postal_code, city, province)')
                     .eq('client_id', clientId)
                     .is('deleted_at', null)
-                    .order('status', { ascending: true })
+                    .order('status_sort_order', { ascending: true })
                     .order('created_at', { ascending: false })
             );
 
