@@ -342,7 +342,8 @@ function DocumentFormDialog({
                         <Label>Note</Label>
                         <Textarea
                             placeholder="Note aggiuntive..."
-                            rows={2}
+                            rows={3}
+                            className="resize-none break-words"
                             value={form.notes}
                             onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
                         />
@@ -500,23 +501,25 @@ function DocumentRow({
     };
 
     return (
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors">
-            <div className="shrink-0 h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center">
+        <div className="flex items-start gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors">
+            <div className="shrink-0 mt-0.5 h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center">
                 <FileText className="h-4 w-4 text-primary" />
             </div>
-            <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-x-4 gap-y-0.5 items-center">
-                <span className="font-medium text-sm truncate">{doc.name}</span>
-                <span className="text-xs text-muted-foreground">{doc.brandName || "—"}</span>
-                <span className="text-xs text-muted-foreground hidden sm:block">
-                    {doc.purchaseNumber ? `Acquisto: ${doc.purchaseNumber}` : ""}
-                </span>
-                <span className="text-xs text-muted-foreground hidden sm:block">
-                    {new Date(doc.createdAt).toLocaleDateString("it-IT")}
-                </span>
+            <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                    <span className="font-medium text-sm">{doc.name}</span>
+                    {doc.brandName && (
+                        <span className="text-xs text-muted-foreground">{doc.brandName}</span>
+                    )}
+                    {doc.purchaseNumber && (
+                        <span className="text-xs text-muted-foreground">Acquisto: <span className="font-medium">{doc.purchaseNumber}</span></span>
+                    )}
+                    <span className="text-xs text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString("it-IT")}</span>
+                </div>
+                {doc.notes && (
+                    <p className="text-xs text-muted-foreground break-words whitespace-pre-wrap">{doc.notes}</p>
+                )}
             </div>
-            {doc.notes && (
-                <span className="text-xs text-muted-foreground hidden lg:block max-w-[160px] truncate">{doc.notes}</span>
-            )}
             <div className="flex items-center gap-1 shrink-0">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary" onClick={openDocument} title="Apri PDF">
                     <FileText className="h-3.5 w-3.5" />
