@@ -64,12 +64,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/purchases",
           active: pathname === "/purchases" || pathname.startsWith("/purchases/"),
         },
-        {
+        ...(userRole === "admin" || userRole === "operativo" ? [{
           label: "Gestione conformità",
           icon: ShieldCheck,
           href: "/compliance",
           active: pathname === "/compliance",
-        },
+        }] : []),
         {
           label: "Movimentazione",
           icon: Truck,

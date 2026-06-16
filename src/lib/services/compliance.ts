@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getSoftDeletePayload } from './utils';
 
 export type ComplianceDocumentType =
     | 'RDC_RDV_FT'
@@ -53,6 +54,7 @@ export const complianceApi = {
             .from('supplier_compliance_documents')
             .select('*, brands(name), purchases(delivery_note_number)')
             .eq('supplier_id', supplierId)
+            .is('deleted_at', null)
             .order('created_at', { ascending: false });
         if (error) throw error;
         return (data || []).map(mapDbToDoc);
@@ -111,9 +113,10 @@ export const complianceApi = {
     },
 
     delete: async (id: string): Promise<void> => {
+        const payload = await getSoftDeletePayload();
         const { error } = await supabase
             .from('supplier_compliance_documents')
-            .delete()
+            .update(payload)
             .eq('id', id);
         if (error) throw error;
     },

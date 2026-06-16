@@ -46,6 +46,8 @@ import {
 import { suppliersApi } from "@/lib/services/suppliers";
 import { brandsApi } from "@/lib/services/inventory";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/auth-provider";
+import { useRouter } from "next/navigation";
 import {
     complianceApi,
     ComplianceDocument,
@@ -500,6 +502,15 @@ function DocumentTypeTabs({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function CompliancePage() {
+    const { userRole } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (userRole && userRole !== "admin" && userRole !== "operativo") {
+            router.replace("/dashboard");
+        }
+    }, [userRole, router]);
+
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
     const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
