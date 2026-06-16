@@ -170,16 +170,20 @@ function DocumentFormDialog({
     open,
     onOpenChange,
     supplierId,
+    suppliers,
     brands,
     editing,
     onSaved,
+    onSupplierSelected,
 }: {
     open: boolean;
     onOpenChange: (v: boolean) => void;
     supplierId: string;
+    suppliers: Supplier[];
     brands: Brand[];
     editing: ComplianceDocument | null;
     onSaved: (doc: ComplianceDocument) => void;
+    onSupplierSelected?: (id: string) => void;
 }) {
     const [form, setForm] = useState<DocFormData>({
         brandId: "",
@@ -190,12 +194,14 @@ function DocumentFormDialog({
         purchaseNumber: "",
         file: null,
     });
+    const [localSupplierId, setLocalSupplierId] = useState(supplierId);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const fileRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (open) {
+            setLocalSupplierId(supplierId);
             if (editing) {
                 setForm({
                     brandId: editing.brandId,
@@ -211,9 +217,15 @@ function DocumentFormDialog({
             }
             setError("");
         }
-    }, [open, editing]);
+    }, [open, editing, supplierId]);
+
+    const effectiveSupplierId = localSupplierId;
 
     const handleSave = async () => {
+        if (!effectiveSupplierId) {
+            setError("Seleziona un fornitore.");
+            return;
+        }
         if (!form.brandId || !form.documentType || !form.name.trim()) {
             setError("Marca, tipo documento e nome sono obbligatori.");
             return;
@@ -240,7 +252,7 @@ function DocumentFormDialog({
                 });
             } else {
                 doc = await complianceApi.create({
-                    supplierId,
+                    supplierId: effectiveSupplierId,
                     brandId: form.brandId,
                     documentType: form.documentType as ComplianceDocumentType,
                     name: form.name.trim(),
@@ -249,6 +261,7 @@ function DocumentFormDialog({
                     purchaseId: form.purchaseId || undefined,
                 });
             }
+            if (!supplierId && onSupplierSelected) onSupplierSelected(effectiveSupplierId);
             onSaved(doc);
             onOpenChange(false);
         } catch (e: any) {
@@ -265,6 +278,21 @@ function DocumentFormDialog({
                     <DialogTitle>{editing ? "Modifica documento" : "Carica documento"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
+                    {!supplierId && !editing && (
+                        <div className="space-y-1.5">
+                            <Label>Fornitore <span className="text-destructive">*</span></Label>
+                            <Select value={localSupplierId} onValueChange={setLocalSupplierId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleziona fornitore" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {suppliers.map((s) => (
+                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <Label>Marca <span className="text-destructive">*</span></Label>
@@ -313,7 +341,7 @@ function DocumentFormDialog({
                     <div className="space-y-1.5">
                         <Label>Associa a acquisto (opzionale)</Label>
                         <PurchaseSearchCombobox
-                            supplierId={supplierId}
+                            supplierId={effectiveSupplierId}
                             value={form.purchaseId}
                             onChange={(id, num) => setForm(f => ({ ...f, purchaseId: id, purchaseNumber: num }))}
                         />
@@ -380,9 +408,11 @@ function DocumentCard({
                         <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium text-sm truncate">{doc.name}</span>
-                                <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full shrink-0">
-                                    {DOCUMENT_TYPE_LABELS[doc.documentType]}
-                                </span>
+                                {doc.brandName && (
+                                    <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full shrink-0">
+                                        {doc.brandName}
+                                    </span>
+                                )}
                             </div>
                             {doc.notes && (
                                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{doc.notes}</p>
@@ -421,9 +451,9 @@ function DocumentCard({
     );
 }
 
-// ── Brand tab content ─────────────────────────────────────────────────────────
+// ── Document type tabs content ────────────────────────────────────────────────
 
-function BrandTabContent({
+function DocumentTypeTabs({
     docs,
     onEdit,
     onDelete,
@@ -432,29 +462,30 @@ function BrandTabContent({
     onEdit: (doc: ComplianceDocument) => void;
     onDelete: (doc: ComplianceDocument) => void;
 }) {
-    const byType = DOCUMENT_TYPES.reduce((acc, [key]) => {
-        const filtered = docs.filter(d => d.documentType === key);
-        if (filtered.length > 0) acc[key] = filtered;
-        return acc;
-    }, {} as Record<ComplianceDocumentType, ComplianceDocument[]>);
-
-    const typesWithDocs = Object.keys(byType) as ComplianceDocumentType[];
+    const typesWithDocs = DOCUMENT_TYPES.filter(([key]) => docs.some(d => d.documentType === key));
 
     return (
-        <div className="space-y-6 pt-4">
-            {typesWithDocs.map((type) => (
-                <div key={type}>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                        {DOCUMENT_TYPE_LABELS[type]}
-                    </h3>
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {byType[type].map((doc) => (
+        <Tabs defaultValue={typesWithDocs[0]?.[0]}>
+            <TabsList className="flex-wrap h-auto gap-1">
+                {typesWithDocs.map(([key, label]) => (
+                    <TabsTrigger key={key} value={key}>
+                        {label}
+                        <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
+                            {docs.filter(d => d.documentType === key).length}
+                        </span>
+                    </TabsTrigger>
+                ))}
+            </TabsList>
+            {typesWithDocs.map(([key]) => (
+                <TabsContent key={key} value={key}>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 pt-4">
+                        {docs.filter(d => d.documentType === key).map((doc) => (
                             <DocumentCard key={doc.id} doc={doc} onEdit={onEdit} onDelete={onDelete} />
                         ))}
                     </div>
-                </div>
+                </TabsContent>
             ))}
-        </div>
+        </Tabs>
     );
 }
 
@@ -487,10 +518,6 @@ export default function CompliancePage() {
             .catch(console.error)
             .finally(() => setLoadingDocs(false));
     }, [selectedSupplierId]);
-
-    // Group docs by brand
-    const brandIds = [...new Set(documents.map(d => d.brandId))];
-    const brandsWithDocs = brands.filter(b => brandIds.includes(b.id));
 
     const handleSaved = (doc: ComplianceDocument) => {
         setDocuments(prev => {
@@ -530,12 +557,10 @@ export default function CompliancePage() {
                             <p className="text-sm text-muted-foreground">Documenti di conformità per fornitore</p>
                         </div>
                     </div>
-                    {selectedSupplierId && (
-                        <Button onClick={() => { setEditingDoc(null); setDialogOpen(true); }}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Carica documento
-                        </Button>
-                    )}
+                    <Button onClick={() => { setEditingDoc(null); setDialogOpen(true); }}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Carica documento
+                    </Button>
                 </div>
 
                 {/* Supplier selector */}
@@ -574,27 +599,11 @@ export default function CompliancePage() {
                                 </Button>
                             </div>
                         ) : (
-                            <Tabs defaultValue={brandsWithDocs[0]?.id}>
-                                <TabsList className="flex-wrap h-auto gap-1">
-                                    {brandsWithDocs.map((b) => (
-                                        <TabsTrigger key={b.id} value={b.id}>
-                                            {b.name}
-                                            <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                                                {documents.filter(d => d.brandId === b.id).length}
-                                            </span>
-                                        </TabsTrigger>
-                                    ))}
-                                </TabsList>
-                                {brandsWithDocs.map((b) => (
-                                    <TabsContent key={b.id} value={b.id}>
-                                        <BrandTabContent
-                                            docs={documents.filter(d => d.brandId === b.id)}
-                                            onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
-                                            onDelete={setDeletingDoc}
-                                        />
-                                    </TabsContent>
-                                ))}
-                            </Tabs>
+                            <DocumentTypeTabs
+                                docs={documents}
+                                onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
+                                onDelete={setDeletingDoc}
+                            />
                         )}
                     </>
                 )}
@@ -605,9 +614,11 @@ export default function CompliancePage() {
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
                 supplierId={selectedSupplierId}
+                suppliers={suppliers}
                 brands={brands}
                 editing={editingDoc}
                 onSaved={handleSaved}
+                onSupplierSelected={setSelectedSupplierId}
             />
 
             {/* Delete confirm */}
