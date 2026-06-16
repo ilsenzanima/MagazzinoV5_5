@@ -42,6 +42,7 @@ import {
     Search,
     Upload,
     ShieldCheck,
+    Receipt,
 } from "lucide-react";
 import { suppliersApi } from "@/lib/services/suppliers";
 import { brandsApi } from "@/lib/services/inventory";
@@ -450,9 +451,16 @@ function DocumentCard({
                         </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openDocument} title="Apri documento">
-                            <ExternalLink className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary" onClick={openDocument} title="Apri PDF">
+                            <FileText className="h-4 w-4" />
                         </Button>
+                        {doc.purchaseId && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
+                                <a href={`/purchases/${doc.purchaseId}`} target="_blank" rel="noopener noreferrer">
+                                    <Receipt className="h-4 w-4" />
+                                </a>
+                            </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(doc)} title="Modifica">
                             <Pencil className="h-4 w-4" />
                         </Button>
@@ -510,9 +518,16 @@ function DocumentRow({
                 <span className="text-xs text-muted-foreground hidden lg:block max-w-[160px] truncate">{doc.notes}</span>
             )}
             <div className="flex items-center gap-1 shrink-0">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openDocument} title="Apri documento">
-                    <ExternalLink className="h-3.5 w-3.5" />
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary" onClick={openDocument} title="Apri PDF">
+                    <FileText className="h-3.5 w-3.5" />
                 </Button>
+                {doc.purchaseId && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
+                        <a href={`/purchases/${doc.purchaseId}`} target="_blank" rel="noopener noreferrer">
+                            <Receipt className="h-3.5 w-3.5" />
+                        </a>
+                    </Button>
+                )}
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(doc)} title="Modifica">
                     <Pencil className="h-3.5 w-3.5" />
                 </Button>

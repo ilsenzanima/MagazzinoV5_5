@@ -135,6 +135,7 @@ export const complianceApi = {
             .from('purchases')
             .select('id, delivery_note_number, delivery_note_date')
             .eq('supplier_id', supplierId)
+            .eq('order_type', 'purchase')
             .is('deleted_at', null)
             .ilike('delivery_note_number', `%${search}%`)
             .order('delivery_note_date', { ascending: false })
