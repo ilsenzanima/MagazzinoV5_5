@@ -48,6 +48,11 @@ import { brandsApi } from "@/lib/services/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
 import { useRouter } from "next/navigation";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { useViewMode } from "@/hooks/useViewMode";
+import { PageSizeSelector } from "@/components/ui/page-size-selector";
+import { usePageSize } from "@/hooks/usePageSize";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
     complianceApi,
     ComplianceDocument,
@@ -461,21 +466,87 @@ function DocumentCard({
     );
 }
 
+// ── Document list row ─────────────────────────────────────────────────────────
+
+function DocumentRow({
+    doc,
+    onEdit,
+    onDelete,
+}: {
+    doc: ComplianceDocument;
+    onEdit: (doc: ComplianceDocument) => void;
+    onDelete: (doc: ComplianceDocument) => void;
+}) {
+    const supabase = createClient();
+
+    const openDocument = async () => {
+        try {
+            const path = doc.fileUrl.split('/public/documents/')[1];
+            if (!path) { window.open(doc.fileUrl, '_blank'); return; }
+            const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600);
+            if (error || !data?.signedUrl) { window.open(doc.fileUrl, '_blank'); return; }
+            window.open(data.signedUrl, '_blank');
+        } catch {
+            window.open(doc.fileUrl, '_blank');
+        }
+    };
+
+    return (
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors">
+            <div className="shrink-0 h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-x-4 gap-y-0.5 items-center">
+                <span className="font-medium text-sm truncate">{doc.name}</span>
+                <span className="text-xs text-muted-foreground">{doc.brandName || "—"}</span>
+                <span className="text-xs text-muted-foreground hidden sm:block">
+                    {doc.purchaseNumber ? `Acquisto: ${doc.purchaseNumber}` : ""}
+                </span>
+                <span className="text-xs text-muted-foreground hidden sm:block">
+                    {new Date(doc.createdAt).toLocaleDateString("it-IT")}
+                </span>
+            </div>
+            {doc.notes && (
+                <span className="text-xs text-muted-foreground hidden lg:block max-w-[160px] truncate">{doc.notes}</span>
+            )}
+            <div className="flex items-center gap-1 shrink-0">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openDocument} title="Apri documento">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(doc)} title="Modifica">
+                    <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(doc)} title="Elimina">
+                    <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 // ── Document type tabs content ────────────────────────────────────────────────
 
 function DocumentTypeTabs({
     docs,
+    viewMode,
+    pageSize,
     onEdit,
     onDelete,
 }: {
     docs: ComplianceDocument[];
+    viewMode: 'grid' | 'list';
+    pageSize: number;
     onEdit: (doc: ComplianceDocument) => void;
     onDelete: (doc: ComplianceDocument) => void;
 }) {
     const typesWithDocs = DOCUMENT_TYPES.filter(([key]) => docs.some(d => d.documentType === key));
+    const [pages, setPages] = useState<Record<string, number>>({});
+
+    const getPage = (key: string) => pages[key] ?? 1;
+    const setPage = (key: string, p: number) => setPages(prev => ({ ...prev, [key]: p }));
 
     return (
-        <Tabs defaultValue={typesWithDocs[0]?.[0]}>
+        <Tabs defaultValue={typesWithDocs[0]?.[0]} onValueChange={() => {}}>
             <TabsList className="flex-wrap h-auto gap-1">
                 {typesWithDocs.map(([key, label]) => (
                     <TabsTrigger key={key} value={key}>
@@ -486,15 +557,39 @@ function DocumentTypeTabs({
                     </TabsTrigger>
                 ))}
             </TabsList>
-            {typesWithDocs.map(([key]) => (
-                <TabsContent key={key} value={key}>
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 pt-4">
-                        {docs.filter(d => d.documentType === key).map((doc) => (
-                            <DocumentCard key={doc.id} doc={doc} onEdit={onEdit} onDelete={onDelete} />
-                        ))}
-                    </div>
-                </TabsContent>
-            ))}
+            {typesWithDocs.map(([key]) => {
+                const typeDocs = docs.filter(d => d.documentType === key);
+                const currentPage = getPage(key);
+                const totalPages = Math.ceil(typeDocs.length / pageSize);
+                const paginated = typeDocs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+                return (
+                    <TabsContent key={key} value={key}>
+                        <div className="pt-4 space-y-3">
+                            {viewMode === 'grid' ? (
+                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                    {paginated.map((doc) => (
+                                        <DocumentCard key={doc.id} doc={doc} onEdit={onEdit} onDelete={onDelete} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="space-y-1">
+                                    {paginated.map((doc) => (
+                                        <DocumentRow key={doc.id} doc={doc} onEdit={onEdit} onDelete={onDelete} />
+                                    ))}
+                                </div>
+                            )}
+                            {totalPages > 1 && (
+                                <PaginationControls
+                                    page={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={(p) => setPage(key, p)}
+                                />
+                            )}
+                        </div>
+                    </TabsContent>
+                );
+            })}
         </Tabs>
     );
 }
@@ -504,6 +599,8 @@ function DocumentTypeTabs({
 export default function CompliancePage() {
     const { userRole } = useAuth();
     const router = useRouter();
+    const [viewMode, setViewMode] = useViewMode('compliance');
+    const [pageSize, setPageSize] = usePageSize('compliance');
 
     useEffect(() => {
         if (userRole && userRole !== "admin" && userRole !== "operativo") {
@@ -618,11 +715,19 @@ export default function CompliancePage() {
                                 </Button>
                             </div>
                         ) : (
-                            <DocumentTypeTabs
-                                docs={documents}
-                                onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
-                                onDelete={setDeletingDoc}
-                            />
+                            <>
+                                <div className="flex items-center justify-end gap-2">
+                                    <PageSizeSelector value={pageSize} onChange={setPageSize} />
+                                    <ViewToggle mode={viewMode} onChange={setViewMode} />
+                                </div>
+                                <DocumentTypeTabs
+                                    docs={documents}
+                                    viewMode={viewMode}
+                                    pageSize={pageSize}
+                                    onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
+                                    onDelete={setDeletingDoc}
+                                />
+                            </>
                         )}
                     </>
                 )}
