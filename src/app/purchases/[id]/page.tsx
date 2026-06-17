@@ -30,8 +30,11 @@ import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocuments";
 import { useAuth } from "@/components/auth-provider";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { complianceApi, ComplianceDocument, DOCUMENT_TYPE_LABELS } from "@/lib/services/compliance";
+import { createClient } from "@/lib/supabase/client";
+import { ShieldCheck } from "lucide-react";
 
 export default function PurchaseDetailPage() {
     const { userRole } = useAuth();
@@ -51,6 +54,8 @@ export default function PurchaseDetailPage() {
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [sourceOrders, setSourceOrders] = useState<{ id: string; deliveryNoteNumber: string }[]>([]);
+    const [complianceDocs, setComplianceDocs] = useState<ComplianceDocument[]>([]);
+    const [complianceModalDoc, setComplianceModalDoc] = useState<ComplianceDocument | null>(null);
     const [items, setItems] = useState<PurchaseItem[]>([]);
     const [batchAvailability, setBatchAvailability] = useState<any[]>([]); // New state for traceability
     const [itemJobMovements, setItemJobMovements] = useState<Record<string, any[]>>({}); // Job movements per item
@@ -117,6 +122,13 @@ export default function PurchaseDetailPage() {
             setTransportCost(tc);
             setTransportInput(tc > 0 ? tc.toString() : "");
             setSourceOrders(sourceOrdersData);
+
+            // Carica documenti conformità associati a questo acquisto
+            if (purchaseData.supplierId) {
+                complianceApi.getBySupplier(purchaseData.supplierId).then(docs => {
+                    setComplianceDocs(docs.filter(d => d.purchaseId === id));
+                }).catch(() => {});
+            }
             setItems(itemsData);
             setInventory(inventoryData);
             setJobs(jobsData.filter(j => j.status === 'active'));
@@ -691,7 +703,7 @@ export default function PurchaseDetailPage() {
                             </div>
 
                             {/* Fattura, ordine di origine o acquisto collegato */}
-                            {(purchase.invoiceId || purchase.convertedPurchaseId || sourceOrders.length > 0) && (
+                            {(purchase.invoiceId || purchase.convertedPurchaseId || sourceOrders.length > 0 || complianceDocs.length > 0) && (
                                 <div className="md:col-span-2 border-t pt-4 mt-2 flex flex-wrap gap-3">
                                     {/* Acquisto → Fattura */}
                                     {purchase.invoiceId && purchase.invoiceNumber && (
@@ -740,10 +752,60 @@ export default function PurchaseDetailPage() {
                                             {!isMobile && <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />}
                                         </Link>
                                     ))}
+                                    {/* Documenti conformità collegati */}
+                                    {complianceDocs.map(doc => (
+                                        <button
+                                            key={doc.id}
+                                            onClick={() => setComplianceModalDoc(doc)}
+                                            className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-800 dark:text-violet-400 dark:hover:text-violet-300 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-md px-3 py-1.5"
+                                        >
+                                            <ShieldCheck className="h-4 w-4" />
+                                            {DOCUMENT_TYPE_LABELS[doc.documentType]}: {doc.name}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
                         </CardContent>
                     </Card>
+
+                    {/* Modale dettaglio documento conformità */}
+                    <Dialog open={!!complianceModalDoc} onOpenChange={(v) => !v && setComplianceModalDoc(null)}>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <ShieldCheck className="h-5 w-5 text-violet-500" />
+                                    {complianceModalDoc?.name}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    {complianceModalDoc && DOCUMENT_TYPE_LABELS[complianceModalDoc.documentType]}
+                                    {complianceModalDoc?.brandName && ` · ${complianceModalDoc.brandName}`}
+                                </DialogDescription>
+                            </DialogHeader>
+                            {complianceModalDoc?.notes && (
+                                <div className="py-2 text-sm text-muted-foreground whitespace-pre-wrap">
+                                    {complianceModalDoc.notes}
+                                </div>
+                            )}
+                            <div className="flex justify-end pt-2">
+                                <Button
+                                    onClick={async () => {
+                                        if (!complianceModalDoc) return;
+                                        try {
+                                            const supabase = createClient();
+                                            const path = complianceModalDoc.fileUrl.split('/public/documents/')[1];
+                                            if (!path) { window.open(complianceModalDoc.fileUrl, '_blank'); return; }
+                                            const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600);
+                                            if (error || !data?.signedUrl) { window.open(complianceModalDoc.fileUrl, '_blank'); return; }
+                                            window.open(data.signedUrl, '_blank');
+                                        } catch { window.open(complianceModalDoc?.fileUrl, '_blank'); }
+                                    }}
+                                >
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Apri documento PDF
+                                </Button>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="md:col-span-2">
@@ -777,7 +839,7 @@ export default function PurchaseDetailPage() {
                                         />
                                         {savingTransport && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />}
                                     </div>
-                                    {transportCost > 0 && (
+                                    {!isOrder && transportCost > 0 && (
                                         <div className="flex items-center gap-2">
                                             {items.some(i => !i.transportApplied) ? (
                                                 <Button

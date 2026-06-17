@@ -207,10 +207,13 @@ function NewPurchaseContent() {
                     );
                     setLines(ensureTrailingEmpty(orderLines));
 
-                    // Somma i costi trasporto degli ordini sorgente
-                    const totalTransport = orders.reduce((sum: number, o: any) => sum + (o.transportCost ?? 0), 0);
-                    if (totalTransport > 0) {
-                        setFromOrdersTransportCost(totalTransport);
+                    // Pre-carica il trasporto solo se c'è un singolo ordine sorgente.
+                    // Con più ordini il totale è ambiguo → azzerato, l'utente lo inserisce a mano.
+                    if (orders.length === 1) {
+                        const totalTransport = orders[0].transportCost ?? 0;
+                        if (totalTransport > 0) {
+                            setFromOrdersTransportCost(totalTransport);
+                        }
                     }
                 }
                 return; // skip presetJobId logic below
