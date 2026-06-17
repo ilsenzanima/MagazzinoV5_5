@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, Calendar, User, Pencil, Trash2, CheckCircle2, Circle } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { cn } from "@/lib/utils"
+import { notify } from "@/lib/notify"
 
 interface JobJournalProps {
   jobId: string
@@ -45,6 +46,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
       setLogs(data)
     } catch (error) {
       console.error("Failed to load logs", error)
+      notify.error("Errore nel caricamento del giornale")
     } finally {
       setLoading(false)
     }
@@ -73,6 +75,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
       loadLogs()
     } catch (error) {
       console.error("Failed to save log", error)
+      notify.error("Errore nel salvataggio della nota")
     }
   }
 
@@ -85,6 +88,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
       loadLogs()
     } catch (error) {
       console.error("Failed to delete log", error)
+      notify.error("Errore nell'eliminazione della nota")
     }
   }
 
@@ -94,6 +98,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
       setLogs(prev => prev.map(l => l.id === log.id ? { ...l, isCompleted: !l.isCompleted } : l))
     } catch (error) {
       console.error("Failed to toggle completed", error)
+      notify.error("Errore nell'aggiornamento dello stato")
     }
   }
 

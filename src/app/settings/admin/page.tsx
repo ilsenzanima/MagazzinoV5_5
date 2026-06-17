@@ -85,6 +85,7 @@ export default function SettingsAdminPage() {
             setUsers(data);
         } catch (error) {
             console.error("Error fetching users:", error);
+            notify.error("Errore nel caricamento degli utenti");
         } finally {
             setLoadingUsers(false);
         }

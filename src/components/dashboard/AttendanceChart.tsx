@@ -13,20 +13,23 @@ import {
   Legend
 } from 'recharts';
 import { attendanceApi } from '@/lib/api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 export const AttendanceChart = memo(function AttendanceChart() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const loadStats = async () => {
       try {
         setLoading(true);
+        setError(false);
         const stats = await attendanceApi.getAggregatedStats(6);
         setData(stats);
       } catch (error) {
         console.error("Error loading attendance stats:", error);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -44,6 +47,11 @@ export const AttendanceChart = memo(function AttendanceChart() {
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center gap-2 h-full text-red-500 text-sm">
+            <AlertTriangle className="h-4 w-4" />
+            Errore nel caricamento
           </div>
         ) : data.length === 0 ? (
           <div className="flex justify-center items-center h-full text-slate-500">

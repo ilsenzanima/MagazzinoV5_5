@@ -27,6 +27,7 @@ import { useSearchParams } from "next/navigation";
 import { InventoryItem } from "@/lib/mock-data";
 import { inventoryApi, itemTypesApi, ItemType } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { notify } from "@/lib/notify";
 import type { Html5Qrcode } from "html5-qrcode";
 import {
   Dialog,
@@ -227,6 +228,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
           }
         } catch (err) {
           console.error("Scanner setup error", err);
+          notify.error("Impossibile avviare la fotocamera per lo scanner");
         }
       }, 200);
 

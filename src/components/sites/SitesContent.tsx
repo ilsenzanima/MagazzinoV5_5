@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notify";
 import { useState, useEffect, useMemo, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export default function SitesContent() {
       }
     } catch (error) {
       console.error("Failed to load sites:", error);
+      notify.error("Errore nel caricamento dei cantieri. Riprova.");
     } finally {
       setLoading(false);
     }

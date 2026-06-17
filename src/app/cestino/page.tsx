@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notify";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -166,6 +167,18 @@ function TrashTable({ items, loading, onRestore, onHardDelete, emptyMessage }: T
 
 type SectionKey = "purchases" | "invoices" | "load-notes" | "clients" | "suppliers" | "inventory" | "jobs" | "workers" | "proposals";
 
+const SECTION_LABELS: Record<SectionKey, string> = {
+  purchases: "Acquisti",
+  invoices: "Fatture",
+  "load-notes": "Note Carico",
+  clients: "Clienti",
+  suppliers: "Fornitori",
+  inventory: "Inventario",
+  jobs: "Commesse",
+  workers: "Operai",
+  proposals: "Proposte",
+};
+
 interface SectionState {
   items: TrashItem[];
   loading: boolean;
@@ -276,6 +289,7 @@ export default function CestinoPage() {
       setSections((prev: Record<SectionKey, SectionState>) => ({ ...prev, [key]: { items, loading: false } }));
     } catch (err) {
       console.error(`Error loading trash for ${key}:`, err);
+      notify.error(`Errore nel caricamento del cestino: ${SECTION_LABELS[key]}.`);
       setSections((prev: Record<SectionKey, SectionState>) => ({ ...prev, [key]: { items: [], loading: false } }));
     }
   }, []);

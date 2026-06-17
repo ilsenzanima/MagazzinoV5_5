@@ -106,6 +106,7 @@ export function InventoryItemForm({
                 }
             } catch (error) {
                 console.error("Failed to load data", error);
+                notify.error("Errore nel caricamento dei dati del modulo");
             } finally {
                 setLoadingData(false);
             }

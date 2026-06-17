@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { WorkerMedicalExam, workerMedicalExamsApi, workersApi } from "@/lib/api";
-import { Stethoscope, Loader2 } from "lucide-react";
+import { Stethoscope, Loader2, AlertTriangle } from "lucide-react";
 import { format, isBefore, subMonths, endOfYear } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -15,6 +15,7 @@ interface ExamWithWorker extends WorkerMedicalExam {
 export function ExpiringMedicalExamsCard() {
     const [loading, setLoading] = useState(true);
     const [expiringExams, setExpiringExams] = useState<ExamWithWorker[]>([]);
+    const [error, setError] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -23,6 +24,7 @@ export function ExpiringMedicalExamsCard() {
     const loadData = async () => {
         try {
             setLoading(true);
+            setError(false);
 
             // Get all workers
             const workers = await workersApi.getAll();
@@ -59,6 +61,7 @@ export function ExpiringMedicalExamsCard() {
             setExpiringExams(allExams);
         } catch (error) {
             console.error("Error loading expiring medical exams:", error);
+            setError(true);
         } finally {
             setLoading(false);
         }
@@ -91,6 +94,11 @@ export function ExpiringMedicalExamsCard() {
                 {loading ? (
                     <div className="flex justify-center py-4">
                         <Loader2 className="h-5 w-5 animate-spin" />
+                    </div>
+                ) : error ? (
+                    <div className="flex items-center justify-center gap-2 text-red-500 text-sm py-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        Errore nel caricamento
                     </div>
                 ) : expiringExams.length === 0 ? (
                     <p className="text-sm text-slate-500 text-center py-4">

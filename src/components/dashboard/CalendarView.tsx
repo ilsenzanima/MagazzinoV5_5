@@ -3,7 +3,7 @@
 import { useState, memo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { attendanceApi, Attendance } from "@/lib/api";
 
@@ -33,6 +33,7 @@ export const CalendarView = memo(function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -48,6 +49,7 @@ export const CalendarView = memo(function CalendarView() {
   const loadAttendanceData = async () => {
     try {
       setLoading(true);
+      setError(false);
       const data = await attendanceApi.getByMonth(
         currentDate.getFullYear(),
         currentDate.getMonth() + 1
@@ -55,6 +57,7 @@ export const CalendarView = memo(function CalendarView() {
       setAttendanceData(data);
     } catch (error) {
       console.error("Error loading attendance data:", error);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -156,6 +159,11 @@ export const CalendarView = memo(function CalendarView() {
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center gap-2 h-64 text-red-500 text-sm">
+            <AlertTriangle className="h-4 w-4" />
+            Errore nel caricamento
           </div>
         ) : (
           <>

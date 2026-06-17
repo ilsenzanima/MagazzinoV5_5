@@ -352,6 +352,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             setJobs(data);
         } catch (error) {
             console.error("Failed to search jobs", error);
+            notify.error("Errore durante la ricerca dei cantieri");
         } finally {
             setJobsLoading(false);
         }
@@ -364,6 +365,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             setInventory(items);
         } catch (error) {
             console.error("Failed to search items", error);
+            notify.error("Errore durante la ricerca articoli");
         } finally {
             setItemsLoading(false);
         }
@@ -432,6 +434,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                     );
                 } catch (err) {
                     console.error("Failed to load batches", err);
+                    notify.error("Errore nel caricamento dei lotti disponibili");
                     setLines((prev) =>
                         prev.map((line) => {
                             if (line.tempId !== rowId) return line;

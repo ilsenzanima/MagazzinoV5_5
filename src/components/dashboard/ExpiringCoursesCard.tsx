@@ -16,6 +16,7 @@ interface CourseWithWorker extends WorkerCourse {
 export function ExpiringCoursesCard() {
     const [loading, setLoading] = useState(true);
     const [expiringCourses, setExpiringCourses] = useState<CourseWithWorker[]>([]);
+    const [error, setError] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -24,6 +25,7 @@ export function ExpiringCoursesCard() {
     const loadData = async () => {
         try {
             setLoading(true);
+            setError(false);
 
             // Get all workers
             const workers = await workersApi.getAll();
@@ -66,6 +68,7 @@ export function ExpiringCoursesCard() {
             setExpiringCourses(allCourses);
         } catch (error) {
             console.error("Error loading expiring courses:", error);
+            setError(true);
         } finally {
             setLoading(false);
         }
@@ -97,6 +100,11 @@ export function ExpiringCoursesCard() {
                 {loading ? (
                     <div className="flex justify-center py-4">
                         <Loader2 className="h-5 w-5 animate-spin" />
+                    </div>
+                ) : error ? (
+                    <div className="flex items-center justify-center gap-2 text-red-500 text-sm py-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        Errore nel caricamento
                     </div>
                 ) : expiringCourses.length === 0 ? (
                     <p className="text-sm text-slate-500 text-center py-4">

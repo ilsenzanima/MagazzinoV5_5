@@ -78,6 +78,7 @@ function NewJobForm() {
         setClients(data);
       } catch (err) {
         console.error(err);
+        notify.error("Errore nel caricamento dei committenti");
       }
     };
     loadClients();
@@ -111,6 +112,7 @@ function NewJobForm() {
         }));
       } catch (err) {
         console.error("Errore caricamento commessa da clonare", err);
+        notify.error("Errore nel caricamento della commessa da clonare");
       }
     };
     loadCloneData();

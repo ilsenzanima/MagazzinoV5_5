@@ -63,6 +63,7 @@ function NewInventoryItemContent() {
         }
       } catch (error) {
         console.error("Failed to load clone data", error);
+        notify.error("Errore nel caricamento dei dati dell'articolo da duplicare");
       } finally {
         setLoadingClone(false);
       }

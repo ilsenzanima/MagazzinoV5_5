@@ -91,6 +91,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
             setInventoryItems(items);
         } catch (err) {
             console.error("Failed to search inventory", err);
+            notify.error("Errore durante la ricerca articoli");
         } finally {
             setIsSearchingInventory(false);
         }

@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notify";
 import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
             setNotes(sorted);
         } catch (error) {
             console.error("Failed to fetch notes", error);
+            notify.error("Errore nel caricamento delle note di carico.");
         } finally {
             setLoading(false);
         }
@@ -83,6 +85,7 @@ export function NotesAssistant({ isOpen, onClose, currentJobId, onUseItem }: Not
             await loadNotesService.toggleItemCheck(noteId, itemId, newChecked);
         } catch (error) {
             console.error("Failed to toggle item check", error);
+            notify.error("Errore nell'aggiornamento dell'elemento. Riprova.");
         }
     };
 

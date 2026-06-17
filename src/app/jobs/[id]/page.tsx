@@ -14,6 +14,7 @@ import autoTable from 'jspdf-autotable';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
+import { notify } from "@/lib/notify";
 
 // Components
 import { JobOverview } from "@/components/jobs/details/JobOverview";
@@ -412,6 +413,7 @@ export default function JobDetailsPage() {
                 .catch(e => console.error("getByConvertedJobId error:", e));
         } catch (error) {
             console.error("Error loading job details:", error);
+            notify.error("Errore nel caricamento dei dettagli della commessa");
         } finally {
             setLoading(false);
         }

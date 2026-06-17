@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notify";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,6 +43,7 @@ function InvoicesContent() {
       setTotalItems(total);
     } catch (error) {
       console.error("Failed to load invoices", error);
+      notify.error("Errore nel caricamento delle fatture. Riprova.");
     } finally {
       setLoading(false);
     }

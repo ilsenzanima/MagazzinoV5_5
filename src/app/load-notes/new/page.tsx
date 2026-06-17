@@ -87,6 +87,7 @@ export default function NewLoadNotePage() {
             setJobs(jobsData.data);
         } catch (error) {
             console.error("Failed to load data", error);
+            toast.error("Errore nel caricamento dei dati. Riprova.");
         } finally {
             setInitialLoading(false);
         }
@@ -99,6 +100,7 @@ export default function NewLoadNotePage() {
             setInventory(items);
         } catch (error) {
             console.error("Failed to search items", error);
+            toast.error("Errore nella ricerca dei materiali. Riprova.");
         } finally {
             setItemsLoading(false);
         }
@@ -111,6 +113,7 @@ export default function NewLoadNotePage() {
             setJobs(data);
         } catch (error) {
             console.error("Failed to search jobs", error);
+            toast.error("Errore nella ricerca delle commesse. Riprova.");
         } finally {
             setJobsLoading(false);
         }

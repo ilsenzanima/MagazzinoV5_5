@@ -1,6 +1,6 @@
 "use client"
 
-import { notify } from "@/lib/notify";;
+import { notify } from "@/lib/notify";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -237,6 +237,7 @@ function NewPurchaseContent() {
             }
         } catch (error) {
             console.error("Failed to load data", error);
+            notify.error("Errore nel caricamento dei dati. Riprova.");
         } finally {
             setInitialLoading(false);
         }
@@ -249,6 +250,7 @@ function NewPurchaseContent() {
             setInventory(items);
         } catch (error) {
             console.error("Failed to search items", error);
+            notify.error("Errore nella ricerca dei materiali. Riprova.");
         } finally {
             setItemsLoading(false);
         }
@@ -261,6 +263,7 @@ function NewPurchaseContent() {
             setJobs(data);
         } catch (error) {
             console.error("Failed to search jobs", error);
+            notify.error("Errore nella ricerca delle commesse. Riprova.");
         } finally {
             setJobsLoading(false);
         }

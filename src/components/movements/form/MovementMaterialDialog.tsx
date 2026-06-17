@@ -28,6 +28,7 @@ import { purchasesApi } from "@/lib/services/purchases";
 import { PurchaseItemToImport } from "@/hooks/useMovementForm";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { notify } from "@/lib/notify";
 
 interface MovementMaterialDialogProps {
     open: boolean;
@@ -140,6 +141,7 @@ export function MovementMaterialDialog({
                 setPurchasesData(data);
             } catch (error) {
                 console.error("Failed to fetch purchases", error);
+                notify.error("Errore nel caricamento degli acquisti");
             } finally {
                 setPurchasesLoading(false);
             }
@@ -172,6 +174,7 @@ export function MovementMaterialDialog({
             );
         } catch (error) {
             console.error("Failed to fetch notes", error);
+            notify.error("Errore nel caricamento delle note di carico");
         } finally {
             setNotesLoading(false);
         }
@@ -234,6 +237,7 @@ export function MovementMaterialDialog({
             onOpenChange(false);
         } catch (error) {
             console.error("Failed to use note item", error);
+            notify.error("Errore durante l'utilizzo dell'articolo della nota");
         } finally {
             setNoteItemLoading(null);
         }
@@ -256,6 +260,7 @@ export function MovementMaterialDialog({
             await loadNotesService.toggleItemCheck(noteId, itemId, newChecked);
         } catch (error) {
             console.error("Failed to toggle item check", error);
+            notify.error("Errore nell'aggiornamento dello stato dell'articolo");
         }
     };
 
@@ -297,6 +302,7 @@ export function MovementMaterialDialog({
             }));
         } catch (error) {
             console.error("Failed to fetch purchase details", error);
+            notify.error("Errore nel caricamento dei dettagli dell'acquisto");
             setPurchaseDetailsMap((prev) => ({
                 ...prev,
                 [purchaseId]: { loading: false, items: [] },

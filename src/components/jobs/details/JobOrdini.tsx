@@ -10,6 +10,7 @@ import { purchasesApi, Purchase } from "@/lib/api"
 import { useAuth } from "@/components/auth-provider"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
+import { notify } from "@/lib/notify"
 
 interface JobOrdiniProps {
     jobId: string
@@ -34,6 +35,7 @@ export function JobOrdini({ jobId, jobCode }: JobOrdiniProps) {
             setOrders(all.filter(p => p.orderType === 'order'))
         } catch (err) {
             console.error("Errore caricamento ordini", err)
+            notify.error("Errore nel caricamento degli ordini")
         } finally {
             setLoading(false)
         }

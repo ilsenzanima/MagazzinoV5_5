@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
+import { notify } from "@/lib/notify"
 
 interface LeaveRequestManagerProps {
     workers: Worker[]
@@ -26,6 +27,7 @@ export function LeaveRequestManager({ workers, initialRequests }: LeaveRequestMa
             setRequests(data)
         } catch (error) {
             console.error("Failed to load requests", error)
+            notify.error("Errore nel caricamento delle richieste")
         }
     }
 

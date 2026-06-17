@@ -10,6 +10,7 @@ import type { Warehouse } from "@/lib/types";
 import { useState, useEffect } from "react";
 import { format, eachDayOfInterval, addDays } from "date-fns";
 import { it } from "date-fns/locale";
+import { notify } from "@/lib/notify";
 
 interface AttendanceEntry {
     status: string;
@@ -155,6 +156,7 @@ export default function BulkAssignmentModal({
             setEntries([{ status: 'presence', jobId: '', hours: "8", notes: '' }]);
         } catch (error) {
             console.error("Error saving bulk:", error);
+            notify.error("Errore nel salvataggio dell'assegnazione di squadra");
         } finally {
             setIsLoading(false);
         }

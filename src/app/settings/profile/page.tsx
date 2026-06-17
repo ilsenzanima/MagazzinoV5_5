@@ -72,6 +72,7 @@ export default function SettingsProfilePage() {
       }
     } catch (error) {
       console.error("Unexpected error:", error);
+      notify.error("Errore nel caricamento del profilo");
     } finally {
       setLoading(false);
     }

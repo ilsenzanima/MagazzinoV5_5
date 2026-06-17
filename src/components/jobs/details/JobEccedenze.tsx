@@ -11,6 +11,7 @@ import { deliveryNotesApi } from "@/lib/api"
 import { DeliveryNote } from "@/lib/types"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
+import { notify } from "@/lib/notify"
 
 interface JobEccedenzeProps {
     jobId: string
@@ -29,6 +30,7 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
                 setNotes(data)
             } catch (err) {
                 console.error("Errore caricamento eccedenze:", err)
+                notify.error("Errore nel caricamento delle eccedenze")
             } finally {
                 setLoading(false)
             }

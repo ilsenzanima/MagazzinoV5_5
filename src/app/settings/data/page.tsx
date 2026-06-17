@@ -61,6 +61,7 @@ export default function SettingsInventoryPage() {
             setSuppliers(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
             console.error("Failed to load suppliers", error);
+            notify.error("Errore nel caricamento dei fornitori");
         } finally {
             setLoadingSuppliers(false);
         }
@@ -73,6 +74,7 @@ export default function SettingsInventoryPage() {
             setBrands(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
             console.error("Failed to load brands", error);
+            notify.error("Errore nel caricamento delle marche");
         } finally {
             setLoadingBrands(false);
         }
@@ -85,6 +87,7 @@ export default function SettingsInventoryPage() {
             setTypes(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
             console.error("Failed to load types", error);
+            notify.error("Errore nel caricamento dei tipi");
         } finally {
             setLoadingTypes(false);
         }
@@ -97,6 +100,7 @@ export default function SettingsInventoryPage() {
             setUnits(data);
         } catch (error) {
             console.error("Failed to load units", error);
+            notify.error("Errore nel caricamento delle unità");
         } finally {
             setLoadingUnits(false);
         }
@@ -120,6 +124,7 @@ export default function SettingsInventoryPage() {
             setNewSupplierName("");
         } catch (error) {
             console.error("Failed to add supplier", error);
+            notify.error("Errore nell'aggiunta del fornitore");
         } finally {
             setAddingSupplier(false);
         }
@@ -143,6 +148,7 @@ export default function SettingsInventoryPage() {
             setNewBrandName("");
         } catch (error) {
             console.error("Failed to add brand", error);
+            notify.error("Errore nell'aggiunta della marca");
         } finally {
             setAddingBrand(false);
         }
@@ -166,6 +172,7 @@ export default function SettingsInventoryPage() {
             setNewTypeName("");
         } catch (error) {
             console.error("Failed to add type", error);
+            notify.error("Errore nell'aggiunta del tipo");
         } finally {
             setAddingType(false);
         }
@@ -178,6 +185,7 @@ export default function SettingsInventoryPage() {
             setSuppliers(suppliers.filter(s => s.id !== id));
         } catch (error) {
             console.error("Failed to delete supplier", error);
+            notify.error("Errore nell'eliminazione del fornitore");
         }
     };
 
@@ -188,6 +196,7 @@ export default function SettingsInventoryPage() {
             setBrands(brands.filter(b => b.id !== id));
         } catch (error) {
             console.error("Failed to delete brand", error);
+            notify.error("Errore nell'eliminazione della marca");
         }
     };
 
@@ -198,6 +207,7 @@ export default function SettingsInventoryPage() {
             setTypes(types.filter(t => t.id !== id));
         } catch (error) {
             console.error("Failed to delete type", error);
+            notify.error("Errore nell'eliminazione del tipo");
         }
     };
 
@@ -210,6 +220,7 @@ export default function SettingsInventoryPage() {
             setNewUnitName("");
         } catch (error) {
             console.error("Failed to add unit", error);
+            notify.error("Errore nell'aggiunta dell'unità");
         } finally {
             setAddingUnit(false);
         }
@@ -222,6 +233,7 @@ export default function SettingsInventoryPage() {
             setUnits(units.filter(u => u.id !== id));
         } catch (error) {
             console.error("Failed to delete unit", error);
+            notify.error("Errore nell'eliminazione dell'unità");
         }
     };
 
@@ -232,6 +244,7 @@ export default function SettingsInventoryPage() {
             setWarehouses(data);
         } catch (error) {
             console.error("Failed to load warehouses", error);
+            notify.error("Errore nel caricamento dei magazzini");
         } finally {
             setLoadingWarehouses(false);
         }
@@ -252,6 +265,7 @@ export default function SettingsInventoryPage() {
             setNewWarehouseIsPrimary(false);
         } catch (error) {
             console.error("Failed to add warehouse", error);
+            notify.error("Errore nell'aggiunta del magazzino");
         } finally {
             setAddingWarehouse(false);
         }
@@ -264,6 +278,7 @@ export default function SettingsInventoryPage() {
             setWarehouses(warehouses.filter(w => w.id !== id));
         } catch (error) {
             console.error("Failed to delete warehouse", error);
+            notify.error("Errore nell'eliminazione del magazzino");
         }
     };
 
@@ -273,6 +288,7 @@ export default function SettingsInventoryPage() {
             await loadWarehouses(); // Reload to reflect trigger changes
         } catch (error) {
             console.error("Failed to update warehouse", error);
+            notify.error("Errore nell'aggiornamento del magazzino");
         }
     };
 

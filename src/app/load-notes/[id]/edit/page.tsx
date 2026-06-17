@@ -134,6 +134,7 @@ export default function EditLoadNotePage() {
             setInventory(items);
         } catch (error) {
             console.error("Failed to search items", error);
+            toast.error("Errore nella ricerca dei materiali. Riprova.");
         } finally {
             setItemsLoading(false);
         }
@@ -146,6 +147,7 @@ export default function EditLoadNotePage() {
             setJobs(data);
         } catch (error) {
             console.error("Failed to search jobs", error);
+            toast.error("Errore nella ricerca delle commesse. Riprova.");
         } finally {
             setJobsLoading(false);
         }

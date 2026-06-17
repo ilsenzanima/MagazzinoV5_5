@@ -135,6 +135,7 @@ export default function BackupSettingsPage() {
             setGithubBackups(backupFolders);
         } catch (error) {
             console.error('Error loading GitHub backups:', error);
+            notify.error("Errore nel caricamento dei backup");
             setGithubBackups([]);
         } finally {
             setLoadingGithubBackups(false);

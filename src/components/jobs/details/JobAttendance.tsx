@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { attendanceApi, correctionsApi, Attendance, AttendanceCorrection } from "@/lib/api";
 import { format, startOfMonth, endOfMonth, eachWeekOfInterval, endOfWeek, addMonths, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
+import { notify } from "@/lib/notify";
 
 interface JobAttendanceProps {
     jobId: string;
@@ -42,6 +43,7 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
                 setCorrections(corr);
             } catch (error) {
                 console.error("Error loading job attendance:", error);
+                notify.error("Errore nel caricamento delle presenze del cantiere");
             } finally {
                 setLoading(false);
             }

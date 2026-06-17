@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { getCroppedImg } from '@/lib/utils/image-utils'
 import { Check, X } from 'lucide-react'
+import { notify } from "@/lib/notify"
 
 // Helper to center the crop initially
 function centerAspectCrop(
@@ -96,6 +97,7 @@ export function ImageCropper({
                 onOpenChange(false)
             } catch (e) {
                 console.error("Error creating cropped image", e)
+                notify.error("Errore durante il ritaglio dell'immagine")
             } finally {
                 setIsLoading(false)
             }

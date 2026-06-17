@@ -234,6 +234,7 @@ export default function PurchaseDetailPage() {
             }
         } catch (error) {
             console.error("Failed to clear purchase job", error);
+            alert("Errore durante la rimozione della commessa");
         }
     };
 

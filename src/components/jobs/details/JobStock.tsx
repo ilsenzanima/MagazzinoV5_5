@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { fictitiousPricesApi } from "@/lib/services/fictitiousPrices"
+import { notify } from "@/lib/notify"
 
 interface JobStockProps {
     movements: Movement[]
@@ -38,6 +39,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                 setFictitiousPrices(prices)
             } catch (error) {
                 console.error('Error loading fictitious prices:', error)
+                notify.error("Errore nel caricamento dei prezzi fittizi")
             } finally {
                 setLoadingPrices(false)
             }
@@ -56,6 +58,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                         await fictitiousPricesApi.setPrice(jobId, itemId, price)
                     } catch (error) {
                         console.error('Error saving fictitious price:', error)
+                        notify.error("Errore nel salvataggio del prezzo fittizio")
                     }
                 }, 1000) // Save after 1 second of inactivity
             }

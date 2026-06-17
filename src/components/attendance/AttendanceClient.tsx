@@ -232,6 +232,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                         }
                     } catch (examError) {
                         console.error('⚠️ Failed to create medical exam record:', examError);
+                        toast.warning("Presenza salvata, ma la creazione della visita medica è fallita");
                     }
                 }
 
@@ -307,6 +308,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                                 console.log('📚 Created/updated course record for worker:', wId);
                             } catch (courseError) {
                                 console.error('⚠️ Failed to create course record:', courseError);
+                                toast.warning("Presenza salvata, ma la creazione del corso è fallita");
                             }
                         }
 
@@ -330,6 +332,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                             } catch (examError) {
                                 console.error('⚠️ Failed to create medical exam record:', examError);
                                 // Don't fail the whole operation, just log the error
+                                toast.warning("Presenza salvata, ma la creazione della visita medica è fallita");
                             }
                         }
                     }

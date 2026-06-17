@@ -3,6 +3,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import JobsContent from "@/components/jobs/JobsContent";
 import { Loader2 } from "lucide-react";
 import { jobsApi, Job } from "@/lib/api";
+import { notify } from "@/lib/notify";
 
 export default async function JobsPage(
   { searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
@@ -24,6 +25,7 @@ export default async function JobsPage(
     initialTotal = total;
   } catch (error) {
     console.error("Error loading jobs:", error);
+    notify.error("Errore nel caricamento delle commesse");
   }
 
   return (

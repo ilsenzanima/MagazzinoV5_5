@@ -256,6 +256,7 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
             setInventory(items);
         } catch (error) {
             console.error("Failed to search items", error);
+            notify.error("Errore durante la ricerca articoli");
         } finally {
             setItemsLoading(false);
         }
@@ -293,6 +294,7 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
                 }
             } catch (err) {
                 console.error("Failed to load batches", err);
+                notify.error("Errore nel caricamento dei lotti disponibili");
                 setAvailableBatches([]);
             }
         }

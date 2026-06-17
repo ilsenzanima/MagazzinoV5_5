@@ -8,6 +8,7 @@ import { Job, Worker, Attendance } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { format, addDays } from "date-fns";
 import { it } from "date-fns/locale";
+import { notify } from "@/lib/notify";
 
 interface AssignmentModalProps {
     isOpen: boolean;
@@ -81,6 +82,7 @@ export default function AssignmentModal({
             onClose();
         } catch (error) {
             console.error("Error saving:", error);
+            notify.error("Errore nel salvataggio della presenza");
         } finally {
             setIsLoading(false);
         }
@@ -94,6 +96,7 @@ export default function AssignmentModal({
             onClose();
         } catch (e) {
             console.error(e);
+            notify.error("Errore nell'eliminazione della presenza");
         } finally {
             setIsLoading(false);
         }
