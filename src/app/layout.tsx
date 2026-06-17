@@ -16,6 +16,7 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false, // usato solo in pagine specifiche (report, tagliatrice, ecc.), non in ogni pagina
 });
 
 const inter = Inter({
