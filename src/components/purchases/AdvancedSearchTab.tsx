@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Loader2, Search, Package } from "lucide-react";
+import { Plus, X, Loader2, ExternalLink, Search, Package } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PurchaseWithItems {
     id: string;
@@ -143,6 +144,7 @@ function AutocompleteInput({ value, onChange, onRemove, showRemove, suggestions,
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function AdvancedSearchTab() {
+    const { isMobile } = useIsMobile();
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [supplierId, setSupplierId] = useState("");
     const [terms, setTerms] = useState<string[]>([""]);
@@ -328,9 +330,11 @@ export function AdvancedSearchTab() {
                                         )}
                                         <Link
                                             href={`/purchases/${p.id}`}
+                                            target={isMobile ? undefined : "_blank"}
+                                            rel={isMobile ? undefined : "noopener noreferrer"}
                                             className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400"
                                         >
-                                            Apri
+                                            Apri {!isMobile && <ExternalLink className="h-3 w-3" />}
                                         </Link>
                                     </div>
                                 </div>

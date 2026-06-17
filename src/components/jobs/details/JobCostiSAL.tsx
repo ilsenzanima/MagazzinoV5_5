@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip } from "lucide-react"
+import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip, ExternalLink } from "lucide-react"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
 import { costAnalysisApi, CostAnalysisRow } from "@/lib/services/cost-analysis"
@@ -56,7 +57,7 @@ interface MaterialGroup {
     totalAmount: number
     totalPieces?: number
     children: SalRow[]
-    linkHref?: string    // internal route to navigate to (load-note or purchase)
+    linkHref?: string    // internal route to navigate to (load-note or purchase); opens in same tab on mobile, new tab on desktop
 }
 
 interface WorkerCostRow {
@@ -173,6 +174,7 @@ function WorkerHoursTable({ data }: { data: WorkerHoursSalData }) {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALProps) {
+    const { isMobile } = useIsMobile()
     const supabase = createClient()
     // ── Data ──────────────────────────────────────────────────────────────────
     const [purchases, setPurchases] = useState<Purchase[]>([])
@@ -1164,10 +1166,13 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                                                         {group.linkHref ? (
                                                             <Link
                                                                 href={group.linkHref}
+                                                                target={isMobile ? undefined : "_blank"}
+                                                                rel={isMobile ? undefined : "noopener noreferrer"}
                                                                 className="font-semibold text-blue-700 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
                                                                 onClick={e => e.stopPropagation()}
                                                             >
                                                                 {group.description}
+                                                                {!isMobile && <ExternalLink className="h-3 w-3 opacity-60 shrink-0" />}
                                                             </Link>
                                                         ) : (
                                                             <div className="font-semibold text-slate-800 dark:text-slate-200">{group.description}</div>
