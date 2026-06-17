@@ -118,11 +118,15 @@ export const complianceApi = {
 
     delete: async (id: string): Promise<void> => {
         const payload = await getSoftDeletePayload();
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('supplier_compliance_documents')
             .update(payload)
-            .eq('id', id);
+            .eq('id', id)
+            .select('id');
         if (error) throw error;
+        if (!data || data.length === 0) {
+            throw new Error('Documento non trovato o permessi insufficienti per l\'eliminazione');
+        }
     },
 
     uploadFile: async (file: File): Promise<string> => {

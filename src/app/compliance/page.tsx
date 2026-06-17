@@ -54,6 +54,7 @@ import { useViewMode } from "@/hooks/useViewMode";
 import { PageSizeSelector } from "@/components/ui/page-size-selector";
 import { usePageSize } from "@/hooks/usePageSize";
 import { PaginationControls } from "@/components/ui/pagination-controls";
+import { toast } from "sonner";
 import {
     complianceApi,
     ComplianceDocument,
@@ -672,8 +673,10 @@ export default function CompliancePage() {
             await complianceApi.delete(deletingDoc.id);
             setDocuments(prev => prev.filter(d => d.id !== deletingDoc.id));
             setDeletingDoc(null);
+            toast.success("Documento eliminato");
         } catch (e) {
             console.error(e);
+            toast.error(e instanceof Error ? e.message : "Errore durante l'eliminazione del documento");
         } finally {
             setDeleting(false);
         }
