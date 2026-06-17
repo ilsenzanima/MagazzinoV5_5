@@ -23,6 +23,7 @@ export default async function DashboardPage() {
       .from("jobs")
       .select("id, code, name, status, site_address, clients(name)")
       .eq("status", "active")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(8),
 
@@ -32,6 +33,7 @@ export default async function DashboardPage() {
       .select(
         "id, type, number, date, created_at, jobs(code, name), delivery_note_items(quantity, inventory(name, unit))"
       )
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
 
@@ -39,6 +41,7 @@ export default async function DashboardPage() {
     supabase
       .from("delivery_notes")
       .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
       .gte("created_at", startOfMonth),
 
     // Ultimi 5 acquisti
@@ -47,6 +50,8 @@ export default async function DashboardPage() {
       .select(
         "id, delivery_note_number, delivery_note_date, created_at, suppliers(name), purchase_items(price, quantity)"
       )
+      .eq("order_type", "purchase")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
 
@@ -54,6 +59,8 @@ export default async function DashboardPage() {
     supabase
       .from("purchases")
       .select("id, purchase_items(price, quantity)")
+      .eq("order_type", "purchase")
+      .is("deleted_at", null)
       .gte("created_at", startOfMonth),
 
     // Articoli in scorta minima (via RPC già esistente)
