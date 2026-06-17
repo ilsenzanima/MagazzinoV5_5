@@ -32,27 +32,31 @@ export interface ComplianceDocument {
     updatedAt: string;
 }
 
-const mapDbToDoc = (db: any): ComplianceDocument => ({
-    id: db.id,
-    supplierId: db.supplier_id,
-    brandId: db.brand_id,
-    brandName: db.brands?.name,
-    documentType: db.document_type,
-    name: db.name,
-    notes: db.notes,
-    fileUrl: db.file_url,
-    purchaseId: db.purchase_id,
-    purchaseNumber: db.purchases?.delivery_note_number,
-    createdBy: db.created_by,
-    createdAt: db.created_at,
-    updatedAt: db.updated_at,
-});
+const mapDbToDoc = (db: any): ComplianceDocument => {
+    // Se la bolla associata è stata eliminata (soft-delete), non mostrare il collegamento
+    const purchaseDeleted = db.purchases?.deleted_at != null;
+    return {
+        id: db.id,
+        supplierId: db.supplier_id,
+        brandId: db.brand_id,
+        brandName: db.brands?.name,
+        documentType: db.document_type,
+        name: db.name,
+        notes: db.notes,
+        fileUrl: db.file_url,
+        purchaseId: purchaseDeleted ? undefined : db.purchase_id,
+        purchaseNumber: purchaseDeleted ? undefined : db.purchases?.delivery_note_number,
+        createdBy: db.created_by,
+        createdAt: db.created_at,
+        updatedAt: db.updated_at,
+    };
+};
 
 export const complianceApi = {
     getBySupplier: async (supplierId: string): Promise<ComplianceDocument[]> => {
         const { data, error } = await supabase
             .from('supplier_compliance_documents')
-            .select('*, brands(name), purchases(delivery_note_number)')
+            .select('*, brands(name), purchases(delivery_note_number, deleted_at)')
             .eq('supplier_id', supplierId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false });
@@ -82,7 +86,7 @@ export const complianceApi = {
                 purchase_id: doc.purchaseId || null,
                 created_by: user?.id,
             })
-            .select('*, brands(name), purchases(delivery_note_number)')
+            .select('*, brands(name), purchases(delivery_note_number, deleted_at)')
             .single();
         if (error) throw error;
         return mapDbToDoc(data);
@@ -106,7 +110,7 @@ export const complianceApi = {
             .from('supplier_compliance_documents')
             .update(payload)
             .eq('id', id)
-            .select('*, brands(name), purchases(delivery_note_number)')
+            .select('*, brands(name), purchases(delivery_note_number, deleted_at)')
             .single();
         if (error) throw error;
         return mapDbToDoc(data);

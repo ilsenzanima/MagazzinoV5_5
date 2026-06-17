@@ -421,7 +421,8 @@ export const purchasesApi = {
             .from('purchases')
             .select('id, delivery_note_number')
             .eq('converted_purchase_id', purchaseId)
-            .eq('order_type', 'order');
+            .eq('order_type', 'order')
+            .is('deleted_at', null);
         if (error) throw error;
         return (data ?? []).map((r: any) => ({ id: r.id, deliveryNoteNumber: r.delivery_note_number }));
     },
@@ -432,7 +433,8 @@ export const purchasesApi = {
             .from('purchases')
             .select('id, supplier_id, transport_cost, suppliers(name), job_id, jobs(code), purchase_items(item_id, price, quantity, pieces, coefficient, job_id, transport_applied, transport_unit_cost, jobs(code), inventory(id, name, model, code, unit, coefficient))')
             .in('id', ids)
-            .eq('order_type', 'order');
+            .eq('order_type', 'order')
+            .is('deleted_at', null);
         if (error) throw error;
         return (data ?? []).map((p: any) => ({
             id: p.id,
