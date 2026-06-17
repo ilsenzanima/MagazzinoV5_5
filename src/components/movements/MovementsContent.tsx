@@ -152,8 +152,10 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
               onChange={handleSearchChange}
             />
           </div>
-          <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
+            <ViewToggle mode={viewMode} onChange={setViewMode} />
+          </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
               <span className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Dal</span>

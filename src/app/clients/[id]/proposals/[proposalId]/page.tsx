@@ -247,7 +247,7 @@ export default function ProposalDetailPage() {
         <DashboardLayout>
             {/* Header */}
             <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 rounded-lg mb-6 border dark:border-border">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                         <Link href={`/clients/${clientId}?tab=proposte`}>
                             <Button variant="ghost" size="icon" className="shrink-0"><ArrowLeft className="h-4 w-4" /></Button>
@@ -263,7 +263,7 @@ export default function ProposalDetailPage() {
                         </div>
                     </div>
                     {canEdit && (
-                        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                        <div className="flex gap-2 shrink-0 flex-wrap sm:justify-end">
                             {!proposal.convertedJobId && (
                                 <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={() => setConvertOpen(true)}>
                                     <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa

@@ -116,7 +116,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
         </div>
       )}
 
-      <div className="flex items-start gap-2">
+      <div className="flex flex-wrap items-start gap-2">
         <div className="flex-1">
           <FilterBar
             searchTerm={searchTerm} setSearchTerm={setSearchTerm}
@@ -359,7 +359,7 @@ function InvoicesTab() {
 
   return (
     <>
-      <div className="flex items-start gap-2">
+      <div className="flex flex-wrap items-start gap-2">
         <div className="flex-1">
           <FilterBar
             searchTerm={searchTerm} setSearchTerm={setSearchTerm}
@@ -520,24 +520,25 @@ function PurchasesPageContent() {
           )}
         </div>
         <Tabs value={tab} onValueChange={handleTabChange}>
-          <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="acquisti" className="flex items-center gap-1.5 flex-1 sm:flex-none">
+          <TabsList className="w-full sm:w-auto h-auto sm:h-9 flex-wrap gap-1">
+            <TabsTrigger value="acquisti" className="flex items-center gap-1.5 flex-1 sm:flex-none basis-[calc(50%-0.125rem)] sm:basis-auto">
               <ShoppingCart className="h-4 w-4" />
               Acquisti
             </TabsTrigger>
-            <TabsTrigger value="ordini" className="flex items-center gap-1.5 flex-1 sm:flex-none">
+            <TabsTrigger value="ordini" className="flex items-center gap-1.5 flex-1 sm:flex-none basis-[calc(50%-0.125rem)] sm:basis-auto">
               <ClipboardList className="h-4 w-4" />
               Ordini
             </TabsTrigger>
             {canSeeFatture && (
-              <TabsTrigger value="fatture" className="flex items-center gap-1.5 flex-1 sm:flex-none">
+              <TabsTrigger value="fatture" className="flex items-center gap-1.5 flex-1 sm:flex-none basis-[calc(50%-0.125rem)] sm:basis-auto">
                 <Receipt className="h-4 w-4" />
                 Fatture
               </TabsTrigger>
             )}
-            <TabsTrigger value="ricerca" className="flex items-center gap-1.5 flex-1 sm:flex-none">
+            <TabsTrigger value="ricerca" className="flex items-center gap-1.5 flex-1 sm:flex-none basis-[calc(50%-0.125rem)] sm:basis-auto">
               <Search className="h-4 w-4" />
-              Ricerca Avanzata
+              <span className="sm:hidden">Ricerca</span>
+              <span className="hidden sm:inline">Ricerca Avanzata</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>

@@ -97,6 +97,32 @@ export default function ClientsPage() {
             }}
           />
         </div>
+
+        {/* Alphabet quick-select (mobile, horizontal scroll) */}
+        <div className="flex sm:hidden gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+          {activeLetter && (
+            <button
+              onClick={() => setActiveLetter(null)}
+              className="shrink-0 w-7 h-7 text-xs font-semibold rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              title="Rimuovi filtro"
+            >
+              ✕
+            </button>
+          )}
+          {ALPHABET.map(letter => (
+            <button
+              key={letter}
+              onClick={() => handleLetterClick(letter)}
+              className={`shrink-0 w-7 h-7 text-xs font-semibold rounded transition-colors ${
+                activeLetter === letter
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600'
+              }`}
+            >
+              {letter}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}

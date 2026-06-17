@@ -357,7 +357,7 @@ function NotesTable({
                                             )}
                                         </span>
                                         {note.jobCode ? (
-                                            <span className="text-sm font-medium line-clamp-1 sm:truncate sm:max-w-[220px]" title={note.jobDescription}>
+                                            <span className="text-sm font-medium break-words sm:truncate sm:max-w-[220px]" title={note.jobDescription}>
                                                 {note.jobDescription || note.jobCode}
                                             </span>
                                         ) : (
@@ -365,7 +365,7 @@ function NotesTable({
                                         )}
                                     </div>
                                     {note.notes && (
-                                        <span className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2 pl-5">
+                                        <span className="text-xs text-muted-foreground break-words sm:line-clamp-2 pl-5">
                                             {note.notes}
                                         </span>
                                     )}

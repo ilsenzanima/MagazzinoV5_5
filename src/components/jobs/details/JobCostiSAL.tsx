@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip, ExternalLink } from "lucide-react"
+import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip } from "lucide-react"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
 import { costAnalysisApi, CostAnalysisRow } from "@/lib/services/cost-analysis"
@@ -55,7 +56,7 @@ interface MaterialGroup {
     totalAmount: number
     totalPieces?: number
     children: SalRow[]
-    linkHref?: string    // URL to open in new tab (load-note or purchase)
+    linkHref?: string    // internal route to navigate to (load-note or purchase)
 }
 
 interface WorkerCostRow {
@@ -1161,16 +1162,13 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
                                                     </td>
                                                     <td className="p-2">
                                                         {group.linkHref ? (
-                                                            <a
+                                                            <Link
                                                                 href={group.linkHref}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
                                                                 className="font-semibold text-blue-700 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
                                                                 onClick={e => e.stopPropagation()}
                                                             >
                                                                 {group.description}
-                                                                <svg className="h-3 w-3 opacity-60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                                            </a>
+                                                            </Link>
                                                         ) : (
                                                             <div className="font-semibold text-slate-800 dark:text-slate-200">{group.description}</div>
                                                         )}

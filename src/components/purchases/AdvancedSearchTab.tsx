@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { suppliersApi, Supplier } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Loader2, ExternalLink, Search, Package } from "lucide-react";
+import { Plus, X, Loader2, Search, Package } from "lucide-react";
 
 interface PurchaseWithItems {
     id: string;
@@ -325,14 +326,12 @@ export function AdvancedSearchTab() {
                                                 {p.matchCount}/{activeTerms.length} match
                                             </Badge>
                                         )}
-                                        <a
+                                        <Link
                                             href={`/purchases/${p.id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
                                             className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400"
                                         >
-                                            Apri <ExternalLink className="h-3 w-3" />
-                                        </a>
+                                            Apri
+                                        </Link>
                                     </div>
                                 </div>
 
