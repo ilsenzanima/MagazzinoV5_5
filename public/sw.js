@@ -69,7 +69,16 @@ self.addEventListener('fetch', (event) => {
             })
             .catch(() => {
                 // Network failed, try cache
-                return caches.match(event.request);
+                return caches.match(event.request).then((cached) => {
+                    if (cached) return cached;
+                    // No cache entry: return a synthetic offline response
+                    // to avoid "Failed to convert value to 'Response'" errors
+                    return new Response('Offline', {
+                        status: 503,
+                        statusText: 'Offline',
+                        headers: { 'Content-Type': 'text/plain' }
+                    });
+                });
             })
     );
 });
