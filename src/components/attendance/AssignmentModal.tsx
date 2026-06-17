@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -109,9 +109,9 @@ export default function AssignmentModal({
                     <DialogTitle>
                         Gestione Presenza - {worker.firstName} {worker.lastName}
                     </DialogTitle>
-                    <div className="text-sm text-gray-500">
+                    <DialogDescription>
                         {format(date, 'EEEE d MMMM yyyy', { locale: it })}
-                    </div>
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
