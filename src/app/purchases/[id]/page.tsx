@@ -820,7 +820,7 @@ export default function PurchaseDetailPage() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-3">
                             <CardTitle>{isOrder ? "Materiali nell'Ordine" : "Materiali in Bolla"}</CardTitle>
-                            {(userRole === 'admin' || userRole === 'operativo') && (
+                            {(userRole === 'admin' || userRole === 'operativo') && !isOrder && (
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <div className="flex items-center gap-1.5">
                                         <Truck className="h-4 w-4 text-slate-400 shrink-0" />
