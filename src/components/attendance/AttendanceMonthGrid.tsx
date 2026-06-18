@@ -1,11 +1,11 @@
 import { Worker, Attendance } from "@/lib/api";
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, isToday, isWeekend } from "date-fns";
+import { format, isToday, isWeekend } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn, isItalianHoliday } from "@/lib/utils";
 import { AttendanceStatus } from "./AttendanceToolbar";
 
 interface MonthGridProps {
-    currentDate: Date;
+    days: Date[];
     workers: Worker[];
     attendanceMap: Record<string, Record<string, Attendance[]>>;
     onCellClick: (worker: Worker, date: Date, assignments: Attendance[]) => void;
@@ -26,16 +26,12 @@ const statusConfig: Record<string, { color: string; letter: string }> = {
 };
 
 export default function AttendanceMonthGrid({
-    currentDate,
+    days,
     workers,
     attendanceMap,
     onCellClick,
     selectedTool
 }: MonthGridProps) {
-
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
     return (
         <div className="overflow-x-auto">
@@ -71,7 +67,8 @@ export default function AttendanceMonthGrid({
                     {workers.map(worker => (
                         <tr key={worker.id} className="group hover:bg-gray-50 dark:hover:bg-slate-800">
                             <td className="sticky left-0 z-10 p-2 font-medium bg-white dark:bg-card group-hover:bg-gray-50 dark:group-hover:bg-slate-800 border-r dark:border-slate-700 border-b shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">
-                                {worker.lastName} {worker.firstName}
+                                <span className="md:hidden">{worker.lastName}</span>
+                                <span className="hidden md:inline">{worker.lastName} {worker.firstName}</span>
                             </td>
                             {days.map(day => {
                                 const dateKey = format(day, "yyyy-MM-dd");

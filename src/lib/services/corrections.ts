@@ -32,6 +32,18 @@ export const correctionsApi = {
         return (data || []).map(mapDbToCorrection);
     },
 
+    getByRange: async (startDate: string, endDate: string): Promise<AttendanceCorrection[]> => {
+        const { data, error } = await supabase
+            .from('attendance_corrections')
+            .select('*, workers(first_name, last_name), jobs(code, name), warehouses(name)')
+            .gte('date', startDate)
+            .lte('date', endDate)
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        return (data || []).map(mapDbToCorrection);
+    },
+
     getByWorkerMonth: async (workerId: string, year: number, month: number): Promise<AttendanceCorrection[]> => {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const lastDay = new Date(year, month, 0).getDate();

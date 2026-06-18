@@ -59,6 +59,19 @@ export const attendanceApi = {
         return (data || []).map(mapDbToAttendance);
     },
 
+    // New: Fetch attendance for an arbitrary date range (e.g. a week)
+    getByRange: async (startDate: string, endDate: string): Promise<Attendance[]> => {
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name), worker_courses(course_name)')
+            .gte('date', startDate)
+            .lte('date', endDate)
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        return (data || []).map(mapDbToAttendance);
+    },
+
     // New: Add a SINGLE entry (append)
     addAttendance: async (record: Partial<Attendance>) => {
         const { data, error } = await supabase

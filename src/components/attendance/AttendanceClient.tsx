@@ -2,8 +2,9 @@
 
 import { Worker, Job, Attendance, AttendanceCorrection, attendanceApi, workerCoursesApi, workerMedicalExamsApi, correctionsApi } from "@/lib/api";
 import { useState, useEffect, useMemo } from "react";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from "date-fns";
 import { it } from "date-fns/locale";
+import { useIsMobile } from "@/hooks/use-mobile";
 import AttendanceMonthGrid from "./AttendanceMonthGrid"; // New grid
 import { AttendanceToolbar, AttendanceStatus } from "./AttendanceToolbar"; // New toolbar
 import AssignmentModal from "./AssignmentModal";
@@ -26,6 +27,7 @@ interface AttendanceClientProps {
 export default function AttendanceClient({ initialWorkers, initialJobs }: AttendanceClientProps) {
     const { userRole } = useAuth();
     const canEdit = userRole === 'admin' || userRole === 'operativo';
+    const { isMobile } = useIsMobile();
 
     // State
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -50,19 +52,21 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     // Job filter state
     const [filterJobId, setFilterJobId] = useState<string | null>(null);
 
-    // Computed
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
+    // Computed: vista settimanale su mobile, mensile su desktop
+    const viewStart = isMobile ? startOfWeek(currentDate, { weekStartsOn: 1 }) : startOfMonth(currentDate);
+    const viewEnd = isMobile ? endOfWeek(currentDate, { weekStartsOn: 1 }) : endOfMonth(currentDate);
+    const monthStart = startOfMonth(currentDate); // usato solo per il report PDF mensile
+    const days = useMemo(() => eachDayOfInterval({ start: viewStart, end: viewEnd }), [viewStart, viewEnd]);
 
     // Fetch Data
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const year = monthStart.getFullYear();
-            const month = monthStart.getMonth() + 1;
+            const startDate = format(viewStart, 'yyyy-MM-dd');
+            const endDate = format(viewEnd, 'yyyy-MM-dd');
             const [data, corr] = await Promise.all([
-                attendanceApi.getByMonth(year, month),
-                correctionsApi.getByMonth(year, month),
+                attendanceApi.getByRange(startDate, endDate),
+                correctionsApi.getByRange(startDate, endDate),
             ]);
             setAttendanceList(data);
             setCorrections(corr);
@@ -76,7 +80,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     useEffect(() => {
         loadData();
-    }, [currentDate]);
+    }, [currentDate, isMobile]);
 
     // Merge corrections into attendance list: adjust hours or create virtual entries
     const mergedAttendanceList = useMemo(() => {
@@ -167,8 +171,8 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     }, [attendanceMap, filterJobId]);
 
     // Handlers
-    const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-    const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+    const handlePrevMonth = () => setCurrentDate(isMobile ? subWeeks(currentDate, 1) : subMonths(currentDate, 1));
+    const handleNextMonth = () => setCurrentDate(isMobile ? addWeeks(currentDate, 1) : addMonths(currentDate, 1));
     const handleToday = () => setCurrentDate(new Date());
 
     const handleCellClick = async (worker: Worker, date: Date, assignments: Attendance[]) => {
@@ -403,7 +407,11 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <div className="font-semibold w-48 text-center capitalize text-lg">
-                        {format(monthStart, 'MMMM yyyy', { locale: it })}
+                        {isMobile
+                            ? (viewStart.getMonth() === viewEnd.getMonth()
+                                ? `${format(viewStart, 'd')} - ${format(viewEnd, 'd MMMM yyyy', { locale: it })}`
+                                : `${format(viewStart, 'd MMM', { locale: it })} - ${format(viewEnd, 'd MMM yyyy', { locale: it })}`)
+                            : format(monthStart, 'MMMM yyyy', { locale: it })}
                     </div>
                     <Button variant="outline" size="icon" onClick={handleNextMonth}>
                         <ChevronRight className="h-4 w-4" />
@@ -494,7 +502,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
             <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border overflow-hidden">
                 <AttendanceMonthGrid
-                    currentDate={currentDate}
+                    days={days}
                     workers={initialWorkers}
                     attendanceMap={filteredAttendanceMap}
                     onCellClick={handleCellClick}
