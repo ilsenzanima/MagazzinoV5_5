@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2 } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, FileText, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -18,8 +18,8 @@ import { useAuth } from "@/components/auth-provider";
 // Components
 import { JobOverview } from "@/components/jobs/details/JobOverview";
 import { JobStock } from "@/components/jobs/details/JobStock";
-import { JobJournal } from "@/components/jobs/details/JobJournal";
 import { JobDocuments } from "@/components/jobs/details/JobDocuments";
+import { JobConformita } from "@/components/jobs/details/JobConformita";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
 import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
 import { JobEccedenze } from "@/components/jobs/details/JobEccedenze";
@@ -501,11 +501,11 @@ export default function JobDetailsPage() {
                                 <span className="hidden md:inline">Materiali</span>
                             </TabsTrigger>
                             <TabsTrigger
-                                value="journal"
-                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                                value="conformita"
+                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-green-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
                             >
-                                <BookOpen className="h-4 w-4 md:mr-1" />
-                                <span className="hidden md:inline">Giornale</span>
+                                <ShieldCheck className="h-4 w-4 md:mr-1 text-green-600" />
+                                <span className="hidden md:inline">Conformità</span>
                             </TabsTrigger>
                             <TabsTrigger
                                 value="documents"
@@ -568,8 +568,8 @@ export default function JobDetailsPage() {
                             <JobStock movements={movements} jobId={job.id} />
                         </TabsContent>
 
-                        <TabsContent value="journal" className="space-y-6 focus-visible:outline-none">
-                            <JobJournal jobId={job.id} />
+                        <TabsContent value="conformita" className="space-y-6 focus-visible:outline-none">
+                            <JobConformita jobId={job.id} />
                         </TabsContent>
 
                         <TabsContent value="documents" className="space-y-6 focus-visible:outline-none">
