@@ -20,6 +20,8 @@ import { clientsApi } from "@/lib/api"
 import { jobsApi } from "@/lib/api"
 import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
 import { costAnalysisApi } from "@/lib/services/cost-analysis"
+import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
+import { jobCommessaDocumentsApi } from "@/lib/services/job-commessa-documents"
 import { Client } from "@/lib/types"
 import { notify } from "@/lib/notify"
 import { format } from "date-fns"
@@ -220,6 +222,18 @@ export default function ProposalDetailPage() {
                     margineTrattativa: params.margineTrattativa,
                 }),
             ])
+
+            // Associa i documenti della proposta alla commessa (Documenti Commessa)
+            const proposalDocs = await proposalDocumentsApi.getByProposalId(proposalId)
+            await Promise.all(proposalDocs.map(doc => jobCommessaDocumentsApi.create({
+                jobId: job.id,
+                name: doc.name,
+                notes: doc.notes,
+                fileUrl: doc.fileUrl,
+                fileType: doc.fileType,
+                uploadedBy: doc.uploadedBy,
+                uploadedByName: doc.uploadedByName,
+            })))
 
             notify.success("Commessa creata con analisi costi copiata!")
             router.push(`/jobs/${job.id}`)

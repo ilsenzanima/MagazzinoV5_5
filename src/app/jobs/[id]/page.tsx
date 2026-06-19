@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, FileText, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -19,6 +19,7 @@ import { useAuth } from "@/components/auth-provider";
 import { JobOverview } from "@/components/jobs/details/JobOverview";
 import { JobStock } from "@/components/jobs/details/JobStock";
 import { JobDocuments } from "@/components/jobs/details/JobDocuments";
+import { JobCommessaDocuments } from "@/components/jobs/details/JobCommessaDocuments";
 import { JobConformita } from "@/components/jobs/details/JobConformita";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
 import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
@@ -512,8 +513,17 @@ export default function JobDetailsPage() {
                                 className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
                             >
                                 <FileText className="h-4 w-4 md:mr-1" />
-                                <span className="hidden md:inline">Documenti</span>
+                                <span className="hidden md:inline">Documenti Cantiere</span>
                             </TabsTrigger>
+                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                <TabsTrigger
+                                    value="commessa-documents"
+                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                                >
+                                    <Folder className="h-4 w-4 md:mr-1" />
+                                    <span className="hidden md:inline">Documenti Commessa</span>
+                                </TabsTrigger>
+                            )}
                             <TabsTrigger
                                 value="attendance"
                                 className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
@@ -575,6 +585,12 @@ export default function JobDetailsPage() {
                         <TabsContent value="documents" className="space-y-6 focus-visible:outline-none">
                             <JobDocuments jobId={job.id} />
                         </TabsContent>
+
+                        {(userRole === 'admin' || userRole === 'operativo') && (
+                            <TabsContent value="commessa-documents" className="space-y-6 focus-visible:outline-none">
+                                <JobCommessaDocuments jobId={job.id} />
+                            </TabsContent>
+                        )}
 
                         <TabsContent value="attendance" className="space-y-6 focus-visible:outline-none">
                             <JobAttendance jobId={job.id} />

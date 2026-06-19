@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, Upload, Download, Trash2, File, FileImage, FileSpreadsheet, AlertCircle, Loader2 } from "lucide-react"
+import { FileText, Upload, Trash2, File, FileImage, FileSpreadsheet, Loader2, Pencil } from "lucide-react"
 import { JobDocument, jobDocumentsApi } from "@/lib/api"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -11,15 +11,12 @@ import { it } from "date-fns/locale"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 
@@ -30,26 +27,33 @@ interface JobDocumentsProps {
 export function JobDocuments({ jobId }: JobDocumentsProps) {
   const [documents, setDocuments] = useState<JobDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const [isUploadOpen, setIsUploadOpen] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [docToDelete, setDocToDelete] = useState<JobDocument | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null)
-  const [uploadCategory, setUploadCategory] = useState("project")
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [activeDoc, setActiveDoc] = useState<JobDocument | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
+  // Upload form
+  const [upFile, setUpFile] = useState<File | null>(null)
+  const [upName, setUpName] = useState("")
+  const [upNotes, setUpNotes] = useState("")
+  const upRef = useRef<HTMLInputElement>(null)
+
+  // Edit form
+  const [editName, setEditName] = useState("")
+  const [editNotes, setEditNotes] = useState("")
+  const editRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
-    if (jobId) {
-      loadDocuments()
-    }
+    if (jobId) loadDocuments()
   }, [jobId])
 
   const loadDocuments = async () => {
     try {
       setLoading(true)
-      const data = await jobDocumentsApi.getByJobId(jobId)
-      setDocuments(data)
+      setDocuments(await jobDocumentsApi.getByJobId(jobId))
     } catch (error) {
       console.error("Failed to load documents", error)
       toast.error("Errore nel caricamento dei documenti")
@@ -58,50 +62,59 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFileToUpload(e.target.files[0])
-    }
-  }
-
   const handleUpload = async () => {
-    if (!fileToUpload || !jobId) return
-
+    if (!upFile || !jobId) return
     try {
-      setIsUploading(true)
-
-      // 1. Upload to Supabase Storage
-      const fileExt = fileToUpload.name.split('.').pop()
-      const fileName = `${jobId}/${Math.random().toString(36).substring(7)}_${fileToUpload.name}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(fileName, fileToUpload)
-
+      setUploading(true)
+      const fileExt = upFile.name.split('.').pop() || ''
+      const fileName = `${jobId}/${Math.random().toString(36).substring(7)}_${upFile.name}`
+      const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, upFile)
       if (uploadError) throw uploadError
 
-      // 2. Get Public URL (or just store path if private)
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName)
+      const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName)
 
-      // 3. Create Record in DB
       await jobDocumentsApi.create({
         jobId,
-        name: fileToUpload.name,
+        name: upName.trim() || upFile.name,
+        notes: upNotes.trim(),
         fileUrl: publicUrl,
         fileType: fileExt,
-        category: uploadCategory,
       })
 
       toast.success("Documento caricato con successo")
-      setIsUploadOpen(false)
-      setFileToUpload(null)
+      setUploadOpen(false)
       loadDocuments()
     } catch (error: any) {
       console.error("Upload failed", error)
       toast.error("Errore durante il caricamento: " + error.message)
     } finally {
-      setIsUploading(false)
+      setUploading(false)
+    }
+  }
+
+  const openEdit = (doc: JobDocument, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setActiveDoc(doc)
+    setEditName(doc.name)
+    setEditNotes(doc.notes || "")
+    setEditOpen(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!activeDoc) return
+    try {
+      setSaving(true)
+      await jobDocumentsApi.update(activeDoc.id, {
+        name: editName.trim() || activeDoc.name,
+        notes: editNotes.trim(),
+      })
+      toast.success("Documento aggiornato")
+      setEditOpen(false)
+      loadDocuments()
+    } catch {
+      toast.error("Errore durante l'aggiornamento")
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -118,16 +131,17 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
   };
 
   const handleDelete = async () => {
-    if (!docToDelete) return
+    if (!activeDoc) return
 
     try {
-      const path = docToDelete.fileUrl?.split('/public/documents/')[1]
+      const path = activeDoc.fileUrl?.split('/public/documents/')[1]
       if (path) await supabase.storage.from('documents').remove([path])
-      await jobDocumentsApi.delete(docToDelete.id)
-      setDeleteDialogOpen(false)
-      setDocToDelete(null)
+      await jobDocumentsApi.delete(activeDoc.id)
+      setDeleteOpen(false)
+      setEditOpen(false)
       toast.success("Documento eliminato")
-      setDocuments(documents.filter(d => d.id !== docToDelete.id))
+      setDocuments(documents.filter(d => d.id !== activeDoc.id))
+      setActiveDoc(null)
     } catch (error) {
       console.error("Delete failed", error)
       toast.error("Errore durante l'eliminazione")
@@ -145,79 +159,14 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     return <File className="h-8 w-8 text-slate-500" />
   }
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-slate-800">Documenti Cantiere</h2>
-        <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Upload className="mr-2 h-4 w-4" />
-              Carica Documento
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Carica Nuovo Documento</DialogTitle>
-              <DialogDescription>
-                Seleziona un file da caricare per questa commessa.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Categoria</Label>
-                <Select value={uploadCategory} onValueChange={setUploadCategory}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="project">Progetto</SelectItem>
-                    <SelectItem value="contract">Contratto</SelectItem>
-                    <SelectItem value="safety">Sicurezza</SelectItem>
-                    <SelectItem value="photo">Foto</SelectItem>
-                    <SelectItem value="other">Altro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>File</Label>
-                <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors"
-                  onClick={() => fileInputRef.current?.click()}>
-                  <input
-                    type="file"
-                    className="hidden"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                  />
-                  <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                  <p className="text-sm text-slate-600 font-medium">
-                    {fileToUpload ? fileToUpload.name : "Clicca per selezionare un file"}
-                  </p>
-                  {fileToUpload && (
-                    <p className="text-xs text-slate-400 mt-1">
-                      {(fileToUpload.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsUploadOpen(false)}>Annulla</Button>
-              <Button onClick={handleUpload} disabled={!fileToUpload || isUploading}>
-                {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Carica
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Documenti Cantiere</h2>
+        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setUpFile(null); setUpName(""); setUpNotes(""); setUploadOpen(true) }}>
+          <Upload className="mr-2 h-4 w-4" />
+          Carica Documento
+        </Button>
       </div>
 
       {loading ? (
@@ -235,35 +184,29 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {documents.map((doc) => (
-            <Card key={doc.id} className="group hover:shadow-md transition-shadow">
+            <Card
+              key={doc.id}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => handleOpenDocument(doc.fileUrl)}
+            >
               <CardContent className="p-4 flex items-start gap-3">
-                <div className="bg-slate-50 p-2 rounded">
+                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
                   {getFileIcon(doc.fileType)}
                 </div>
                 <div className="flex-1 overflow-hidden min-w-0">
-                  <div className="flex justify-between items-start">
-                    <p className="font-medium truncate pr-2" title={doc.name}>{doc.name}</p>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenDocument(doc.fileUrl)}>
-                        <Download className="h-3 w-3 text-slate-500" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setDocToDelete(doc); setDeleteDialogOpen(true); }}>
-                        <Trash2 className="h-3 w-3 text-red-500" />
-                      </Button>
-                    </div>
+                  <div className="flex justify-between items-start gap-1">
+                    <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
+                      onClick={e => openEdit(doc, e)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] uppercase tracking-wider bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-semibold">
-                      {doc.category === 'project' ? 'Progetto' :
-                        doc.category === 'contract' ? 'Contratto' :
-                          doc.category === 'safety' ? 'Sicurezza' :
-                            doc.category === 'photo' ? 'Foto' : 'Altro'}
-                    </span>
-                    <span className="text-xs text-slate-400">• {format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</span>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1 truncate">
-                    Caricato da {doc.uploadedBy || 'Utente'}
-                  </div>
+                  {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
+                  <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
                 </div>
               </CardContent>
             </Card>
@@ -271,11 +214,82 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
         </div>
       )}
 
+      {/* Upload dialog */}
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Carica Documento</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>File</Label>
+              <div
+                className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                onClick={() => upRef.current?.click()}
+              >
+                <input type="file" className="hidden" ref={upRef} onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  setUpFile(f)
+                  if (!upName) setUpName(f.name.replace(/\.[^.]+$/, ''))
+                }} />
+                <Upload className="h-8 w-8 text-slate-400 mb-2" />
+                <p className="text-sm text-slate-600 font-medium">{upFile ? upFile.name : "Clicca per selezionare un file"}</p>
+                {upFile && <p className="text-xs text-slate-400 mt-1">{(upFile.size / 1024 / 1024).toFixed(2)} MB</p>}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Nome documento</Label>
+              <Input value={upName} onChange={e => setUpName(e.target.value)} placeholder="Es. Permesso di costruire" />
+            </div>
+            <div className="space-y-1">
+              <Label>Nota (opzionale)</Label>
+              <Input value={upNotes} onChange={e => setUpNotes(e.target.value)} placeholder="Breve descrizione visibile al volo" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
+            <Button onClick={handleUpload} disabled={!upFile || uploading}>
+              {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Carica
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Modifica Documento</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Nome documento</Label>
+              <Input value={editName} onChange={e => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Nota</Label>
+              <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Breve descrizione" />
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 sm:mr-auto"
+              onClick={() => { setEditOpen(false); setDeleteOpen(true) }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />Elimina
+            </Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Annulla</Button>
+            <Button onClick={handleSaveEdit} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salva
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ConfirmDeleteDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
         title="Elimina documento"
-        description={`Il documento "${docToDelete?.name || 'selezionato'}" verrà eliminato definitivamente e non potrà essere recuperato.`}
+        description={`Il documento "${activeDoc?.name || 'selezionato'}" verrà eliminato definitivamente e non potrà essere recuperato.`}
         onConfirm={handleDelete}
       />
     </div>
