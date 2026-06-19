@@ -468,7 +468,7 @@ export default function JobDetailsPage() {
                 {/* Printable Area */}
                 <div ref={printRef}>
                     <Tabs defaultValue="overview" className="space-y-6">
-                        <TabsList className="print:hidden w-full flex-wrap justify-between gap-y-1 border-b rounded-none p-0 h-auto bg-transparent md:flex-nowrap">
+                        <TabsList className="print:hidden w-full grid grid-cols-6 gap-1 border-b rounded-none p-0 h-auto bg-transparent md:flex md:flex-nowrap md:gap-0">
                             <TabsTrigger
                                 value="overview"
                                 className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
