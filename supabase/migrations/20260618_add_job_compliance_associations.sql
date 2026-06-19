@@ -13,9 +13,13 @@ CREATE TABLE IF NOT EXISTS job_compliance_associations (
 
 ALTER TABLE job_compliance_associations ENABLE ROW LEVEL SECURITY;
 
+-- USING (true): il filtro su deleted_at va fatto a livello applicativo. Una policy
+-- SELECT che esclude le righe soft-deleted causa un errore RLS quando un UPDATE
+-- imposta deleted_at, perché PostgREST richiede return=representation di default
+-- e la riga aggiornata non sarebbe piu visibile secondo la policy.
 CREATE POLICY "auth_select_job_compliance_associations"
     ON job_compliance_associations FOR SELECT TO authenticated
-    USING (deleted_at IS NULL);
+    USING (true);
 
 CREATE POLICY "auth_insert_job_compliance_associations"
     ON job_compliance_associations FOR INSERT TO authenticated

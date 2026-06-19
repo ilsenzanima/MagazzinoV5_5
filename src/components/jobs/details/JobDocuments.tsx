@@ -53,7 +53,8 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
   const loadDocuments = async () => {
     try {
       setLoading(true)
-      setDocuments(await jobDocumentsApi.getByJobId(jobId))
+      const all = await jobDocumentsApi.getByJobId(jobId)
+      setDocuments(all.filter(d => d.category !== "conformita"))
     } catch (error) {
       console.error("Failed to load documents", error)
       toast.error("Errore nel caricamento dei documenti")
