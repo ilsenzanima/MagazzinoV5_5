@@ -221,3 +221,63 @@ export const jobComplianceApi = {
         if (error) throw error;
     },
 };
+
+export interface ProposalComplianceAssociation {
+    id: string;
+    proposalId: string;
+    complianceDocumentId: string;
+    customName?: string;
+    customNotes?: string;
+    createdAt: string;
+    document?: ComplianceDocument;
+}
+
+const mapDbToProposalAssociation = (db: any): ProposalComplianceAssociation => ({
+    id: db.id,
+    proposalId: db.proposal_id,
+    complianceDocumentId: db.compliance_document_id,
+    customName: db.custom_name ?? undefined,
+    customNotes: db.custom_notes ?? undefined,
+    createdAt: db.created_at,
+    document: db.supplier_compliance_documents ? mapDbToDoc(db.supplier_compliance_documents) : undefined,
+});
+
+export const proposalComplianceApi = {
+    getByProposalId: async (proposalId: string): Promise<ProposalComplianceAssociation[]> => {
+        const { data, error } = await supabase
+            .from('proposal_compliance_associations')
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .eq('proposal_id', proposalId)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapDbToProposalAssociation);
+    },
+
+    associate: async (proposalId: string, complianceDocumentId: string): Promise<ProposalComplianceAssociation> => {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data, error } = await supabase
+            .from('proposal_compliance_associations')
+            .insert({ proposal_id: proposalId, compliance_document_id: complianceDocumentId, created_by: user?.id })
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .single();
+        if (error) throw error;
+        return mapDbToProposalAssociation(data);
+    },
+
+    update: async (id: string, payload: { customName?: string | null; customNotes?: string | null }): Promise<void> => {
+        const { error } = await supabase
+            .from('proposal_compliance_associations')
+            .update({ custom_name: payload.customName ?? null, custom_notes: payload.customNotes ?? null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    disassociate: async (id: string): Promise<void> => {
+        const { error } = await supabase
+            .from('proposal_compliance_associations')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
+        if (error) throw error;
+    },
+};

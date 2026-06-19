@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, Loader2, MapPin, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, Loader2, MapPin, Pencil, ShieldCheck, Trash2 } from "lucide-react"
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals"
 import { clientsApi } from "@/lib/api"
 import { jobsApi } from "@/lib/api"
@@ -22,12 +22,14 @@ import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
 import { costAnalysisApi } from "@/lib/services/cost-analysis"
 import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
 import { jobCommessaDocumentsApi } from "@/lib/services/job-commessa-documents"
+import { proposalComplianceApi, jobComplianceApi } from "@/lib/services/compliance"
 import { Client } from "@/lib/types"
 import { notify } from "@/lib/notify"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { ProposalAnalisiCosti } from "@/components/clients/detail/ProposalAnalisiCosti"
 import { ProposalDocuments } from "@/components/clients/detail/ProposalDocuments"
+import { ProposalConformita } from "@/components/clients/detail/ProposalConformita"
 import { ProposalDistanza } from "@/components/clients/detail/ProposalDistanza"
 import { useAuth } from "@/components/auth-provider"
 
@@ -235,6 +237,18 @@ export default function ProposalDetailPage() {
                 uploadedByName: doc.uploadedByName,
             })))
 
+            // Associa i documenti di conformità della proposta alla commessa (tab Conformità)
+            const proposalComplianceDocs = await proposalComplianceApi.getByProposalId(proposalId)
+            await Promise.all(proposalComplianceDocs.map(async assoc => {
+                const jobAssoc = await jobComplianceApi.associate(job.id, assoc.complianceDocumentId)
+                if (assoc.customName || assoc.customNotes) {
+                    await jobComplianceApi.update(jobAssoc.id, {
+                        customName: assoc.customName ?? null,
+                        customNotes: assoc.customNotes ?? null,
+                    })
+                }
+            }))
+
             notify.success("Commessa creata con analisi costi copiata!")
             router.push(`/jobs/${job.id}`)
         } catch { notify.error("Errore durante la conversione") }
@@ -301,6 +315,7 @@ export default function ProposalDetailPage() {
                     <TabsTrigger value="info"><FileText className="h-4 w-4 mr-2" />Info</TabsTrigger>
                     <TabsTrigger value="costi"><Calculator className="h-4 w-4 mr-2" />Analisi Costi</TabsTrigger>
                     <TabsTrigger value="documenti"><BarChart2 className="h-4 w-4 mr-2" />Documenti</TabsTrigger>
+                    <TabsTrigger value="conformita"><ShieldCheck className="h-4 w-4 mr-2 text-green-600" />Conformità</TabsTrigger>
                 </TabsList>
 
                 {/* ── INFO ─────────────────────────────────────────────── */}
@@ -465,6 +480,11 @@ export default function ProposalDetailPage() {
                 {/* ── DOCUMENTI ─────────────────────────────────────── */}
                 <TabsContent value="documenti">
                     <ProposalDocuments proposalId={proposalId} />
+                </TabsContent>
+
+                {/* ── CONFORMITÀ ────────────────────────────────────── */}
+                <TabsContent value="conformita">
+                    <ProposalConformita proposalId={proposalId} />
                 </TabsContent>
             </Tabs>
 
