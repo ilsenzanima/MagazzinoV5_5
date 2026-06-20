@@ -115,7 +115,7 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           active: pathname === "/clients" || pathname.startsWith("/clients/"),
         },
         ...(userRole === "admin" || userRole === "operativo" ? [{
-          label: "Proposte",
+          label: "Offerte generali",
           icon: FileText,
           href: "/proposals",
           active: pathname === "/proposals",

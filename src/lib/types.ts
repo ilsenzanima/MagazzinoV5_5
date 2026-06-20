@@ -170,6 +170,7 @@ export interface JobDocument {
     id: string;
     jobId: string;
     name: string;
+    notes?: string;
     fileUrl: string;
     fileType: string;
     category: string;

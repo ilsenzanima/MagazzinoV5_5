@@ -53,6 +53,19 @@ const mapDbToDoc = (db: any): ComplianceDocument => {
 };
 
 export const complianceApi = {
+    getAll: async (search?: string): Promise<ComplianceDocument[]> => {
+        let query = supabase
+            .from('supplier_compliance_documents')
+            .select('*, brands(name), purchases(delivery_note_number, deleted_at)')
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(50);
+        if (search) query = query.ilike('name', `%${search}%`);
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data || []).map(mapDbToDoc);
+    },
+
     getBySupplier: async (supplierId: string): Promise<ComplianceDocument[]> => {
         const { data, error } = await supabase
             .from('supplier_compliance_documents')
@@ -150,5 +163,125 @@ export const complianceApi = {
             .limit(20);
         if (error) throw error;
         return (data || []) as { id: string; delivery_note_number: string; delivery_note_date: string }[];
+    },
+};
+
+export interface JobComplianceAssociation {
+    id: string;
+    jobId: string;
+    complianceDocumentId: string;
+    customName?: string;
+    customNotes?: string;
+    createdAt: string;
+    document?: ComplianceDocument;
+}
+
+const mapDbToAssociation = (db: any): JobComplianceAssociation => ({
+    id: db.id,
+    jobId: db.job_id,
+    complianceDocumentId: db.compliance_document_id,
+    customName: db.custom_name ?? undefined,
+    customNotes: db.custom_notes ?? undefined,
+    createdAt: db.created_at,
+    document: db.supplier_compliance_documents ? mapDbToDoc(db.supplier_compliance_documents) : undefined,
+});
+
+export const jobComplianceApi = {
+    getByJobId: async (jobId: string): Promise<JobComplianceAssociation[]> => {
+        const { data, error } = await supabase
+            .from('job_compliance_associations')
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .eq('job_id', jobId)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapDbToAssociation);
+    },
+
+    associate: async (jobId: string, complianceDocumentId: string): Promise<JobComplianceAssociation> => {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data, error } = await supabase
+            .from('job_compliance_associations')
+            .insert({ job_id: jobId, compliance_document_id: complianceDocumentId, created_by: user?.id })
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .single();
+        if (error) throw error;
+        return mapDbToAssociation(data);
+    },
+
+    update: async (id: string, payload: { customName?: string | null; customNotes?: string | null }): Promise<void> => {
+        const { error } = await supabase
+            .from('job_compliance_associations')
+            .update({ custom_name: payload.customName ?? null, custom_notes: payload.customNotes ?? null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    disassociate: async (id: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_compliance_associations')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
+        if (error) throw error;
+    },
+};
+
+export interface ProposalComplianceAssociation {
+    id: string;
+    proposalId: string;
+    complianceDocumentId: string;
+    customName?: string;
+    customNotes?: string;
+    createdAt: string;
+    document?: ComplianceDocument;
+}
+
+const mapDbToProposalAssociation = (db: any): ProposalComplianceAssociation => ({
+    id: db.id,
+    proposalId: db.proposal_id,
+    complianceDocumentId: db.compliance_document_id,
+    customName: db.custom_name ?? undefined,
+    customNotes: db.custom_notes ?? undefined,
+    createdAt: db.created_at,
+    document: db.supplier_compliance_documents ? mapDbToDoc(db.supplier_compliance_documents) : undefined,
+});
+
+export const proposalComplianceApi = {
+    getByProposalId: async (proposalId: string): Promise<ProposalComplianceAssociation[]> => {
+        const { data, error } = await supabase
+            .from('proposal_compliance_associations')
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .eq('proposal_id', proposalId)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapDbToProposalAssociation);
+    },
+
+    associate: async (proposalId: string, complianceDocumentId: string): Promise<ProposalComplianceAssociation> => {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data, error } = await supabase
+            .from('proposal_compliance_associations')
+            .insert({ proposal_id: proposalId, compliance_document_id: complianceDocumentId, created_by: user?.id })
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .single();
+        if (error) throw error;
+        return mapDbToProposalAssociation(data);
+    },
+
+    update: async (id: string, payload: { customName?: string | null; customNotes?: string | null }): Promise<void> => {
+        const { error } = await supabase
+            .from('proposal_compliance_associations')
+            .update({ custom_name: payload.customName ?? null, custom_notes: payload.customNotes ?? null })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    disassociate: async (id: string): Promise<void> => {
+        const { error } = await supabase
+            .from('proposal_compliance_associations')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
+        if (error) throw error;
     },
 };

@@ -16,11 +16,14 @@ import { Client, clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { ClientCard } from "@/components/clients";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { useViewMode } from "@/hooks/useViewMode";
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function ClientsPage() {
   const { userRole } = useAuth();
+  const [viewMode, setViewMode] = useViewMode('committenti');
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDeferredValue(searchTerm);
   const [activeLetter, setActiveLetter] = useState<string | null>(null);
@@ -85,17 +88,46 @@ export default function ClientsPage() {
           )}
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            placeholder="Cerca Committente (Nome, P.IVA, Email...)"
-            className="pl-9 bg-slate-100 dark:bg-muted border-none"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              if (e.target.value) setActiveLetter(null);
-            }}
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <Input
+              placeholder="Cerca Committente (Nome, P.IVA, Email...)"
+              className="pl-9 bg-slate-100 dark:bg-muted border-none"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                if (e.target.value) setActiveLetter(null);
+              }}
+            />
+          </div>
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+        </div>
+
+        {/* Alphabet quick-select (mobile, horizontal scroll) */}
+        <div className="flex sm:hidden gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+          {activeLetter && (
+            <button
+              onClick={() => setActiveLetter(null)}
+              className="shrink-0 w-7 h-7 text-xs font-semibold rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              title="Rimuovi filtro"
+            >
+              ✕
+            </button>
+          )}
+          {ALPHABET.map(letter => (
+            <button
+              key={letter}
+              onClick={() => handleLetterClick(letter)}
+              className={`shrink-0 w-7 h-7 text-xs font-semibold rounded transition-colors ${
+                activeLetter === letter
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600'
+              }`}
+            >
+              {letter}
+            </button>
+          ))}
         </div>
 
         {/* Alphabet quick-select (mobile, horizontal scroll) */}
@@ -150,6 +182,30 @@ export default function ClientsPage() {
               <div className="text-center py-10 text-slate-400 dark:text-slate-500">
                 <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
                 <p>Nessun committente trovato{activeLetter ? ` con la lettera "${activeLetter}"` : ''}</p>
+              </div>
+            ) : viewMode === 'list' ? (
+              <div className="space-y-1.5">
+                {clients.map((client) => {
+                  const addressLine = [
+                    client.street ? `${client.street}${client.streetNumber ? ' ' + client.streetNumber : ''}` : '',
+                    client.postalCode || '',
+                    client.city || '',
+                    client.province ? `(${client.province.toUpperCase()})` : '',
+                  ].filter(Boolean).join(' ').replace(/\s+/g, ' ').replace(/ ,/g, ',').trim();
+                  return (
+                    <Link href={`/clients/${client.id}`} key={client.id}>
+                      <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                        <Building2 className="h-4 w-4 text-blue-600 shrink-0" />
+                        <span className="font-semibold text-slate-900 dark:text-white text-sm w-48 shrink-0 truncate">
+                          {client.name}
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden sm:block">
+                          {addressLine || '—'}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">

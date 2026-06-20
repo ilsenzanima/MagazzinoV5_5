@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, BookOpen, FileText, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2 } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -19,8 +19,9 @@ import { notify } from "@/lib/notify";
 // Components
 import { JobOverview } from "@/components/jobs/details/JobOverview";
 import { JobStock } from "@/components/jobs/details/JobStock";
-import { JobJournal } from "@/components/jobs/details/JobJournal";
 import { JobDocuments } from "@/components/jobs/details/JobDocuments";
+import { JobCommessaDocuments } from "@/components/jobs/details/JobCommessaDocuments";
+import { JobConformita } from "@/components/jobs/details/JobConformita";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
 import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
 import { JobEccedenze } from "@/components/jobs/details/JobEccedenze";
@@ -29,10 +30,23 @@ import { JobFatturazione } from "@/components/jobs/details/JobFatturazione";
 import { JobAnalisiCosti } from "@/components/jobs/details/JobAnalisiCosti";
 import { clientProposalsApi, ClientProposal } from "@/lib/services/client-proposals";
 
+type TabGroupKey = 'generale' | 'documenti' | 'economico';
+
+const TAB_GROUPS: { key: TabGroupKey; label: string; adminOnly?: boolean; tabs: string[] }[] = [
+    { key: 'generale', label: 'Generale', tabs: ['overview', 'stock', 'attendance', 'eccedenze', 'ordini'] },
+    { key: 'documenti', label: 'Documenti', tabs: ['conformita', 'documents', 'commessa-documents'] },
+    { key: 'economico', label: 'Economico', adminOnly: true, tabs: ['costi-sal', 'analisi-costi', 'fatturazione'] },
+];
+
+function groupOfTab(tab: string): TabGroupKey {
+    return TAB_GROUPS.find(g => g.tabs.includes(tab))?.key || 'generale';
+}
+
 export default function JobDetailsPage() {
     const { id } = useParams<{ id: string }>();
     const { userRole } = useAuth();
     const [activeTab, setActiveTab] = useState("overview");
+    const [activeGroup, setActiveGroup] = useState<TabGroupKey>(groupOfTab("overview"));
     const [job, setJob] = useState<Job | null>(null);
     const [movements, setMovements] = useState<Movement[]>([]);
     const [totalCost, setTotalCost] = useState(0);
@@ -468,83 +482,73 @@ export default function JobDetailsPage() {
 
                 {/* Printable Area */}
                 <div ref={printRef}>
-                    <Tabs defaultValue="overview" className="space-y-6">
-                        <TabsList className="print:hidden w-full justify-between border-b rounded-none p-0 h-auto bg-transparent">
-                            <TabsTrigger
-                                value="overview"
-                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                            >
-                                <Info className="h-4 w-4 md:mr-1" />
-                                <span className="hidden md:inline">Dettagli</span>
-                            </TabsTrigger>
-                            {(userRole === 'admin' || userRole === 'operativo') && (
-                                <TabsTrigger
-                                    value="costi-sal"
-                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                        {/* Selettore di gruppo */}
+                        <div className="print:hidden flex gap-2">
+                            {TAB_GROUPS.filter(g => !g.adminOnly || userRole === 'admin' || userRole === 'operativo').map(g => (
+                                <button
+                                    key={g.key}
+                                    type="button"
+                                    onClick={() => { setActiveGroup(g.key); setActiveTab(g.tabs[0]); }}
+                                    className={`flex-1 rounded-md px-2 py-2 text-xs sm:text-sm font-medium transition-colors ${
+                                        activeGroup === g.key
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                    }`}
                                 >
-                                    <Euro className="h-4 w-4 md:mr-1" />
-                                    <span className="hidden md:inline">Costi</span>
-                                </TabsTrigger>
+                                    {g.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab del gruppo selezionato (max 5 voci, sempre con etichetta visibile) */}
+                        <TabsList className="print:hidden w-full justify-start border-b rounded-none p-0 h-auto bg-transparent">
+                            {activeGroup === 'generale' && (
+                                <>
+                                    <TabsTrigger value="overview" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <Info className="h-4 w-4 mr-1" />Dettagli
+                                    </TabsTrigger>
+                                    <TabsTrigger value="stock" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <Package className="h-4 w-4 mr-1" />Materiali
+                                    </TabsTrigger>
+                                    <TabsTrigger value="attendance" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <Clock className="h-4 w-4 mr-1" />Ore
+                                    </TabsTrigger>
+                                    <TabsTrigger value="eccedenze" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <Recycle className="h-4 w-4 mr-1 text-violet-500" />Eccedenze
+                                    </TabsTrigger>
+                                    <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini
+                                    </TabsTrigger>
+                                </>
                             )}
-                            {(userRole === 'admin' || userRole === 'operativo') && (
-                                <TabsTrigger
-                                    value="analisi-costi"
-                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-emerald-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                                >
-                                    <BarChart2 className="h-4 w-4 md:mr-1 text-emerald-600" />
-                                    <span className="hidden md:inline">Analisi Costi</span>
-                                </TabsTrigger>
+                            {activeGroup === 'documenti' && (
+                                <>
+                                    <TabsTrigger value="conformita" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-green-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <ShieldCheck className="h-4 w-4 mr-1 text-green-600" />Conformità
+                                    </TabsTrigger>
+                                    <TabsTrigger value="documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <FileText className="h-4 w-4 mr-1" />Documenti Cantiere
+                                    </TabsTrigger>
+                                    {(userRole === 'admin' || userRole === 'operativo') && (
+                                        <TabsTrigger value="commessa-documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                            <Folder className="h-4 w-4 mr-1" />Documenti Commessa
+                                        </TabsTrigger>
+                                    )}
+                                </>
                             )}
-                            <TabsTrigger
-                                value="stock"
-                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                            >
-                                <Package className="h-4 w-4 md:mr-1" />
-                                <span className="hidden md:inline">Materiali</span>
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="journal"
-                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                            >
-                                <BookOpen className="h-4 w-4 md:mr-1" />
-                                <span className="hidden md:inline">Giornale</span>
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="documents"
-                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                            >
-                                <FileText className="h-4 w-4 md:mr-1" />
-                                <span className="hidden md:inline">Documenti</span>
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="attendance"
-                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                            >
-                                <Clock className="h-4 w-4 md:mr-1" />
-                                <span className="hidden md:inline">Ore</span>
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="eccedenze"
-                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                            >
-                                <Recycle className="h-4 w-4 md:mr-1 text-violet-500" />
-                                <span className="hidden md:inline">Eccedenze</span>
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="ordini"
-                                className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                            >
-                                <ClipboardList className="h-4 w-4 md:mr-1 text-orange-500" />
-                                <span className="hidden md:inline">Ordini</span>
-                            </TabsTrigger>
-                            {(userRole === 'admin' || userRole === 'operativo') && (
-                                <TabsTrigger
-                                    value="fatturazione"
-                                    className="flex-1 rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-teal-600 data-[state=active]:shadow-none px-1 md:px-4 py-2 text-xs md:text-sm"
-                                >
-                                    <Receipt className="h-4 w-4 md:mr-1 text-teal-600" />
-                                    <span className="hidden md:inline">Fatturazione</span>
-                                </TabsTrigger>
+                            {activeGroup === 'economico' && (userRole === 'admin' || userRole === 'operativo') && (
+                                <>
+                                    <TabsTrigger value="costi-sal" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <Euro className="h-4 w-4 mr-1" />Costi
+                                    </TabsTrigger>
+                                    <TabsTrigger value="analisi-costi" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-emerald-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <BarChart2 className="h-4 w-4 mr-1 text-emerald-600" />Analisi Costi
+                                    </TabsTrigger>
+                                    <TabsTrigger value="fatturazione" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-teal-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <Receipt className="h-4 w-4 mr-1 text-teal-600" />Fatturazione
+                                    </TabsTrigger>
+                                </>
                             )}
                         </TabsList>
 
@@ -570,13 +574,19 @@ export default function JobDetailsPage() {
                             <JobStock movements={movements} jobId={job.id} />
                         </TabsContent>
 
-                        <TabsContent value="journal" className="space-y-6 focus-visible:outline-none">
-                            <JobJournal jobId={job.id} />
+                        <TabsContent value="conformita" className="space-y-6 focus-visible:outline-none">
+                            <JobConformita jobId={job.id} />
                         </TabsContent>
 
                         <TabsContent value="documents" className="space-y-6 focus-visible:outline-none">
                             <JobDocuments jobId={job.id} />
                         </TabsContent>
+
+                        {(userRole === 'admin' || userRole === 'operativo') && (
+                            <TabsContent value="commessa-documents" className="space-y-6 focus-visible:outline-none">
+                                <JobCommessaDocuments jobId={job.id} />
+                            </TabsContent>
+                        )}
 
                         <TabsContent value="attendance" className="space-y-6 focus-visible:outline-none">
                             <JobAttendance jobId={job.id} />

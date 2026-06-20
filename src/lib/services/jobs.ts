@@ -83,6 +83,7 @@ const mapDbToJobDocument = (db: any): JobDocument => ({
     id: db.id,
     jobId: db.job_id,
     name: db.name,
+    notes: db.notes || '',
     fileUrl: db.file_url,
     fileType: db.file_type,
     category: db.category,
@@ -94,6 +95,7 @@ const mapDbToJobDocument = (db: any): JobDocument => ({
 const mapJobDocumentToDb = (doc: Partial<JobDocument>) => ({
     job_id: doc.jobId,
     name: doc.name,
+    notes: doc.notes || null,
     file_url: doc.fileUrl,
     file_type: doc.fileType,
     category: doc.category,
@@ -385,6 +387,19 @@ export const jobDocumentsApi = {
         const { data, error } = await supabase
             .from('job_documents')
             .insert(mapJobDocumentToDb({ ...doc, uploadedBy: user.id }))
+            .select('*, profiles:uploaded_by(full_name)')
+            .single();
+        if (error) throw error;
+        return mapDbToJobDocument(data);
+    },
+    update: async (id: string, patch: Partial<Pick<JobDocument, 'name' | 'notes'>>) => {
+        const update: any = {};
+        if (patch.name !== undefined) update.name = patch.name;
+        if (patch.notes !== undefined) update.notes = patch.notes || null;
+        const { data, error } = await supabase
+            .from('job_documents')
+            .update(update)
+            .eq('id', id)
             .select('*, profiles:uploaded_by(full_name)')
             .single();
         if (error) throw error;
