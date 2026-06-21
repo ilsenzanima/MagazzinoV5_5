@@ -63,7 +63,7 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
     >
       {sidebarNavItems
         .filter(item => {
-          if (item.href === "/settings/admin") {
+          if (item.href === "/settings/admin" || item.href === "/settings/backup") {
             // Show if effectively admin OR real admin (so they can disable simulation)
             return userRole === 'admin' || realRole === 'admin';
           }

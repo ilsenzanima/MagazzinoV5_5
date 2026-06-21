@@ -20,6 +20,7 @@ import {
     FolderOpen
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/auth-provider";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -40,16 +41,51 @@ import {
 // Tables to backup/restore (in dependency order)
 const TABLES = [
     'profiles',
+    'warehouses',
+    'brands',
+    'item_types',
+    'units',
     'clients',
+    'client_contacts',
     'suppliers',
+    'supplier_compliance_documents',
     'inventory',
+    'inventory_supplier_codes',
+    'fictitious_item_prices',
     'jobs',
+    'sites',
+    'job_logs',
+    'job_documents',
+    'job_inventory',
+    'job_commessa_documents',
+    'job_compliance_associations',
+    'job_sal_names',
+    'job_sal_items',
+    'job_sal_costs',
+    'job_sal_approvati',
+    'job_fatture_committente',
+    'job_sal_fattura_links',
+    'job_cost_analysis_params',
+    'job_cost_analysis_rows',
+    'client_proposals',
+    'proposal_cost_analysis_params',
+    'proposal_cost_analysis_rows',
+    'proposal_documents',
+    'proposal_compliance_associations',
     'purchases',
     'purchase_items',
-    'workers',
-    'attendance',
+    'invoices',
     'delivery_notes',
     'delivery_note_items',
+    'load_notes',
+    'load_note_items',
+    'movements',
+    'workers',
+    'attendance',
+    'attendance_corrections',
+    'leave_requests',
+    'worker_courses',
+    'worker_medical_exams',
 ];
 
 interface BackupData {
@@ -58,14 +94,15 @@ interface BackupData {
     totalRecords: number;
 }
 
-interface GitHubBackup {
+interface StoredBackup {
     name: string;
-    path: string;
     date: Date;
-    downloadUrl: string;
 }
 
 export default function BackupSettingsPage() {
+    const { userRole, realRole } = useAuth();
+    const isAdmin = userRole === 'admin' || realRole === 'admin';
+
     const [isBackingUp, setIsBackingUp] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
     const [backupData, setBackupData] = useState<BackupData | null>(null);
@@ -76,42 +113,26 @@ export default function BackupSettingsPage() {
     const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
     const [restoreStatus, setRestoreStatus] = useState<string>("");
 
-    // GitHub backups state
-    const [githubBackups, setGithubBackups] = useState<GitHubBackup[]>([]);
-    const [loadingGithubBackups, setLoadingGithubBackups] = useState(true);
+    // Backup automatici salvati su Supabase Storage
+    const [storedBackups, setStoredBackups] = useState<StoredBackup[]>([]);
+    const [loadingStoredBackups, setLoadingStoredBackups] = useState(true);
     const [downloadingBackup, setDownloadingBackup] = useState<string | null>(null);
 
-    // Load GitHub backups on mount
     useEffect(() => {
-        loadGithubBackups();
-    }, []);
+        if (isAdmin) loadStoredBackups();
+    }, [isAdmin]);
 
-    // Fetch backups from GitHub repository
-    const loadGithubBackups = async () => {
-        setLoadingGithubBackups(true);
+    // Recupera l'elenco dei backup automatici dal bucket Supabase Storage (via API admin-gated)
+    const loadStoredBackups = async () => {
+        setLoadingStoredBackups(true);
         try {
-            // Fetch backup folders from GitHub API
-            const response = await fetch(
-                'https://api.github.com/repos/ilsenzanima/MagazzinoV5_5/contents/backups',
-                {
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                }
-            );
+            const response = await fetch('/api/backups');
+            if (!response.ok) throw new Error('Failed to fetch backups');
+            const { folders } = await response.json();
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch backups');
-            }
-
-            const folders = await response.json();
-
-            // Filter only directories (backup folders)
-            const backupFolders = folders
-                .filter((item: any) => item.type === 'dir' && item.name.match(/^\d{4}-\d{2}-\d{2}/))
-                .map((folder: any) => {
-                    // Parse date from folder name (format: 2026-01-14T19-45)
-                    const dateParts = folder.name.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/);
+            const parsed = (folders as string[])
+                .map((name) => {
+                    const dateParts = name.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/);
                     let date = new Date();
                     if (dateParts) {
                         date = new Date(
@@ -122,62 +143,28 @@ export default function BackupSettingsPage() {
                             parseInt(dateParts[5])
                         );
                     }
-
-                    return {
-                        name: folder.name,
-                        path: folder.path,
-                        date,
-                        downloadUrl: folder.url
-                    };
+                    return { name, date };
                 })
-                .sort((a: GitHubBackup, b: GitHubBackup) => b.date.getTime() - a.date.getTime());
+                .sort((a, b) => b.date.getTime() - a.date.getTime());
 
-            setGithubBackups(backupFolders);
+            setStoredBackups(parsed);
         } catch (error) {
-            console.error('Error loading GitHub backups:', error);
+            console.error('Error loading stored backups:', error);
             notify.error("Errore nel caricamento dei backup");
-            setGithubBackups([]);
+            setStoredBackups([]);
         } finally {
-            setLoadingGithubBackups(false);
+            setLoadingStoredBackups(false);
         }
     };
 
-    // Download a specific backup from GitHub
-    const downloadGithubBackup = async (backup: GitHubBackup) => {
+    // Scarica un backup automatico specifico dal bucket Supabase Storage
+    const downloadStoredBackup = async (backup: StoredBackup) => {
         setDownloadingBackup(backup.name);
         try {
-            // Fetch the list of files in the backup folder
-            const response = await fetch(backup.downloadUrl, {
-                headers: {
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
+            const response = await fetch(`/api/backups?folder=${encodeURIComponent(backup.name)}`);
+            if (!response.ok) throw new Error('Failed to fetch backup contents');
+            const combinedBackup: BackupData = await response.json();
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch backup contents');
-            }
-
-            const files = await response.json();
-
-            // Create a combined backup object
-            const combinedBackup: BackupData = {
-                timestamp: backup.date.toISOString(),
-                tables: {},
-                totalRecords: 0
-            };
-
-            // Download each JSON file
-            for (const file of files) {
-                if (file.name.endsWith('.json')) {
-                    const tableName = file.name.replace('.json', '');
-                    const fileResponse = await fetch(file.download_url);
-                    const tableData = await fileResponse.json();
-                    combinedBackup.tables[tableName] = tableData;
-                    combinedBackup.totalRecords += tableData.length;
-                }
-            }
-
-            // Create and download the combined file
             const blob = new Blob([JSON.stringify(combinedBackup, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -347,8 +334,14 @@ export default function BackupSettingsPage() {
             </div>
             <Separator />
 
+            {!isAdmin ? (
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm border border-amber-200 dark:border-amber-800 rounded-lg p-4 bg-amber-50 dark:bg-amber-900/20">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Solo gli amministratori possono gestire backup e ripristino dei dati.
+                </div>
+            ) : (
             <div className="space-y-6">
-                {/* GitHub Backups Section */}
+                {/* Stored Backups Section */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -356,21 +349,21 @@ export default function BackupSettingsPage() {
                             Backup Precedenti
                         </CardTitle>
                         <CardDescription>
-                            Scarica un backup precedente dal repository. I backup vengono creati automaticamente ogni domenica.
+                            Scarica un backup automatico precedente. I backup vengono creati ogni domenica.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-sm text-muted-foreground">
-                                {githubBackups.length} backup disponibili
+                                {storedBackups.length} backup disponibili
                             </span>
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={loadGithubBackups}
-                                disabled={loadingGithubBackups}
+                                onClick={loadStoredBackups}
+                                disabled={loadingStoredBackups}
                             >
-                                {loadingGithubBackups ? (
+                                {loadingStoredBackups ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                     <RefreshCw className="h-4 w-4" />
@@ -379,18 +372,18 @@ export default function BackupSettingsPage() {
                             </Button>
                         </div>
 
-                        {loadingGithubBackups ? (
+                        {loadingStoredBackups ? (
                             <div className="flex items-center gap-2 text-muted-foreground py-4">
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 Caricamento backup...
                             </div>
-                        ) : githubBackups.length === 0 ? (
+                        ) : storedBackups.length === 0 ? (
                             <p className="text-sm text-muted-foreground italic py-4">
-                                Nessun backup trovato nel repository.
+                                Nessun backup automatico trovato.
                             </p>
                         ) : (
                             <div className="space-y-2 max-h-64 overflow-y-auto">
-                                {githubBackups.map((backup) => (
+                                {storedBackups.map((backup) => (
                                     <div
                                         key={backup.name}
                                         className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
@@ -417,7 +410,7 @@ export default function BackupSettingsPage() {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => downloadGithubBackup(backup)}
+                                            onClick={() => downloadStoredBackup(backup)}
                                             disabled={downloadingBackup === backup.name}
                                         >
                                             {downloadingBackup === backup.name ? (
@@ -587,6 +580,7 @@ export default function BackupSettingsPage() {
                     </CardContent>
                 </Card>
             </div>
+            )}
 
             {/* Confirm Dialog */}
             <AlertDialog open={showRestoreConfirm} onOpenChange={setShowRestoreConfirm}>
