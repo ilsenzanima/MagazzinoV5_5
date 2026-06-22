@@ -352,7 +352,7 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                                                     </span>
                                                 )}
                                                 <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                                    {doc.documentType.replace(/_/g, " ")}
+                                                    {doc.documentTypeName}
                                                 </span>
                                             </div>
                                         )}
@@ -536,7 +536,7 @@ function AssociateDialog({
                                     <ShieldCheck className="h-5 w-5 text-green-500 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium truncate">{doc.name}</p>
-                                        <p className="text-xs text-slate-400">{doc.brandName} · {doc.documentType.replace(/_/g, " ")}</p>
+                                        <p className="text-xs text-slate-400">{doc.brandName} · {doc.documentTypeName}</p>
                                     </div>
                                     <Button
                                         size="sm"
