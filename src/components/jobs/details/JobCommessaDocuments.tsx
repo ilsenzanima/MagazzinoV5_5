@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Upload, Trash2, File, FileImage, FileSpreadsheet, Loader2, Pencil } from "lucide-react"
+import { FileText, Upload, Trash2, Loader2, Pencil } from "lucide-react"
 import { jobCommessaDocumentsApi, JobCommessaDocument } from "@/lib/services/job-commessa-documents"
 import { supabase } from "@/lib/supabase"
 import { format } from "date-fns"
@@ -13,6 +13,7 @@ import { it } from "date-fns/locale"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { notify } from "@/lib/notify"
+import { getFileIcon } from "@/lib/file-icon"
 
 interface Props {
     jobId: string
@@ -135,14 +136,6 @@ export function JobCommessaDocuments({ jobId }: Props) {
         } catch { notify.error("Errore eliminazione") }
     }
 
-    const getIcon = (type?: string) => {
-        const t = (type || '').toLowerCase()
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(t)) return <FileImage className="h-8 w-8 text-blue-500" />
-        if (t === 'pdf') return <FileText className="h-8 w-8 text-red-500" />
-        if (['xls', 'xlsx', 'csv'].includes(t)) return <FileSpreadsheet className="h-8 w-8 text-green-500" />
-        return <File className="h-8 w-8 text-slate-500" />
-    }
-
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -170,7 +163,7 @@ export function JobCommessaDocuments({ jobId }: Props) {
                             onClick={() => openDoc(doc.fileUrl)}
                         >
                             <CardContent className="p-4 flex items-start gap-3">
-                                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getIcon(doc.fileType)}</div>
+                                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
                                 <div className="flex-1 overflow-hidden min-w-0">
                                     <div className="flex justify-between items-start gap-1">
                                         <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>

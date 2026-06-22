@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, Upload, Trash2, File, FileImage, FileSpreadsheet, Loader2, Pencil } from "lucide-react"
+import { FileText, Upload, Trash2, Loader2, Pencil } from "lucide-react"
 import { JobDocument, jobDocumentsApi } from "@/lib/api"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
+import { getFileIcon } from "@/lib/file-icon"
 
 interface JobDocumentsProps {
   jobId: string
@@ -147,17 +148,6 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
       console.error("Delete failed", error)
       toast.error("Errore durante l'eliminazione")
     }
-  }
-
-  const getFileIcon = (type?: string) => {
-    if (!type) return <FileText className="h-8 w-8 text-slate-400" />
-
-    const t = type.toLowerCase()
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(t)) return <FileImage className="h-8 w-8 text-blue-500" />
-    if (['pdf'].includes(t)) return <FileText className="h-8 w-8 text-red-500" />
-    if (['xls', 'xlsx', 'csv'].includes(t)) return <FileSpreadsheet className="h-8 w-8 text-green-500" />
-
-    return <File className="h-8 w-8 text-slate-500" />
   }
 
   return (

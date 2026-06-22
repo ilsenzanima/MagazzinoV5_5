@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, Upload, Trash2, File, FileImage, FileSpreadsheet, Loader2, Pencil, X } from "lucide-react"
+import { FileText, Upload, Trash2, Loader2, Pencil, X } from "lucide-react"
 import { proposalDocumentsApi, ProposalDocument } from "@/lib/services/proposal-documents"
 import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types"
 import { supabase } from "@/lib/supabase"
@@ -18,6 +18,7 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { notify } from "@/lib/notify"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
+import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 
 interface Props {
     proposalId: string
@@ -205,21 +206,6 @@ export function ProposalDocuments({ proposalId }: Props) {
         } catch { notify.error("Errore eliminazione") }
     }
 
-    const formatFileSize = (bytes: number | null) => {
-        if (!bytes && bytes !== 0) return ''
-        if (bytes < 1024) return `${bytes} B`
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-    }
-
-    const getIcon = (type?: string) => {
-        const t = (type || '').toLowerCase()
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(t)) return <FileImage className="h-8 w-8 text-blue-500" />
-        if (t === 'pdf') return <FileText className="h-8 w-8 text-red-500" />
-        if (['xls', 'xlsx', 'csv'].includes(t)) return <FileSpreadsheet className="h-8 w-8 text-green-500" />
-        return <File className="h-8 w-8 text-slate-500" />
-    }
-
     const renderDocCard = (doc: ProposalDocument) => (
         <Card
             key={doc.id}
@@ -227,7 +213,7 @@ export function ProposalDocuments({ proposalId }: Props) {
             onClick={() => openDoc(doc.fileUrl)}
         >
             <CardContent className="p-4 flex items-start gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getIcon(doc.fileType)}</div>
+                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
                 <div className="flex-1 overflow-hidden min-w-0">
                     <div className="flex justify-between items-start gap-1">
                         <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
@@ -256,7 +242,7 @@ export function ProposalDocuments({ proposalId }: Props) {
             className="flex items-center gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors cursor-pointer"
             onClick={() => openDoc(doc.fileUrl)}
         >
-            <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">{getIcon(doc.fileType)}</div>
+            <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
             <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                     <span className="font-medium text-sm truncate" title={doc.name}>{doc.name}</span>
