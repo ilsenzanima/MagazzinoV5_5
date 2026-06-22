@@ -47,6 +47,7 @@ export function ProposalDocuments({ proposalId }: Props) {
     const [upStep, setUpStep] = useState<1 | 2>(1)
     const [upDocTypeId, setUpDocTypeId] = useState("")
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+    const [dragOver, setDragOver] = useState(false)
     const upRef = useRef<HTMLInputElement>(null)
 
     // Edit form
@@ -95,6 +96,7 @@ export function ProposalDocuments({ proposalId }: Props) {
         setUpStep(1)
         setUpDocTypeId("")
         setPendingFiles([])
+        setDragOver(false)
         setUploadOpen(true)
     }
 
@@ -105,7 +107,13 @@ export function ProposalDocuments({ proposalId }: Props) {
             name: f.name.replace(/\.[^.]+$/, ''),
             notes: "",
         }))
-        setPendingFiles(newPending)
+        setPendingFiles(prev => [...prev, ...newPending])
+    }
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault()
+        setDragOver(false)
+        handleFilesSelected(e.dataTransfer.files)
     }
 
     const goToStep2 = () => {
@@ -340,15 +348,18 @@ export function ProposalDocuments({ proposalId }: Props) {
                                 )}
                             </div>
                             <div className="space-y-1">
-                                <Label>File (puoi selezionarne più di uno)</Label>
+                                <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
                                 <div
-                                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragOver ? 'bg-blue-50 border-blue-400 dark:bg-blue-950' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                                     onClick={() => upRef.current?.click()}
+                                    onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                                    onDragLeave={() => setDragOver(false)}
+                                    onDrop={handleDrop}
                                 >
                                     <input type="file" multiple className="hidden" ref={upRef} onChange={e => handleFilesSelected(e.target.files)} />
                                     <Upload className="h-8 w-8 text-slate-400 mb-2" />
                                     <p className="text-sm text-slate-600 font-medium">
-                                        {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca per selezionare i file"}
+                                        {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca o trascina qui i file"}
                                     </p>
                                 </div>
                             </div>
