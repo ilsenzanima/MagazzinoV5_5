@@ -20,6 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ViewToggle } from "@/components/ui/view-toggle";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Loader2, Search, MapPin, FileText, Users, Plus } from "lucide-react";
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals";
 import { clientsApi } from "@/lib/api";
@@ -405,12 +406,20 @@ export default function ProposalsPage() {
             <div className="space-y-1">
               <Label>Committente *</Label>
               <div className="flex gap-2">
-                <Select value={proposalForm.clientId} onValueChange={v => setProposalForm({ ...proposalForm, clientId: v })}>
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Seleziona committente" /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div className="flex-1">
+                  <SearchableSelect
+                    options={clients.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                      description: c.address || undefined
+                    }))}
+                    value={proposalForm.clientId}
+                    onValueChange={v => setProposalForm({ ...proposalForm, clientId: v })}
+                    placeholder="Cerca committente..."
+                    searchPlaceholder="Digita per cercare..."
+                    emptyMessage="Nessun committente trovato."
+                  />
+                </div>
                 <Button type="button" variant="outline" size="icon" onClick={() => setQuickClientOpen(true)} title="Nuovo committente">
                   <Plus className="h-4 w-4" />
                 </Button>
