@@ -184,6 +184,15 @@ export default function ProposalDetailPage() {
         } catch { notify.error("Errore durante l'eliminazione") }
     }
 
+    const generateJobCode = (clientName: string) => {
+        const date = new Date()
+        const year = date.getFullYear()
+        const month = (date.getMonth() + 1).toString().padStart(2, '0')
+        const clientSlug = clientName.trim().substring(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, 'X') || "JOB"
+        const suffix = Date.now().toString(36).toUpperCase().slice(-4)
+        return `${year}-${month}-${clientSlug}-${suffix}`
+    }
+
     const handleConvert = async () => {
         if (!proposal || !client) return
         try {
@@ -195,7 +204,7 @@ export default function ProposalDetailPage() {
             ].filter(Boolean)
             const job = await jobsApi.create({
                 clientId,
-                code: "",
+                code: generateJobCode(client.name),
                 name: proposal.title,
                 description: proposal.description,
                 status: "active",
