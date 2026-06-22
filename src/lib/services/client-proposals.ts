@@ -104,8 +104,9 @@ export const clientProposalsApi = {
         return map(data);
     },
 
-    update: async (id: string, fields: Partial<Omit<ClientProposal, 'id' | 'clientId' | 'createdAt' | 'updatedAt'>>): Promise<void> => {
+    update: async (id: string, fields: Partial<Omit<ClientProposal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> => {
         const db: any = { updated_at: new Date().toISOString() };
+        if (fields.clientId !== undefined) db.client_id = fields.clientId;
         if (fields.title !== undefined) db.title = fields.title;
         if (fields.description !== undefined) db.description = fields.description || null;
         if (fields.estimatedValue !== undefined) db.estimated_value = fields.estimatedValue;

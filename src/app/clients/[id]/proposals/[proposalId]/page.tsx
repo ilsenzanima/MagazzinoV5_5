@@ -52,6 +52,7 @@ export default function ProposalDetailPage() {
 
     const [proposal, setProposal] = useState<ClientProposal | null>(null)
     const [client, setClient] = useState<Client | null>(null)
+    const [allClients, setAllClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
     const [editOpen, setEditOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
@@ -62,7 +63,7 @@ export default function ProposalDetailPage() {
 
     const [form, setForm] = useState({
         title: "", description: "", estimatedValue: "", status: "draft" as ProposalStatus,
-        date: "", notes: "",
+        date: "", notes: "", clientId: "",
         siteStreet: "", siteStreetNumber: "", sitePostalCode: "", siteCity: "", siteProvince: "",
     })
 
@@ -101,10 +102,12 @@ export default function ProposalDetailPage() {
         Promise.all([
             clientProposalsApi.getById(proposalId),
             clientsApi.getById(clientId),
-        ]).then(([p, c]) => {
+            clientsApi.getAll(),
+        ]).then(([p, c, all]) => {
             if (!p) { router.push(`/clients/${clientId}`); return }
             setProposal(p)
             setClient(c)
+            setAllClients(all)
         }).catch(() => router.push(`/clients/${clientId}`))
           .finally(() => setLoading(false))
     }, [proposalId, clientId])
@@ -118,6 +121,7 @@ export default function ProposalDetailPage() {
             status: proposal.status,
             date: proposal.date,
             notes: proposal.notes,
+            clientId: proposal.clientId,
             siteStreet: proposal.siteStreet,
             siteStreetNumber: proposal.siteStreetNumber,
             sitePostalCode: proposal.sitePostalCode,
@@ -143,9 +147,12 @@ export default function ProposalDetailPage() {
 
     const handleSave = async () => {
         if (!form.title.trim()) { notify.warning("Il titolo è obbligatorio"); return }
+        if (!form.clientId) { notify.warning("Il committente è obbligatorio"); return }
         try {
             setSaving(true)
+            const clientChanged = form.clientId !== clientId
             await clientProposalsApi.update(proposalId, {
+                clientId: form.clientId,
                 title: form.title.trim(),
                 description: form.description,
                 estimatedValue: form.estimatedValue ? Number(form.estimatedValue) : null,
@@ -158,6 +165,11 @@ export default function ProposalDetailPage() {
                 siteCity: form.siteCity,
                 siteProvince: form.siteProvince,
             })
+            if (clientChanged) {
+                notify.success("Committente aggiornato")
+                router.push(`/clients/${form.clientId}/proposals/${proposalId}`)
+                return
+            }
             const updated = await clientProposalsApi.getById(proposalId)
             setProposal(updated)
             setEditOpen(false)
@@ -496,6 +508,18 @@ export default function ProposalDetailPage() {
                         <div className="space-y-1">
                             <Label>Titolo *</Label>
                             <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Committente *</Label>
+                            <Select value={form.clientId} onValueChange={v => setForm({ ...form, clientId: v })}>
+                                <SelectTrigger><SelectValue placeholder="Seleziona committente" /></SelectTrigger>
+                                <SelectContent>
+                                    {allClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            {form.clientId !== clientId && (
+                                <p className="text-xs text-amber-600">Cambiando il committente la proposta verrà spostata sotto il nuovo cliente.</p>
+                            )}
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">

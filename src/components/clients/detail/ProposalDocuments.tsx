@@ -5,8 +5,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Upload, Trash2, File, FileImage, FileSpreadsheet, Loader2, Pencil } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { FileText, Upload, Trash2, File, FileImage, FileSpreadsheet, Loader2, Pencil, X } from "lucide-react"
 import { proposalDocumentsApi, ProposalDocument } from "@/lib/services/proposal-documents"
+import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types"
 import { supabase } from "@/lib/supabase"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
@@ -18,8 +21,17 @@ interface Props {
     proposalId: string
 }
 
+interface PendingFile {
+    file: File
+    name: string
+    notes: string
+}
+
+const UNTYPED_KEY = "__untyped__"
+
 export function ProposalDocuments({ proposalId }: Props) {
     const [documents, setDocuments] = useState<ProposalDocument[]>([])
+    const [docTypes, setDocTypes] = useState<ProposalDocumentType[]>([])
     const [loading, setLoading] = useState(true)
     const [uploadOpen, setUploadOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
@@ -28,23 +40,31 @@ export function ProposalDocuments({ proposalId }: Props) {
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
 
-    // Upload form
-    const [upFile, setUpFile] = useState<File | null>(null)
-    const [upName, setUpName] = useState("")
-    const [upNotes, setUpNotes] = useState("")
+    // Upload wizard state
+    const [upStep, setUpStep] = useState<1 | 2>(1)
+    const [upDocTypeId, setUpDocTypeId] = useState("")
+    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
     const upRef = useRef<HTMLInputElement>(null)
 
     // Edit form
     const [editName, setEditName] = useState("")
     const [editNotes, setEditNotes] = useState("")
+    const [editDocTypeId, setEditDocTypeId] = useState("")
     const [editFile, setEditFile] = useState<File | null>(null)
     const editRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => { load() }, [proposalId])
 
     const load = async () => {
-        try { setLoading(true); setDocuments(await proposalDocumentsApi.getByProposalId(proposalId)) }
-        catch { notify.error("Errore nel caricamento documenti") }
+        try {
+            setLoading(true)
+            const [docs, types] = await Promise.all([
+                proposalDocumentsApi.getByProposalId(proposalId),
+                proposalDocumentTypesApi.getAll(),
+            ])
+            setDocuments(docs)
+            setDocTypes(types)
+        } catch { notify.error("Errore nel caricamento documenti") }
         finally { setLoading(false) }
     }
 
@@ -63,29 +83,63 @@ export function ProposalDocuments({ proposalId }: Props) {
         setActiveDoc(doc)
         setEditName(doc.name)
         setEditNotes(doc.notes || "")
+        setEditDocTypeId(doc.documentTypeId || "")
         setEditFile(null)
         setEditOpen(true)
     }
 
-    const handleUpload = async () => {
-        if (!upFile) return
+    const openUpload = () => {
+        setUpStep(1)
+        setUpDocTypeId("")
+        setPendingFiles([])
+        setUploadOpen(true)
+    }
+
+    const handleFilesSelected = (files: FileList | null) => {
+        if (!files || files.length === 0) return
+        const newPending: PendingFile[] = Array.from(files).map(f => ({
+            file: f,
+            name: f.name.replace(/\.[^.]+$/, ''),
+            notes: "",
+        }))
+        setPendingFiles(newPending)
+    }
+
+    const goToStep2 = () => {
+        if (!upDocTypeId || pendingFiles.length === 0) return
+        setUpStep(2)
+    }
+
+    const updatePending = (idx: number, patch: Partial<PendingFile>) => {
+        setPendingFiles(prev => prev.map((p, i) => i === idx ? { ...p, ...patch } : p))
+    }
+
+    const removePending = (idx: number) => {
+        setPendingFiles(prev => prev.filter((_, i) => i !== idx))
+    }
+
+    const handleUploadAll = async () => {
+        if (pendingFiles.length === 0) return
         try {
             setUploading(true)
-            const ext = upFile.name.split('.').pop() || ''
-            const path = `proposals/${proposalId}/${Math.random().toString(36).slice(2)}_${upFile.name}`
-            const { error: upErr } = await supabase.storage.from('documents').upload(path, upFile)
-            if (upErr) throw upErr
-            const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
-            await proposalDocumentsApi.create({
-                proposalId,
-                name: upName.trim() || upFile.name,
-                notes: upNotes.trim(),
-                fileUrl: publicUrl,
-                fileType: ext,
-                uploadedBy: '',
-                uploadedByName: '',
-            })
-            notify.success("Documento caricato")
+            for (const pf of pendingFiles) {
+                const ext = pf.file.name.split('.').pop() || ''
+                const path = `proposals/${proposalId}/${Math.random().toString(36).slice(2)}_${pf.file.name}`
+                const { error: upErr } = await supabase.storage.from('documents').upload(path, pf.file)
+                if (upErr) throw upErr
+                const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
+                await proposalDocumentsApi.create({
+                    proposalId,
+                    documentTypeId: upDocTypeId || null,
+                    name: pf.name.trim() || pf.file.name,
+                    notes: pf.notes.trim(),
+                    fileUrl: publicUrl,
+                    fileType: ext,
+                    uploadedBy: '',
+                    uploadedByName: '',
+                })
+            }
+            notify.success(pendingFiles.length > 1 ? "Documenti caricati" : "Documento caricato")
             setUploadOpen(false)
             await load()
         } catch (e: any) { notify.error("Errore upload: " + e.message) }
@@ -112,6 +166,7 @@ export function ProposalDocuments({ proposalId }: Props) {
             await proposalDocumentsApi.update(activeDoc.id, {
                 name: editName.trim() || activeDoc.name,
                 notes: editNotes.trim(),
+                documentTypeId: editDocTypeId || null,
                 fileUrl,
                 fileType,
             })
@@ -143,12 +198,44 @@ export function ProposalDocuments({ proposalId }: Props) {
         return <File className="h-8 w-8 text-slate-500" />
     }
 
+    const renderDocCard = (doc: ProposalDocument) => (
+        <Card
+            key={doc.id}
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => openDoc(doc.fileUrl)}
+        >
+            <CardContent className="p-4 flex items-start gap-3">
+                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getIcon(doc.fileType)}</div>
+                <div className="flex-1 overflow-hidden min-w-0">
+                    <div className="flex justify-between items-start gap-1">
+                        <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
+                            onClick={e => openEdit(doc, e)}
+                        >
+                            <Pencil className="h-3 w-3" />
+                        </Button>
+                    </div>
+                    {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
+                    <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
+                </div>
+            </CardContent>
+        </Card>
+    )
+
+    const groups: { key: string; label: string; docs: ProposalDocument[] }[] = [
+        ...docTypes.map(t => ({ key: t.id, label: t.name, docs: documents.filter(d => d.documentTypeId === t.id) })),
+        { key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) },
+    ].filter(g => g.key !== UNTYPED_KEY || g.docs.length > 0)
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Documenti Proposta</h2>
-                <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setUpFile(null); setUpName(""); setUpNotes(""); setUploadOpen(true) }}>
-                    <Upload className="mr-2 h-4 w-4" />Carica Documento
+                <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
+                    <Upload className="mr-2 h-4 w-4" />Carica Documenti
                 </Button>
             </div>
 
@@ -161,73 +248,110 @@ export function ProposalDocuments({ proposalId }: Props) {
                         <p>Nessun documento. Carica preventivi, planimetrie o altro.</p>
                     </CardContent>
                 </Card>
-            ) : (
+            ) : groups.length <= 1 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {documents.map(doc => (
-                        <Card
-                            key={doc.id}
-                            className="hover:shadow-md transition-shadow cursor-pointer"
-                            onClick={() => openDoc(doc.fileUrl)}
-                        >
-                            <CardContent className="p-4 flex items-start gap-3">
-                                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getIcon(doc.fileType)}</div>
-                                <div className="flex-1 overflow-hidden min-w-0">
-                                    <div className="flex justify-between items-start gap-1">
-                                        <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-                                            onClick={e => openEdit(doc, e)}
-                                        >
-                                            <Pencil className="h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                    {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
-                                    <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                    {documents.map(renderDocCard)}
                 </div>
+            ) : (
+                <Tabs defaultValue={groups[0]?.key}>
+                    <TabsList className="flex-wrap h-auto gap-1">
+                        {groups.map(g => (
+                            <TabsTrigger key={g.key} value={g.key}>
+                                {g.label}
+                                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
+                                    {g.docs.length}
+                                </span>
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                    {groups.map(g => (
+                        <TabsContent key={g.key} value={g.key} className="pt-4">
+                            {g.docs.length === 0 ? (
+                                <Card className="border-dashed">
+                                    <CardContent className="py-8 text-center text-slate-500 text-sm">
+                                        Nessun documento di questo tipo caricato.
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {g.docs.map(renderDocCard)}
+                                </div>
+                            )}
+                        </TabsContent>
+                    ))}
+                </Tabs>
             )}
 
-            {/* Upload dialog */}
+            {/* Upload dialog - step 1: tipo + file multipli */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Carica Documento</DialogTitle></DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="space-y-1">
-                            <Label>File</Label>
-                            <div
-                                className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                onClick={() => upRef.current?.click()}
-                            >
-                                <input type="file" className="hidden" ref={upRef} onChange={e => {
-                                    const f = e.target.files?.[0]
-                                    if (!f) return
-                                    setUpFile(f)
-                                    if (!upName) setUpName(f.name.replace(/\.[^.]+$/, ''))
-                                }} />
-                                <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                                <p className="text-sm text-slate-600 font-medium">{upFile ? upFile.name : "Clicca per selezionare"}</p>
-                                {upFile && <p className="text-xs text-slate-400 mt-1">{(upFile.size / 1024 / 1024).toFixed(2)} MB</p>}
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>Carica Documenti</DialogTitle></DialogHeader>
+                    {upStep === 1 ? (
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <Label>Tipo documento *</Label>
+                                <Select value={upDocTypeId} onValueChange={setUpDocTypeId}>
+                                    <SelectTrigger><SelectValue placeholder="Seleziona tipo documento" /></SelectTrigger>
+                                    <SelectContent>
+                                        {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                {docTypes.length === 0 && (
+                                    <p className="text-xs text-slate-400">Nessun tipo configurato. Vai in Impostazioni &gt; Dati &gt; Documenti Offerte per crearne uno.</p>
+                                )}
+                            </div>
+                            <div className="space-y-1">
+                                <Label>File (puoi selezionarne più di uno)</Label>
+                                <div
+                                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    onClick={() => upRef.current?.click()}
+                                >
+                                    <input type="file" multiple className="hidden" ref={upRef} onChange={e => handleFilesSelected(e.target.files)} />
+                                    <Upload className="h-8 w-8 text-slate-400 mb-2" />
+                                    <p className="text-sm text-slate-600 font-medium">
+                                        {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca per selezionare i file"}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                        <div className="space-y-1">
-                            <Label>Nome documento</Label>
-                            <Input value={upName} onChange={e => setUpName(e.target.value)} placeholder="Es. Preventivo iniziale" />
+                    ) : (
+                        <div className="space-y-4 py-2">
+                            <p className="text-xs text-slate-500">Per ogni file inserisci nome e nota (opzionale).</p>
+                            {pendingFiles.map((pf, idx) => (
+                                <div key={idx} className="border rounded-lg p-3 space-y-2 relative">
+                                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600" onClick={() => removePending(idx)}>
+                                        <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <p className="text-xs text-slate-400 truncate pr-6">{pf.file.name}</p>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Nome documento</Label>
+                                        <Input value={pf.name} onChange={e => updatePending(idx, { name: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Nota (opzionale)</Label>
+                                        <Input value={pf.notes} onChange={e => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
+                                    </div>
+                                </div>
+                            ))}
+                            {pendingFiles.length === 0 && (
+                                <p className="text-sm text-slate-400 italic text-center py-4">Nessun file selezionato.</p>
+                            )}
                         </div>
-                        <div className="space-y-1">
-                            <Label>Nota (opzionale)</Label>
-                            <Input value={upNotes} onChange={e => setUpNotes(e.target.value)} placeholder="Breve descrizione visibile al volo" />
-                        </div>
-                    </div>
+                    )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
-                        <Button onClick={handleUpload} disabled={!upFile || uploading}>
-                            {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Carica
-                        </Button>
+                        {upStep === 1 ? (
+                            <>
+                                <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
+                                <Button onClick={goToStep2} disabled={!upDocTypeId || pendingFiles.length === 0}>Continua</Button>
+                            </>
+                        ) : (
+                            <>
+                                <Button variant="outline" onClick={() => setUpStep(1)}>Indietro</Button>
+                                <Button onClick={handleUploadAll} disabled={uploading || pendingFiles.length === 0}>
+                                    {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Carica {pendingFiles.length > 1 ? `(${pendingFiles.length})` : ""}
+                                </Button>
+                            </>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -237,6 +361,15 @@ export function ProposalDocuments({ proposalId }: Props) {
                 <DialogContent>
                     <DialogHeader><DialogTitle>Modifica Documento</DialogTitle></DialogHeader>
                     <div className="space-y-4 py-2">
+                        <div className="space-y-1">
+                            <Label>Tipo documento</Label>
+                            <Select value={editDocTypeId} onValueChange={setEditDocTypeId}>
+                                <SelectTrigger><SelectValue placeholder="Nessun tipo" /></SelectTrigger>
+                                <SelectContent>
+                                    {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div className="space-y-1">
                             <Label>Nome documento</Label>
                             <Input value={editName} onChange={e => setEditName(e.target.value)} />
