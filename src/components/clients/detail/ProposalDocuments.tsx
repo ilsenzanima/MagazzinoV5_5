@@ -146,6 +146,7 @@ export function ProposalDocuments({ proposalId }: Props) {
                     notes: pf.notes.trim(),
                     fileUrl: publicUrl,
                     fileType: ext,
+                    fileSize: pf.file.size,
                     uploadedBy: '',
                     uploadedByName: '',
                 })
@@ -163,6 +164,7 @@ export function ProposalDocuments({ proposalId }: Props) {
             setSaving(true)
             let fileUrl = activeDoc.fileUrl
             let fileType = activeDoc.fileType
+            let fileSize = activeDoc.fileSize
 
             if (editFile) {
                 const ext = editFile.name.split('.').pop() || ''
@@ -172,6 +174,7 @@ export function ProposalDocuments({ proposalId }: Props) {
                 const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
                 fileUrl = publicUrl
                 fileType = ext
+                fileSize = editFile.size
             }
 
             await proposalDocumentsApi.update(activeDoc.id, {
@@ -180,6 +183,7 @@ export function ProposalDocuments({ proposalId }: Props) {
                 documentTypeId: editDocTypeId || null,
                 fileUrl,
                 fileType,
+                fileSize,
             })
             notify.success("Documento aggiornato")
             setEditOpen(false)
@@ -199,6 +203,13 @@ export function ProposalDocuments({ proposalId }: Props) {
             setEditOpen(false)
             setActiveDoc(null)
         } catch { notify.error("Errore eliminazione") }
+    }
+
+    const formatFileSize = (bytes: number | null) => {
+        if (!bytes && bytes !== 0) return ''
+        if (bytes < 1024) return `${bytes} B`
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     }
 
     const getIcon = (type?: string) => {
@@ -230,7 +241,10 @@ export function ProposalDocuments({ proposalId }: Props) {
                         </Button>
                     </div>
                     {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
-                    <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                        {format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}
+                        {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
+                    </p>
                 </div>
             </CardContent>
         </Card>
@@ -247,6 +261,7 @@ export function ProposalDocuments({ proposalId }: Props) {
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                     <span className="font-medium text-sm truncate" title={doc.name}>{doc.name}</span>
                     <span className="text-xs text-slate-400">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</span>
+                    {doc.fileSize != null && <span className="text-xs text-slate-400">{formatFileSize(doc.fileSize)}</span>}
                 </div>
                 {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
             </div>
