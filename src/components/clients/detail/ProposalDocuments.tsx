@@ -16,6 +16,8 @@ import { it } from "date-fns/locale"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { notify } from "@/lib/notify"
+import { ViewToggle } from "@/components/ui/view-toggle"
+import { useViewMode } from "@/hooks/useViewMode"
 
 interface Props {
     proposalId: string
@@ -39,6 +41,7 @@ export function ProposalDocuments({ proposalId }: Props) {
     const [activeDoc, setActiveDoc] = useState<ProposalDocument | null>(null)
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [viewMode, setViewMode] = useViewMode('proposal-documents')
 
     // Upload wizard state
     const [upStep, setUpStep] = useState<1 | 2>(1)
@@ -225,10 +228,35 @@ export function ProposalDocuments({ proposalId }: Props) {
         </Card>
     )
 
+    const renderDocRow = (doc: ProposalDocument) => (
+        <div
+            key={doc.id}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors cursor-pointer"
+            onClick={() => openDoc(doc.fileUrl)}
+        >
+            <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">{getIcon(doc.fileType)}</div>
+            <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                    <span className="font-medium text-sm truncate" title={doc.name}>{doc.name}</span>
+                    <span className="text-xs text-slate-400">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</span>
+                </div>
+                {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
+            </div>
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700"
+                onClick={e => openEdit(doc, e)}
+            >
+                <Pencil className="h-3.5 w-3.5" />
+            </Button>
+        </div>
+    )
+
     const groups: { key: string; label: string; docs: ProposalDocument[] }[] = [
         ...docTypes.map(t => ({ key: t.id, label: t.name, docs: documents.filter(d => d.documentTypeId === t.id) })),
         { key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) },
-    ].filter(g => g.key !== UNTYPED_KEY || g.docs.length > 0)
+    ].filter(g => g.docs.length > 0)
 
     return (
         <div className="space-y-6">
@@ -248,38 +276,49 @@ export function ProposalDocuments({ proposalId }: Props) {
                         <p>Nessun documento. Carica preventivi, planimetrie o altro.</p>
                     </CardContent>
                 </Card>
-            ) : groups.length <= 1 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {documents.map(renderDocCard)}
-                </div>
             ) : (
-                <Tabs defaultValue={groups[0]?.key}>
-                    <TabsList className="flex-wrap h-auto gap-1">
-                        {groups.map(g => (
-                            <TabsTrigger key={g.key} value={g.key}>
-                                {g.label}
-                                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                                    {g.docs.length}
-                                </span>
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
-                    {groups.map(g => (
-                        <TabsContent key={g.key} value={g.key} className="pt-4">
-                            {g.docs.length === 0 ? (
-                                <Card className="border-dashed">
-                                    <CardContent className="py-8 text-center text-slate-500 text-sm">
-                                        Nessun documento di questo tipo caricato.
-                                    </CardContent>
-                                </Card>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {g.docs.map(renderDocCard)}
-                                </div>
-                            )}
-                        </TabsContent>
-                    ))}
-                </Tabs>
+                <>
+                    <div className="flex justify-end">
+                        <ViewToggle mode={viewMode} onChange={setViewMode} />
+                    </div>
+                    {groups.length <= 1 ? (
+                        viewMode === 'grid' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {documents.map(renderDocCard)}
+                            </div>
+                        ) : (
+                            <div className="space-y-1">
+                                {documents.map(renderDocRow)}
+                            </div>
+                        )
+                    ) : (
+                        <Tabs defaultValue={groups[0]?.key}>
+                            <TabsList className="flex-wrap h-auto gap-1">
+                                {groups.map(g => (
+                                    <TabsTrigger key={g.key} value={g.key}>
+                                        {g.label}
+                                        <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
+                                            {g.docs.length}
+                                        </span>
+                                    </TabsTrigger>
+                                ))}
+                            </TabsList>
+                            {groups.map(g => (
+                                <TabsContent key={g.key} value={g.key} className="pt-4">
+                                    {viewMode === 'grid' ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {g.docs.map(renderDocCard)}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {g.docs.map(renderDocRow)}
+                                        </div>
+                                    )}
+                                </TabsContent>
+                            ))}
+                        </Tabs>
+                    )}
+                </>
             )}
 
             {/* Upload dialog - step 1: tipo + file multipli */}
