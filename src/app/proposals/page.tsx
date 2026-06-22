@@ -50,7 +50,12 @@ const EMPTY_PROPOSAL_FORM = {
   siteStreet: "", siteStreetNumber: "", sitePostalCode: "", siteCity: "", siteProvince: "",
 };
 
-const EMPTY_QUICK_CLIENT_FORM = { name: "", vatNumber: "", email: "", phone: "" };
+const EMPTY_QUICK_CLIENT_FORM = {
+  name: "", street: "", streetNumber: "", postalCode: "", city: "", province: "",
+  vatNumber: "", email: "", phone: "",
+};
+
+const proposalYear = (p: ClientProposal) => new Date(p.date || p.createdAt).getFullYear();
 
 const ALL_YEARS = "all";
 const CURRENT_YEAR = new Date().getFullYear();
@@ -130,7 +135,7 @@ export default function ProposalsPage() {
   }, [proposals, stageTab]);
 
   const availableYears = useMemo(() => {
-    const years = new Set(stageFiltered.map(p => new Date(p.createdAt).getFullYear()));
+    const years = new Set(stageFiltered.map(proposalYear));
     LAST_5_YEARS.forEach(y => years.add(y));
     return [...years].sort((a, b) => b - a);
   }, [stageFiltered]);
@@ -150,7 +155,7 @@ export default function ProposalsPage() {
         (p.siteCity && p.siteCity.toLowerCase().includes(s));
       const matchStatus = statusFilter === "all" || p.status === statusFilter;
       const matchClient = clientFilter === "all" || p.clientName === clientFilter;
-      const matchYear = yearTab === ALL_YEARS || new Date(p.createdAt).getFullYear() === Number(yearTab);
+      const matchYear = yearTab === ALL_YEARS || proposalYear(p) === Number(yearTab);
       return matchSearch && matchStatus && matchClient && matchYear;
     });
   }, [stageFiltered, search, statusFilter, clientFilter, yearTab]);
@@ -192,6 +197,11 @@ export default function ProposalsPage() {
       setSavingQuickClient(true);
       const created = await clientsApi.create({
         name: quickClientForm.name.trim(),
+        street: quickClientForm.street,
+        streetNumber: quickClientForm.streetNumber,
+        postalCode: quickClientForm.postalCode,
+        city: quickClientForm.city,
+        province: quickClientForm.province,
         vatNumber: quickClientForm.vatNumber,
         email: quickClientForm.email,
         phone: quickClientForm.phone,
@@ -466,26 +476,53 @@ export default function ProposalsPage() {
 
       {/* Nuovo committente rapido */}
       <Dialog open={quickClientOpen} onOpenChange={setQuickClientOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nuovo Committente</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
-              <Label>Nome / Ragione sociale *</Label>
-              <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Es. Mario Rossi" />
+              <Label>Ragione Sociale / Nome *</Label>
+              <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Inserisci il nome dell'azienda o del cliente" />
             </div>
-            <div className="space-y-1">
-              <Label>Partita IVA / Codice Fiscale</Label>
-              <Input value={quickClientForm.vatNumber} onChange={e => setQuickClientForm({ ...quickClientForm, vatNumber: e.target.value })} />
+            <div className="space-y-4 border-t border-b py-4 border-slate-100">
+              <h3 className="font-medium text-slate-900 dark:text-white text-sm">Indirizzo Sede</h3>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="col-span-3 space-y-1">
+                  <Label>Via / Piazza</Label>
+                  <Input value={quickClientForm.street} onChange={e => setQuickClientForm({ ...quickClientForm, street: e.target.value })} placeholder="Via Roma" />
+                </div>
+                <div className="col-span-1 space-y-1">
+                  <Label>N. Civico</Label>
+                  <Input value={quickClientForm.streetNumber} onChange={e => setQuickClientForm({ ...quickClientForm, streetNumber: e.target.value })} placeholder="10" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="md:col-span-1 space-y-1">
+                  <Label>CAP</Label>
+                  <Input value={quickClientForm.postalCode} onChange={e => setQuickClientForm({ ...quickClientForm, postalCode: e.target.value })} placeholder="00100" />
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <Label>Città</Label>
+                  <Input value={quickClientForm.city} onChange={e => setQuickClientForm({ ...quickClientForm, city: e.target.value })} placeholder="Milano" />
+                </div>
+                <div className="md:col-span-1 space-y-1">
+                  <Label>Provincia</Label>
+                  <Input value={quickClientForm.province} onChange={e => setQuickClientForm({ ...quickClientForm, province: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" />
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Email</Label>
-                <Input type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })} />
+                <Label>Partita IVA / Codice Fiscale</Label>
+                <Input value={quickClientForm.vatNumber} onChange={e => setQuickClientForm({ ...quickClientForm, vatNumber: e.target.value })} />
               </div>
               <div className="space-y-1">
                 <Label>Telefono</Label>
-                <Input value={quickClientForm.phone} onChange={e => setQuickClientForm({ ...quickClientForm, phone: e.target.value })} />
+                <Input type="tel" value={quickClientForm.phone} onChange={e => setQuickClientForm({ ...quickClientForm, phone: e.target.value })} />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <Input type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })} />
             </div>
           </div>
           <DialogFooter>
