@@ -14,11 +14,12 @@ import { toast } from "sonner"
 
 interface JobDdtProps {
   jobId: string
+  jobName: string
 }
 
 type SupplierDoc = { purchase: Purchase; url: string; index: number }
 
-export function JobDdt({ jobId }: JobDdtProps) {
+export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const [subTab, setSubTab] = useState<"opi" | "fornitori">("opi")
   const [loading, setLoading] = useState(true)
   const [zipping, setZipping] = useState(false)
@@ -127,9 +128,10 @@ export function JobDdt({ jobId }: JobDdtProps) {
       }
 
       const zipBlob = await zip.generateAsync({ type: "blob" })
+      const safeJobName = jobName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 30) || jobId
       const link = document.createElement("a")
       link.href = URL.createObjectURL(zipBlob)
-      link.download = `DDT_commessa_${jobId}.zip`
+      link.download = `DDT_${safeJobName}.zip`
       link.click()
       URL.revokeObjectURL(link.href)
     } catch (error) {
