@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, Upload, Trash2, File, FileImage, FileSpreadsheet, Loader2, Pencil } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FileText, Upload, Trash2, File, FileImage, FileSpreadsheet, Loader2, Pencil, Truck } from "lucide-react"
 import { JobDocument, jobDocumentsApi } from "@/lib/api"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -19,12 +20,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
+import { JobDdt } from "./JobDdt"
 
 interface JobDocumentsProps {
   jobId: string
 }
 
 export function JobDocuments({ jobId }: JobDocumentsProps) {
+  const [mainTab, setMainTab] = useState<"documenti" | "ddt">("documenti")
   const [documents, setDocuments] = useState<JobDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -162,57 +165,72 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Documenti Cantiere</h2>
-        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setUpFile(null); setUpName(""); setUpNotes(""); setUploadOpen(true) }}>
-          <Upload className="mr-2 h-4 w-4" />
-          Carica Documento
-        </Button>
-      </div>
+      <Tabs value={mainTab} onValueChange={v => setMainTab(v as "documenti" | "ddt")}>
+        <TabsList>
+          <TabsTrigger value="documenti">Documenti</TabsTrigger>
+          <TabsTrigger value="ddt">
+            <Truck className="h-4 w-4 mr-1.5" />DDT
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-        </div>
-      ) : documents.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-slate-500">
-            <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Nessun documento</h3>
-            <p className="text-slate-500 dark:text-slate-400">Carica progetti, permessi, o foto del cantiere.</p>
-          </CardContent>
-        </Card>
+      {mainTab === "ddt" ? (
+        <JobDdt jobId={jobId} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {documents.map((doc) => (
-            <Card
-              key={doc.id}
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => handleOpenDocument(doc.fileUrl)}
-            >
-              <CardContent className="p-4 flex items-start gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-                  {getFileIcon(doc.fileType)}
-                </div>
-                <div className="flex-1 overflow-hidden min-w-0">
-                  <div className="flex justify-between items-start gap-1">
-                    <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-                      onClick={e => openEdit(doc, e)}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
-                  <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
-                </div>
+        <>
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Documenti Cantiere</h2>
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setUpFile(null); setUpName(""); setUpNotes(""); setUploadOpen(true) }}>
+              <Upload className="mr-2 h-4 w-4" />
+              Carica Documento
+            </Button>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            </div>
+          ) : documents.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center text-slate-500">
+                <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Nessun documento</h3>
+                <p className="text-slate-500 dark:text-slate-400">Carica progetti, permessi, o foto del cantiere.</p>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {documents.map((doc) => (
+                <Card
+                  key={doc.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleOpenDocument(doc.fileUrl)}
+                >
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
+                      {getFileIcon(doc.fileType)}
+                    </div>
+                    <div className="flex-1 overflow-hidden min-w-0">
+                      <div className="flex justify-between items-start gap-1">
+                        <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
+                          onClick={e => openEdit(doc, e)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
+                      <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Upload dialog */}

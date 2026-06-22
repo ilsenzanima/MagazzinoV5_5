@@ -7,10 +7,10 @@ import type { DeliveryNote, DeliveryNoteItem } from '@/lib/types';
  * @param movement - The delivery note data
  * @param groupedItems - The items to include in the PDF (already grouped)
  */
-export async function generateDeliveryNotePDF(
+async function buildDeliveryNotePdfDoc(
     movement: DeliveryNote,
     groupedItems: DeliveryNoteItem[]
-): Promise<void> {
+): Promise<{ doc: any; filename: string }> {
     // Dynamic import of jsPDF to reduce initial bundle size (~248KB saved)
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
@@ -372,5 +372,27 @@ export async function generateDeliveryNotePDF(
     const bollaNumber = movement.number.replace('/', '_').replace(/^(\d+)/, (match) => match.padStart(3, '0'));
 
     const filename = `${bollaNumber}_${dateFormatted}_${jobName}_${typeLabel}.pdf`;
+    return { doc, filename };
+}
+
+/**
+ * Generates a PDF for a delivery note (DDT - Documento Di Trasporto) and triggers a download
+ */
+export async function generateDeliveryNotePDF(
+    movement: DeliveryNote,
+    groupedItems: DeliveryNoteItem[]
+): Promise<void> {
+    const { doc, filename } = await buildDeliveryNotePdfDoc(movement, groupedItems);
     doc.save(filename);
+}
+
+/**
+ * Generates a PDF for a delivery note and returns it as a Blob (no download triggered)
+ */
+export async function generateDeliveryNotePdfBlob(
+    movement: DeliveryNote,
+    groupedItems: DeliveryNoteItem[]
+): Promise<Blob> {
+    const { doc } = await buildDeliveryNotePdfDoc(movement, groupedItems);
+    return doc.output('blob');
 }

@@ -316,6 +316,30 @@ export const deliveryNotesApi = {
         if (error) throw error;
     },
 
+    getByJobId: async (jobId: string, type?: string) => {
+        let query = supabase
+            .from('delivery_notes')
+            .select(`
+        *,
+        jobs(code, description, site_address, job_name:name, client_id, clients(id, name)),
+        delivery_note_items(
+          *,
+          inventory(name, code, unit, brand, category, description, price, model),
+          purchase_items(
+            price,
+            purchases(id, delivery_note_number, delivery_note_date, suppliers(name))
+          )
+        )
+      `)
+            .eq('job_id', jobId);
+        if (type) query = query.eq('type', type);
+        query = query.order('date', { ascending: false }).order('number_int', { ascending: false });
+
+        const { data, error } = await fetchWithTimeout(query);
+        if (error) throw error;
+        return data.map(mapDbToDeliveryNote);
+    },
+
     getWasteByJobId: async (jobId: string) => {
         const { data, error } = await supabase
             .from('delivery_notes')
