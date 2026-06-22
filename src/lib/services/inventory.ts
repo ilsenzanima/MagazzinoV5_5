@@ -595,6 +595,11 @@ export const brandsApi = {
         if (error) throw error;
         return data as Brand;
     },
+    update: async (id: string, name: string) => {
+        const { data, error } = await supabase.from('brands').update({ name }).eq('id', id).select().single();
+        if (error) throw error;
+        return data as Brand;
+    },
     delete: async (id: string) => {
         const { error } = await supabase.from('brands').delete().eq('id', id);
         if (error) throw error;
@@ -616,6 +621,11 @@ export const itemTypesApi = {
         if (error) throw error;
         return data as ItemType;
     },
+    update: async (id: string, name: string) => {
+        const { data, error } = await supabase.from('item_types').update({ name }).eq('id', id).select().single();
+        if (error) throw error;
+        return data as ItemType;
+    },
     delete: async (id: string) => {
         const { error } = await supabase.from('item_types').delete().eq('id', id);
         if (error) throw error;
@@ -630,6 +640,11 @@ export const unitsApi = {
     },
     create: async (name: string) => {
         const { data, error } = await supabase.from('units').insert({ name }).select().single();
+        if (error) throw error;
+        return data as Unit;
+    },
+    update: async (id: string, name: string) => {
+        const { data, error } = await supabase.from('units').update({ name }).eq('id', id).select().single();
         if (error) throw error;
         return data as Unit;
     },

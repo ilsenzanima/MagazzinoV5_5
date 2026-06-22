@@ -8,11 +8,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Loader2, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Plus, X, Loader2, Trash2, Pencil } from "lucide-react";
 import { useState, useEffect } from "react";
 import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemType, Unit } from "@/lib/api";
 import { warehousesApi } from "@/lib/services/warehouses";
+import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types";
 import type { Warehouse } from "@/lib/types";
+
+type RenameTarget = {
+    kind: "supplier" | "brand" | "type" | "unit" | "warehouse" | "docType";
+    id: string;
+    name: string;
+};
+
 export default function SettingsInventoryPage() {
     // Units State
     const [units, setUnits] = useState<Unit[]>([]);
@@ -46,12 +56,24 @@ export default function SettingsInventoryPage() {
     const [newWarehouseIsPrimary, setNewWarehouseIsPrimary] = useState(false);
     const [addingWarehouse, setAddingWarehouse] = useState(false);
 
+    // Proposal document types State
+    const [docTypes, setDocTypes] = useState<ProposalDocumentType[]>([]);
+    const [loadingDocTypes, setLoadingDocTypes] = useState(true);
+    const [newDocTypeName, setNewDocTypeName] = useState("");
+    const [addingDocType, setAddingDocType] = useState(false);
+
+    // Rename dialog state
+    const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
+    const [renameValue, setRenameValue] = useState("");
+    const [renaming, setRenaming] = useState(false);
+
     useEffect(() => {
         loadSuppliers();
         loadBrands();
         loadTypes();
         loadUnits();
         loadWarehouses();
+        loadDocTypes();
     }, []);
 
     const loadSuppliers = async () => {
@@ -103,6 +125,19 @@ export default function SettingsInventoryPage() {
             notify.error("Errore nel caricamento delle unità");
         } finally {
             setLoadingUnits(false);
+        }
+    };
+
+    const loadDocTypes = async () => {
+        try {
+            setLoadingDocTypes(true);
+            const data = await proposalDocumentTypesApi.getAll();
+            setDocTypes(data.sort((a, b) => a.name.localeCompare(b.name)));
+        } catch (error) {
+            console.error("Failed to load proposal document types", error);
+            notify.error("Errore nel caricamento dei tipi di documento offerte");
+        } finally {
+            setLoadingDocTypes(false);
         }
     };
 
@@ -292,6 +327,89 @@ export default function SettingsInventoryPage() {
         }
     };
 
+    const handleAddDocType = async () => {
+        const nameToAdd = newDocTypeName.trim();
+        if (!nameToAdd) return;
+        if (docTypes.some(t => t.name.toLowerCase() === nameToAdd.toLowerCase())) {
+            notify.warning("Esiste già un tipo di documento con questo nome.");
+            return;
+        }
+        try {
+            setAddingDocType(true);
+            const newType = await proposalDocumentTypesApi.create(nameToAdd);
+            setDocTypes([...docTypes, newType].sort((a, b) => a.name.localeCompare(b.name)));
+            setNewDocTypeName("");
+        } catch (error) {
+            console.error("Failed to add proposal document type", error);
+            notify.error("Errore nell'aggiunta del tipo di documento");
+        } finally {
+            setAddingDocType(false);
+        }
+    };
+
+    const handleDeleteDocType = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questo tipo di documento?")) return;
+        try {
+            await proposalDocumentTypesApi.delete(id);
+            setDocTypes(docTypes.filter(t => t.id !== id));
+        } catch (error) {
+            console.error("Failed to delete proposal document type", error);
+            notify.error("Errore nell'eliminazione del tipo di documento");
+        }
+    };
+
+    const openRename = (kind: RenameTarget["kind"], id: string, name: string) => {
+        setRenameTarget({ kind, id, name });
+        setRenameValue(name);
+    };
+
+    const handleRename = async () => {
+        if (!renameTarget) return;
+        const newName = renameValue.trim();
+        if (!newName) return;
+        try {
+            setRenaming(true);
+            switch (renameTarget.kind) {
+                case "supplier": {
+                    const updated = await suppliersApi.update(renameTarget.id, { name: newName });
+                    setSuppliers(prev => prev.map(s => s.id === renameTarget.id ? updated : s).sort((a, b) => a.name.localeCompare(b.name)));
+                    break;
+                }
+                case "brand": {
+                    const updated = await brandsApi.update(renameTarget.id, newName);
+                    setBrands(prev => prev.map(b => b.id === renameTarget.id ? updated : b).sort((a, b) => a.name.localeCompare(b.name)));
+                    break;
+                }
+                case "type": {
+                    const updated = await itemTypesApi.update(renameTarget.id, newName);
+                    setTypes(prev => prev.map(t => t.id === renameTarget.id ? updated : t).sort((a, b) => a.name.localeCompare(b.name)));
+                    break;
+                }
+                case "unit": {
+                    const updated = await unitsApi.update(renameTarget.id, newName);
+                    setUnits(prev => prev.map(u => u.id === renameTarget.id ? updated : u));
+                    break;
+                }
+                case "warehouse": {
+                    const updated = await warehousesApi.update(renameTarget.id, { name: newName });
+                    setWarehouses(prev => prev.map(w => w.id === renameTarget.id ? updated : w));
+                    break;
+                }
+                case "docType": {
+                    const updated = await proposalDocumentTypesApi.update(renameTarget.id, newName);
+                    setDocTypes(prev => prev.map(t => t.id === renameTarget.id ? updated : t).sort((a, b) => a.name.localeCompare(b.name)));
+                    break;
+                }
+            }
+            setRenameTarget(null);
+        } catch (error) {
+            console.error("Failed to rename", error);
+            notify.error("Errore durante la rinomina");
+        } finally {
+            setRenaming(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div>
@@ -303,12 +421,13 @@ export default function SettingsInventoryPage() {
             <Separator />
 
             <Tabs defaultValue="suppliers">
-                <TabsList>
+                <TabsList className="flex-wrap h-auto gap-1">
                     <TabsTrigger value="suppliers">Fornitori</TabsTrigger>
                     <TabsTrigger value="brands">Marche</TabsTrigger>
                     <TabsTrigger value="types">Tipologie</TabsTrigger>
                     <TabsTrigger value="units">Unità di Misura</TabsTrigger>
                     <TabsTrigger value="warehouses">Magazzini</TabsTrigger>
+                    <TabsTrigger value="docTypes">Documenti Offerte</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="suppliers" className="space-y-4 mt-4">
@@ -343,8 +462,14 @@ export default function SettingsInventoryPage() {
                             ) : (
                                 <div className="flex flex-wrap gap-2">
                                     {suppliers.map(supplier => (
-                                        <Badge key={supplier.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                        <Badge key={supplier.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
                                             {supplier.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => openRename("supplier", supplier.id, supplier.name)}
+                                            >
+                                                <Pencil className="h-3 w-3 text-slate-500" />
+                                            </button>
                                             <button
                                                 className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
                                                 onClick={() => handleDeleteSupplier(supplier.id)}
@@ -393,8 +518,14 @@ export default function SettingsInventoryPage() {
                             ) : (
                                 <div className="flex flex-wrap gap-2">
                                     {brands.map(brand => (
-                                        <Badge key={brand.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                        <Badge key={brand.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
                                             {brand.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => openRename("brand", brand.id, brand.name)}
+                                            >
+                                                <Pencil className="h-3 w-3 text-slate-500" />
+                                            </button>
                                             <button
                                                 className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
                                                 onClick={() => handleDeleteBrand(brand.id)}
@@ -443,8 +574,14 @@ export default function SettingsInventoryPage() {
                             ) : (
                                 <div className="flex flex-wrap gap-2">
                                     {types.map(type => (
-                                        <Badge key={type.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                        <Badge key={type.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
                                             {type.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => openRename("type", type.id, type.name)}
+                                            >
+                                                <Pencil className="h-3 w-3 text-slate-500" />
+                                            </button>
                                             <button
                                                 className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
                                                 onClick={() => handleDeleteType(type.id)}
@@ -493,8 +630,14 @@ export default function SettingsInventoryPage() {
                             ) : (
                                 <div className="flex flex-wrap gap-2">
                                     {units.map(unit => (
-                                        <Badge key={unit.id} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-2 text-sm">
+                                        <Badge key={unit.id} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
                                             {unit.name}
+                                            <button
+                                                className="hover:bg-slate-100 rounded-full p-0.5 transition-colors"
+                                                onClick={() => openRename("unit", unit.id, unit.name)}
+                                            >
+                                                <Pencil className="h-3 w-3 text-slate-500" />
+                                            </button>
                                             <button
                                                 className="hover:bg-slate-100 rounded-full p-0.5 transition-colors"
                                                 onClick={() => handleDeleteUnit(unit.id)}
@@ -588,6 +731,14 @@ export default function SettingsInventoryPage() {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
+                                                    onClick={() => openRename("warehouse", warehouse.id, warehouse.name)}
+                                                    className="text-slate-600 hover:text-slate-800"
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     onClick={() => handleDeleteWarehouse(warehouse.id)}
                                                     className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
                                                 >
@@ -604,7 +755,85 @@ export default function SettingsInventoryPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                <TabsContent value="docTypes" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Documenti Offerte</CardTitle>
+                            <CardDescription>Tipi di documento selezionabili quando si carica un documento su una proposta/offerta.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuovo Tipo Documento..."
+                                    className="max-w-sm"
+                                    value={newDocTypeName}
+                                    onChange={(e) => setNewDocTypeName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddDocType()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddDocType}
+                                    disabled={addingDocType || !newDocTypeName.trim()}
+                                >
+                                    {addingDocType ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingDocTypes ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento tipi documento...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {docTypes.map(docType => (
+                                        <Badge key={docType.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
+                                            {docType.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => openRename("docType", docType.id, docType.name)}
+                                            >
+                                                <Pencil className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteDocType(docType.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {docTypes.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessun tipo di documento presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
             </Tabs>
+
+            {/* Rename dialog */}
+            <Dialog open={!!renameTarget} onOpenChange={(v) => !v && setRenameTarget(null)}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Rinomina</DialogTitle></DialogHeader>
+                    <div className="space-y-1 py-2">
+                        <Label>Nome</Label>
+                        <Input
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                            autoFocus
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRenameTarget(null)}>Annulla</Button>
+                        <Button onClick={handleRename} disabled={renaming || !renameValue.trim()}>
+                            {renaming && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
