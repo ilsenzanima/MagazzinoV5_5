@@ -67,7 +67,8 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
       endDate: job.endDate,
       cig: job.cig || '',
       cup: job.cup || '',
-      clientId: job.clientId
+      clientId: job.clientId,
+      createdAt: job.createdAt
     })
     setUpdateExistingMovements(false)
     setIsEditOpen(true)
@@ -400,6 +401,16 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
                   onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="createdAt">Data Creazione Commessa</Label>
+              <Input
+                id="createdAt"
+                type="date"
+                value={editForm.createdAt ? (typeof editForm.createdAt === 'string' ? editForm.createdAt.split('T')[0] : '') : ""}
+                onChange={(e) => setEditForm({ ...editForm, createdAt: e.target.value })}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
