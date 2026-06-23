@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { JobSalApprovato, JobFatturaCommittente, JobSalFatturaLink } from '@/lib/types';
+import { compressImageIfNeeded } from '@/lib/image-compress';
 
 const mapSal = (db: any): JobSalApprovato => ({
     id: db.id,
@@ -78,9 +79,10 @@ export const jobSalApprovatiApi = {
     },
 
     uploadDocument: async (file: File): Promise<string> => {
-        const ext = file.name.split('.').pop();
+        const compressed = await compressImageIfNeeded(file);
+        const ext = compressed.name.split('.').pop();
         const path = `job-billing/sal/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from('documents').upload(path, file);
+        const { error } = await supabase.storage.from('documents').upload(path, compressed);
         if (error) throw error;
         const { data } = supabase.storage.from('documents').getPublicUrl(path);
         return data.publicUrl;
@@ -134,9 +136,10 @@ export const jobFattureCommittenteApi = {
     },
 
     uploadDocument: async (file: File): Promise<string> => {
-        const ext = file.name.split('.').pop();
+        const compressed = await compressImageIfNeeded(file);
+        const ext = compressed.name.split('.').pop();
         const path = `job-billing/fatture/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from('documents').upload(path, file);
+        const { error } = await supabase.storage.from('documents').upload(path, compressed);
         if (error) throw error;
         const { data } = supabase.storage.from('documents').getPublicUrl(path);
         return data.publicUrl;

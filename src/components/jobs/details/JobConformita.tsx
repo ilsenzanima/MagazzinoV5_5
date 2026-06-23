@@ -47,6 +47,7 @@ import {
 import { getFileIcon } from "@/lib/file-icon"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
+import { compressImageIfNeeded } from "@/lib/image-compress"
 
 interface JobConformitaProps {
     jobId: string
@@ -85,9 +86,10 @@ function OwnDocuments({ jobId }: { jobId: string }) {
         if (!file) return
         try {
             setUploading(true)
-            const fileExt = file.name.split(".").pop()
-            const fileName = `${jobId}/conformita_${Math.random().toString(36).substring(7)}_${file.name}`
-            const { error: upErr } = await supabase.storage.from("documents").upload(fileName, file)
+            const compressed = await compressImageIfNeeded(file)
+            const fileExt = compressed.name.split(".").pop()
+            const fileName = `${jobId}/conformita_${Math.random().toString(36).substring(7)}_${compressed.name}`
+            const { error: upErr } = await supabase.storage.from("documents").upload(fileName, compressed)
             if (upErr) throw upErr
             const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(fileName)
             await jobDocumentsApi.create({

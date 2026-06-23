@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { compressImageIfNeeded } from '@/lib/image-compress';
 
 export interface SalCost {
     id: string;
@@ -274,9 +275,10 @@ export const salCostsApi = {
     },
 
     uploadDocument: async (file: File): Promise<string> => {
-        const fileExt = file.name.split('.').pop();
+        const compressed = await compressImageIfNeeded(file);
+        const fileExt = compressed.name.split('.').pop();
         const fileName = `sal_costs/${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, file);
+        const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, compressed);
         if (uploadError) throw uploadError;
         const { data } = supabase.storage.from('documents').getPublicUrl(fileName);
         return data.publicUrl;

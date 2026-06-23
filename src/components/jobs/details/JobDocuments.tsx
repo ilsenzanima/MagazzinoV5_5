@@ -22,6 +22,7 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { getFileIcon } from "@/lib/file-icon"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
+import { compressImageIfNeeded } from "@/lib/image-compress"
 
 interface JobDocumentsProps {
   jobId: string
@@ -71,9 +72,10 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     if (!upFile || !jobId) return
     try {
       setUploading(true)
-      const fileExt = upFile.name.split('.').pop() || ''
-      const fileName = `${jobId}/${Math.random().toString(36).substring(7)}_${upFile.name}`
-      const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, upFile)
+      const compressed = await compressImageIfNeeded(upFile)
+      const fileExt = compressed.name.split('.').pop() || ''
+      const fileName = `${jobId}/${Math.random().toString(36).substring(7)}_${compressed.name}`
+      const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, compressed)
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName)

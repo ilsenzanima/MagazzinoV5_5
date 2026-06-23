@@ -19,6 +19,7 @@ import { notify } from "@/lib/notify"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
 import { getFileIcon, formatFileSize } from "@/lib/file-icon"
+import { compressImageIfNeeded } from "@/lib/image-compress"
 
 interface Props {
     jobId: string
@@ -135,9 +136,10 @@ export function JobCommessaDocuments({ jobId }: Props) {
         try {
             setUploading(true)
             for (const pf of pendingFiles) {
-                const ext = pf.file.name.split('.').pop() || ''
-                const path = `jobs/${jobId}/commessa/${Math.random().toString(36).slice(2)}_${pf.file.name}`
-                const { error: upErr } = await supabase.storage.from('documents').upload(path, pf.file)
+                const compressed = await compressImageIfNeeded(pf.file)
+                const ext = compressed.name.split('.').pop() || ''
+                const path = `jobs/${jobId}/commessa/${Math.random().toString(36).slice(2)}_${compressed.name}`
+                const { error: upErr } = await supabase.storage.from('documents').upload(path, compressed)
                 if (upErr) throw upErr
                 const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
                 await jobCommessaDocumentsApi.create({
@@ -147,7 +149,7 @@ export function JobCommessaDocuments({ jobId }: Props) {
                     notes: pf.notes.trim(),
                     fileUrl: publicUrl,
                     fileType: ext,
-                    fileSize: pf.file.size,
+                    fileSize: compressed.size,
                     uploadedBy: '',
                     uploadedByName: '',
                 })
@@ -168,14 +170,15 @@ export function JobCommessaDocuments({ jobId }: Props) {
             let fileSize = activeDoc.fileSize
 
             if (editFile) {
-                const ext = editFile.name.split('.').pop() || ''
-                const path = `jobs/${jobId}/commessa/${Math.random().toString(36).slice(2)}_${editFile.name}`
-                const { error: upErr } = await supabase.storage.from('documents').upload(path, editFile)
+                const compressed = await compressImageIfNeeded(editFile)
+                const ext = compressed.name.split('.').pop() || ''
+                const path = `jobs/${jobId}/commessa/${Math.random().toString(36).slice(2)}_${compressed.name}`
+                const { error: upErr } = await supabase.storage.from('documents').upload(path, compressed)
                 if (upErr) throw upErr
                 const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
                 fileUrl = publicUrl
                 fileType = ext
-                fileSize = editFile.size
+                fileSize = compressed.size
             }
 
             await jobCommessaDocumentsApi.update(activeDoc.id, {

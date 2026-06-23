@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { getSoftDeletePayload } from './utils';
+import { compressImageIfNeeded } from '@/lib/image-compress';
 
 export type ComplianceDocumentType =
     | 'RDC_RDV_FT'
@@ -157,9 +158,10 @@ export const complianceApi = {
     },
 
     uploadFile: async (file: File): Promise<string> => {
-        const fileExt = file.name.split('.').pop();
+        const compressed = await compressImageIfNeeded(file);
+        const fileExt = compressed.name.split('.').pop();
         const fileName = `compliance_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-        const { error } = await supabase.storage.from('documents').upload(fileName, file);
+        const { error } = await supabase.storage.from('documents').upload(fileName, compressed);
         if (error) throw error;
         const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
         return publicUrl;

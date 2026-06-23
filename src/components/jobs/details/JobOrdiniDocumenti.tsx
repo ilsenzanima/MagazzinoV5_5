@@ -16,6 +16,7 @@ import { it } from "date-fns/locale"
 import { notify } from "@/lib/notify"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { getFileIcon } from "@/lib/file-icon"
+import { compressImageIfNeeded } from "@/lib/image-compress"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
 import { JobOrdini } from "@/components/jobs/details/JobOrdini"
@@ -115,9 +116,10 @@ export function JobOrdiniDocumenti({ jobId, jobCode }: Props) {
         try {
             setUploading(true)
             for (const pending of pendingFiles) {
-                const fileExt = pending.file.name.split('.').pop() || ''
-                const path = `jobs/${jobId}/offerte-fornitori/${Math.random().toString(36).substring(7)}_${pending.file.name}`
-                const { error: uploadError } = await supabase.storage.from('documents').upload(path, pending.file)
+                const compressed = await compressImageIfNeeded(pending.file)
+                const fileExt = compressed.name.split('.').pop() || ''
+                const path = `jobs/${jobId}/offerte-fornitori/${Math.random().toString(36).substring(7)}_${compressed.name}`
+                const { error: uploadError } = await supabase.storage.from('documents').upload(path, compressed)
                 if (uploadError) throw uploadError
                 const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
 
