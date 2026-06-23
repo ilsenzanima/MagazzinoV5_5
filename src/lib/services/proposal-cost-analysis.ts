@@ -4,9 +4,27 @@ import { CostAnalysisRow, CostAnalysisParams } from './cost-analysis';
 // Re-uses the same types as job cost analysis, just different tables
 const DEFAULT_PARAMS = { sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10 };
 
+export interface ProposalCostAnalysisVersion {
+    id: string;
+    proposalId: string;
+    name: string;
+    note: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+const mapVersion = (db: any): ProposalCostAnalysisVersion => ({
+    id: db.id,
+    proposalId: db.proposal_id,
+    name: db.name,
+    note: db.note,
+    createdAt: db.created_at,
+    updatedAt: db.updated_at,
+});
+
 const mapRow = (db: any): CostAnalysisRow => ({
     id: db.id,
-    jobId: db.proposal_id,
+    jobId: db.version_id,
     type: db.type,
     itemId: db.item_id,
     itemName: db.item_name,
@@ -20,23 +38,75 @@ const mapRow = (db: any): CostAnalysisRow => ({
     createdAt: db.created_at,
 });
 
+export const proposalCostAnalysisVersionsApi = {
+    getByProposalId: async (proposalId: string): Promise<ProposalCostAnalysisVersion[]> => {
+        const { data, error } = await supabase
+            .from('proposal_cost_analysis_versions')
+            .select('*')
+            .eq('proposal_id', proposalId)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapVersion);
+    },
+
+    getById: async (id: string): Promise<ProposalCostAnalysisVersion> => {
+        const { data, error } = await supabase
+            .from('proposal_cost_analysis_versions')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (error) throw error;
+        return mapVersion(data);
+    },
+
+    create: async (proposalId: string, name: string, note?: string): Promise<ProposalCostAnalysisVersion> => {
+        const { data, error } = await supabase
+            .from('proposal_cost_analysis_versions')
+            .insert({ proposal_id: proposalId, name, note: note || null })
+            .select()
+            .single();
+        if (error) throw error;
+        return mapVersion(data);
+    },
+
+    update: async (id: string, fields: { name?: string; note?: string | null }): Promise<ProposalCostAnalysisVersion> => {
+        const db: any = { updated_at: new Date().toISOString() };
+        if (fields.name !== undefined) db.name = fields.name;
+        if (fields.note !== undefined) db.note = fields.note || null;
+        const { data, error } = await supabase
+            .from('proposal_cost_analysis_versions')
+            .update(db)
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw error;
+        return mapVersion(data);
+    },
+
+    delete: async (id: string): Promise<void> => {
+        const { error } = await supabase.from('proposal_cost_analysis_versions').delete().eq('id', id);
+        if (error) throw error;
+    },
+};
+
 export const proposalCostAnalysisApi = {
-    getByProposalId: async (proposalId: string): Promise<CostAnalysisRow[]> => {
+    getByVersionId: async (versionId: string): Promise<CostAnalysisRow[]> => {
         const { data, error } = await supabase
             .from('proposal_cost_analysis_rows')
             .select('*')
-            .eq('proposal_id', proposalId)
+            .eq('version_id', versionId)
             .order('sort_order', { ascending: true })
             .order('created_at', { ascending: true });
         if (error) throw error;
         return (data || []).map(mapRow);
     },
 
-    add: async (proposalId: string, row: Omit<CostAnalysisRow, 'id' | 'jobId' | 'createdAt'>): Promise<CostAnalysisRow> => {
+    add: async (proposalId: string, versionId: string, row: Omit<CostAnalysisRow, 'id' | 'jobId' | 'createdAt'>): Promise<CostAnalysisRow> => {
         const { data, error } = await supabase
             .from('proposal_cost_analysis_rows')
             .insert({
                 proposal_id: proposalId,
+                version_id: versionId,
                 type: row.type,
                 item_id: row.itemId || null,
                 item_name: row.itemName,
@@ -70,15 +140,15 @@ export const proposalCostAnalysisApi = {
         if (error) throw error;
     },
 
-    getParams: async (proposalId: string): Promise<CostAnalysisParams> => {
+    getParams: async (versionId: string): Promise<CostAnalysisParams> => {
         const { data } = await supabase
             .from('proposal_cost_analysis_params')
             .select('*')
-            .eq('proposal_id', proposalId)
+            .eq('version_id', versionId)
             .maybeSingle();
-        if (!data) return { jobId: proposalId, ...DEFAULT_PARAMS };
+        if (!data) return { jobId: versionId, ...DEFAULT_PARAMS };
         return {
-            jobId: data.proposal_id,
+            jobId: data.version_id,
             sfrido: Number(data.sfrido),
             sconto: Number(data.sconto),
             trasporto: Number(data.trasporto),
@@ -88,11 +158,12 @@ export const proposalCostAnalysisApi = {
         };
     },
 
-    upsertParams: async (proposalId: string, p: Omit<CostAnalysisParams, 'jobId'>): Promise<void> => {
+    upsertParams: async (proposalId: string, versionId: string, p: Omit<CostAnalysisParams, 'jobId'>): Promise<void> => {
         const { error } = await supabase
             .from('proposal_cost_analysis_params')
             .upsert({
                 proposal_id: proposalId,
+                version_id: versionId,
                 sfrido: p.sfrido,
                 sconto: p.sconto,
                 trasporto: p.trasporto,
@@ -100,7 +171,7 @@ export const proposalCostAnalysisApi = {
                 ricarico: p.ricarico,
                 margine_trattativa: p.margineTrattativa,
                 updated_at: new Date().toISOString(),
-            }, { onConflict: 'proposal_id' });
+            }, { onConflict: 'version_id' });
         if (error) throw error;
     },
 };

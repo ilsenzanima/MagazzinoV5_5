@@ -67,6 +67,7 @@ const TABLES = [
     'job_cost_analysis_params',
     'job_cost_analysis_rows',
     'client_proposals',
+    'proposal_cost_analysis_versions',
     'proposal_cost_analysis_params',
     'proposal_cost_analysis_rows',
     'shared_documents',

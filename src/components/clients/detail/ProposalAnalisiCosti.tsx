@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator } from "lucide-react"
+import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, ArrowLeft } from "lucide-react"
 import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams } from "@/lib/services/cost-analysis"
 import { inventoryApi } from "@/lib/api"
@@ -16,7 +16,9 @@ import * as XLSX from "xlsx-js-style"
 
 interface Props {
     proposalId: string
-    proposalTitle?: string
+    versionId: string
+    versionName: string
+    onBack: () => void
 }
 
 const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -142,9 +144,9 @@ function SummaryRow({ label, value, delta, subtotal }: { label: string; value: n
 
 const DEFAULT_PARAMS = { sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10 }
 
-export function ProposalAnalisiCosti({ proposalId, proposalTitle }: Props) {
+export function ProposalAnalisiCosti({ proposalId, versionId, versionName, onBack }: Props) {
     const [rows, setRows] = useState<CostAnalysisRow[]>([])
-    const [params, setParams] = useState<CostAnalysisParams>({ jobId: proposalId, ...DEFAULT_PARAMS })
+    const [params, setParams] = useState<CostAnalysisParams>({ jobId: versionId, ...DEFAULT_PARAMS })
     const [loading, setLoading] = useState(true)
     const [selectorOpen, setSelectorOpen] = useState(false)
     const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -159,8 +161,8 @@ export function ProposalAnalisiCosti({ proposalId, proposalTitle }: Props) {
         try {
             setLoading(true)
             const [existing, paramsData] = await Promise.all([
-                proposalCostAnalysisApi.getByProposalId(proposalId),
-                proposalCostAnalysisApi.getParams(proposalId),
+                proposalCostAnalysisApi.getByVersionId(versionId),
+                proposalCostAnalysisApi.getParams(versionId),
             ])
             setRows(existing)
             setParams(paramsData)
@@ -168,7 +170,7 @@ export function ProposalAnalisiCosti({ proposalId, proposalTitle }: Props) {
         finally { setLoading(false) }
     }
 
-    useEffect(() => { loadRows() }, [proposalId])
+    useEffect(() => { loadRows() }, [versionId])
 
     const handleItemSearch = useCallback(async (term: string) => {
         setInvLoading(true)
@@ -182,7 +184,7 @@ export function ProposalAnalisiCosti({ proposalId, proposalTitle }: Props) {
         if (inventoryRows.some(r => r.itemId === item.id)) { notify.error(`"${item.name}" è già presente`); return }
         try {
             const maxPrice = await costAnalysisApi.getMaxPurchasePrice(item.id)
-            const newRow = await proposalCostAnalysisApi.add(proposalId, {
+            const newRow = await proposalCostAnalysisApi.add(proposalId, versionId, {
                 type: 'inventory', itemId: item.id, itemName: item.name,
                 itemModel: item.model || '', itemUnit: (item as any).unit || '',
                 maxPurchasePrice: maxPrice, unitPrice: null,
@@ -196,7 +198,7 @@ export function ProposalAnalisiCosti({ proposalId, proposalTitle }: Props) {
         const name = newGenericName.trim()
         if (!name) return
         try {
-            const newRow = await proposalCostAnalysisApi.add(proposalId, {
+            const newRow = await proposalCostAnalysisApi.add(proposalId, versionId, {
                 type: 'generic', itemId: null, itemName: name,
                 itemModel: '', itemUnit: '', maxPurchasePrice: null,
                 unitPrice: null, qtyEstimated: 0, qtyActual: 0, sortOrder: genericRows.length,
@@ -221,7 +223,7 @@ export function ProposalAnalisiCosti({ proposalId, proposalTitle }: Props) {
     const handleParamChange = async (field: keyof Omit<CostAnalysisParams, 'jobId'>, value: number) => {
         const updated = { ...params, [field]: value }
         setParams(updated)
-        try { await proposalCostAnalysisApi.upsertParams(proposalId, { sfrido: updated.sfrido, sconto: updated.sconto, trasporto: updated.trasporto, posa: updated.posa, ricarico: updated.ricarico, margineTrattativa: updated.margineTrattativa }) }
+        try { await proposalCostAnalysisApi.upsertParams(proposalId, versionId, { sfrido: updated.sfrido, sconto: updated.sconto, trasporto: updated.trasporto, posa: updated.posa, ricarico: updated.ricarico, margineTrattativa: updated.margineTrattativa }) }
         catch { notify.error("Errore durante il salvataggio dei parametri") }
     }
 
@@ -240,7 +242,7 @@ export function ProposalAnalisiCosti({ proposalId, proposalTitle }: Props) {
     const handleExport = () => {
         const wb = XLSX.utils.book_new()
         const today = new Date().toISOString().slice(0, 10)
-        const slug = (proposalTitle || 'Proposta').replace(/[^a-zA-Z0-9_\-àáèéìíòóùú]/g, '_').slice(0, 40)
+        const slug = (versionName || 'Proposta').replace(/[^a-zA-Z0-9_\-àáèéìíòóùú]/g, '_').slice(0, 40)
         type XS = Record<string, any>
         const xc = (v: any, s: XS = {}) => ({ v, t: typeof v === 'number' ? 'n' : 's', s })
         const hdr = (v: string) => xc(v, { fill: { patternType: 'solid', fgColor: { rgb: 'FF334155' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } } })
@@ -284,8 +286,12 @@ export function ProposalAnalisiCosti({ proposalId, proposalTitle }: Props) {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-end">
-                <Button size="sm" variant="outline" onClick={handleExport}><Download className="h-4 w-4 mr-1" />Excel</Button>
+            <div className="flex items-center justify-between">
+                <Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" />Torna alle versioni</Button>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{versionName}</span>
+                    <Button size="sm" variant="outline" onClick={handleExport}><Download className="h-4 w-4 mr-1" />Excel</Button>
+                </div>
             </div>
 
             <Card>

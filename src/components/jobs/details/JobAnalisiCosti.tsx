@@ -5,10 +5,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator } from "lucide-react"
+import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, RefreshCw } from "lucide-react"
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams } from "@/lib/services/cost-analysis"
+import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
+import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { inventoryApi } from "@/lib/api"
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { notify } from "@/lib/notify"
 import type { InventoryItem, Movement } from "@/lib/types"
 import * as XLSX from "xlsx-js-style"
@@ -232,6 +236,42 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
     const [newGenericName, setNewGenericName] = useState('')
     const autoImported = useRef(false)
 
+    const [proposalId, setProposalId] = useState<string | null>(null)
+    const [changeOpen, setChangeOpen] = useState(false)
+    const [proposalVersions, setProposalVersions] = useState<ProposalCostAnalysisVersion[]>([])
+    const [selectedVersionId, setSelectedVersionId] = useState<string>("")
+    const [changing, setChanging] = useState(false)
+
+    useEffect(() => {
+        clientProposalsApi.getByConvertedJobId(jobId)
+            .then(proposal => setProposalId(proposal?.id ?? null))
+            .catch(() => setProposalId(null))
+    }, [jobId])
+
+    const openChangeDialog = async () => {
+        if (!proposalId) return
+        try {
+            const versions = await proposalCostAnalysisVersionsApi.getByProposalId(proposalId)
+            setProposalVersions(versions)
+            const currentSource = await costAnalysisApi.getSourceProposalVersionId(jobId)
+            setSelectedVersionId(currentSource ?? "")
+            setChangeOpen(true)
+        } catch { notify.error("Errore nel caricamento delle analisi costi della proposta") }
+    }
+
+    const handleChangeVersion = async () => {
+        if (!selectedVersionId) return
+        try {
+            setChanging(true)
+            await costAnalysisApi.replaceFromProposalVersion(jobId, selectedVersionId)
+            notify.success("Analisi costi aggiornata")
+            setChangeOpen(false)
+            autoImported.current = true
+            await loadRows()
+        } catch { notify.error("Errore durante l'aggiornamento dell'analisi costi") }
+        finally { setChanging(false) }
+    }
+
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
 
@@ -429,7 +469,13 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-end gap-2">
+                {proposalId && (
+                    <Button size="sm" variant="outline" onClick={openChangeDialog}>
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Cambia analisi costi
+                    </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={handleExport}>
                     <Download className="h-4 w-4 mr-1" />
                     Excel
@@ -558,6 +604,32 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
                 onSearch={handleItemSearch}
                 loading={invLoading}
             />
+
+            <Dialog open={changeOpen} onOpenChange={setChangeOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Cambia analisi costi</DialogTitle></DialogHeader>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 py-2">
+                        Seleziona quale analisi costi della proposta usare. Le righe e i parametri attuali della commessa verranno sostituiti.
+                    </p>
+                    <div className="space-y-1 py-2">
+                        <label className="text-sm font-medium">Analisi costi</label>
+                        <Select value={selectedVersionId} onValueChange={setSelectedVersionId}>
+                            <SelectTrigger><SelectValue placeholder="Seleziona analisi costi" /></SelectTrigger>
+                            <SelectContent>
+                                {proposalVersions.map(v => (
+                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setChangeOpen(false)}>Annulla</Button>
+                        <Button onClick={handleChangeVersion} disabled={!selectedVersionId || changing}>
+                            {changing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Applica
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

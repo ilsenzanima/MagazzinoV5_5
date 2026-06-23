@@ -28,7 +28,8 @@ import { Client } from "@/lib/types"
 import { notify } from "@/lib/notify"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
-import { ProposalAnalisiCosti } from "@/components/clients/detail/ProposalAnalisiCosti"
+import { ProposalCostAnalysisVersions } from "@/components/clients/detail/ProposalCostAnalysisVersions"
+import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { ProposalDocuments } from "@/components/clients/detail/ProposalDocuments"
 import { ProposalConformita } from "@/components/clients/detail/ProposalConformita"
 import { ProposalDistanza } from "@/components/clients/detail/ProposalDistanza"
@@ -59,6 +60,8 @@ export default function ProposalDetailPage() {
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [convertOpen, setConvertOpen] = useState(false)
     const [converting, setConverting] = useState(false)
+    const [costVersions, setCostVersions] = useState<ProposalCostAnalysisVersion[]>([])
+    const [convertVersionId, setConvertVersionId] = useState<string>("")
     const [saving, setSaving] = useState(false)
     const [useClientAddr, setUseClientAddr] = useState(false)
 
@@ -219,33 +222,35 @@ export default function ProposalDetailPage() {
             })
             await clientProposalsApi.update(proposalId, { status: "accepted", convertedJobId: job.id })
 
-            // Copia analisi costi dalla proposta alla commessa
-            const [rows, params] = await Promise.all([
-                proposalCostAnalysisApi.getByProposalId(proposalId),
-                proposalCostAnalysisApi.getParams(proposalId),
-            ])
-            await Promise.all([
-                ...rows.map(row => costAnalysisApi.add(job.id, {
-                    type: row.type,
-                    itemId: row.itemId,
-                    itemName: row.itemName,
-                    itemModel: row.itemModel,
-                    itemUnit: row.itemUnit,
-                    maxPurchasePrice: row.maxPurchasePrice,
-                    unitPrice: row.unitPrice,
-                    qtyEstimated: row.qtyEstimated,
-                    qtyActual: row.qtyActual,
-                    sortOrder: row.sortOrder,
-                })),
-                costAnalysisApi.upsertParams(job.id, {
-                    sfrido: params.sfrido,
-                    sconto: params.sconto,
-                    trasporto: params.trasporto,
-                    posa: params.posa,
-                    ricarico: params.ricarico,
-                    margineTrattativa: params.margineTrattativa,
-                }),
-            ])
+            // Copia l'analisi costi scelta dalla proposta alla commessa (se selezionata)
+            if (convertVersionId) {
+                const [rows, params] = await Promise.all([
+                    proposalCostAnalysisApi.getByVersionId(convertVersionId),
+                    proposalCostAnalysisApi.getParams(convertVersionId),
+                ])
+                await Promise.all([
+                    ...rows.map(row => costAnalysisApi.add(job.id, {
+                        type: row.type,
+                        itemId: row.itemId,
+                        itemName: row.itemName,
+                        itemModel: row.itemModel,
+                        itemUnit: row.itemUnit,
+                        maxPurchasePrice: row.maxPurchasePrice,
+                        unitPrice: row.unitPrice,
+                        qtyEstimated: row.qtyEstimated,
+                        qtyActual: row.qtyActual,
+                        sortOrder: row.sortOrder,
+                    })),
+                    costAnalysisApi.upsertParams(job.id, {
+                        sfrido: params.sfrido,
+                        sconto: params.sconto,
+                        trasporto: params.trasporto,
+                        posa: params.posa,
+                        ricarico: params.ricarico,
+                        margineTrattativa: params.margineTrattativa,
+                    }, convertVersionId),
+                ])
+            }
 
             // Collega alla commessa i documenti già caricati sulla proposta (stessi record, nessuna copia)
             await proposalDocumentsApi.linkToJob(proposalId, job.id)
@@ -306,7 +311,11 @@ export default function ProposalDetailPage() {
                     {canEdit && (
                         <div className="flex gap-2 shrink-0 flex-wrap sm:justify-end">
                             {!proposal.convertedJobId && (
-                                <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={() => setConvertOpen(true)}>
+                                <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={async () => {
+                                    setConvertVersionId("")
+                                    try { setCostVersions(await proposalCostAnalysisVersionsApi.getByProposalId(proposalId)) } catch { setCostVersions([]) }
+                                    setConvertOpen(true)
+                                }}>
                                     <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa
                                 </Button>
                             )}
@@ -495,7 +504,7 @@ export default function ProposalDetailPage() {
 
                 {/* ── ANALISI COSTI ─────────────────────────────────── */}
                 <TabsContent value="costi">
-                    <ProposalAnalisiCosti proposalId={proposalId} proposalTitle={proposal.title} />
+                    <ProposalCostAnalysisVersions proposalId={proposalId} />
                 </TabsContent>
 
                 {/* ── DOCUMENTI ─────────────────────────────────────── */}
@@ -593,6 +602,18 @@ export default function ProposalDetailPage() {
                     <p className="text-sm text-slate-600 dark:text-slate-400 py-2">
                         Verrà creata una nuova commessa a partire da questa proposta con titolo, descrizione, indirizzo cantiere e valore stimato già compilati. La proposta verrà marcata come <strong>Accettata</strong>.
                     </p>
+                    <div className="space-y-1 py-2">
+                        <label className="text-sm font-medium">Analisi costi da usare</label>
+                        <Select value={convertVersionId || "none"} onValueChange={v => setConvertVersionId(v === "none" ? "" : v)}>
+                            <SelectTrigger><SelectValue placeholder="Seleziona analisi costi" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">Nessuna</SelectItem>
+                                {costVersions.map(v => (
+                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setConvertOpen(false)}>Annulla</Button>
                         <Button className="bg-green-600 hover:bg-green-700" onClick={handleConvert} disabled={converting}>
