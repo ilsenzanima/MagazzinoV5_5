@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FileText, Upload, Trash2, Loader2, Pencil, X } from "lucide-react"
 import { jobCommessaDocumentsApi, JobCommessaDocument } from "@/lib/services/job-commessa-documents"
-import { jobCommessaDocumentTypesApi, JobCommessaDocumentType } from "@/lib/services/job-commessa-document-types"
+import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types"
 import { supabase } from "@/lib/supabase"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
@@ -35,7 +35,7 @@ const UNTYPED_KEY = "__untyped__"
 
 export function JobCommessaDocuments({ jobId }: Props) {
     const [documents, setDocuments] = useState<JobCommessaDocument[]>([])
-    const [docTypes, setDocTypes] = useState<JobCommessaDocumentType[]>([])
+    const [docTypes, setDocTypes] = useState<ProposalDocumentType[]>([])
     const [loading, setLoading] = useState(true)
     const [uploadOpen, setUploadOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
@@ -66,7 +66,7 @@ export function JobCommessaDocuments({ jobId }: Props) {
             setLoading(true)
             const [docs, types] = await Promise.all([
                 jobCommessaDocumentsApi.getByJobId(jobId),
-                jobCommessaDocumentTypesApi.getAll(),
+                proposalDocumentTypesApi.getAll(),
             ])
             setDocuments(docs)
             setDocTypes(types)
@@ -348,7 +348,7 @@ export function JobCommessaDocuments({ jobId }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {docTypes.length === 0 && (
-                                    <p className="text-xs text-slate-400">Nessun tipo configurato. Vai in Impostazioni &gt; Dati &gt; Documenti Commessa per crearne uno.</p>
+                                    <p className="text-xs text-slate-400">Nessun tipo configurato. Vai in Impostazioni &gt; Dati &gt; Documenti Offerte per crearne uno.</p>
                                 )}
                             </div>
                             <div className="space-y-1">

@@ -173,7 +173,10 @@ export interface JobDocument {
     notes?: string;
     fileUrl: string;
     fileType: string;
+    fileSize?: number | null;
     category: string;
+    documentTypeId?: string | null;
+    documentTypeName?: string;
     uploadedBy: string;
     uploadedByName?: string;
     createdAt: string;

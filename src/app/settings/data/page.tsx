@@ -16,11 +16,11 @@ import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemT
 import { warehousesApi } from "@/lib/services/warehouses";
 import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types";
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
-import { jobCommessaDocumentTypesApi, JobCommessaDocumentType } from "@/lib/services/job-commessa-document-types";
+import { jobSiteDocumentTypesApi, JobSiteDocumentType } from "@/lib/services/job-site-document-types";
 import type { Warehouse } from "@/lib/types";
 
 type RenameTarget = {
-    kind: "supplier" | "brand" | "type" | "unit" | "warehouse" | "docType" | "complianceDocType" | "jobCommessaDocType";
+    kind: "supplier" | "brand" | "type" | "unit" | "warehouse" | "docType" | "complianceDocType" | "jobSiteDocType";
     id: string;
     name: string;
 };
@@ -71,7 +71,7 @@ export default function SettingsInventoryPage() {
     const [addingComplianceDocType, setAddingComplianceDocType] = useState(false);
 
     // Job commessa document types State
-    const [jobDocTypes, setJobDocTypes] = useState<JobCommessaDocumentType[]>([]);
+    const [jobDocTypes, setJobDocTypes] = useState<JobSiteDocumentType[]>([]);
     const [loadingJobDocTypes, setLoadingJobDocTypes] = useState(true);
     const [newJobDocTypeName, setNewJobDocTypeName] = useState("");
     const [addingJobDocType, setAddingJobDocType] = useState(false);
@@ -173,7 +173,7 @@ export default function SettingsInventoryPage() {
     const loadJobDocTypes = async () => {
         try {
             setLoadingJobDocTypes(true);
-            const data = await jobCommessaDocumentTypesApi.getAll();
+            const data = await jobSiteDocumentTypesApi.getAll();
             setJobDocTypes(data.sort((a, b) => a.name.localeCompare(b.name)));
         } catch (error) {
             console.error("Failed to load job commessa document types", error);
@@ -440,7 +440,7 @@ export default function SettingsInventoryPage() {
         }
         try {
             setAddingJobDocType(true);
-            const newType = await jobCommessaDocumentTypesApi.create(nameToAdd);
+            const newType = await jobSiteDocumentTypesApi.create(nameToAdd);
             setJobDocTypes([...jobDocTypes, newType].sort((a, b) => a.name.localeCompare(b.name)));
             setNewJobDocTypeName("");
         } catch (error) {
@@ -454,7 +454,7 @@ export default function SettingsInventoryPage() {
     const handleDeleteJobDocType = async (id: string) => {
         if (!confirm("Sei sicuro di voler eliminare questo tipo di documento?")) return;
         try {
-            await jobCommessaDocumentTypesApi.delete(id);
+            await jobSiteDocumentTypesApi.delete(id);
             setJobDocTypes(jobDocTypes.filter(t => t.id !== id));
         } catch (error) {
             console.error("Failed to delete job commessa document type", error);
@@ -509,8 +509,8 @@ export default function SettingsInventoryPage() {
                     setComplianceDocTypes(prev => prev.map(t => t.id === renameTarget.id ? updated : t).sort((a, b) => a.name.localeCompare(b.name)));
                     break;
                 }
-                case "jobCommessaDocType": {
-                    const updated = await jobCommessaDocumentTypesApi.update(renameTarget.id, newName);
+                case "jobSiteDocType": {
+                    const updated = await jobSiteDocumentTypesApi.update(renameTarget.id, newName);
                     setJobDocTypes(prev => prev.map(t => t.id === renameTarget.id ? updated : t).sort((a, b) => a.name.localeCompare(b.name)));
                     break;
                 }
@@ -543,7 +543,7 @@ export default function SettingsInventoryPage() {
                     <TabsTrigger value="warehouses">Magazzini</TabsTrigger>
                     <TabsTrigger value="docTypes">Documenti Offerte</TabsTrigger>
                     <TabsTrigger value="complianceDocTypes">Documenti Conformità</TabsTrigger>
-                    <TabsTrigger value="jobDocTypes">Documenti Commessa</TabsTrigger>
+                    <TabsTrigger value="jobDocTypes">Documenti Cantiere</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="suppliers" className="space-y-4 mt-4">
@@ -987,8 +987,8 @@ export default function SettingsInventoryPage() {
                 <TabsContent value="jobDocTypes" className="space-y-4 mt-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Documenti Commessa</CardTitle>
-                            <CardDescription>Tipi di documento selezionabili quando si carica un documento su una commessa.</CardDescription>
+                            <CardTitle>Documenti Cantiere</CardTitle>
+                            <CardDescription>Tipi di documento selezionabili quando si carica un documento di cantiere.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex gap-2">
@@ -1019,7 +1019,7 @@ export default function SettingsInventoryPage() {
                                             {docType.name}
                                             <button
                                                 className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
-                                                onClick={() => openRename("jobCommessaDocType", docType.id, docType.name)}
+                                                onClick={() => openRename("jobSiteDocType", docType.id, docType.name)}
                                             >
                                                 <Pencil className="h-3 w-3 text-slate-500" />
                                             </button>

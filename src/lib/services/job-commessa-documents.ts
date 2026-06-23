@@ -20,8 +20,8 @@ const map = (db: any): JobCommessaDocument => ({
     id: db.id,
     jobId: db.job_id,
     proposalId: db.proposal_id || null,
-    documentTypeId: db.job_document_type_id || null,
-    documentTypeName: db.job_commessa_document_types?.name || '',
+    documentTypeId: db.proposal_document_type_id || null,
+    documentTypeName: db.proposal_document_types?.name || '',
     name: db.name,
     notes: db.notes || '',
     fileUrl: db.file_url,
@@ -36,7 +36,7 @@ export const jobCommessaDocumentsApi = {
     getByJobId: async (jobId: string): Promise<JobCommessaDocument[]> => {
         const { data, error } = await supabase
             .from('shared_documents')
-            .select('*, job_commessa_document_types(name)')
+            .select('*, proposal_document_types(name)')
             .eq('job_id', jobId)
             .order('created_at', { ascending: false });
         if (error) throw error;
@@ -56,7 +56,7 @@ export const jobCommessaDocumentsApi = {
             .insert({
                 job_id: doc.jobId,
                 proposal_id: proposal?.id || null,
-                job_document_type_id: doc.documentTypeId || null,
+                proposal_document_type_id: doc.documentTypeId || null,
                 name: doc.name,
                 notes: doc.notes || null,
                 file_url: doc.fileUrl,
@@ -65,7 +65,7 @@ export const jobCommessaDocumentsApi = {
                 uploaded_by: doc.uploadedBy || null,
                 uploaded_by_name: doc.uploadedByName || null,
             })
-            .select('*, job_commessa_document_types(name)')
+            .select('*, proposal_document_types(name)')
             .single();
         if (error) throw error;
         return map(data);
@@ -78,8 +78,8 @@ export const jobCommessaDocumentsApi = {
         if (patch.fileUrl !== undefined) update.file_url = patch.fileUrl;
         if (patch.fileType !== undefined) update.file_type = patch.fileType;
         if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
-        if (patch.documentTypeId !== undefined) update.job_document_type_id = patch.documentTypeId || null;
-        const { data, error } = await supabase.from('shared_documents').update(update).eq('id', id).select('*, job_commessa_document_types(name)').single();
+        if (patch.documentTypeId !== undefined) update.proposal_document_type_id = patch.documentTypeId || null;
+        const { data, error } = await supabase.from('shared_documents').update(update).eq('id', id).select('*, proposal_document_types(name)').single();
         if (error) throw error;
         return map(data);
     },

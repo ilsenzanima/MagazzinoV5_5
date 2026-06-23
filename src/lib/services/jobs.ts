@@ -87,7 +87,10 @@ const mapDbToJobDocument = (db: any): JobDocument => ({
     notes: db.notes || '',
     fileUrl: db.file_url,
     fileType: db.file_type,
+    fileSize: db.file_size !== null && db.file_size !== undefined ? Number(db.file_size) : null,
     category: db.category,
+    documentTypeId: db.document_type_id || null,
+    documentTypeName: db.job_site_document_types?.name || '',
     uploadedBy: db.uploaded_by,
     uploadedByName: db.profiles?.full_name,
     createdAt: db.created_at
@@ -99,7 +102,9 @@ const mapJobDocumentToDb = (doc: Partial<JobDocument>) => ({
     notes: doc.notes || null,
     file_url: doc.fileUrl,
     file_type: doc.fileType,
+    file_size: doc.fileSize ?? null,
     category: doc.category,
+    document_type_id: doc.documentTypeId || null,
     uploaded_by: doc.uploadedBy
 });
 
@@ -374,7 +379,7 @@ export const jobDocumentsApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('job_documents')
-                .select('*, profiles:uploaded_by(full_name)')
+                .select('*, profiles:uploaded_by(full_name), job_site_document_types(name)')
                 .eq('job_id', jobId)
                 .order('created_at', { ascending: false })
         );
@@ -388,20 +393,24 @@ export const jobDocumentsApi = {
         const { data, error } = await supabase
             .from('job_documents')
             .insert(mapJobDocumentToDb({ ...doc, uploadedBy: user.id }))
-            .select('*, profiles:uploaded_by(full_name)')
+            .select('*, profiles:uploaded_by(full_name), job_site_document_types(name)')
             .single();
         if (error) throw error;
         return mapDbToJobDocument(data);
     },
-    update: async (id: string, patch: Partial<Pick<JobDocument, 'name' | 'notes'>>) => {
+    update: async (id: string, patch: Partial<Pick<JobDocument, 'name' | 'notes' | 'documentTypeId' | 'fileUrl' | 'fileType' | 'fileSize'>>) => {
         const update: any = {};
         if (patch.name !== undefined) update.name = patch.name;
         if (patch.notes !== undefined) update.notes = patch.notes || null;
+        if (patch.documentTypeId !== undefined) update.document_type_id = patch.documentTypeId || null;
+        if (patch.fileUrl !== undefined) update.file_url = patch.fileUrl;
+        if (patch.fileType !== undefined) update.file_type = patch.fileType;
+        if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
         const { data, error } = await supabase
             .from('job_documents')
             .update(update)
             .eq('id', id)
-            .select('*, profiles:uploaded_by(full_name)')
+            .select('*, profiles:uploaded_by(full_name), job_site_document_types(name)')
             .single();
         if (error) throw error;
         return mapDbToJobDocument(data);
