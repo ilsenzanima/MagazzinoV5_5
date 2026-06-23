@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, Truck } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, Truck, GanttChartSquare } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -33,12 +33,13 @@ import { JobEccedenze } from "@/components/jobs/details/JobEccedenze";
 import { JobOrdiniDocumenti } from "@/components/jobs/details/JobOrdiniDocumenti";
 import { JobFatturazione } from "@/components/jobs/details/JobFatturazione";
 import { JobAnalisiCosti } from "@/components/jobs/details/JobAnalisiCosti";
+import { JobCronoprogramma } from "@/components/jobs/details/JobCronoprogramma";
 import { clientProposalsApi, ClientProposal } from "@/lib/services/client-proposals";
 
 type TabGroupKey = 'generale' | 'documenti' | 'economico';
 
 const TAB_GROUPS: { key: TabGroupKey; label: string; adminOnly?: boolean; tabs: string[] }[] = [
-    { key: 'generale', label: 'Generale', tabs: ['overview', 'stock', 'attendance', 'eccedenze', 'ordini'] },
+    { key: 'generale', label: 'Generale', tabs: ['overview', 'cronoprogramma', 'stock', 'attendance', 'eccedenze', 'ordini'] },
     { key: 'documenti', label: 'Documenti', tabs: ['conformita', 'documents', 'commessa-documents'] },
     { key: 'economico', label: 'Economico', adminOnly: true, tabs: ['costi-sal', 'analisi-costi', 'fatturazione'] },
 ];
@@ -513,6 +514,9 @@ export default function JobDetailsPage() {
                                     <TabsTrigger value="overview" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                         <Info className="h-4 w-4 mr-1" />Dettagli
                                     </TabsTrigger>
+                                    <TabsTrigger value="cronoprogramma" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <GanttChartSquare className="h-4 w-4 mr-1" />Cronoprogramma
+                                    </TabsTrigger>
                                     <TabsTrigger value="stock" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                         <Package className="h-4 w-4 mr-1" />Materiali
                                     </TabsTrigger>
@@ -594,6 +598,10 @@ export default function JobDetailsPage() {
                                     </Link>
                                 </div>
                             )}
+                        </TabsContent>
+
+                        <TabsContent value="cronoprogramma" className="space-y-6 focus-visible:outline-none">
+                            <JobCronoprogramma jobId={job.id} />
                         </TabsContent>
 
                         <TabsContent value="stock" className="space-y-6 focus-visible:outline-none">

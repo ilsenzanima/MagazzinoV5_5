@@ -24,7 +24,8 @@ import {
   Receipt,
   Trash2,
   FileText,
-  ShieldCheck
+  ShieldCheck,
+  GanttChartSquare
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -113,6 +114,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           icon: Users,
           href: "/clients",
           active: pathname === "/clients" || pathname.startsWith("/clients/"),
+        },
+        {
+          label: "Cronoprogramma",
+          icon: GanttChartSquare,
+          href: "/cronoprogramma",
+          active: pathname === "/cronoprogramma",
         },
         ...(userRole === "admin" || userRole === "operativo" ? [{
           label: "Offerte generali",

@@ -176,6 +176,21 @@ export interface JobLog {
     createdAt: string;
 }
 
+export interface JobTask {
+    id: string;
+    jobId: string;
+    jobCode?: string;
+    jobName?: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    progress: number;
+    status: 'planned' | 'in_progress' | 'completed' | 'delayed';
+    sortOrder: number;
+    notes?: string;
+    createdAt: string;
+}
+
 export interface JobDocument {
     id: string;
     jobId: string;

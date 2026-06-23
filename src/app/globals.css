@@ -334,3 +334,9 @@ body.font-opendyslexic h6 {
   display: none;
   /* Chrome, Safari and Opera */
 }
+
+/* Cronoprogramma - colori barre Gantt per stato fase */
+.task-status-planned .bar { fill: #94a3b8; }
+.task-status-in-progress .bar { fill: #3b82f6; }
+.task-status-completed .bar { fill: #22c55e; }
+.task-status-delayed .bar { fill: #f59e0b; }
