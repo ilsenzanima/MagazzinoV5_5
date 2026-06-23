@@ -16,10 +16,11 @@ import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemT
 import { warehousesApi } from "@/lib/services/warehouses";
 import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types";
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
+import { jobCommessaDocumentTypesApi, JobCommessaDocumentType } from "@/lib/services/job-commessa-document-types";
 import type { Warehouse } from "@/lib/types";
 
 type RenameTarget = {
-    kind: "supplier" | "brand" | "type" | "unit" | "warehouse" | "docType" | "complianceDocType";
+    kind: "supplier" | "brand" | "type" | "unit" | "warehouse" | "docType" | "complianceDocType" | "jobCommessaDocType";
     id: string;
     name: string;
 };
@@ -69,6 +70,12 @@ export default function SettingsInventoryPage() {
     const [newComplianceDocTypeName, setNewComplianceDocTypeName] = useState("");
     const [addingComplianceDocType, setAddingComplianceDocType] = useState(false);
 
+    // Job commessa document types State
+    const [jobDocTypes, setJobDocTypes] = useState<JobCommessaDocumentType[]>([]);
+    const [loadingJobDocTypes, setLoadingJobDocTypes] = useState(true);
+    const [newJobDocTypeName, setNewJobDocTypeName] = useState("");
+    const [addingJobDocType, setAddingJobDocType] = useState(false);
+
     // Rename dialog state
     const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
     const [renameValue, setRenameValue] = useState("");
@@ -82,6 +89,7 @@ export default function SettingsInventoryPage() {
         loadWarehouses();
         loadDocTypes();
         loadComplianceDocTypes();
+        loadJobDocTypes();
     }, []);
 
     const loadSuppliers = async () => {
@@ -159,6 +167,19 @@ export default function SettingsInventoryPage() {
             notify.error("Errore nel caricamento dei tipi di documento conformità");
         } finally {
             setLoadingComplianceDocTypes(false);
+        }
+    };
+
+    const loadJobDocTypes = async () => {
+        try {
+            setLoadingJobDocTypes(true);
+            const data = await jobCommessaDocumentTypesApi.getAll();
+            setJobDocTypes(data.sort((a, b) => a.name.localeCompare(b.name)));
+        } catch (error) {
+            console.error("Failed to load job commessa document types", error);
+            notify.error("Errore nel caricamento dei tipi di documento commessa");
+        } finally {
+            setLoadingJobDocTypes(false);
         }
     };
 
@@ -410,6 +431,37 @@ export default function SettingsInventoryPage() {
         }
     };
 
+    const handleAddJobDocType = async () => {
+        const nameToAdd = newJobDocTypeName.trim();
+        if (!nameToAdd) return;
+        if (jobDocTypes.some(t => t.name.toLowerCase() === nameToAdd.toLowerCase())) {
+            notify.warning("Esiste già un tipo di documento con questo nome.");
+            return;
+        }
+        try {
+            setAddingJobDocType(true);
+            const newType = await jobCommessaDocumentTypesApi.create(nameToAdd);
+            setJobDocTypes([...jobDocTypes, newType].sort((a, b) => a.name.localeCompare(b.name)));
+            setNewJobDocTypeName("");
+        } catch (error) {
+            console.error("Failed to add job commessa document type", error);
+            notify.error("Errore nell'aggiunta del tipo di documento");
+        } finally {
+            setAddingJobDocType(false);
+        }
+    };
+
+    const handleDeleteJobDocType = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questo tipo di documento?")) return;
+        try {
+            await jobCommessaDocumentTypesApi.delete(id);
+            setJobDocTypes(jobDocTypes.filter(t => t.id !== id));
+        } catch (error) {
+            console.error("Failed to delete job commessa document type", error);
+            notify.error("Errore nell'eliminazione del tipo di documento");
+        }
+    };
+
     const openRename = (kind: RenameTarget["kind"], id: string, name: string) => {
         setRenameTarget({ kind, id, name });
         setRenameValue(name);
@@ -457,6 +509,11 @@ export default function SettingsInventoryPage() {
                     setComplianceDocTypes(prev => prev.map(t => t.id === renameTarget.id ? updated : t).sort((a, b) => a.name.localeCompare(b.name)));
                     break;
                 }
+                case "jobCommessaDocType": {
+                    const updated = await jobCommessaDocumentTypesApi.update(renameTarget.id, newName);
+                    setJobDocTypes(prev => prev.map(t => t.id === renameTarget.id ? updated : t).sort((a, b) => a.name.localeCompare(b.name)));
+                    break;
+                }
             }
             setRenameTarget(null);
         } catch (error) {
@@ -486,6 +543,7 @@ export default function SettingsInventoryPage() {
                     <TabsTrigger value="warehouses">Magazzini</TabsTrigger>
                     <TabsTrigger value="docTypes">Documenti Offerte</TabsTrigger>
                     <TabsTrigger value="complianceDocTypes">Documenti Conformità</TabsTrigger>
+                    <TabsTrigger value="jobDocTypes">Documenti Commessa</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="suppliers" className="space-y-4 mt-4">
@@ -918,6 +976,62 @@ export default function SettingsInventoryPage() {
                                         </Badge>
                                     ))}
                                     {complianceDocTypes.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessun tipo di documento presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="jobDocTypes" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Documenti Commessa</CardTitle>
+                            <CardDescription>Tipi di documento selezionabili quando si carica un documento su una commessa.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Nuovo Tipo Documento..."
+                                    className="max-w-sm"
+                                    value={newJobDocTypeName}
+                                    onChange={(e) => setNewJobDocTypeName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddJobDocType()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddJobDocType}
+                                    disabled={addingJobDocType || !newJobDocTypeName.trim()}
+                                >
+                                    {addingJobDocType ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingJobDocTypes ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento tipi documento...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {jobDocTypes.map(docType => (
+                                        <Badge key={docType.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
+                                            {docType.name}
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => openRename("jobCommessaDocType", docType.id, docType.name)}
+                                            >
+                                                <Pencil className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                            <button
+                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                                                onClick={() => handleDeleteJobDocType(docType.id)}
+                                            >
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {jobDocTypes.length === 0 && (
                                         <p className="text-sm text-muted-foreground italic">Nessun tipo di documento presente.</p>
                                     )}
                                 </div>

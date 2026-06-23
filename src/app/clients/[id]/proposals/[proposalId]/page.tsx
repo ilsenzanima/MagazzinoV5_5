@@ -250,10 +250,12 @@ export default function ProposalDetailPage() {
             const proposalDocs = await proposalDocumentsApi.getByProposalId(proposalId)
             await Promise.all(proposalDocs.map(doc => jobCommessaDocumentsApi.create({
                 jobId: job.id,
+                documentTypeId: null,
                 name: doc.name,
                 notes: doc.notes,
                 fileUrl: doc.fileUrl,
                 fileType: doc.fileType,
+                fileSize: doc.fileSize,
                 uploadedBy: doc.uploadedBy,
                 uploadedByName: doc.uploadedByName,
             })))
