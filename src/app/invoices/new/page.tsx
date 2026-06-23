@@ -13,7 +13,7 @@ import { ArrowLeft, Save, Loader2, Upload, FileText, Calendar } from "lucide-rea
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { suppliersApi, invoicesApi, Supplier } from "@/lib/api";
+import { suppliersApi, invoicesApi, supplierGroupsApi, Supplier } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 
 interface UnlinkedPurchase {
@@ -48,7 +48,10 @@ export default function NewInvoicePage() {
     const [isDragging, setIsDragging] = useState(false);
 
     useEffect(() => {
-        suppliersApi.getAll().then(setSuppliers).catch(console.error).finally(() => setSuppliersLoading(false));
+        Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromInvoicesIds()])
+            .then(([allSuppliers, hiddenIds]) => setSuppliers(allSuppliers.filter(s => !hiddenIds.includes(s.id))))
+            .catch(console.error)
+            .finally(() => setSuppliersLoading(false));
     }, []);
 
     useEffect(() => {

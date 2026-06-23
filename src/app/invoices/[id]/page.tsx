@@ -12,7 +12,7 @@ import {
 import Link from "next/link";
 import { Fragment, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { invoicesApi, purchasesApi, suppliersApi, Invoice, Supplier } from "@/lib/api";
+import { invoicesApi, purchasesApi, suppliersApi, supplierGroupsApi, Invoice, Supplier } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
 import { InvoiceDocuments } from "@/components/invoices/InvoiceDocuments";
@@ -266,7 +266,11 @@ export default function InvoiceDetailPage() {
     // Load suppliers + available purchases when entering edit mode
     const startEdit = () => {
         if (suppliers.length === 0) {
-            suppliersApi.getAll().then(setSuppliers).catch(console.error);
+            Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromInvoicesIds()])
+                .then(([allSuppliers, hiddenIds]) => setSuppliers(
+                    allSuppliers.filter(s => !hiddenIds.includes(s.id) || s.id === invoice?.supplierId)
+                ))
+                .catch(console.error);
         }
         if (invoice) {
             setLoadingAvailable(true);

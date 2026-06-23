@@ -60,6 +60,22 @@ export const supplierGroupsApi = {
         return data.map((g: any) => g.billing_supplier_id);
     },
 
+    /**
+     * Member supplier ids that should be hidden from the supplier dropdown
+     * when registering/editing invoices: once a supplier belongs to a
+     * group, invoicing must go through the group's billing supplier.
+     */
+    getHiddenFromInvoicesIds: async (): Promise<string[]> => {
+        const { data, error } = await fetchWithTimeout(
+            supabase
+                .from('supplier_groups')
+                .select('supplier_group_members(supplier_id)')
+                .is('deleted_at', null)
+        );
+        if (error) throw error;
+        return data.flatMap((g: any) => g.supplier_group_members.map((m: any) => m.supplier_id));
+    },
+
     create: async (
         name: string,
         billingSupplierId: string,
