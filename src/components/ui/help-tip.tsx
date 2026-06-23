@@ -33,14 +33,16 @@ export function HelpTip({ title, description, fetchItems, emptyText = "Nessun ti
     return (
         <Popover open={open} onOpenChange={handleOpenChange}>
             <PopoverTrigger asChild>
-                <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); e.preventDefault() }}
+                <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={e => e.stopPropagation()}
                     onPointerDown={e => e.stopPropagation()}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation() }}
                     className="inline-flex items-center justify-center h-4 w-4 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 ml-1 shrink-0"
                 >
                     <HelpCircle className="h-3.5 w-3.5" />
-                </button>
+                </span>
             </PopoverTrigger>
             <PopoverContent
                 className="w-64 text-sm"

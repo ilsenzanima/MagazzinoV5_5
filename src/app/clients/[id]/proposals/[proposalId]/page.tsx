@@ -327,15 +327,15 @@ export default function ProposalDetailPage() {
                 <TabsList className="mb-6">
                     <TabsTrigger value="info"><FileText className="h-4 w-4 mr-2" />Info</TabsTrigger>
                     <TabsTrigger value="costi"><Calculator className="h-4 w-4 mr-2" />Analisi Costi</TabsTrigger>
-                    <span className="inline-flex items-center">
-                        <TabsTrigger value="documenti"><BarChart2 className="h-4 w-4 mr-2" />Documenti</TabsTrigger>
+                    <TabsTrigger value="documenti">
+                        <BarChart2 className="h-4 w-4 mr-2" />Documenti
                         <HelpTip
                             title="Documenti"
                             description="Tipi disponibili per i documenti caricati in questa sezione (condivisi con le commesse)."
                             fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => t.name)}
                             emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
                         />
-                    </span>
+                    </TabsTrigger>
                     <TabsTrigger value="conformita"><ShieldCheck className="h-4 w-4 mr-2 text-green-600" />Conformità</TabsTrigger>
                 </TabsList>
 
