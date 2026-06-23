@@ -14,7 +14,6 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import {
-    FileText,
     Upload,
     Loader2,
     Trash2,
@@ -23,9 +22,6 @@ import {
     Search,
     Pencil,
     ExternalLink,
-    File,
-    FileImage,
-    FileSpreadsheet,
     ShieldCheck,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -48,18 +44,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { getFileIcon } from "@/lib/file-icon"
+import { ViewToggle } from "@/components/ui/view-toggle"
+import { useViewMode } from "@/hooks/useViewMode"
 
 interface JobConformitaProps {
     jobId: string
-}
-
-function getFileIcon(type?: string) {
-    if (!type) return <FileText className="h-7 w-7 text-slate-400" />
-    const t = type.toLowerCase()
-    if (["jpg", "jpeg", "png", "gif", "webp"].includes(t)) return <FileImage className="h-7 w-7 text-blue-500" />
-    if (t === "pdf") return <FileText className="h-7 w-7 text-red-500" />
-    if (["xls", "xlsx", "csv"].includes(t)) return <FileSpreadsheet className="h-7 w-7 text-green-500" />
-    return <File className="h-7 w-7 text-slate-500" />
 }
 
 // ─── Upload sezione ──────────────────────────────────────────────────────────
@@ -75,6 +65,7 @@ function OwnDocuments({ jobId }: { jobId: string }) {
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [toDelete, setToDelete] = useState<JobDocument | null>(null)
     const fileRef = useRef<HTMLInputElement>(null)
+    const [viewMode, setViewMode] = useViewMode('job-conformita-own-documents', 'grid')
 
     useEffect(() => { load() }, [jobId])
 
@@ -150,22 +141,49 @@ function OwnDocuments({ jobId }: { jobId: string }) {
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                     Documenti caricati
                 </h3>
-                <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
-                    <Upload className="h-3.5 w-3.5 mr-1.5" />Carica
-                </Button>
+                <div className="flex items-center gap-2">
+                    {docs.length > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
+                    <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
+                        <Upload className="h-3.5 w-3.5 mr-1.5" />Carica
+                    </Button>
+                </div>
             </div>
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
             ) : docs.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento caricato</p>
+            ) : viewMode === 'list' ? (
+                <div className="space-y-1.5">
+                    {docs.map(doc => (
+                        <div key={doc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
+                            <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
+                                {getFileIcon(doc.fileType, "h-5 w-5")}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
+                            </div>
+                            <p className="text-xs text-slate-400 shrink-0">
+                                {format(new Date(doc.createdAt), "dd MMM yyyy", { locale: it })}
+                            </p>
+                            <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDoc(doc.fileUrl)}>
+                                    <ExternalLink className="h-3 w-3 text-slate-500" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setToDelete(doc); setDeleteOpen(true) }}>
+                                    <Trash2 className="h-3 w-3 text-red-500" />
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {docs.map(doc => (
                         <Card key={doc.id} className="group hover:shadow-md transition-shadow">
                             <CardContent className="p-3 flex items-start gap-3">
                                 <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">
-                                    {getFileIcon(doc.fileType)}
+                                    {getFileIcon(doc.fileType, "h-7 w-7")}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>

@@ -11,6 +11,8 @@ import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
+import { ViewToggle } from "@/components/ui/view-toggle"
+import { useViewMode } from "@/hooks/useViewMode"
 
 interface JobDdtProps {
   jobId: string
@@ -26,6 +28,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const [opiNotes, setOpiNotes] = useState<DeliveryNote[]>([])
   const [supplierDocs, setSupplierDocs] = useState<SupplierDoc[]>([])
   const supabase = createClient()
+  const [viewMode, setViewMode] = useViewMode('job-ddt', 'grid')
 
   useEffect(() => {
     if (jobId) load()
@@ -157,14 +160,19 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <Button
-          variant="outline"
-          onClick={handleDownloadZip}
-          disabled={zipping || (opiNotes.length === 0 && supplierDocs.length === 0)}
-        >
-          {zipping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-          Scarica tutto (ZIP)
-        </Button>
+        <div className="flex items-center gap-2">
+          {((subTab === "opi" && opiNotes.length > 0) || (subTab === "fornitori" && supplierDocs.length > 0)) && (
+            <ViewToggle mode={viewMode} onChange={setViewMode} />
+          )}
+          <Button
+            variant="outline"
+            onClick={handleDownloadZip}
+            disabled={zipping || (opiNotes.length === 0 && supplierDocs.length === 0)}
+          >
+            {zipping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            Scarica tutto (ZIP)
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -180,6 +188,18 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
               <p className="text-slate-500 dark:text-slate-400">Nessuna uscita di magazzino destinata a questa commessa.</p>
             </CardContent>
           </Card>
+        ) : viewMode === 'list' ? (
+          <div className="space-y-1.5">
+            {opiNotes.map(note => (
+              <div key={note.id} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openOpiNote(note)}>
+                <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
+                  <Truck className="h-5 w-5 text-blue-500" />
+                </div>
+                <p className="font-medium text-sm flex-1 min-w-0 truncate">DDT {note.number}</p>
+                <p className="text-xs text-slate-400 shrink-0">{format(new Date(note.date), 'dd MMM yyyy', { locale: it })}</p>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {opiNotes.map(note => (
@@ -205,6 +225,23 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
             <p className="text-slate-500 dark:text-slate-400">Nessun documento allegato agli acquisti di questa commessa.</p>
           </CardContent>
         </Card>
+      ) : viewMode === 'list' ? (
+        <div className="space-y-1.5">
+          {supplierDocs.map((doc) => (
+            <div key={`${doc.purchase.id}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+              <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
+                <FileText className="h-5 w-5 text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate text-sm">
+                  {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
+                </p>
+                <p className="text-xs text-slate-500 truncate">Allegato {doc.index + 1}</p>
+              </div>
+              <p className="text-xs text-slate-400 shrink-0">{format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it })}</p>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {supplierDocs.map((doc) => (

@@ -20,6 +20,8 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { getFileIcon } from "@/lib/file-icon"
+import { ViewToggle } from "@/components/ui/view-toggle"
+import { useViewMode } from "@/hooks/useViewMode"
 
 interface JobDocumentsProps {
   jobId: string
@@ -46,6 +48,7 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
   const [editName, setEditName] = useState("")
   const [editNotes, setEditNotes] = useState("")
   const editRef = useRef<HTMLInputElement>(null)
+  const [viewMode, setViewMode] = useViewMode('job-documents', 'grid')
 
   useEffect(() => {
     if (jobId) loadDocuments()
@@ -154,10 +157,13 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Documenti Cantiere</h2>
-        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setUpFile(null); setUpName(""); setUpNotes(""); setUploadOpen(true) }}>
-          <Upload className="mr-2 h-4 w-4" />
-          Carica Documento
-        </Button>
+        <div className="flex items-center gap-2">
+          {documents.length > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
+          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setUpFile(null); setUpName(""); setUpNotes(""); setUploadOpen(true) }}>
+            <Upload className="mr-2 h-4 w-4" />
+            Carica Documento
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -172,6 +178,33 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
             <p className="text-slate-500 dark:text-slate-400">Carica progetti, permessi, o foto del cantiere.</p>
           </CardContent>
         </Card>
+      ) : viewMode === 'list' ? (
+        <div className="space-y-1.5">
+          {documents.map((doc) => (
+            <div
+              key={doc.id}
+              className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer"
+              onClick={() => handleOpenDocument(doc.fileUrl)}
+            >
+              <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
+                {getFileIcon(doc.fileType, "h-5 w-5")}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
+                {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
+              </div>
+              <p className="text-xs text-slate-400 shrink-0">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
+                onClick={e => openEdit(doc, e)}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {documents.map((doc) => (
