@@ -1,6 +1,7 @@
 export * from './utils';
 export * from './users';
 export * from './suppliers';
+export * from './supplier-groups';
 export * from './purchases';
 export * from './inventory';
 export * from './clients';

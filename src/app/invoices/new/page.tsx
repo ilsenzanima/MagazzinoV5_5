@@ -20,6 +20,8 @@ interface UnlinkedPurchase {
     id: string;
     deliveryNoteNumber: string;
     deliveryNoteDate: string;
+    supplierId: string;
+    supplierName?: string;
     totalAmount: number;
     selected: boolean;
 }
@@ -81,6 +83,7 @@ export default function NewInvoicePage() {
 
     const selectedPurchases = unlinkedPurchases.filter(p => p.selected);
     const totalAmount = selectedPurchases.reduce((s, p) => s + p.totalAmount, 0);
+    const isSharedBilling = new Set(unlinkedPurchases.map(p => p.supplierId)).size > 1;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -267,6 +270,9 @@ export default function NewInvoicePage() {
                                                         <span className="flex-1 flex items-center gap-1 text-xs font-medium">
                                                             <FileText className="h-3.5 w-3.5" />Numero Bolla
                                                         </span>
+                                                        {isSharedBilling && (
+                                                            <span className="text-xs font-medium min-w-[120px]">Fornitore</span>
+                                                        )}
                                                         <span className="text-xs font-medium flex items-center gap-1">
                                                             <Calendar className="h-3.5 w-3.5" />Data
                                                         </span>
@@ -285,6 +291,9 @@ export default function NewInvoicePage() {
                                                                 onCheckedChange={() => togglePurchase(purchase.id)}
                                                             />
                                                             <span className="font-medium flex-1">{purchase.deliveryNoteNumber}</span>
+                                                            {isSharedBilling && (
+                                                                <span className="text-slate-500 text-sm min-w-[120px]">{purchase.supplierName}</span>
+                                                            )}
                                                             <span className="text-slate-500 text-sm">
                                                                 {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}
                                                             </span>

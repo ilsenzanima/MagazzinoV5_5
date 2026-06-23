@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 import { compressImageIfNeeded } from '@/lib/image-compress';
+import { supplierGroupsApi } from './supplier-groups';
 
 const mapDbToInvoice = (db: any): Invoice => ({
     id: db.id,
@@ -138,11 +139,16 @@ export const invoicesApi = {
     },
 
     getUnlinkedPurchasesBySupplier: async (supplierId: string) => {
+        const scope = await supplierGroupsApi.getBillingScope(supplierId);
+        return invoicesApi.getUnlinkedPurchasesBySupplierIds(scope);
+    },
+
+    getUnlinkedPurchasesBySupplierIds: async (supplierIds: string[]) => {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('id, delivery_note_number, delivery_note_date, purchase_items(price, quantity)')
-                .eq('supplier_id', supplierId)
+                .select('id, delivery_note_number, delivery_note_date, supplier_id, suppliers(name), purchase_items(price, quantity)')
+                .in('supplier_id', supplierIds)
                 .eq('order_type', 'purchase')
                 .is('invoice_id', null)
                 .is('deleted_at', null)
@@ -153,6 +159,8 @@ export const invoicesApi = {
             id: p.id,
             deliveryNoteNumber: p.delivery_note_number,
             deliveryNoteDate: p.delivery_note_date,
+            supplierId: p.supplier_id,
+            supplierName: p.suppliers?.name,
             totalAmount: p.purchase_items?.reduce(
                 (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1),
                 0

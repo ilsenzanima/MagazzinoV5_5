@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Plus, X, Loader2, Trash2, Pencil } from "lucide-react";
 import { useState, useEffect } from "react";
-import { suppliersApi, brandsApi, itemTypesApi, unitsApi, Supplier, Brand, ItemType, Unit } from "@/lib/api";
+import { suppliersApi, brandsApi, itemTypesApi, unitsApi, supplierGroupsApi, Supplier, Brand, ItemType, Unit, SupplierGroup } from "@/lib/api";
+import { Checkbox } from "@/components/ui/checkbox";
 import { warehousesApi } from "@/lib/services/warehouses";
 import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types";
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
@@ -38,6 +39,15 @@ export default function SettingsInventoryPage() {
     const [loadingSuppliers, setLoadingSuppliers] = useState(true);
     const [newSupplierName, setNewSupplierName] = useState("");
     const [addingSupplier, setAddingSupplier] = useState(false);
+
+    // Supplier Groups State (fatturazione condivisa)
+    const [supplierGroups, setSupplierGroups] = useState<SupplierGroup[]>([]);
+    const [loadingSupplierGroups, setLoadingSupplierGroups] = useState(true);
+    const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+    const [editingGroup, setEditingGroup] = useState<SupplierGroup | null>(null);
+    const [groupName, setGroupName] = useState("");
+    const [groupSupplierIds, setGroupSupplierIds] = useState<string[]>([]);
+    const [savingGroup, setSavingGroup] = useState(false);
 
     // Brands State
     const [brands, setBrands] = useState<Brand[]>([]);
@@ -90,6 +100,7 @@ export default function SettingsInventoryPage() {
 
     useEffect(() => {
         loadSuppliers();
+        loadSupplierGroups();
         loadBrands();
         loadTypes();
         loadUnits();
@@ -110,6 +121,84 @@ export default function SettingsInventoryPage() {
             notify.error("Errore nel caricamento dei fornitori");
         } finally {
             setLoadingSuppliers(false);
+        }
+    };
+
+    const loadSupplierGroups = async () => {
+        try {
+            setLoadingSupplierGroups(true);
+            const data = await supplierGroupsApi.getAll();
+            setSupplierGroups(data);
+        } catch (error) {
+            console.error("Failed to load supplier groups", error);
+            notify.error("Errore nel caricamento dei gruppi fornitori");
+        } finally {
+            setLoadingSupplierGroups(false);
+        }
+    };
+
+    const openGroupDialog = (group?: SupplierGroup) => {
+        if (group) {
+            setEditingGroup(group);
+            setGroupName(group.name);
+            setGroupSupplierIds(group.memberSupplierIds);
+        } else {
+            setEditingGroup(null);
+            setGroupName("");
+            setGroupSupplierIds([]);
+        }
+        setGroupDialogOpen(true);
+    };
+
+    const toggleGroupSupplier = (id: string) => {
+        setGroupSupplierIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
+    };
+
+    const handleSaveGroup = async () => {
+        const name = groupName.trim();
+        if (!name) return;
+        if (groupSupplierIds.length < 2) {
+            notify.warning("Seleziona almeno due fornitori da raggruppare.");
+            return;
+        }
+        try {
+            setSavingGroup(true);
+            if (editingGroup) {
+                await supplierGroupsApi.update(editingGroup.id, name, groupSupplierIds);
+                if (name !== editingGroup.name) {
+                    const updatedSupplier = await suppliersApi.update(editingGroup.billingSupplierId, { name });
+                    setSuppliers(prev => prev.map(s => s.id === updatedSupplier.id ? updatedSupplier : s).sort((a, b) => a.name.localeCompare(b.name)));
+                }
+            } else {
+                // Check for duplicates (case insensitive), same rule applied to regular suppliers
+                if (suppliers.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+                    notify.warning("Esiste già un fornitore con questo nome.");
+                    return;
+                }
+                // The billing entity is created as a normal supplier so it can
+                // be selected like any other supplier when registering an invoice.
+                const billingSupplier = await suppliersApi.create({ name });
+                await supplierGroupsApi.create(name, billingSupplier.id, groupSupplierIds);
+                setSuppliers(prev => [...prev, billingSupplier].sort((a, b) => a.name.localeCompare(b.name)));
+            }
+            setGroupDialogOpen(false);
+            await loadSupplierGroups();
+        } catch (error) {
+            console.error("Failed to save supplier group", error);
+            notify.error("Errore nel salvataggio del gruppo fornitori");
+        } finally {
+            setSavingGroup(false);
+        }
+    };
+
+    const handleDeleteGroup = async (id: string) => {
+        if (!confirm("Sei sicuro di voler eliminare questo gruppo di fatturazione condivisa?")) return;
+        try {
+            await supplierGroupsApi.delete(id);
+            setSupplierGroups(prev => prev.filter(g => g.id !== id));
+        } catch (error) {
+            console.error("Failed to delete supplier group", error);
+            notify.error("Errore nell'eliminazione del gruppo");
         }
     };
 
@@ -594,6 +683,7 @@ export default function SettingsInventoryPage() {
             <Tabs defaultValue="suppliers">
                 <TabsList className="flex-wrap h-auto gap-1">
                     <TabsTrigger value="suppliers">Fornitori</TabsTrigger>
+                    <TabsTrigger value="supplierGroups">Fatturazione Condivisa</TabsTrigger>
                     <TabsTrigger value="brands">Marche</TabsTrigger>
                     <TabsTrigger value="types">Tipologie</TabsTrigger>
                     <TabsTrigger value="units">Unità di Misura</TabsTrigger>
@@ -654,6 +744,56 @@ export default function SettingsInventoryPage() {
                                     ))}
                                     {suppliers.length === 0 && (
                                         <p className="text-sm text-muted-foreground italic">Nessun fornitore presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="supplierGroups" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Fatturazione Condivisa</CardTitle>
+                                <CardDescription>
+                                    Raggruppa due o più fornitori il cui acquisti vengono fatturati da un fornitore terzo. Quando crei una fattura selezionando il gruppo, vedrai gli acquisti di tutti i fornitori associati.
+                                </CardDescription>
+                            </div>
+                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => openGroupDialog()}>
+                                <Plus className="h-4 w-4 mr-2" /> Nuovo Gruppo
+                            </Button>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {loadingSupplierGroups ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento gruppi...
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {supplierGroups.map(group => (
+                                        <div key={group.id} className="flex items-start justify-between p-3 border rounded-lg bg-white dark:bg-slate-800">
+                                            <div>
+                                                <span className="font-medium">{group.name}</span>
+                                                <p className="text-sm text-muted-foreground mt-1">
+                                                    Bolle aggregate da: {group.memberSupplierIds
+                                                        .map(id => suppliers.find(s => s.id === id)?.name)
+                                                        .filter(Boolean)
+                                                        .join(", ")}
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button variant="ghost" size="sm" onClick={() => openGroupDialog(group)} className="text-slate-600 hover:text-slate-800">
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteGroup(group.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {supplierGroups.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessun gruppo di fatturazione condivisa presente.</p>
                                     )}
                                 </div>
                             )}
@@ -1154,6 +1294,46 @@ export default function SettingsInventoryPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Supplier group dialog */}
+            <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{editingGroup ? "Modifica Gruppo" : "Nuovo Gruppo di Fatturazione Condivisa"}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-1">
+                            <Label>Nome Gruppo</Label>
+                            <Input
+                                value={groupName}
+                                onChange={(e) => setGroupName(e.target.value)}
+                                placeholder="Es. Fatturazione condivisa XYZ"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Fornitori associati (seleziona almeno 2)</Label>
+                            <div className="max-h-60 overflow-y-auto border rounded-md p-2 space-y-1">
+                                {suppliers.filter(s => s.id !== editingGroup?.billingSupplierId).map(supplier => (
+                                    <label key={supplier.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                                        <Checkbox
+                                            checked={groupSupplierIds.includes(supplier.id)}
+                                            onCheckedChange={() => toggleGroupSupplier(supplier.id)}
+                                        />
+                                        <span className="text-sm">{supplier.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setGroupDialogOpen(false)}>Annulla</Button>
+                        <Button onClick={handleSaveGroup} disabled={savingGroup || !groupName.trim()}>
+                            {savingGroup && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Rename dialog */}
             <Dialog open={!!renameTarget} onOpenChange={(v) => !v && setRenameTarget(null)}>

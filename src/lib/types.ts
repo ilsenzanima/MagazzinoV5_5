@@ -80,6 +80,14 @@ export interface Supplier {
     createdAt: string;
 }
 
+export interface SupplierGroup {
+    id: string;
+    name: string;
+    billingSupplierId: string;
+    memberSupplierIds: string[];
+    createdAt: string;
+}
+
 export interface Client {
     id: string;
     name: string;
