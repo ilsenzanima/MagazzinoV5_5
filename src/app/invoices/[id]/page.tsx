@@ -73,7 +73,7 @@ function ItemPriceRow({
             await purchasesApi.updateItem(item.id, { price: p });
             notify.success("Prezzo aggiornato");
             setEditing(false);
-            onSaved();
+            await onSaved();
         } catch (e: any) {
             notify.error(`Errore: ${e.message}`);
         } finally {
@@ -210,6 +210,17 @@ export default function InvoiceDetailPage() {
             })
             .catch(console.error)
             .finally(() => setLoading(false));
+    };
+
+    // Dopo la modifica del prezzo di una riga, il totale netto mostrato in pagina
+    // viene già ricalcolato dinamicamente, ma il campo invoices.total_amount
+    // (usato nell'elenco Acquisti > Fatture) resta una colonna salvata: va
+    // risincronizzato esplicitamente.
+    const syncTotalAfterItemEdit = async () => {
+        const inv = await invoicesApi.getById(id);
+        const newTotal = inv.purchases?.reduce((s, p) => s + (p.totalAmount ?? 0), 0) ?? 0;
+        await invoicesApi.updateTotal(id, newTotal);
+        load();
     };
 
     const handleApplyTransport = async (purchaseId: string) => {
@@ -584,7 +595,7 @@ export default function InvoiceDetailPage() {
                                                                                 key={item.id}
                                                                                 item={item}
                                                                                 canEdit={canSeeAmounts}
-                                                                                onSaved={load}
+                                                                                onSaved={syncTotalAfterItemEdit}
                                                                             />
                                                                         ))}
                                                                     </tbody>
