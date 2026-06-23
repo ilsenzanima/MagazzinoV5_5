@@ -15,6 +15,10 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
+import { HelpTip } from "@/components/ui/help-tip";
+import { jobConformitaDocumentTypesApi } from "@/lib/services/job-conformita-document-types";
+import { jobSiteDocumentTypesApi } from "@/lib/services/job-site-document-types";
+import { proposalDocumentTypesApi } from "@/lib/services/proposal-document-types";
 
 // Components
 import { JobOverview } from "@/components/jobs/details/JobOverview";
@@ -522,16 +526,40 @@ export default function JobDetailsPage() {
                             )}
                             {activeGroup === 'documenti' && (
                                 <>
-                                    <TabsTrigger value="conformita" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-green-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
-                                        <ShieldCheck className="h-4 w-4 mr-1 text-green-600" />Conformità
-                                    </TabsTrigger>
-                                    <TabsTrigger value="documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
-                                        <FileText className="h-4 w-4 mr-1" />Documenti Cantiere
-                                    </TabsTrigger>
-                                    {(userRole === 'admin' || userRole === 'operativo') && (
-                                        <TabsTrigger value="commessa-documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
-                                            <Folder className="h-4 w-4 mr-1" />Documenti Commessa
+                                    <span className="inline-flex items-center">
+                                        <TabsTrigger value="conformita" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-green-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                            <ShieldCheck className="h-4 w-4 mr-1 text-green-600" />Conformità
                                         </TabsTrigger>
+                                        <HelpTip
+                                            title="Documenti Conformità Cantiere"
+                                            description="Tipi disponibili per i documenti caricati direttamente sulla commessa."
+                                            fetchItems={async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => t.name)}
+                                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
+                                        />
+                                    </span>
+                                    <span className="inline-flex items-center">
+                                        <TabsTrigger value="documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                            <FileText className="h-4 w-4 mr-1" />Documenti Cantiere
+                                        </TabsTrigger>
+                                        <HelpTip
+                                            title="Documenti Cantiere"
+                                            description="Tipi disponibili per i documenti caricati in questa sezione."
+                                            fetchItems={async () => (await jobSiteDocumentTypesApi.getAll()).map(t => t.name)}
+                                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Cantiere per crearne uno."
+                                        />
+                                    </span>
+                                    {(userRole === 'admin' || userRole === 'operativo') && (
+                                        <span className="inline-flex items-center">
+                                            <TabsTrigger value="commessa-documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                                <Folder className="h-4 w-4 mr-1" />Documenti Commessa
+                                            </TabsTrigger>
+                                            <HelpTip
+                                                title="Documenti Commessa"
+                                                description="Tipi disponibili per i documenti caricati in questa sezione (condivisi con le proposte)."
+                                                fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => t.name)}
+                                                emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
+                                            />
+                                        </span>
                                     )}
                                     <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                         <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini

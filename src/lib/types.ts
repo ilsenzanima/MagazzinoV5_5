@@ -177,6 +177,8 @@ export interface JobDocument {
     category: string;
     documentTypeId?: string | null;
     documentTypeName?: string;
+    conformitaDocumentTypeId?: string | null;
+    conformitaDocumentTypeName?: string;
     uploadedBy: string;
     uploadedByName?: string;
     createdAt: string;
