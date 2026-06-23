@@ -26,7 +26,7 @@ import { JobConformita } from "@/components/jobs/details/JobConformita";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
 import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
 import { JobEccedenze } from "@/components/jobs/details/JobEccedenze";
-import { JobOrdini } from "@/components/jobs/details/JobOrdini";
+import { JobOrdiniDocumenti } from "@/components/jobs/details/JobOrdiniDocumenti";
 import { JobFatturazione } from "@/components/jobs/details/JobFatturazione";
 import { JobAnalisiCosti } from "@/components/jobs/details/JobAnalisiCosti";
 import { clientProposalsApi, ClientProposal } from "@/lib/services/client-proposals";
@@ -518,9 +518,6 @@ export default function JobDetailsPage() {
                                     <TabsTrigger value="eccedenze" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                         <Recycle className="h-4 w-4 mr-1 text-violet-500" />Eccedenze
                                     </TabsTrigger>
-                                    <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
-                                        <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini
-                                    </TabsTrigger>
                                 </>
                             )}
                             {activeGroup === 'documenti' && (
@@ -536,6 +533,9 @@ export default function JobDetailsPage() {
                                             <Folder className="h-4 w-4 mr-1" />Documenti Commessa
                                         </TabsTrigger>
                                     )}
+                                    <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini
+                                    </TabsTrigger>
                                     <TabsTrigger value="ddt" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                         <Truck className="h-4 w-4 mr-1" />DDT
                                     </TabsTrigger>
@@ -615,7 +615,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="ordini" className="space-y-6 focus-visible:outline-none">
-                            <JobOrdini jobId={job.id} jobCode={job.code} />
+                            <JobOrdiniDocumenti jobId={job.id} jobCode={job.code} />
                         </TabsContent>
 
                         {(userRole === 'admin' || userRole === 'operativo') && (
