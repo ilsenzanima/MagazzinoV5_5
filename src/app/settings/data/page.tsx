@@ -14,6 +14,7 @@ import { Plus, X, Loader2, Trash2, Pencil } from "lucide-react";
 import { useState, useEffect } from "react";
 import { suppliersApi, brandsApi, itemTypesApi, unitsApi, supplierGroupsApi, Supplier, Brand, ItemType, Unit, SupplierGroup } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { warehousesApi } from "@/lib/services/warehouses";
 import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types";
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
@@ -47,6 +48,8 @@ export default function SettingsInventoryPage() {
     const [editingGroup, setEditingGroup] = useState<SupplierGroup | null>(null);
     const [groupName, setGroupName] = useState("");
     const [groupSupplierIds, setGroupSupplierIds] = useState<string[]>([]);
+    const [groupVisibleInPurchases, setGroupVisibleInPurchases] = useState(false);
+    const [groupShowMembersInInvoices, setGroupShowMembersInInvoices] = useState(true);
     const [savingGroup, setSavingGroup] = useState(false);
 
     // Brands State
@@ -142,10 +145,14 @@ export default function SettingsInventoryPage() {
             setEditingGroup(group);
             setGroupName(group.name);
             setGroupSupplierIds(group.memberSupplierIds);
+            setGroupVisibleInPurchases(group.visibleInPurchases);
+            setGroupShowMembersInInvoices(group.showMembersInInvoices);
         } else {
             setEditingGroup(null);
             setGroupName("");
             setGroupSupplierIds([]);
+            setGroupVisibleInPurchases(false);
+            setGroupShowMembersInInvoices(true);
         }
         setGroupDialogOpen(true);
     };
@@ -163,8 +170,9 @@ export default function SettingsInventoryPage() {
         }
         try {
             setSavingGroup(true);
+            const options = { visibleInPurchases: groupVisibleInPurchases, showMembersInInvoices: groupShowMembersInInvoices };
             if (editingGroup) {
-                await supplierGroupsApi.update(editingGroup.id, name, groupSupplierIds);
+                await supplierGroupsApi.update(editingGroup.id, name, groupSupplierIds, options);
                 if (name !== editingGroup.name) {
                     const updatedSupplier = await suppliersApi.update(editingGroup.billingSupplierId, { name });
                     setSuppliers(prev => prev.map(s => s.id === updatedSupplier.id ? updatedSupplier : s).sort((a, b) => a.name.localeCompare(b.name)));
@@ -178,7 +186,7 @@ export default function SettingsInventoryPage() {
                 // The billing entity is created as a normal supplier so it can
                 // be selected like any other supplier when registering an invoice.
                 const billingSupplier = await suppliersApi.create({ name });
-                await supplierGroupsApi.create(name, billingSupplier.id, groupSupplierIds);
+                await supplierGroupsApi.create(name, billingSupplier.id, groupSupplierIds, options);
                 setSuppliers(prev => [...prev, billingSupplier].sort((a, b) => a.name.localeCompare(b.name)));
             }
             setGroupDialogOpen(false);
@@ -781,6 +789,14 @@ export default function SettingsInventoryPage() {
                                                         .filter(Boolean)
                                                         .join(", ")}
                                                 </p>
+                                                <div className="flex gap-2 mt-2">
+                                                    {group.visibleInPurchases && (
+                                                        <Badge variant="outline" className="text-xs">Visibile in Ordini/Acquisti</Badge>
+                                                    )}
+                                                    {!group.showMembersInInvoices && (
+                                                        <Badge variant="outline" className="text-xs">Senza aggregazione in fattura</Badge>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className="flex gap-2">
                                                 <Button variant="ghost" size="sm" onClick={() => openGroupDialog(group)} className="text-slate-600 hover:text-slate-800">
@@ -1324,6 +1340,24 @@ export default function SettingsInventoryPage() {
                                     </label>
                                 ))}
                             </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 border-t pt-3">
+                            <div>
+                                <Label className="text-sm">Mostra in Ordini e Acquisti</Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Se attivo, il fornitore "{groupName || 'di fatturazione'}" è selezionabile anche per registrare ordini e bolle. Se disattivo, è disponibile solo per le fatture.
+                                </p>
+                            </div>
+                            <Switch checked={groupVisibleInPurchases} onCheckedChange={setGroupVisibleInPurchases} />
+                        </div>
+                        <div className="flex items-center justify-between gap-4 border-t pt-3">
+                            <div>
+                                <Label className="text-sm">Aggrega bolle dei fornitori associati</Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Se attivo, selezionando questo fornitore in una fattura vedrai anche le bolle non fatturate dei fornitori associati. Se disattivo, vedrai solo le sue bolle.
+                                </p>
+                            </div>
+                            <Switch checked={groupShowMembersInInvoices} onCheckedChange={setGroupShowMembersInInvoices} />
                         </div>
                     </div>
                     <DialogFooter>

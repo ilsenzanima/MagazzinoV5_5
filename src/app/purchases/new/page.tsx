@@ -18,6 +18,7 @@ import {
     inventoryApi,
     jobsApi,
     purchasesApi,
+    supplierGroupsApi,
     Supplier,
     InventoryItem,
     Job
@@ -148,12 +149,13 @@ function NewPurchaseContent() {
     const loadData = async () => {
         try {
             setInitialLoading(true);
-            const [suppliersData, inventoryData, jobsData] = await Promise.all([
+            const [suppliersData, inventoryData, jobsData, hiddenSupplierIds] = await Promise.all([
                 suppliersApi.getAll(),
                 inventoryApi.getPaginated({ page: 1, limit: 50 }),
-                jobsApi.getPaginated({ page: 1, limit: 50, status: 'active' })
+                jobsApi.getPaginated({ page: 1, limit: 50, status: 'active' }),
+                supplierGroupsApi.getHiddenFromPurchasesIds()
             ]);
-            setSuppliers(suppliersData);
+            setSuppliers(suppliersData.filter(s => !hiddenSupplierIds.includes(s.id)));
             setInventory(inventoryData.items);
             setJobs(jobsData.data);
 

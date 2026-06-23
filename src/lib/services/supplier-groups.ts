@@ -7,6 +7,8 @@ const mapDbToSupplierGroup = (db: any): SupplierGroup => ({
     name: db.name,
     billingSupplierId: db.billing_supplier_id,
     memberSupplierIds: (db.supplier_group_members ?? []).map((m: any) => m.supplier_id),
+    visibleInPurchases: db.visible_in_purchases ?? false,
+    showMembersInInvoices: db.show_members_in_invoices ?? true,
     createdAt: db.created_at,
 });
 
@@ -32,20 +34,46 @@ export const supplierGroupsApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('supplier_groups')
-                .select('billing_supplier_id, supplier_group_members(supplier_id)')
+                .select('billing_supplier_id, show_members_in_invoices, supplier_group_members(supplier_id)')
                 .eq('billing_supplier_id', supplierId)
                 .is('deleted_at', null)
                 .maybeSingle()
         );
         if (error) throw error;
-        if (!data) return [supplierId];
+        if (!data || !data.show_members_in_invoices) return [supplierId];
         return [data.billing_supplier_id, ...data.supplier_group_members.map((m: any) => m.supplier_id)];
     },
 
-    create: async (name: string, billingSupplierId: string, memberSupplierIds: string[]): Promise<SupplierGroup> => {
+    /**
+     * Billing supplier ids that should be hidden from the supplier dropdown
+     * in orders/purchases forms (visible_in_purchases = false).
+     */
+    getHiddenFromPurchasesIds: async (): Promise<string[]> => {
+        const { data, error } = await fetchWithTimeout(
+            supabase
+                .from('supplier_groups')
+                .select('billing_supplier_id')
+                .eq('visible_in_purchases', false)
+                .is('deleted_at', null)
+        );
+        if (error) throw error;
+        return data.map((g: any) => g.billing_supplier_id);
+    },
+
+    create: async (
+        name: string,
+        billingSupplierId: string,
+        memberSupplierIds: string[],
+        options: { visibleInPurchases: boolean; showMembersInInvoices: boolean }
+    ): Promise<SupplierGroup> => {
         const { data: group, error } = await supabase
             .from('supplier_groups')
-            .insert({ name, billing_supplier_id: billingSupplierId })
+            .insert({
+                name,
+                billing_supplier_id: billingSupplierId,
+                visible_in_purchases: options.visibleInPurchases,
+                show_members_in_invoices: options.showMembersInInvoices,
+            })
             .select()
             .single();
         if (error) throw error;
@@ -62,12 +90,26 @@ export const supplierGroupsApi = {
             name: group.name,
             billingSupplierId: group.billing_supplier_id,
             memberSupplierIds,
+            visibleInPurchases: group.visible_in_purchases,
+            showMembersInInvoices: group.show_members_in_invoices,
             createdAt: group.created_at,
         };
     },
 
-    update: async (id: string, name: string, memberSupplierIds: string[]): Promise<void> => {
-        const { error } = await supabase.from('supplier_groups').update({ name }).eq('id', id);
+    update: async (
+        id: string,
+        name: string,
+        memberSupplierIds: string[],
+        options: { visibleInPurchases: boolean; showMembersInInvoices: boolean }
+    ): Promise<void> => {
+        const { error } = await supabase
+            .from('supplier_groups')
+            .update({
+                name,
+                visible_in_purchases: options.visibleInPurchases,
+                show_members_in_invoices: options.showMembersInInvoices,
+            })
+            .eq('id', id);
         if (error) throw error;
 
         const { error: deleteError } = await supabase.from('supplier_group_members').delete().eq('group_id', id);

@@ -85,6 +85,8 @@ export interface SupplierGroup {
     name: string;
     billingSupplierId: string;
     memberSupplierIds: string[];
+    visibleInPurchases: boolean;
+    showMembersInInvoices: boolean;
     createdAt: string;
 }
 
