@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { getSoftDeletePayload } from './utils';
+import { compressImageIfNeeded } from '@/lib/image-compress';
 
 export type ComplianceDocumentType =
     | 'RDC_RDV_FT'
@@ -21,10 +22,13 @@ export interface ComplianceDocument {
     supplierId: string;
     brandId: string;
     brandName?: string;
-    documentType: ComplianceDocumentType;
+    documentType: ComplianceDocumentType | '';
+    documentTypeId: string | null;
+    documentTypeName: string;
     name: string;
     notes?: string;
     fileUrl: string;
+    fileSize: number | null;
     purchaseId?: string;
     purchaseNumber?: string;
     createdBy?: string;
@@ -40,10 +44,13 @@ const mapDbToDoc = (db: any): ComplianceDocument => {
         supplierId: db.supplier_id,
         brandId: db.brand_id,
         brandName: db.brands?.name,
-        documentType: db.document_type,
+        documentType: db.document_type || '',
+        documentTypeId: db.document_type_id || null,
+        documentTypeName: db.compliance_document_types?.name || (db.document_type ? DOCUMENT_TYPE_LABELS[db.document_type as ComplianceDocumentType] : '') || '',
         name: db.name,
         notes: db.notes,
         fileUrl: db.file_url,
+        fileSize: db.file_size !== null && db.file_size !== undefined ? Number(db.file_size) : null,
         purchaseId: purchaseDeleted ? undefined : db.purchase_id,
         purchaseNumber: purchaseDeleted ? undefined : db.purchases?.delivery_note_number,
         createdBy: db.created_by,
@@ -52,11 +59,13 @@ const mapDbToDoc = (db: any): ComplianceDocument => {
     };
 };
 
+const SELECT_WITH_RELATIONS = '*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name)';
+
 export const complianceApi = {
     getAll: async (search?: string): Promise<ComplianceDocument[]> => {
         let query = supabase
             .from('supplier_compliance_documents')
-            .select('*, brands(name), purchases(delivery_note_number, deleted_at)')
+            .select(SELECT_WITH_RELATIONS)
             .is('deleted_at', null)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -69,7 +78,7 @@ export const complianceApi = {
     getBySupplier: async (supplierId: string): Promise<ComplianceDocument[]> => {
         const { data, error } = await supabase
             .from('supplier_compliance_documents')
-            .select('*, brands(name), purchases(delivery_note_number, deleted_at)')
+            .select(SELECT_WITH_RELATIONS)
             .eq('supplier_id', supplierId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false });
@@ -80,10 +89,11 @@ export const complianceApi = {
     create: async (doc: {
         supplierId: string;
         brandId: string;
-        documentType: ComplianceDocumentType;
+        documentTypeId?: string | null;
         name: string;
         notes?: string;
         fileUrl: string;
+        fileSize?: number | null;
         purchaseId?: string;
     }): Promise<ComplianceDocument> => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -92,14 +102,15 @@ export const complianceApi = {
             .insert({
                 supplier_id: doc.supplierId,
                 brand_id: doc.brandId,
-                document_type: doc.documentType,
+                document_type_id: doc.documentTypeId || null,
                 name: doc.name,
                 notes: doc.notes || null,
                 file_url: doc.fileUrl,
+                file_size: doc.fileSize ?? null,
                 purchase_id: doc.purchaseId || null,
                 created_by: user?.id,
             })
-            .select('*, brands(name), purchases(delivery_note_number, deleted_at)')
+            .select(SELECT_WITH_RELATIONS)
             .single();
         if (error) throw error;
         return mapDbToDoc(data);
@@ -107,23 +118,27 @@ export const complianceApi = {
 
     update: async (id: string, doc: {
         brandId?: string;
-        documentType?: ComplianceDocumentType;
+        documentTypeId?: string | null;
         name?: string;
         notes?: string;
+        fileUrl?: string;
+        fileSize?: number | null;
         purchaseId?: string | null;
     }): Promise<ComplianceDocument> => {
         const payload: any = {};
         if (doc.brandId !== undefined) payload.brand_id = doc.brandId;
-        if (doc.documentType !== undefined) payload.document_type = doc.documentType;
+        if (doc.documentTypeId !== undefined) payload.document_type_id = doc.documentTypeId;
         if (doc.name !== undefined) payload.name = doc.name;
         if (doc.notes !== undefined) payload.notes = doc.notes;
+        if (doc.fileUrl !== undefined) payload.file_url = doc.fileUrl;
+        if (doc.fileSize !== undefined) payload.file_size = doc.fileSize;
         if ('purchaseId' in doc) payload.purchase_id = doc.purchaseId ?? null;
 
         const { data, error } = await supabase
             .from('supplier_compliance_documents')
             .update(payload)
             .eq('id', id)
-            .select('*, brands(name), purchases(delivery_note_number, deleted_at)')
+            .select(SELECT_WITH_RELATIONS)
             .single();
         if (error) throw error;
         return mapDbToDoc(data);
@@ -143,9 +158,10 @@ export const complianceApi = {
     },
 
     uploadFile: async (file: File): Promise<string> => {
-        const fileExt = file.name.split('.').pop();
+        const compressed = await compressImageIfNeeded(file);
+        const fileExt = compressed.name.split('.').pop();
         const fileName = `compliance_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-        const { error } = await supabase.storage.from('documents').upload(fileName, file);
+        const { error } = await supabase.storage.from('documents').upload(fileName, compressed);
         if (error) throw error;
         const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
         return publicUrl;
@@ -190,7 +206,7 @@ export const jobComplianceApi = {
     getByJobId: async (jobId: string): Promise<JobComplianceAssociation[]> => {
         const { data, error } = await supabase
             .from('job_compliance_associations')
-            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))')
             .eq('job_id', jobId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false });
@@ -203,7 +219,7 @@ export const jobComplianceApi = {
         const { data, error } = await supabase
             .from('job_compliance_associations')
             .insert({ job_id: jobId, compliance_document_id: complianceDocumentId, created_by: user?.id })
-            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))')
             .single();
         if (error) throw error;
         return mapDbToAssociation(data);
@@ -250,7 +266,7 @@ export const proposalComplianceApi = {
     getByProposalId: async (proposalId: string): Promise<ProposalComplianceAssociation[]> => {
         const { data, error } = await supabase
             .from('proposal_compliance_associations')
-            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))')
             .eq('proposal_id', proposalId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false });
@@ -263,7 +279,7 @@ export const proposalComplianceApi = {
         const { data, error } = await supabase
             .from('proposal_compliance_associations')
             .insert({ proposal_id: proposalId, compliance_document_id: complianceDocumentId, created_by: user?.id })
-            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at))')
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))')
             .single();
         if (error) throw error;
         return mapDbToProposalAssociation(data);

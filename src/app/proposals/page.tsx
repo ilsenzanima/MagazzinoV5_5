@@ -6,11 +6,25 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { ViewToggle } from "@/components/ui/view-toggle";
-import { Loader2, Search, MapPin, FileText, Users } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Loader2, Search, MapPin, FileText, Users, Plus } from "lucide-react";
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals";
+import { clientsApi } from "@/lib/api";
+import { Client } from "@/lib/types";
 import { notify } from "@/lib/notify";
 import { useAuth } from "@/components/auth-provider";
 import { useViewMode } from "@/hooks/useViewMode";
@@ -30,16 +44,50 @@ const PROP_STATUS_COLORS: Record<ProposalStatus, string> = {
 
 type ProposalWithClient = ClientProposal & { clientName: string };
 
+const EMPTY_PROPOSAL_FORM = {
+  clientId: "",
+  title: "", description: "", estimatedValue: "",
+  status: "draft" as ProposalStatus, date: "", notes: "",
+  siteStreet: "", siteStreetNumber: "", sitePostalCode: "", siteCity: "", siteProvince: "",
+};
+
+const EMPTY_QUICK_CLIENT_FORM = {
+  name: "", street: "", streetNumber: "", postalCode: "", city: "", province: "",
+  vatNumber: "", email: "", phone: "",
+};
+
+const proposalYear = (p: ClientProposal) => new Date(p.date || p.createdAt).getFullYear();
+
+const ALL_YEARS = "all";
+const CURRENT_YEAR = new Date().getFullYear();
+const LAST_5_YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2, CURRENT_YEAR - 3, CURRENT_YEAR - 4];
+
 export default function ProposalsPage() {
   const { userRole } = useAuth();
   const router = useRouter();
   const [viewMode, setViewMode] = useViewMode("proposte");
 
   const [proposals, setProposals] = useState<ProposalWithClient[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [stageTab, setStageTab] = useState<"progress" | "accepted">("progress");
+  const [yearTab, setYearTab] = useState<string>(ALL_YEARS);
+
+  // Nuova proposta dialog
+  const [newProposalOpen, setNewProposalOpen] = useState(false);
+  const [proposalForm, setProposalForm] = useState(EMPTY_PROPOSAL_FORM);
+  const [useClientAddr, setUseClientAddr] = useState(false);
+  const [savingProposal, setSavingProposal] = useState(false);
+
+  // Nuovo committente rapido (dal modale nuova proposta)
+  const [quickClientOpen, setQuickClientOpen] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState(EMPTY_QUICK_CLIENT_FORM);
+  const [savingQuickClient, setSavingQuickClient] = useState(false);
+
+  const canEdit = userRole === "admin" || userRole === "operativo";
 
   useEffect(() => {
     if (userRole && userRole !== "admin" && userRole !== "operativo") {
@@ -49,10 +97,28 @@ export default function ProposalsPage() {
     if (userRole) load();
   }, [userRole]);
 
+  useEffect(() => {
+    if (useClientAddr) {
+      const c = clients.find(c => c.id === proposalForm.clientId);
+      if (c) {
+        setProposalForm(f => ({
+          ...f,
+          siteStreet: c.street || "",
+          siteStreetNumber: c.streetNumber || "",
+          sitePostalCode: c.postalCode || "",
+          siteCity: c.city || "",
+          siteProvince: c.province || "",
+        }));
+      }
+    }
+  }, [useClientAddr, proposalForm.clientId, clients]);
+
   const load = async () => {
     try {
       setLoading(true);
-      setProposals(await clientProposalsApi.getAll());
+      const [props, cls] = await Promise.all([clientProposalsApi.getAll(), clientsApi.getAll()]);
+      setProposals(props);
+      setClients(cls.sort((a, b) => a.name.localeCompare(b.name, "it")));
     } catch {
       notify.error("Errore caricamento proposte");
     } finally {
@@ -65,8 +131,24 @@ export default function ProposalsPage() {
     return names.sort((a, b) => a.localeCompare(b, "it"));
   }, [proposals]);
 
+  const stageFiltered = useMemo(() => {
+    return proposals.filter(p => stageTab === "accepted" ? p.status === "accepted" : p.status !== "accepted");
+  }, [proposals, stageTab]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set(stageFiltered.map(proposalYear));
+    LAST_5_YEARS.forEach(y => years.add(y));
+    return [...years].sort((a, b) => b - a);
+  }, [stageFiltered]);
+
+  const yearTabsToShow = useMemo(() => {
+    const tabs = [...LAST_5_YEARS];
+    if (yearTab !== ALL_YEARS && !tabs.includes(Number(yearTab))) tabs.push(Number(yearTab));
+    return tabs.sort((a, b) => b - a);
+  }, [yearTab]);
+
   const filtered = useMemo(() => {
-    return proposals.filter(p => {
+    return stageFiltered.filter(p => {
       const s = search.toLowerCase();
       const matchSearch = !s ||
         p.title.toLowerCase().includes(s) ||
@@ -74,16 +156,118 @@ export default function ProposalsPage() {
         (p.siteCity && p.siteCity.toLowerCase().includes(s));
       const matchStatus = statusFilter === "all" || p.status === statusFilter;
       const matchClient = clientFilter === "all" || p.clientName === clientFilter;
-      return matchSearch && matchStatus && matchClient;
+      const matchYear = yearTab === ALL_YEARS || proposalYear(p) === Number(yearTab);
+      return matchSearch && matchStatus && matchClient && matchYear;
     });
-  }, [proposals, search, statusFilter, clientFilter]);
+  }, [stageFiltered, search, statusFilter, clientFilter, yearTab]);
+
+  const openNewProposal = () => {
+    setProposalForm(EMPTY_PROPOSAL_FORM);
+    setUseClientAddr(false);
+    setNewProposalOpen(true);
+  };
+
+  const handleNewProposal = async () => {
+    if (!proposalForm.title.trim()) { notify.warning("Il titolo è obbligatorio"); return; }
+    if (!proposalForm.clientId) { notify.warning("Il committente è obbligatorio"); return; }
+    try {
+      setSavingProposal(true);
+      const created = await clientProposalsApi.create(proposalForm.clientId, {
+        title: proposalForm.title.trim(),
+        description: proposalForm.description,
+        estimatedValue: proposalForm.estimatedValue ? Number(proposalForm.estimatedValue) : null,
+        status: proposalForm.status,
+        date: proposalForm.date,
+        notes: proposalForm.notes,
+        siteStreet: proposalForm.siteStreet,
+        siteStreetNumber: proposalForm.siteStreetNumber,
+        sitePostalCode: proposalForm.sitePostalCode,
+        siteCity: proposalForm.siteCity,
+        siteProvince: proposalForm.siteProvince,
+      });
+      setNewProposalOpen(false);
+      setProposalForm(EMPTY_PROPOSAL_FORM);
+      router.push(`/clients/${proposalForm.clientId}/proposals/${created.id}`);
+    } catch { notify.error("Errore durante la creazione"); }
+    finally { setSavingProposal(false); }
+  };
+
+  const handleQuickClient = async () => {
+    if (!quickClientForm.name.trim()) { notify.warning("Il nome del committente è obbligatorio"); return; }
+    try {
+      setSavingQuickClient(true);
+      const created = await clientsApi.create({
+        name: quickClientForm.name.trim(),
+        street: quickClientForm.street,
+        streetNumber: quickClientForm.streetNumber,
+        postalCode: quickClientForm.postalCode,
+        city: quickClientForm.city,
+        province: quickClientForm.province,
+        vatNumber: quickClientForm.vatNumber,
+        email: quickClientForm.email,
+        phone: quickClientForm.phone,
+      });
+      setClients(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "it")));
+      setProposalForm(f => ({ ...f, clientId: created.id }));
+      setQuickClientForm(EMPTY_QUICK_CLIENT_FORM);
+      setQuickClientOpen(false);
+      notify.success("Committente creato");
+    } catch { notify.error("Errore durante la creazione del committente"); }
+    finally { setSavingQuickClient(false); }
+  };
+
+  const progressCount = proposals.filter(p => p.status !== "accepted").length;
+  const acceptedCount = proposals.filter(p => p.status === "accepted").length;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Elenco Proposte</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Tutte le proposte di tutti i committenti</p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Elenco Proposte</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Tutte le proposte di tutti i committenti</p>
+          </div>
+          {canEdit && (
+            <Button onClick={openNewProposal} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />Nuova Proposta
+            </Button>
+          )}
+        </div>
+
+        {/* Tabs stato: in lavorazione / accettate */}
+        <Tabs value={stageTab} onValueChange={v => setStageTab(v as "progress" | "accepted")}>
+          <TabsList>
+            <TabsTrigger value="progress">
+              In Lavorazione
+              <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{progressCount}</span>
+            </TabsTrigger>
+            <TabsTrigger value="accepted">
+              Accettate
+              <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{acceptedCount}</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Tabs anno + selettore anno specifico */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs value={yearTab} onValueChange={setYearTab}>
+            <TabsList className="flex-wrap h-auto gap-1">
+              <TabsTrigger value={ALL_YEARS}>Tutti gli anni</TabsTrigger>
+              {yearTabsToShow.map(y => (
+                <TabsTrigger key={y} value={String(y)}>{y}</TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <Select value={yearTab === ALL_YEARS || LAST_5_YEARS.includes(Number(yearTab)) ? "" : yearTab} onValueChange={setYearTab}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Cerca anno specifico..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map(y => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Filtri + toggle */}
@@ -126,7 +310,7 @@ export default function ProposalsPage() {
         {!loading && (
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {filtered.length} proposta{filtered.length !== 1 ? "e" : ""} trovata{filtered.length !== 1 ? "e" : ""}
-            {filtered.length !== proposals.length && ` (su ${proposals.length} totali)`}
+            {filtered.length !== stageFiltered.length && ` (su ${stageFiltered.length} totali)`}
           </p>
         )}
 
@@ -138,7 +322,7 @@ export default function ProposalsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-slate-400">
             <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <p>{proposals.length === 0 ? "Nessuna proposta presente." : "Nessuna proposta corrisponde ai filtri."}</p>
+            <p>{stageFiltered.length === 0 ? "Nessuna proposta presente." : "Nessuna proposta corrisponde ai filtri."}</p>
           </div>
         ) : viewMode === "list" ? (
           <div className="space-y-1.5">
@@ -213,6 +397,151 @@ export default function ProposalsPage() {
           </div>
         )}
       </div>
+
+      {/* Nuova proposta dialog */}
+      <Dialog open={newProposalOpen} onOpenChange={setNewProposalOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Nuova Proposta</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Committente *</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <SearchableSelect
+                    options={clients.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                      description: c.address || undefined
+                    }))}
+                    value={proposalForm.clientId}
+                    onValueChange={v => setProposalForm({ ...proposalForm, clientId: v })}
+                    placeholder="Cerca committente..."
+                    searchPlaceholder="Digita per cercare..."
+                    emptyMessage="Nessun committente trovato."
+                  />
+                </div>
+                <Button type="button" variant="outline" size="icon" onClick={() => setQuickClientOpen(true)} title="Nuovo committente">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Titolo *</Label>
+              <Input value={proposalForm.title} onChange={e => setProposalForm({ ...proposalForm, title: e.target.value })} placeholder="Es. Ristrutturazione appartamento Via Roma" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Stato</Label>
+                <Select value={proposalForm.status} onValueChange={v => setProposalForm({ ...proposalForm, status: v as ProposalStatus })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Data</Label>
+                <Input type="date" value={proposalForm.date} onChange={e => setProposalForm({ ...proposalForm, date: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Valore Stimato (€)</Label>
+              <Input type="number" value={proposalForm.estimatedValue} onChange={e => setProposalForm({ ...proposalForm, estimatedValue: e.target.value })} placeholder="0.00" />
+            </div>
+            <div className="space-y-1">
+              <Label>Descrizione</Label>
+              <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.description} onChange={e => setProposalForm({ ...proposalForm, description: e.target.value })} />
+            </div>
+            {/* Indirizzo cantiere */}
+            <div className="space-y-3 border-t pt-3">
+              <div className="flex items-center justify-between">
+                <Label className="font-semibold">Indirizzo Cantiere</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="useClientAddrNew" checked={useClientAddr} onCheckedChange={v => setUseClientAddr(v as boolean)} disabled={!proposalForm.clientId} />
+                  <label htmlFor="useClientAddrNew" className="text-xs cursor-pointer text-slate-600">Usa indirizzo committente</label>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="col-span-3 space-y-1"><Label className="text-xs">Via / Piazza</Label><Input value={proposalForm.siteStreet} onChange={e => setProposalForm({ ...proposalForm, siteStreet: e.target.value })} placeholder="Via Roma" /></div>
+                <div className="col-span-1 space-y-1"><Label className="text-xs">N. Civico</Label><Input value={proposalForm.siteStreetNumber} onChange={e => setProposalForm({ ...proposalForm, siteStreetNumber: e.target.value })} placeholder="1" /></div>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="col-span-1 space-y-1"><Label className="text-xs">CAP</Label><Input value={proposalForm.sitePostalCode} onChange={e => setProposalForm({ ...proposalForm, sitePostalCode: e.target.value })} placeholder="00100" /></div>
+                <div className="col-span-2 space-y-1"><Label className="text-xs">Città</Label><Input value={proposalForm.siteCity} onChange={e => setProposalForm({ ...proposalForm, siteCity: e.target.value })} placeholder="Milano" /></div>
+                <div className="col-span-1 space-y-1"><Label className="text-xs">Prov.</Label><Input value={proposalForm.siteProvince} onChange={e => setProposalForm({ ...proposalForm, siteProvince: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" /></div>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Note</Label>
+              <textarea className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.notes} onChange={e => setProposalForm({ ...proposalForm, notes: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewProposalOpen(false)}>Annulla</Button>
+            <Button onClick={handleNewProposal} disabled={savingProposal} className="bg-blue-600 hover:bg-blue-700">
+              {savingProposal && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Crea e Apri
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Nuovo committente rapido */}
+      <Dialog open={quickClientOpen} onOpenChange={setQuickClientOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Nuovo Committente</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Ragione Sociale / Nome *</Label>
+              <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Inserisci il nome dell'azienda o del cliente" />
+            </div>
+            <div className="space-y-4 border-t border-b py-4 border-slate-100">
+              <h3 className="font-medium text-slate-900 dark:text-white text-sm">Indirizzo Sede</h3>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="col-span-3 space-y-1">
+                  <Label>Via / Piazza</Label>
+                  <Input value={quickClientForm.street} onChange={e => setQuickClientForm({ ...quickClientForm, street: e.target.value })} placeholder="Via Roma" />
+                </div>
+                <div className="col-span-1 space-y-1">
+                  <Label>N. Civico</Label>
+                  <Input value={quickClientForm.streetNumber} onChange={e => setQuickClientForm({ ...quickClientForm, streetNumber: e.target.value })} placeholder="10" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="md:col-span-1 space-y-1">
+                  <Label>CAP</Label>
+                  <Input value={quickClientForm.postalCode} onChange={e => setQuickClientForm({ ...quickClientForm, postalCode: e.target.value })} placeholder="00100" />
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <Label>Città</Label>
+                  <Input value={quickClientForm.city} onChange={e => setQuickClientForm({ ...quickClientForm, city: e.target.value })} placeholder="Milano" />
+                </div>
+                <div className="md:col-span-1 space-y-1">
+                  <Label>Provincia</Label>
+                  <Input value={quickClientForm.province} onChange={e => setQuickClientForm({ ...quickClientForm, province: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Partita IVA / Codice Fiscale</Label>
+                <Input value={quickClientForm.vatNumber} onChange={e => setQuickClientForm({ ...quickClientForm, vatNumber: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label>Telefono</Label>
+                <Input type="tel" value={quickClientForm.phone} onChange={e => setQuickClientForm({ ...quickClientForm, phone: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <Input type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickClientOpen(false)}>Annulla</Button>
+            <Button onClick={handleQuickClient} disabled={savingQuickClient} className="bg-blue-600 hover:bg-blue-700">
+              {savingQuickClient && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Crea Committente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

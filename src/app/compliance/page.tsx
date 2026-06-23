@@ -43,6 +43,7 @@ import {
     Upload,
     ShieldCheck,
     Receipt,
+    X,
 } from "lucide-react";
 import { suppliersApi } from "@/lib/services/suppliers";
 import { brandsApi } from "@/lib/services/inventory";
@@ -58,12 +59,18 @@ import { toast } from "sonner";
 import {
     complianceApi,
     ComplianceDocument,
-    ComplianceDocumentType,
-    DOCUMENT_TYPE_LABELS,
 } from "@/lib/services/compliance";
+import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
 import { Supplier, Brand } from "@/lib/types";
 
-const DOCUMENT_TYPES = Object.entries(DOCUMENT_TYPE_LABELS) as [ComplianceDocumentType, string][];
+const UNTYPED_KEY = "__untyped__";
+
+function formatFileSize(bytes: number | null): string {
+    if (bytes === null) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 // ── Purchase search combobox ──────────────────────────────────────────────────
 
@@ -168,7 +175,7 @@ function PurchaseSearchCombobox({
 
 interface DocFormData {
     brandId: string;
-    documentType: ComplianceDocumentType | "";
+    documentTypeId: string;
     name: string;
     notes: string;
     purchaseId: string;
@@ -180,98 +187,70 @@ function DocumentFormDialog({
     open,
     onOpenChange,
     supplierId,
-    suppliers,
     brands,
+    docTypes,
     editing,
     onSaved,
-    onSupplierSelected,
 }: {
     open: boolean;
     onOpenChange: (v: boolean) => void;
     supplierId: string;
-    suppliers: Supplier[];
     brands: Brand[];
-    editing: ComplianceDocument | null;
+    docTypes: ComplianceDocumentTypeConfig[];
+    editing: ComplianceDocument;
     onSaved: (doc: ComplianceDocument) => void;
-    onSupplierSelected?: (id: string) => void;
 }) {
     const [form, setForm] = useState<DocFormData>({
         brandId: "",
-        documentType: "",
+        documentTypeId: "",
         name: "",
         notes: "",
         purchaseId: "",
         purchaseNumber: "",
         file: null,
     });
-    const [localSupplierId, setLocalSupplierId] = useState(supplierId);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const fileRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (open) {
-            setLocalSupplierId(supplierId);
-            if (editing) {
-                setForm({
-                    brandId: editing.brandId,
-                    documentType: editing.documentType,
-                    name: editing.name,
-                    notes: editing.notes || "",
-                    purchaseId: editing.purchaseId || "",
-                    purchaseNumber: editing.purchaseNumber || "",
-                    file: null,
-                });
-            } else {
-                setForm({ brandId: "", documentType: "", name: "", notes: "", purchaseId: "", purchaseNumber: "", file: null });
-            }
+        if (open && editing) {
+            setForm({
+                brandId: editing.brandId,
+                documentTypeId: editing.documentTypeId || "",
+                name: editing.name,
+                notes: editing.notes || "",
+                purchaseId: editing.purchaseId || "",
+                purchaseNumber: editing.purchaseNumber || "",
+                file: null,
+            });
             setError("");
         }
-    }, [open, editing, supplierId]);
-
-    const effectiveSupplierId = localSupplierId;
+    }, [open, editing]);
 
     const handleSave = async () => {
-        if (!effectiveSupplierId) {
-            setError("Seleziona un fornitore.");
-            return;
-        }
-        if (!form.brandId || !form.documentType || !form.name.trim()) {
-            setError("Marca, tipo documento e nome sono obbligatori.");
-            return;
-        }
-        if (!editing && !form.file) {
-            setError("Seleziona un file da caricare.");
+        if (!form.brandId || !form.name.trim()) {
+            setError("Marca e nome sono obbligatori.");
             return;
         }
         setSaving(true);
         setError("");
         try {
-            let fileUrl = editing?.fileUrl || "";
+            let fileUrl = editing.fileUrl;
+            let fileSize = editing.fileSize;
             if (form.file) {
                 fileUrl = await complianceApi.uploadFile(form.file);
+                fileSize = form.file.size;
             }
-            let doc: ComplianceDocument;
-            if (editing) {
-                doc = await complianceApi.update(editing.id, {
-                    brandId: form.brandId,
-                    documentType: form.documentType as ComplianceDocumentType,
-                    name: form.name.trim(),
-                    notes: form.notes.trim(),
-                    purchaseId: form.purchaseId || null,
-                });
-            } else {
-                doc = await complianceApi.create({
-                    supplierId: effectiveSupplierId,
-                    brandId: form.brandId,
-                    documentType: form.documentType as ComplianceDocumentType,
-                    name: form.name.trim(),
-                    notes: form.notes.trim() || undefined,
-                    fileUrl,
-                    purchaseId: form.purchaseId || undefined,
-                });
-            }
-            if (!supplierId && onSupplierSelected) onSupplierSelected(effectiveSupplierId);
+            const doc = await complianceApi.update(editing.id, {
+                brandId: form.brandId,
+                documentTypeId: form.documentTypeId || null,
+                name: form.name.trim(),
+                notes: form.notes.trim(),
+                fileUrl,
+                fileSize,
+                purchaseId: form.purchaseId || null,
+            });
             onSaved(doc);
             onOpenChange(false);
         } catch (e: any) {
@@ -285,24 +264,9 @@ function DocumentFormDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{editing ? "Modifica documento" : "Carica documento"}</DialogTitle>
+                    <DialogTitle>Modifica documento</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
-                    {!supplierId && !editing && (
-                        <div className="space-y-1.5">
-                            <Label>Fornitore <span className="text-destructive">*</span></Label>
-                            <Select value={localSupplierId} onValueChange={setLocalSupplierId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleziona fornitore" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {suppliers.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <Label>Marca <span className="text-destructive">*</span></Label>
@@ -318,14 +282,14 @@ function DocumentFormDialog({
                             </Select>
                         </div>
                         <div className="space-y-1.5">
-                            <Label>Tipo documento <span className="text-destructive">*</span></Label>
-                            <Select value={form.documentType} onValueChange={(v) => setForm(f => ({ ...f, documentType: v as ComplianceDocumentType }))}>
+                            <Label>Tipo documento</Label>
+                            <Select value={form.documentTypeId} onValueChange={(v) => setForm(f => ({ ...f, documentTypeId: v }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleziona tipo" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {DOCUMENT_TYPES.map(([key, label]) => (
-                                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                                    {docTypes.map((t) => (
+                                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -352,13 +316,13 @@ function DocumentFormDialog({
                     <div className="space-y-1.5">
                         <Label>Associa a acquisto (opzionale)</Label>
                         <PurchaseSearchCombobox
-                            supplierId={effectiveSupplierId}
+                            supplierId={supplierId}
                             value={form.purchaseId}
                             onChange={(id, num) => setForm(f => ({ ...f, purchaseId: id, purchaseNumber: num }))}
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <Label>{editing ? "Sostituisci file (opzionale)" : "File"} <span className="text-destructive">{!editing && "*"}</span></Label>
+                        <Label>Sostituisci file (opzionale)</Label>
                         <div
                             className="border-2 border-dashed rounded-md p-4 text-center cursor-pointer hover:border-primary transition-colors"
                             onClick={() => fileRef.current?.click()}
@@ -389,8 +353,235 @@ function DocumentFormDialog({
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Annulla</Button>
                     <Button onClick={handleSave} disabled={saving}>
                         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {editing ? "Salva modifiche" : "Carica"}
+                        Salva modifiche
                     </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// ── Multi-upload wizard ──────────────────────────────────────────────────────
+
+interface PendingComplianceFile {
+    file: File;
+    name: string;
+    notes: string;
+}
+
+function MultiUploadDialog({
+    open,
+    onOpenChange,
+    supplierId,
+    suppliers,
+    brands,
+    docTypes,
+    onUploaded,
+    onSupplierSelected,
+}: {
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
+    supplierId: string;
+    suppliers: Supplier[];
+    brands: Brand[];
+    docTypes: ComplianceDocumentTypeConfig[];
+    onUploaded: (docs: ComplianceDocument[]) => void;
+    onSupplierSelected: (id: string) => void;
+}) {
+    const [step, setStep] = useState<1 | 2>(1);
+    const [localSupplierId, setLocalSupplierId] = useState(supplierId);
+    const [brandId, setBrandId] = useState("");
+    const [documentTypeId, setDocumentTypeId] = useState("");
+    const [pendingFiles, setPendingFiles] = useState<PendingComplianceFile[]>([]);
+    const [dragOver, setDragOver] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (open) {
+            setStep(1);
+            setLocalSupplierId(supplierId);
+            setBrandId("");
+            setDocumentTypeId("");
+            setPendingFiles([]);
+            setDragOver(false);
+        }
+    }, [open, supplierId]);
+
+    const effectiveSupplierId = localSupplierId;
+
+    const handleFilesSelected = (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        const newPending: PendingComplianceFile[] = Array.from(files).map((f) => ({
+            file: f,
+            name: f.name.replace(/\.[^.]+$/, ''),
+            notes: "",
+        }));
+        setPendingFiles((prev) => [...prev, ...newPending]);
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setDragOver(false);
+        handleFilesSelected(e.dataTransfer.files);
+    };
+
+    const goToStep2 = () => {
+        if (!effectiveSupplierId || !brandId || pendingFiles.length === 0) return;
+        setStep(2);
+    };
+
+    const updatePending = (idx: number, patch: Partial<PendingComplianceFile>) => {
+        setPendingFiles((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+    };
+
+    const removePending = (idx: number) => {
+        setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
+    };
+
+    const handleUploadAll = async () => {
+        if (pendingFiles.length === 0) return;
+        try {
+            setUploading(true);
+            const uploaded: ComplianceDocument[] = [];
+            for (const pf of pendingFiles) {
+                const fileUrl = await complianceApi.uploadFile(pf.file);
+                const doc = await complianceApi.create({
+                    supplierId: effectiveSupplierId,
+                    brandId,
+                    documentTypeId: documentTypeId || null,
+                    name: pf.name.trim() || pf.file.name,
+                    notes: pf.notes.trim() || undefined,
+                    fileUrl,
+                    fileSize: pf.file.size,
+                });
+                uploaded.push(doc);
+            }
+            if (!supplierId) onSupplierSelected(effectiveSupplierId);
+            onUploaded(uploaded);
+            toast.success(uploaded.length > 1 ? "Documenti caricati" : "Documento caricato");
+            onOpenChange(false);
+        } catch (e: any) {
+            toast.error(e.message || "Errore durante il caricamento");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Carica documenti</DialogTitle>
+                </DialogHeader>
+                {step === 1 ? (
+                    <div className="space-y-4 py-2">
+                        {!supplierId && (
+                            <div className="space-y-1.5">
+                                <Label>Fornitore <span className="text-destructive">*</span></Label>
+                                <Select value={localSupplierId} onValueChange={setLocalSupplierId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleziona fornitore" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {suppliers.map((s) => (
+                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label>Marca <span className="text-destructive">*</span></Label>
+                                <Select value={brandId} onValueChange={setBrandId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleziona marca" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {brands.map((b) => (
+                                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Tipo documento</Label>
+                                <Select value={documentTypeId} onValueChange={setDocumentTypeId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleziona tipo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {docTypes.map((t) => (
+                                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
+                            <div
+                                className={`border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragOver ? 'bg-primary/5 border-primary' : 'hover:border-primary'}`}
+                                onClick={() => fileRef.current?.click()}
+                                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                                onDragLeave={() => setDragOver(false)}
+                                onDrop={handleDrop}
+                            >
+                                <input
+                                    ref={fileRef}
+                                    type="file"
+                                    multiple
+                                    accept=".pdf,.PDF,image/*"
+                                    className="hidden"
+                                    onChange={(e) => handleFilesSelected(e.target.files)}
+                                />
+                                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                                <p className="text-sm font-medium text-muted-foreground">
+                                    {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca o trascina qui i file"}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-4 py-2">
+                        <p className="text-xs text-muted-foreground">Per ogni file inserisci nome e nota (opzionale).</p>
+                        {pendingFiles.map((pf, idx) => (
+                            <div key={idx} className="border rounded-lg p-3 space-y-2 relative">
+                                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => removePending(idx)}>
+                                    <X className="h-3.5 w-3.5" />
+                                </Button>
+                                <p className="text-xs text-muted-foreground truncate pr-6">{pf.file.name}</p>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Nome documento</Label>
+                                    <Input value={pf.name} onChange={(e) => updatePending(idx, { name: e.target.value })} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Nota (opzionale)</Label>
+                                    <Input value={pf.notes} onChange={(e) => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
+                                </div>
+                            </div>
+                        ))}
+                        {pendingFiles.length === 0 && (
+                            <p className="text-sm text-muted-foreground italic text-center py-4">Nessun file selezionato.</p>
+                        )}
+                    </div>
+                )}
+                <DialogFooter>
+                    {step === 1 ? (
+                        <>
+                            <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
+                            <Button onClick={goToStep2} disabled={!effectiveSupplierId || !brandId || pendingFiles.length === 0}>Continua</Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button variant="outline" onClick={() => setStep(1)}>Indietro</Button>
+                            <Button onClick={handleUploadAll} disabled={uploading || pendingFiles.length === 0}>
+                                {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Carica {pendingFiles.length > 1 ? `(${pendingFiles.length})` : ""}
+                            </Button>
+                        </>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -449,6 +640,7 @@ function DocumentCard({
                             )}
                             <p className="text-xs text-muted-foreground mt-1">
                                 {new Date(doc.createdAt).toLocaleDateString("it-IT")}
+                                {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
                             </p>
                         </div>
                     </div>
@@ -516,6 +708,7 @@ function DocumentRow({
                         <span className="text-xs text-muted-foreground">Acquisto: <span className="font-medium">{doc.purchaseNumber}</span></span>
                     )}
                     <span className="text-xs text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString("it-IT")}</span>
+                    {doc.fileSize != null && <span className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</span>}
                 </div>
                 {doc.notes && (
                     <p className="text-xs text-muted-foreground break-words whitespace-pre-wrap">{doc.notes}</p>
@@ -547,37 +740,41 @@ function DocumentRow({
 
 function DocumentTypeTabs({
     docs,
+    docTypes,
     viewMode,
     pageSize,
     onEdit,
     onDelete,
 }: {
     docs: ComplianceDocument[];
+    docTypes: ComplianceDocumentTypeConfig[];
     viewMode: 'grid' | 'list';
     pageSize: number;
     onEdit: (doc: ComplianceDocument) => void;
     onDelete: (doc: ComplianceDocument) => void;
 }) {
-    const typesWithDocs = DOCUMENT_TYPES.filter(([key]) => docs.some(d => d.documentType === key));
+    const groups = [
+        ...docTypes.map(t => ({ key: t.id, label: t.name, docs: docs.filter(d => d.documentTypeId === t.id) })),
+        { key: UNTYPED_KEY, label: "Senza tipo", docs: docs.filter(d => !d.documentTypeId) },
+    ].filter(g => g.docs.length > 0);
     const [pages, setPages] = useState<Record<string, number>>({});
 
     const getPage = (key: string) => pages[key] ?? 1;
     const setPage = (key: string, p: number) => setPages(prev => ({ ...prev, [key]: p }));
 
     return (
-        <Tabs defaultValue={typesWithDocs[0]?.[0]} onValueChange={() => {}}>
+        <Tabs defaultValue={groups[0]?.key} onValueChange={() => {}}>
             <TabsList className="flex-wrap h-auto gap-1">
-                {typesWithDocs.map(([key, label]) => (
+                {groups.map(({ key, label, docs: groupDocs }) => (
                     <TabsTrigger key={key} value={key}>
                         {label}
                         <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                            {docs.filter(d => d.documentType === key).length}
+                            {groupDocs.length}
                         </span>
                     </TabsTrigger>
                 ))}
             </TabsList>
-            {typesWithDocs.map(([key]) => {
-                const typeDocs = docs.filter(d => d.documentType === key);
+            {groups.map(({ key, docs: typeDocs }) => {
                 const currentPage = getPage(key);
                 const totalPages = Math.ceil(typeDocs.length / pageSize);
                 const paginated = typeDocs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -629,10 +826,13 @@ export default function CompliancePage() {
 
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
+    const [docTypes, setDocTypes] = useState<ComplianceDocumentTypeConfig[]>([]);
     const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
     const [documents, setDocuments] = useState<ComplianceDocument[]>([]);
+    const [search, setSearch] = useState("");
     const [loadingDocs, setLoadingDocs] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [uploadOpen, setUploadOpen] = useState(false);
     const [editingDoc, setEditingDoc] = useState<ComplianceDocument | null>(null);
     const [deletingDoc, setDeletingDoc] = useState<ComplianceDocument | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -640,6 +840,7 @@ export default function CompliancePage() {
     useEffect(() => {
         suppliersApi.getAll().then(setSuppliers).catch(console.error);
         brandsApi.getAll().then(setBrands).catch(console.error);
+        complianceDocumentTypesApi.getAll().then(setDocTypes).catch(console.error);
     }, []);
 
     useEffect(() => {
@@ -665,6 +866,14 @@ export default function CompliancePage() {
             return [doc, ...prev];
         });
     };
+
+    const handleUploaded = (docs: ComplianceDocument[]) => {
+        setDocuments(prev => [...docs, ...prev]);
+    };
+
+    const filteredDocuments = search.trim()
+        ? documents.filter(d => d.name.toLowerCase().includes(search.trim().toLowerCase()))
+        : documents;
 
     const handleDelete = async () => {
         if (!deletingDoc) return;
@@ -694,7 +903,7 @@ export default function CompliancePage() {
                             <p className="text-sm text-muted-foreground">Documenti di conformità per fornitore</p>
                         </div>
                     </div>
-                    <Button onClick={() => { setEditingDoc(null); setDialogOpen(true); }}>
+                    <Button onClick={() => setUploadOpen(true)}>
                         <Plus className="mr-2 h-4 w-4" />
                         Carica documento
                     </Button>
@@ -703,18 +912,34 @@ export default function CompliancePage() {
                 {/* Supplier selector */}
                 <Card>
                     <CardContent className="p-4">
-                        <div className="max-w-sm space-y-1.5">
-                            <Label className="text-sm font-medium">Seleziona fornitore</Label>
-                            <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Scegli un fornitore..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {suppliers.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                        <div className="flex flex-wrap gap-4">
+                            <div className="max-w-sm flex-1 space-y-1.5">
+                                <Label className="text-sm font-medium">Seleziona fornitore</Label>
+                                <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Scegli un fornitore..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {suppliers.map((s) => (
+                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {selectedSupplierId && (
+                                <div className="max-w-sm flex-1 space-y-1.5">
+                                    <Label className="text-sm font-medium">Cerca documento</Label>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                        <Input
+                                            className="pl-9"
+                                            placeholder="Cerca per nome..."
+                                            value={search}
+                                            onChange={(e) => setSearch(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -730,10 +955,15 @@ export default function CompliancePage() {
                             <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
                                 <FileText className="h-10 w-10 opacity-30" />
                                 <p className="text-sm">Nessun documento caricato per questo fornitore.</p>
-                                <Button variant="outline" size="sm" onClick={() => { setEditingDoc(null); setDialogOpen(true); }}>
+                                <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
                                     <Plus className="mr-2 h-4 w-4" />
                                     Carica il primo documento
                                 </Button>
+                            </div>
+                        ) : filteredDocuments.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
+                                <Search className="h-10 w-10 opacity-30" />
+                                <p className="text-sm">Nessun documento trovato per &quot;{search}&quot;.</p>
                             </div>
                         ) : (
                             <>
@@ -742,7 +972,8 @@ export default function CompliancePage() {
                                     <ViewToggle mode={viewMode} onChange={setViewMode} />
                                 </div>
                                 <DocumentTypeTabs
-                                    docs={documents}
+                                    docs={filteredDocuments}
+                                    docTypes={docTypes}
                                     viewMode={viewMode}
                                     pageSize={pageSize}
                                     onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
@@ -754,17 +985,30 @@ export default function CompliancePage() {
                 )}
             </div>
 
-            {/* Upload / Edit dialog */}
-            <DocumentFormDialog
-                open={dialogOpen}
-                onOpenChange={setDialogOpen}
+            {/* Multi upload dialog */}
+            <MultiUploadDialog
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
                 supplierId={selectedSupplierId}
                 suppliers={suppliers}
                 brands={brands}
-                editing={editingDoc}
-                onSaved={handleSaved}
+                docTypes={docTypes}
+                onUploaded={handleUploaded}
                 onSupplierSelected={setSelectedSupplierId}
             />
+
+            {/* Edit dialog */}
+            {editingDoc && (
+                <DocumentFormDialog
+                    open={dialogOpen}
+                    onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditingDoc(null); }}
+                    supplierId={selectedSupplierId}
+                    brands={brands}
+                    docTypes={docTypes}
+                    editing={editingDoc}
+                    onSaved={handleSaved}
+                />
+            )}
 
             {/* Delete confirm */}
             <AlertDialog open={!!deletingDoc} onOpenChange={(v) => !v && setDeletingDoc(null)}>

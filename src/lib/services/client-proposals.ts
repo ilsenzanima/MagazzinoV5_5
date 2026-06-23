@@ -128,7 +128,6 @@ export const clientProposalsApi = {
             .from('client_proposals')
             .select('*, clients(name)')
             .is('deleted_at', null)
-            .is('converted_job_id', null)
             .order('created_at', { ascending: false });
         if (error) throw error;
         return (data || []).map(d => ({ ...map(d), clientName: d.clients?.name || '' }));

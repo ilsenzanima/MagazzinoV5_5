@@ -14,7 +14,6 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import {
-    FileText,
     Upload,
     Loader2,
     Trash2,
@@ -23,14 +22,13 @@ import {
     Search,
     Pencil,
     ExternalLink,
-    File,
-    FileImage,
-    FileSpreadsheet,
     ShieldCheck,
+    X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { jobDocumentsApi, JobDocument } from "@/lib/api"
+import { jobConformitaDocumentTypesApi, JobConformitaDocumentType } from "@/lib/services/job-conformita-document-types"
 import {
     complianceApi,
     jobComplianceApi,
@@ -48,41 +46,63 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getFileIcon, formatFileSize } from "@/lib/file-icon"
+import { ViewToggle } from "@/components/ui/view-toggle"
+import { useViewMode } from "@/hooks/useViewMode"
+import { compressImageIfNeeded } from "@/lib/image-compress"
 
 interface JobConformitaProps {
     jobId: string
 }
 
-function getFileIcon(type?: string) {
-    if (!type) return <FileText className="h-7 w-7 text-slate-400" />
-    const t = type.toLowerCase()
-    if (["jpg", "jpeg", "png", "gif", "webp"].includes(t)) return <FileImage className="h-7 w-7 text-blue-500" />
-    if (t === "pdf") return <FileText className="h-7 w-7 text-red-500" />
-    if (["xls", "xlsx", "csv"].includes(t)) return <FileSpreadsheet className="h-7 w-7 text-green-500" />
-    return <File className="h-7 w-7 text-slate-500" />
+interface PendingFile {
+    file: File
+    name: string
+    notes: string
 }
+
+const UNTYPED_KEY = "__untyped__"
 
 // ─── Upload sezione ──────────────────────────────────────────────────────────
 
 function OwnDocuments({ jobId }: { jobId: string }) {
     const supabase = createClient()
     const [docs, setDocs] = useState<JobDocument[]>([])
+    const [docTypes, setDocTypes] = useState<JobConformitaDocumentType[]>([])
     const [loading, setLoading] = useState(true)
     const [uploadOpen, setUploadOpen] = useState(false)
-    const [file, setFile] = useState<File | null>(null)
-    const [docName, setDocName] = useState("")
+    const [editOpen, setEditOpen] = useState(false)
     const [uploading, setUploading] = useState(false)
+    const [saving, setSaving] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
-    const [toDelete, setToDelete] = useState<JobDocument | null>(null)
-    const fileRef = useRef<HTMLInputElement>(null)
+    const [activeDoc, setActiveDoc] = useState<JobDocument | null>(null)
+    const [viewMode, setViewMode] = useViewMode('job-conformita-own-documents', 'grid')
+
+    // Upload wizard state
+    const [upStep, setUpStep] = useState<1 | 2>(1)
+    const [upDocTypeId, setUpDocTypeId] = useState("")
+    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+    const [dragOver, setDragOver] = useState(false)
+    const upRef = useRef<HTMLInputElement>(null)
+
+    // Edit form
+    const [editName, setEditName] = useState("")
+    const [editNotes, setEditNotes] = useState("")
+    const [editDocTypeId, setEditDocTypeId] = useState("")
+    const editRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => { load() }, [jobId])
 
     const load = async () => {
         try {
             setLoading(true)
-            const all = await jobDocumentsApi.getByJobId(jobId)
+            const [all, types] = await Promise.all([
+                jobDocumentsApi.getByJobId(jobId),
+                jobConformitaDocumentTypesApi.getAll(),
+            ])
             setDocs(all.filter(d => d.category === "conformita"))
+            setDocTypes(types)
         } catch {
             toast.error("Errore nel caricamento dei documenti")
         } finally {
@@ -90,26 +110,67 @@ function OwnDocuments({ jobId }: { jobId: string }) {
         }
     }
 
-    const handleUpload = async () => {
-        if (!file) return
+    const openUpload = () => {
+        setUpStep(1)
+        setUpDocTypeId("")
+        setPendingFiles([])
+        setDragOver(false)
+        setUploadOpen(true)
+    }
+
+    const handleFilesSelected = (files: FileList | null) => {
+        if (!files || files.length === 0) return
+        const newPending: PendingFile[] = Array.from(files).map(f => ({
+            file: f,
+            name: f.name.replace(/\.[^.]+$/, ''),
+            notes: "",
+        }))
+        setPendingFiles(prev => [...prev, ...newPending])
+    }
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault()
+        setDragOver(false)
+        handleFilesSelected(e.dataTransfer.files)
+    }
+
+    const goToStep2 = () => {
+        if (pendingFiles.length === 0) return
+        setUpStep(2)
+    }
+
+    const updatePending = (idx: number, patch: Partial<PendingFile>) => {
+        setPendingFiles(prev => prev.map((p, i) => i === idx ? { ...p, ...patch } : p))
+    }
+
+    const removePending = (idx: number) => {
+        setPendingFiles(prev => prev.filter((_, i) => i !== idx))
+    }
+
+    const handleUploadAll = async () => {
+        if (pendingFiles.length === 0) return
         try {
             setUploading(true)
-            const fileExt = file.name.split(".").pop()
-            const fileName = `${jobId}/conformita_${Math.random().toString(36).substring(7)}_${file.name}`
-            const { error: upErr } = await supabase.storage.from("documents").upload(fileName, file)
-            if (upErr) throw upErr
-            const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(fileName)
-            await jobDocumentsApi.create({
-                jobId,
-                name: docName || file.name,
-                fileUrl: publicUrl,
-                fileType: fileExt,
-                category: "conformita",
-            })
-            toast.success("Documento caricato")
+            for (const pf of pendingFiles) {
+                const compressed = await compressImageIfNeeded(pf.file)
+                const fileExt = compressed.name.split(".").pop() || ''
+                const fileName = `${jobId}/conformita_${Math.random().toString(36).substring(7)}_${compressed.name}`
+                const { error: upErr } = await supabase.storage.from("documents").upload(fileName, compressed)
+                if (upErr) throw upErr
+                const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(fileName)
+                await jobDocumentsApi.create({
+                    jobId,
+                    name: pf.name.trim() || pf.file.name,
+                    notes: pf.notes.trim(),
+                    fileUrl: publicUrl,
+                    fileType: fileExt,
+                    fileSize: compressed.size,
+                    category: "conformita",
+                    conformitaDocumentTypeId: upDocTypeId || null,
+                })
+            }
+            toast.success(pendingFiles.length > 1 ? "Documenti caricati" : "Documento caricato")
             setUploadOpen(false)
-            setFile(null)
-            setDocName("")
             load()
         } catch (e: any) {
             toast.error("Errore caricamento: " + e.message)
@@ -118,19 +179,47 @@ function OwnDocuments({ jobId }: { jobId: string }) {
         }
     }
 
-    const handleDelete = async () => {
-        if (!toDelete) return
+    const openEdit = (doc: JobDocument) => {
+        setActiveDoc(doc)
+        setEditName(doc.name)
+        setEditNotes(doc.notes || "")
+        setEditDocTypeId(doc.conformitaDocumentTypeId || "")
+        setEditOpen(true)
+    }
+
+    const handleSaveEdit = async () => {
+        if (!activeDoc) return
         try {
-            const path = toDelete.fileUrl?.split("/public/documents/")[1]
+            setSaving(true)
+            await jobDocumentsApi.update(activeDoc.id, {
+                name: editName.trim() || activeDoc.name,
+                notes: editNotes.trim(),
+                conformitaDocumentTypeId: editDocTypeId || null,
+            })
+            toast.success("Documento aggiornato")
+            setEditOpen(false)
+            load()
+        } catch {
+            toast.error("Errore durante l'aggiornamento")
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleDelete = async () => {
+        if (!activeDoc) return
+        try {
+            const path = activeDoc.fileUrl?.split("/public/documents/")[1]
             if (path) await supabase.storage.from("documents").remove([path])
-            await jobDocumentsApi.delete(toDelete.id)
-            setDocs(docs.filter(d => d.id !== toDelete.id))
+            await jobDocumentsApi.delete(activeDoc.id)
+            setDocs(docs.filter(d => d.id !== activeDoc.id))
             toast.success("Documento eliminato")
         } catch {
             toast.error("Errore eliminazione")
         } finally {
             setDeleteOpen(false)
-            setToDelete(null)
+            setEditOpen(false)
+            setActiveDoc(null)
         }
     }
 
@@ -144,81 +233,222 @@ function OwnDocuments({ jobId }: { jobId: string }) {
         } catch { window.open(url, "_blank") }
     }
 
+    const renderDocCard = (doc: JobDocument) => (
+        <Card key={doc.id} className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => openDoc(doc.fileUrl)}>
+            <CardContent className="p-3 flex items-start gap-3">
+                <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">
+                    {getFileIcon(doc.fileType, "h-7 w-7")}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
+                    {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        {format(new Date(doc.createdAt), "dd MMM yyyy", { locale: it })}
+                        {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
+                    </p>
+                </div>
+                <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); openEdit(doc) }}>
+                        <Pencil className="h-3 w-3 text-slate-500" />
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    )
+
+    const renderDocRow = (doc: JobDocument) => (
+        <div key={doc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openDoc(doc.fileUrl)}>
+            <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
+                {getFileIcon(doc.fileType, "h-5 w-5")}
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
+                {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
+            </div>
+            <p className="text-xs text-slate-400 shrink-0">
+                {format(new Date(doc.createdAt), "dd MMM yyyy", { locale: it })}
+                {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
+            </p>
+            <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); openEdit(doc) }}>
+                    <Pencil className="h-3 w-3 text-slate-500" />
+                </Button>
+            </div>
+        </div>
+    )
+
+    const groups: { key: string; label: string; docs: JobDocument[] }[] = [
+        ...docTypes.map(t => ({ key: t.id, label: t.name, docs: docs.filter(d => d.conformitaDocumentTypeId === t.id) })),
+        { key: UNTYPED_KEY, label: "Senza tipo", docs: docs.filter(d => !d.conformitaDocumentTypeId) },
+    ].filter(g => g.docs.length > 0)
+
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                     Documenti caricati
                 </h3>
-                <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
-                    <Upload className="h-3.5 w-3.5 mr-1.5" />Carica
-                </Button>
+                <div className="flex items-center gap-2">
+                    {docs.length > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
+                    <Button size="sm" variant="outline" onClick={openUpload}>
+                        <Upload className="h-3.5 w-3.5 mr-1.5" />Carica
+                    </Button>
+                </div>
             </div>
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
             ) : docs.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento caricato</p>
+            ) : groups.length <= 1 ? (
+                viewMode === 'list' ? (
+                    <div className="space-y-1.5">
+                        {docs.map(renderDocRow)}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {docs.map(renderDocCard)}
+                    </div>
+                )
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {docs.map(doc => (
-                        <Card key={doc.id} className="group hover:shadow-md transition-shadow">
-                            <CardContent className="p-3 flex items-start gap-3">
-                                <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">
-                                    {getFileIcon(doc.fileType)}
+                <Tabs defaultValue={groups[0]?.key}>
+                    <TabsList className="flex-wrap h-auto gap-1">
+                        {groups.map(g => (
+                            <TabsTrigger key={g.key} value={g.key}>
+                                {g.label}
+                                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
+                                    {g.docs.length}
+                                </span>
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                    {groups.map(g => (
+                        <TabsContent key={g.key} value={g.key} className="pt-4">
+                            {viewMode === 'list' ? (
+                                <div className="space-y-1.5">
+                                    {g.docs.map(renderDocRow)}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
-                                    <p className="text-xs text-slate-400 mt-0.5">
-                                        {format(new Date(doc.createdAt), "dd MMM yyyy", { locale: it })}
-                                    </p>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {g.docs.map(renderDocCard)}
                                 </div>
-                                <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDoc(doc.fileUrl)}>
-                                        <ExternalLink className="h-3 w-3 text-slate-500" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setToDelete(doc); setDeleteOpen(true) }}>
-                                        <Trash2 className="h-3 w-3 text-red-500" />
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                            )}
+                        </TabsContent>
                     ))}
-                </div>
+                </Tabs>
             )}
 
-            {/* Upload dialog */}
+            {/* Upload dialog - step 1: tipo + file multipli */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Carica documento conformità</DialogTitle></DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="space-y-1.5">
-                            <Label>Nome documento</Label>
-                            <Input
-                                placeholder="Lascia vuoto per usare il nome del file"
-                                value={docName}
-                                onChange={e => setDocName(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>File</Label>
-                            <div
-                                className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                onClick={() => fileRef.current?.click()}
-                            >
-                                <input type="file" className="hidden" ref={fileRef} onChange={e => e.target.files?.[0] && setFile(e.target.files[0])} />
-                                <Upload className="h-7 w-7 text-slate-400 mb-2" />
-                                <p className="text-sm text-slate-600 font-medium">
-                                    {file ? file.name : "Clicca per selezionare"}
-                                </p>
-                                {file && <p className="text-xs text-slate-400 mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>}
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>Carica documenti conformità</DialogTitle></DialogHeader>
+                    {upStep === 1 ? (
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <Label>Tipo documento</Label>
+                                <Select value={upDocTypeId} onValueChange={setUpDocTypeId}>
+                                    <SelectTrigger><SelectValue placeholder="Seleziona tipo documento" /></SelectTrigger>
+                                    <SelectContent>
+                                        {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                {docTypes.length === 0 && (
+                                    <p className="text-xs text-slate-400">Nessun tipo configurato. Vai in Impostazioni &gt; Dati &gt; Documenti Conformità Cantiere per crearne uno.</p>
+                                )}
+                            </div>
+                            <div className="space-y-1">
+                                <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
+                                <div
+                                    className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragOver ? 'bg-blue-50 border-blue-400 dark:bg-blue-950' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                    onClick={() => upRef.current?.click()}
+                                    onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                                    onDragLeave={() => setDragOver(false)}
+                                    onDrop={handleDrop}
+                                >
+                                    <input type="file" multiple className="hidden" ref={upRef} onChange={e => handleFilesSelected(e.target.files)} />
+                                    <Upload className="h-8 w-8 text-slate-400 mb-2" />
+                                    <p className="text-sm text-slate-600 font-medium">
+                                        {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca o trascina qui i file"}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="space-y-4 py-2">
+                            <p className="text-xs text-slate-500">Per ogni file inserisci nome e nota (opzionale).</p>
+                            {pendingFiles.map((pf, idx) => (
+                                <div key={idx} className="border rounded-lg p-3 space-y-2 relative">
+                                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600" onClick={() => removePending(idx)}>
+                                        <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <p className="text-xs text-slate-400 truncate pr-6">{pf.file.name}</p>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Nome documento</Label>
+                                        <Input value={pf.name} onChange={e => updatePending(idx, { name: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Nota (opzionale)</Label>
+                                        <Input value={pf.notes} onChange={e => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
+                                    </div>
+                                </div>
+                            ))}
+                            {pendingFiles.length === 0 && (
+                                <p className="text-sm text-slate-400 italic text-center py-4">Nessun file selezionato.</p>
+                            )}
+                        </div>
+                    )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
-                        <Button onClick={handleUpload} disabled={!file || uploading}>
-                            {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Carica
+                        {upStep === 1 ? (
+                            <>
+                                <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
+                                <Button onClick={goToStep2} disabled={pendingFiles.length === 0}>Continua</Button>
+                            </>
+                        ) : (
+                            <>
+                                <Button variant="outline" onClick={() => setUpStep(1)}>Indietro</Button>
+                                <Button onClick={handleUploadAll} disabled={uploading || pendingFiles.length === 0}>
+                                    {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Carica {pendingFiles.length > 1 ? `(${pendingFiles.length})` : ""}
+                                </Button>
+                            </>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit dialog */}
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Modifica documento</DialogTitle></DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-1">
+                            <Label>Tipo documento</Label>
+                            <Select value={editDocTypeId} onValueChange={setEditDocTypeId}>
+                                <SelectTrigger><SelectValue placeholder="Nessun tipo" /></SelectTrigger>
+                                <SelectContent>
+                                    {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Nome documento</Label>
+                            <Input value={editName} onChange={e => setEditName(e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Nota</Label>
+                            <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Breve descrizione" />
+                        </div>
+                    </div>
+                    <DialogFooter className="flex-col sm:flex-row gap-2">
+                        <Button
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50 sm:mr-auto"
+                            onClick={() => { setEditOpen(false); setDeleteOpen(true) }}
+                        >
+                            <Trash2 className="h-4 w-4 mr-1" />Elimina
+                        </Button>
+                        <Button variant="outline" onClick={() => setEditOpen(false)}>Annulla</Button>
+                        <Button onClick={handleSaveEdit} disabled={saving}>
+                            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salva
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -228,7 +458,7 @@ function OwnDocuments({ jobId }: { jobId: string }) {
                 open={deleteOpen}
                 onOpenChange={setDeleteOpen}
                 title="Elimina documento"
-                description={`Il documento "${toDelete?.name}" verrà eliminato definitivamente.`}
+                description={`Il documento "${activeDoc?.name}" verrà eliminato definitivamente.`}
                 onConfirm={handleDelete}
             />
         </div>
@@ -352,7 +582,7 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                                                     </span>
                                                 )}
                                                 <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                                    {doc.documentType.replace(/_/g, " ")}
+                                                    {doc.documentTypeName}
                                                 </span>
                                             </div>
                                         )}
@@ -536,7 +766,7 @@ function AssociateDialog({
                                     <ShieldCheck className="h-5 w-5 text-green-500 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium truncate">{doc.name}</p>
-                                        <p className="text-xs text-slate-400">{doc.brandName} · {doc.documentType.replace(/_/g, " ")}</p>
+                                        <p className="text-xs text-slate-400">{doc.brandName} · {doc.documentTypeName}</p>
                                     </div>
                                     <Button
                                         size="sm"

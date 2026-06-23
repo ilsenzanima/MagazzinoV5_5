@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, Truck } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -15,17 +15,22 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
+import { HelpTip } from "@/components/ui/help-tip";
+import { jobConformitaDocumentTypesApi } from "@/lib/services/job-conformita-document-types";
+import { jobSiteDocumentTypesApi } from "@/lib/services/job-site-document-types";
+import { proposalDocumentTypesApi } from "@/lib/services/proposal-document-types";
 
 // Components
 import { JobOverview } from "@/components/jobs/details/JobOverview";
 import { JobStock } from "@/components/jobs/details/JobStock";
 import { JobDocuments } from "@/components/jobs/details/JobDocuments";
+import { JobDdt } from "@/components/jobs/details/JobDdt";
 import { JobCommessaDocuments } from "@/components/jobs/details/JobCommessaDocuments";
 import { JobConformita } from "@/components/jobs/details/JobConformita";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
 import { JobCostiSAL } from "@/components/jobs/details/JobCostiSAL";
 import { JobEccedenze } from "@/components/jobs/details/JobEccedenze";
-import { JobOrdini } from "@/components/jobs/details/JobOrdini";
+import { JobOrdiniDocumenti } from "@/components/jobs/details/JobOrdiniDocumenti";
 import { JobFatturazione } from "@/components/jobs/details/JobFatturazione";
 import { JobAnalisiCosti } from "@/components/jobs/details/JobAnalisiCosti";
 import { clientProposalsApi, ClientProposal } from "@/lib/services/client-proposals";
@@ -517,24 +522,45 @@ export default function JobDetailsPage() {
                                     <TabsTrigger value="eccedenze" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                         <Recycle className="h-4 w-4 mr-1 text-violet-500" />Eccedenze
                                     </TabsTrigger>
-                                    <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
-                                        <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini
-                                    </TabsTrigger>
                                 </>
                             )}
                             {activeGroup === 'documenti' && (
                                 <>
                                     <TabsTrigger value="conformita" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-green-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                         <ShieldCheck className="h-4 w-4 mr-1 text-green-600" />Conformità
+                                        <HelpTip
+                                            title="Documenti Conformità Cantiere"
+                                            description="Tipi disponibili per i documenti caricati direttamente sulla commessa."
+                                            fetchItems={async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => t.name)}
+                                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
+                                        />
                                     </TabsTrigger>
                                     <TabsTrigger value="documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                         <FileText className="h-4 w-4 mr-1" />Documenti Cantiere
+                                        <HelpTip
+                                            title="Documenti Cantiere"
+                                            description="Tipi disponibili per i documenti caricati in questa sezione."
+                                            fetchItems={async () => (await jobSiteDocumentTypesApi.getAll()).map(t => t.name)}
+                                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Cantiere per crearne uno."
+                                        />
                                     </TabsTrigger>
                                     {(userRole === 'admin' || userRole === 'operativo') && (
                                         <TabsTrigger value="commessa-documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
                                             <Folder className="h-4 w-4 mr-1" />Documenti Commessa
+                                            <HelpTip
+                                                title="Documenti Commessa"
+                                                description="Tipi disponibili per i documenti caricati in questa sezione (condivisi con le proposte)."
+                                                fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => t.name)}
+                                                emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
+                                            />
                                         </TabsTrigger>
                                     )}
+                                    <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini
+                                    </TabsTrigger>
+                                    <TabsTrigger value="ddt" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <Truck className="h-4 w-4 mr-1" />DDT
+                                    </TabsTrigger>
                                 </>
                             )}
                             {activeGroup === 'economico' && (userRole === 'admin' || userRole === 'operativo') && (
@@ -588,6 +614,10 @@ export default function JobDetailsPage() {
                             </TabsContent>
                         )}
 
+                        <TabsContent value="ddt" className="space-y-6 focus-visible:outline-none">
+                            <JobDdt jobId={job.id} jobName={job.name} />
+                        </TabsContent>
+
                         <TabsContent value="attendance" className="space-y-6 focus-visible:outline-none">
                             <JobAttendance jobId={job.id} />
                         </TabsContent>
@@ -607,7 +637,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="ordini" className="space-y-6 focus-visible:outline-none">
-                            <JobOrdini jobId={job.id} jobCode={job.code} />
+                            <JobOrdiniDocumenti jobId={job.id} jobCode={job.code} />
                         </TabsContent>
 
                         {(userRole === 'admin' || userRole === 'operativo') && (

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Purchase, PurchaseItem } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload } from './utils';
+import { compressImageIfNeeded } from '@/lib/image-compress';
 
 export const mapDbToPurchase = (db: any): Purchase => ({
     id: db.id,
@@ -216,13 +217,14 @@ export const purchasesApi = {
     },
 
     uploadDocument: async (file: File) => {
-        const fileExt = file.name.split('.').pop();
+        const compressed = await compressImageIfNeeded(file);
+        const fileExt = compressed.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
             .from('documents')
-            .upload(filePath, file);
+            .upload(filePath, compressed);
 
         if (uploadError) throw uploadError;
 

@@ -25,6 +25,8 @@ import { ClientContacts } from "@/components/clients/detail/ClientContacts";
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { useViewMode } from "@/hooks/useViewMode";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Attiva", completed: "Completata", suspended: "Sospesa",
@@ -68,6 +70,7 @@ export default function ClientDetailPage() {
   const [savingNotes, setSavingNotes] = useState(false);
   const [proposalSearch, setProposalSearch] = useState("");
   const [proposalStatusFilter, setProposalStatusFilter] = useState<string>("all");
+  const [proposalsViewMode, setProposalsViewMode] = useViewMode("client-proposals", "grid");
 
   // Dialogs
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -299,6 +302,7 @@ export default function ClientDetailPage() {
                     {(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <ViewToggle mode={proposalsViewMode} onChange={setProposalsViewMode} />
               </div>
               {canEdit && (
                 <Button onClick={() => { setProposalForm(EMPTY_PROPOSAL_FORM); setUseClientAddr(false); setNewProposalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 shrink-0">
@@ -313,6 +317,34 @@ export default function ClientDetailPage() {
               <div className="text-center py-12 text-slate-400">
                 <Plus className="h-12 w-12 mx-auto mb-2 opacity-20" />
                 <p>{proposals.length === 0 ? "Nessuna proposta ancora. Creane una!" : "Nessuna proposta corrisponde alla ricerca."}</p>
+              </div>
+            ) : proposalsViewMode === "list" ? (
+              <div className="space-y-1.5">
+                {filteredProposals.map(p => (
+                  <Link key={p.id} href={`/clients/${id}/proposals/${p.id}`}>
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
+                      <span className="font-medium text-slate-900 dark:text-white text-sm flex-1 min-w-0 truncate">
+                        {p.title}
+                      </span>
+                      {p.estimatedValue !== null && (
+                        <span className="text-blue-700 dark:text-blue-400 text-xs w-28 shrink-0 text-right hidden md:block">
+                          € {p.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                      {(p.siteCity || p.siteStreet) && (
+                        <span className="text-slate-400 text-xs w-36 shrink-0 truncate hidden lg:flex items-center gap-1">
+                          <MapPin className="h-3 w-3 shrink-0" />{[p.siteStreet, p.siteCity].filter(Boolean).join(", ")}
+                        </span>
+                      )}
+                      {p.date && (
+                        <span className="text-slate-400 text-xs w-24 shrink-0 hidden xl:block">
+                          {format(new Date(p.date), "d MMM yyyy", { locale: it })}
+                        </span>
+                      )}
+                      <Badge className={`text-xs shrink-0 ${PROP_STATUS_COLORS[p.status]}`} variant="secondary">{PROP_STATUS_LABELS[p.status]}</Badge>
+                    </div>
+                  </Link>
+                ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

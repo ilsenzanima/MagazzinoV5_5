@@ -1,9 +1,9 @@
 import { supabase } from '@/lib/supabase';
-import { supabase as supabaseClient } from '@/lib/supabase';
 
 export interface ProposalDocument {
     id: string;
     proposalId: string;
+    jobId: string | null;
     documentTypeId: string | null;
     documentTypeName: string;
     name: string;
@@ -19,7 +19,8 @@ export interface ProposalDocument {
 const map = (db: any): ProposalDocument => ({
     id: db.id,
     proposalId: db.proposal_id,
-    documentTypeId: db.document_type_id || null,
+    jobId: db.job_id || null,
+    documentTypeId: db.proposal_document_type_id || null,
     documentTypeName: db.proposal_document_types?.name || '',
     name: db.name,
     notes: db.notes || '',
@@ -34,7 +35,7 @@ const map = (db: any): ProposalDocument => ({
 export const proposalDocumentsApi = {
     getByProposalId: async (proposalId: string): Promise<ProposalDocument[]> => {
         const { data, error } = await supabase
-            .from('proposal_documents')
+            .from('shared_documents')
             .select('*, proposal_document_types(name)')
             .eq('proposal_id', proposalId)
             .order('created_at', { ascending: false });
@@ -42,12 +43,20 @@ export const proposalDocumentsApi = {
         return (data || []).map(map);
     },
 
-    create: async (doc: Omit<ProposalDocument, 'id' | 'createdAt' | 'documentTypeName'>): Promise<ProposalDocument> => {
+    create: async (doc: Omit<ProposalDocument, 'id' | 'createdAt' | 'documentTypeName' | 'jobId'>): Promise<ProposalDocument> => {
+        // Se la proposta è già stata convertita in commessa, il documento è subito visibile anche lì.
+        const { data: proposal } = await supabase
+            .from('client_proposals')
+            .select('converted_job_id')
+            .eq('id', doc.proposalId)
+            .single();
+
         const { data, error } = await supabase
-            .from('proposal_documents')
+            .from('shared_documents')
             .insert({
                 proposal_id: doc.proposalId,
-                document_type_id: doc.documentTypeId || null,
+                job_id: proposal?.converted_job_id || null,
+                proposal_document_type_id: doc.documentTypeId || null,
                 name: doc.name,
                 notes: doc.notes || null,
                 file_url: doc.fileUrl,
@@ -69,14 +78,24 @@ export const proposalDocumentsApi = {
         if (patch.fileUrl !== undefined) update.file_url = patch.fileUrl;
         if (patch.fileType !== undefined) update.file_type = patch.fileType;
         if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
-        if (patch.documentTypeId !== undefined) update.document_type_id = patch.documentTypeId || null;
-        const { data, error } = await supabase.from('proposal_documents').update(update).eq('id', id).select('*, proposal_document_types(name)').single();
+        if (patch.documentTypeId !== undefined) update.proposal_document_type_id = patch.documentTypeId || null;
+        const { data, error } = await supabase.from('shared_documents').update(update).eq('id', id).select('*, proposal_document_types(name)').single();
         if (error) throw error;
         return map(data);
     },
 
     delete: async (id: string): Promise<void> => {
-        const { error } = await supabase.from('proposal_documents').delete().eq('id', id);
+        const { error } = await supabase.from('shared_documents').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    // Collega alla commessa appena creata tutti i documenti già caricati sulla proposta,
+    // così restano gli stessi record (nessuna copia) e sono visibili da entrambe le pagine.
+    linkToJob: async (proposalId: string, jobId: string): Promise<void> => {
+        const { error } = await supabase
+            .from('shared_documents')
+            .update({ job_id: jobId })
+            .eq('proposal_id', proposalId);
         if (error) throw error;
     },
 };

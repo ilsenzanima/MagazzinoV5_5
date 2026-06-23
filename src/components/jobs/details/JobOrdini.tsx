@@ -41,9 +41,6 @@ export function JobOrdini({ jobId, jobCode }: JobOrdiniProps) {
         }
     }
 
-    const totalOrdinato = orders.reduce((s, o) => s + (o.totalAmount ?? 0), 0)
-    const totalArticoli = orders.reduce((s, o) => s + (o.items?.length ?? 0), 0)
-
     if (loading) {
         return (
             <div className="flex justify-center items-center py-12">
@@ -55,26 +52,9 @@ export function JobOrdini({ jobId, jobCode }: JobOrdiniProps) {
 
     return (
         <div className="space-y-4">
-            {/* Header con totali e bottone nuovo ordine */}
+            {/* Header con bottone nuovo ordine */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex gap-4">
-                    <div className="text-center">
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{orders.length}</p>
-                        <p className="text-xs text-slate-500">Ordini</p>
-                    </div>
-                    <div className="border-l dark:border-slate-700 pl-4 text-center">
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalArticoli}</p>
-                        <p className="text-xs text-slate-500">Articoli totali</p>
-                    </div>
-                    {canEdit && (
-                        <div className="border-l dark:border-slate-700 pl-4 text-center">
-                            <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-                                € {totalOrdinato.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                            </p>
-                            <p className="text-xs text-slate-500">Valore totale</p>
-                        </div>
-                    )}
-                </div>
+                <p className="text-sm text-slate-500">{orders.length} {orders.length === 1 ? 'ordine' : 'ordini'}</p>
                 {canEdit && (
                     <Link href={`/purchases/new?type=order&jobId=${jobId}`}>
                         <Button className="bg-blue-600 hover:bg-blue-700">

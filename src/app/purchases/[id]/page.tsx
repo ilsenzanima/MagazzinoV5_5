@@ -32,7 +32,7 @@ import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocume
 import { useAuth } from "@/components/auth-provider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { complianceApi, ComplianceDocument, DOCUMENT_TYPE_LABELS } from "@/lib/services/compliance";
+import { complianceApi, ComplianceDocument } from "@/lib/services/compliance";
 import { createClient } from "@/lib/supabase/client";
 import { ShieldCheck } from "lucide-react";
 
@@ -761,7 +761,7 @@ export default function PurchaseDetailPage() {
                                             className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-800 dark:text-violet-400 dark:hover:text-violet-300 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-md px-3 py-1.5"
                                         >
                                             <ShieldCheck className="h-4 w-4" />
-                                            {DOCUMENT_TYPE_LABELS[doc.documentType]}: {doc.name}
+                                            {doc.documentTypeName}: {doc.name}
                                         </button>
                                     ))}
                                 </div>
@@ -778,7 +778,7 @@ export default function PurchaseDetailPage() {
                                     {complianceModalDoc?.name}
                                 </DialogTitle>
                                 <DialogDescription>
-                                    {complianceModalDoc && DOCUMENT_TYPE_LABELS[complianceModalDoc.documentType]}
+                                    {complianceModalDoc?.documentTypeName}
                                     {complianceModalDoc?.brandName && ` · ${complianceModalDoc.brandName}`}
                                 </DialogDescription>
                             </DialogHeader>

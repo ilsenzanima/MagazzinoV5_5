@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { proposalCostAnalysisApi } from './proposal-cost-analysis';
 
 export interface CostAnalysisParams {
     jobId: string;
@@ -126,19 +127,21 @@ export const costAnalysisApi = {
         };
     },
 
-    upsertParams: async (jobId: string, p: Omit<CostAnalysisParams, 'jobId'>): Promise<void> => {
+    upsertParams: async (jobId: string, p: Omit<CostAnalysisParams, 'jobId'>, sourceProposalVersionId?: string | null): Promise<void> => {
+        const db: any = {
+            job_id: jobId,
+            sfrido: p.sfrido,
+            sconto: p.sconto,
+            trasporto: p.trasporto,
+            posa: p.posa,
+            ricarico: p.ricarico,
+            margine_trattativa: p.margineTrattativa,
+            updated_at: new Date().toISOString(),
+        };
+        if (sourceProposalVersionId !== undefined) db.source_proposal_version_id = sourceProposalVersionId;
         const { error } = await supabase
             .from('job_cost_analysis_params')
-            .upsert({
-                job_id: jobId,
-                sfrido: p.sfrido,
-                sconto: p.sconto,
-                trasporto: p.trasporto,
-                posa: p.posa,
-                ricarico: p.ricarico,
-                margine_trattativa: p.margineTrattativa,
-                updated_at: new Date().toISOString(),
-            }, { onConflict: 'job_id' });
+            .upsert(db, { onConflict: 'job_id' });
         if (error) throw error;
     },
 
@@ -164,5 +167,48 @@ export const costAnalysisApi = {
         const map = new Map<string, number>();
         for (const r of data || []) map.set(r.item_id, Number(r.max_price));
         return map;
+    },
+
+    getSourceProposalVersionId: async (jobId: string): Promise<string | null> => {
+        const { data } = await supabase
+            .from('job_cost_analysis_params')
+            .select('source_proposal_version_id')
+            .eq('job_id', jobId)
+            .maybeSingle();
+        return data?.source_proposal_version_id || null;
+    },
+
+    // Sostituisce righe e parametri della commessa con quelli di una versione di analisi costi della proposta
+    replaceFromProposalVersion: async (jobId: string, versionId: string): Promise<void> => {
+        const [rows, params] = await Promise.all([
+            proposalCostAnalysisApi.getByVersionId(versionId),
+            proposalCostAnalysisApi.getParams(versionId),
+        ]);
+        const { error: delError } = await supabase.from('job_cost_analysis_rows').delete().eq('job_id', jobId);
+        if (delError) throw delError;
+        if (rows.length > 0) {
+            const { error: insError } = await supabase.from('job_cost_analysis_rows').insert(rows.map(r => ({
+                job_id: jobId,
+                type: r.type,
+                item_id: r.itemId || null,
+                item_name: r.itemName,
+                item_model: r.itemModel,
+                item_unit: r.itemUnit,
+                max_purchase_price: r.maxPurchasePrice,
+                unit_price: r.unitPrice,
+                qty_estimated: r.qtyEstimated,
+                qty_actual: r.qtyActual,
+                sort_order: r.sortOrder,
+            })));
+            if (insError) throw insError;
+        }
+        await costAnalysisApi.upsertParams(jobId, {
+            sfrido: params.sfrido,
+            sconto: params.sconto,
+            trasporto: params.trasporto,
+            posa: params.posa,
+            ricarico: params.ricarico,
+            margineTrattativa: params.margineTrattativa,
+        }, versionId);
     },
 };
