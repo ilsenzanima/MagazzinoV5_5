@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS idx_proposal_cost_analysis_params_proposal_id ON public.proposal_cost_analysis_params(proposal_id);
+CREATE INDEX IF NOT EXISTS idx_job_cost_analysis_params_source_proposal_version_id ON public.job_cost_analysis_params(source_proposal_version_id);
