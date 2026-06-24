@@ -274,7 +274,10 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <Label>Stato</Label>
-                                <Select value={form.status} onValueChange={(v: JobTask['status']) => setForm({ ...form, status: v })}>
+                                <Select
+                                    value={form.status}
+                                    onValueChange={(v: JobTask['status']) => setForm({ ...form, status: v, progress: v === 'in_progress' ? form.progress : 0 })}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
@@ -285,16 +288,18 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div>
-                                <Label>Avanzamento (%)</Label>
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={form.progress}
-                                    onChange={e => setForm({ ...form, progress: Math.min(100, Math.max(0, Number(e.target.value))) })}
-                                />
-                            </div>
+                            {form.status === 'in_progress' && (
+                                <div>
+                                    <Label>Avanzamento (%)</Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={form.progress}
+                                        onChange={e => setForm({ ...form, progress: Math.min(100, Math.max(0, Number(e.target.value))) })}
+                                    />
+                                </div>
+                            )}
                         </div>
                         <div>
                             <Label>Note</Label>

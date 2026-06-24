@@ -113,6 +113,16 @@ export function CronoprogrammaGlobalView() {
         return result.filter(j => jobFilter === "all" || j.jobId === jobFilter)
     }, [jobs, attendance, tasks, jobFilter])
 
+    const presencePopupContent = (task: JobTask) => {
+        const inRange = attendance.filter(a => a.jobId === task.jobId && a.date >= task.startDate && a.date <= task.endDate && a.status === 'presence')
+        const totalHours = inRange.reduce((sum, a) => sum + a.hours, 0)
+        const workers = new Set(inRange.map(a => a.workerId)).size
+        if (inRange.length === 0) {
+            return `<div class="text-xs text-slate-500">Nessuna presenza registrata nel periodo</div>`
+        }
+        return `<div class="text-xs"><strong>${workers}</strong> lavoratori · <strong>${totalHours}</strong> ore presenza nel periodo</div>`
+    }
+
     const jobOptions = useMemo(() => {
         const map = new Map<string, string>()
         tasks.forEach(t => map.set(t.jobId, t.jobName || ''))
@@ -250,16 +260,37 @@ export function CronoprogrammaGlobalView() {
                 <>
                     {/* Unico diagramma di Gantt con tutte le commesse */}
                     <Card>
-                        <CardContent className="py-4">
+                        <CardContent className="py-4 space-y-4">
                             <TimelineChart
                                 tasks={filteredTasks}
                                 taskLabel={(t) => `${t.jobName ? t.jobName + ' · ' : ''}${t.name}`}
                                 barClass={(t) => jobColorClass(t.jobId)}
+                                popupContent={presencePopupContent}
                                 readonly={false}
                                 onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
                                 onDateChange={handleDateChange}
                                 onProgressChange={handleProgressChange}
                             />
+                            {jobsWithPresence.length > 0 && (
+                                <div className="space-y-3 pt-3 border-t">
+                                    <h2 className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                        Presenze per commessa (giorni con almeno un lavoratore in cantiere)
+                                    </h2>
+                                    {jobsWithPresence.map(j => (
+                                        <div key={j.jobId} className="flex items-center justify-between gap-3 flex-wrap">
+                                            <AttendanceStrip
+                                                startDate={j.startDate}
+                                                endDate={j.endDate}
+                                                presenceDates={j.presenceDates}
+                                                label={j.jobName}
+                                            />
+                                            {!tasks.some(t => t.jobId === j.jobId) && (
+                                                <Badge variant="outline" className="text-[10px] shrink-0">Nessuna fase pianificata</Badge>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -298,30 +329,6 @@ export function CronoprogrammaGlobalView() {
                         })}
                     </div>
                 </>
-            )}
-
-            {/* Presenze per commessa - inclusi i cantieri senza fasi pianificate */}
-            {jobsWithPresence.length > 0 && (
-                <Card>
-                    <CardContent className="py-4 space-y-4">
-                        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                            Presenze per commessa (giorni con almeno un lavoratore in cantiere)
-                        </h2>
-                        {jobsWithPresence.map(j => (
-                            <div key={j.jobId} className="flex items-center justify-between gap-3 flex-wrap">
-                                <AttendanceStrip
-                                    startDate={j.startDate}
-                                    endDate={j.endDate}
-                                    presenceDates={j.presenceDates}
-                                    label={j.jobName}
-                                />
-                                {!tasks.some(t => t.jobId === j.jobId) && (
-                                    <Badge variant="outline" className="text-[10px] shrink-0">Nessuna fase pianificata</Badge>
-                                )}
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
             )}
 
             {/* Dialog creazione/modifica fase, senza dover passare dalla commessa */}
@@ -376,7 +383,10 @@ export function CronoprogrammaGlobalView() {
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <Label>Stato</Label>
-                                <Select value={form.status} onValueChange={(v: JobTask['status']) => setForm({ ...form, status: v })}>
+                                <Select
+                                    value={form.status}
+                                    onValueChange={(v: JobTask['status']) => setForm({ ...form, status: v, progress: v === 'in_progress' ? form.progress : 0 })}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
@@ -387,16 +397,18 @@ export function CronoprogrammaGlobalView() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div>
-                                <Label>Avanzamento (%)</Label>
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={form.progress}
-                                    onChange={e => setForm({ ...form, progress: Math.min(100, Math.max(0, Number(e.target.value))) })}
-                                />
-                            </div>
+                            {form.status === 'in_progress' && (
+                                <div>
+                                    <Label>Avanzamento (%)</Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={form.progress}
+                                        onChange={e => setForm({ ...form, progress: Math.min(100, Math.max(0, Number(e.target.value))) })}
+                                    />
+                                </div>
+                            )}
                         </div>
                         <div>
                             <Label>Note</Label>

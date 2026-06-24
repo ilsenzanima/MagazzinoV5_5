@@ -347,11 +347,11 @@ body.font-opendyslexic h6 {
 .gantt [class*="task-status-delayed"] .bar { fill: #f59e0b !important; }
 
 /* Cronoprogramma - sfumatura leggera per distinguere le commesse nella vista globale (contorno, non sovrascrive il colore di stato) */
-.gantt [class*="job-color-0"] .bar { stroke: #93c5fd !important; stroke-width: 2 !important; }
-.gantt [class*="job-color-1"] .bar { stroke: #fca5a5 !important; stroke-width: 2 !important; }
-.gantt [class*="job-color-2"] .bar { stroke: #86efac !important; stroke-width: 2 !important; }
-.gantt [class*="job-color-3"] .bar { stroke: #fde047 !important; stroke-width: 2 !important; }
-.gantt [class*="job-color-4"] .bar { stroke: #c4b5fd !important; stroke-width: 2 !important; }
-.gantt [class*="job-color-5"] .bar { stroke: #fdba74 !important; stroke-width: 2 !important; }
-.gantt [class*="job-color-6"] .bar { stroke: #67e8f9 !important; stroke-width: 2 !important; }
-.gantt [class*="job-color-7"] .bar { stroke: #f9a8d4 !important; stroke-width: 2 !important; }
+.gantt [class*="job-color-0"] .bar { stroke: #2563eb !important; stroke-width: 3 !important; }
+.gantt [class*="job-color-1"] .bar { stroke: #dc2626 !important; stroke-width: 3 !important; }
+.gantt [class*="job-color-2"] .bar { stroke: #16a34a !important; stroke-width: 3 !important; }
+.gantt [class*="job-color-3"] .bar { stroke: #ca8a04 !important; stroke-width: 3 !important; }
+.gantt [class*="job-color-4"] .bar { stroke: #7c3aed !important; stroke-width: 3 !important; }
+.gantt [class*="job-color-5"] .bar { stroke: #ea580c !important; stroke-width: 3 !important; }
+.gantt [class*="job-color-6"] .bar { stroke: #0891b2 !important; stroke-width: 3 !important; }
+.gantt [class*="job-color-7"] .bar { stroke: #db2777 !important; stroke-width: 3 !important; }
