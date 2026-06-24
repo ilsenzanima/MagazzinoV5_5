@@ -160,17 +160,19 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                 </Button>
             </div>
 
-            {/* Diagramma di Gantt */}
-            <div className="hidden md:block">
-                <TimelineChart
-                    tasks={tasks}
-                    onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
-                    onDateChange={handleDateChange}
-                    onProgressChange={handleProgressChange}
-                />
-            </div>
+            {/* Diagramma di Gantt - sempre visibile e ben leggibile */}
+            <Card>
+                <CardContent className="py-4">
+                    <TimelineChart
+                        tasks={tasks}
+                        onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
+                        onDateChange={handleDateChange}
+                        onProgressChange={handleProgressChange}
+                    />
+                </CardContent>
+            </Card>
 
-            {/* Lista fasi (sempre visibile, fallback mobile) */}
+            {/* Lista fasi (fallback compatto per mobile) */}
             <div className="space-y-2">
                 {tasks.length === 0 ? (
                     <div className="text-center py-10 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700 md:hidden">

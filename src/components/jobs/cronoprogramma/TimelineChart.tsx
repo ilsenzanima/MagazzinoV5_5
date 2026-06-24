@@ -11,36 +11,43 @@ const STATUS_CLASS: Record<JobTask['status'], string> = {
     delayed: "task-status-delayed",
 };
 
+const BAR_HEIGHT = 38;
+const BAR_PADDING = 22;
+const HEADER_HEIGHT = 80;
+
 interface TimelineChartProps {
     tasks: JobTask[];
+    /** Personalizza l'etichetta mostrata per ogni barra (es. con prefisso commessa) */
+    taskLabel?: (task: JobTask) => string;
     onTaskClick?: (taskId: string) => void;
     onDateChange?: (taskId: string, start: Date, end: Date) => void;
     onProgressChange?: (taskId: string, progress: number) => void;
     readonly?: boolean;
 }
 
-export function TimelineChart({ tasks, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
+export function TimelineChart({ tasks, taskLabel, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!containerRef.current || tasks.length === 0) return;
 
-        let ganttInstance: any;
         (async () => {
             const { default: Gantt } = await import("frappe-gantt");
             const ganttTasks = tasks.map(t => ({
                 id: t.id,
-                name: t.name,
+                name: taskLabel ? taskLabel(t) : t.name,
                 start: t.startDate,
                 end: t.endDate,
                 progress: t.progress,
                 custom_class: STATUS_CLASS[t.status],
             }));
 
-            ganttInstance = new Gantt(containerRef.current!, ganttTasks, {
+            new Gantt(containerRef.current!, ganttTasks, {
                 view_mode: "Week",
                 language: "it",
                 readonly,
+                bar_height: BAR_HEIGHT,
+                padding: BAR_PADDING,
                 on_click: (task) => onTaskClick?.(task.id),
                 on_date_change: (task, start, end) => onDateChange?.(task.id, start, end),
                 on_progress_change: (task, progress) => onProgressChange?.(task.id, progress),
@@ -50,7 +57,7 @@ export function TimelineChart({ tasks, onTaskClick, onDateChange, onProgressChan
         return () => {
             if (containerRef.current) containerRef.current.innerHTML = "";
         };
-    }, [tasks, onTaskClick, onDateChange, onProgressChange, readonly]);
+    }, [tasks, taskLabel, onTaskClick, onDateChange, onProgressChange, readonly]);
 
     if (tasks.length === 0) {
         return (
@@ -60,9 +67,16 @@ export function TimelineChart({ tasks, onTaskClick, onDateChange, onProgressChan
         );
     }
 
+    // Altezza minima calcolata come rete di sicurezza: il Gantt imposta la propria
+    // altezza via JS, ma garantiamo comunque che il contenitore non venga mai tagliato.
+    const minHeight = HEADER_HEIGHT + tasks.length * (BAR_HEIGHT + BAR_PADDING);
+
     return (
-        <div className="overflow-x-auto border rounded-md bg-white dark:bg-slate-900">
-            <div ref={containerRef} />
+        <div
+            className="w-full overflow-x-auto overflow-y-visible border rounded-md bg-white dark:bg-slate-900"
+            style={{ minHeight }}
+        >
+            <div ref={containerRef} className="w-full" />
         </div>
     );
 }

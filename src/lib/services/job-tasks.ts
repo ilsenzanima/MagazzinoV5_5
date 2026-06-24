@@ -7,6 +7,7 @@ const mapDbToJobTask = (db: any): JobTask => ({
     jobId: db.job_id,
     jobCode: db.jobs?.code,
     jobName: db.jobs?.name,
+    jobStatus: db.jobs?.status,
     name: db.name,
     startDate: db.start_date,
     endDate: db.end_date,
@@ -43,12 +44,12 @@ export const jobTasksApi = {
         if (error) throw error;
         return data.map(mapDbToJobTask);
     },
-    getAllActive: async () => {
+    getAll: async () => {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('job_tasks')
                 .select('*, jobs!inner(code, name, status)')
-                .eq('jobs.status', 'active')
+                .is('jobs.deleted_at', null)
                 .order('start_date', { ascending: true })
         );
         if (error) throw error;

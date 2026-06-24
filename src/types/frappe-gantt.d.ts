@@ -13,6 +13,8 @@ declare module 'frappe-gantt' {
         view_mode?: 'Day' | 'Week' | 'Month' | 'Year';
         language?: string;
         readonly?: boolean;
+        bar_height?: number;
+        padding?: number;
         on_click?: (task: GanttTask) => void;
         on_date_change?: (task: GanttTask, start: Date, end: Date) => void;
         on_progress_change?: (task: GanttTask, progress: number) => void;

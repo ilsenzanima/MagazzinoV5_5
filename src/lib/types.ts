@@ -181,6 +181,7 @@ export interface JobTask {
     jobId: string;
     jobCode?: string;
     jobName?: string;
+    jobStatus?: 'active' | 'completed' | 'suspended';
     name: string;
     startDate: string;
     endDate: string;
