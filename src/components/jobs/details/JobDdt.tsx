@@ -56,7 +56,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   }
 
   const openOpiNote = async (note: DeliveryNote) => {
-    const { generateDeliveryNotePDF } = await import("@/lib/pdf/delivery-note-pdf")
+    const { generateDeliveryNotePdfBlob } = await import("@/lib/pdf/delivery-note-pdf")
     const grouped = new Map<string, DeliveryNoteItem>()
     ;(note.items || []).forEach(item => {
       const key = item.inventoryId
@@ -73,7 +73,10 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
         grouped.set(key, { ...item })
       }
     })
-    await generateDeliveryNotePDF(note, Array.from(grouped.values()))
+    const blob = await generateDeliveryNotePdfBlob(note, Array.from(grouped.values()))
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
   const openSupplierDoc = async (url: string) => {
