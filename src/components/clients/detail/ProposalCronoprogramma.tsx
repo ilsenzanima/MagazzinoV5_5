@@ -192,8 +192,8 @@ export function ProposalCronoprogramma({ proposalId }: ProposalCronoprogrammaPro
                             <Input
                                 type="number"
                                 min={1}
-                                value={form.durationDays}
-                                onChange={e => setForm({ ...form, durationDays: Math.max(1, Number(e.target.value)) })}
+                                value={form.durationDays || ""}
+                                onChange={e => setForm({ ...form, durationDays: e.target.value === "" ? 0 : Number(e.target.value) })}
                             />
                         </div>
                         <div>

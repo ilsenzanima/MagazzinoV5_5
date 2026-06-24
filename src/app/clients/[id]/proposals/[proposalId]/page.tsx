@@ -14,13 +14,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, GanttChartSquare, Loader2, MapPin, Pencil, ShieldCheck, Trash2 } from "lucide-react"
+import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, GanttChartSquare, Loader2, MapPin, Pencil, ShieldCheck, Trash2, Truck } from "lucide-react"
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals"
 import { clientsApi } from "@/lib/api"
 import { jobsApi, jobTasksApi } from "@/lib/api"
 import { proposalTasksApi } from "@/lib/services/proposal-tasks"
 import { costAnalysisApi } from "@/lib/services/cost-analysis"
 import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
+import { supplierOffersApi } from "@/lib/services/supplier-offers"
+import { SupplierOffers } from "@/components/shared/SupplierOffers"
 import { proposalDocumentTypesApi } from "@/lib/services/proposal-document-types"
 import { HelpTip } from "@/components/ui/help-tip"
 import { proposalComplianceApi, jobComplianceApi } from "@/lib/services/compliance"
@@ -296,6 +298,7 @@ export default function ProposalDetailPage() {
 
             // Collega alla commessa i documenti già caricati sulla proposta (stessi record, nessuna copia)
             await proposalDocumentsApi.linkToJob(proposalId, job.id)
+            await supplierOffersApi.linkToJob(proposalId, job.id)
 
             // Associa i documenti di conformità della proposta alla commessa (tab Conformità)
             const proposalComplianceDocs = await proposalComplianceApi.getByProposalId(proposalId)
@@ -401,6 +404,7 @@ export default function ProposalDetailPage() {
                         />
                     </TabsTrigger>
                     <TabsTrigger value="conformita"><ShieldCheck className="h-4 w-4 mr-2 text-green-600" />Conformità</TabsTrigger>
+                    <TabsTrigger value="offerte-fornitori"><Truck className="h-4 w-4 mr-2" />Offerte Fornitori</TabsTrigger>
                     <TabsTrigger value="cronoprogramma"><GanttChartSquare className="h-4 w-4 mr-2" />Cronoprogramma</TabsTrigger>
                 </TabsList>
 
@@ -571,6 +575,11 @@ export default function ProposalDetailPage() {
                 {/* ── CONFORMITÀ ────────────────────────────────────── */}
                 <TabsContent value="conformita">
                     <ProposalConformita proposalId={proposalId} />
+                </TabsContent>
+
+                {/* ── OFFERTE FORNITORI ────────────────────────────────── */}
+                <TabsContent value="offerte-fornitori">
+                    <SupplierOffers proposalId={proposalId} />
                 </TabsContent>
 
                 {/* ── CRONOPROGRAMMA ───────────────────────────────── */}
