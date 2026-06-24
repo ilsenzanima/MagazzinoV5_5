@@ -240,6 +240,14 @@ export const jobComplianceApi = {
             .eq('id', id);
         if (error) throw error;
     },
+    disassociateAll: async (jobId: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_compliance_associations')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('job_id', jobId)
+            .is('deleted_at', null);
+        if (error) throw error;
+    },
 };
 
 export interface ProposalComplianceAssociation {

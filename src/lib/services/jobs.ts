@@ -227,6 +227,16 @@ export const jobsApi = {
         if (error) throw error;
         return mapDbToJob(data);
     },
+    /** Verifica se una commessa esiste ancora (anche se soft-deleted), senza lanciare errore se è stata eliminata definitivamente. */
+    getStatusById: async (id: string): Promise<{ exists: boolean; deletedAt: string | null }> => {
+        const { data, error } = await supabase
+            .from('jobs')
+            .select('deleted_at')
+            .eq('id', id)
+            .maybeSingle();
+        if (error) throw error;
+        return { exists: !!data, deletedAt: data?.deleted_at ?? null };
+    },
     create: async (job: Partial<Job>) => {
         const { data, error } = await supabase.from('jobs').insert(mapJobToDb(job)).select().single();
         if (error) throw error;
@@ -302,6 +312,17 @@ export const jobsApi = {
         const payload = await getSoftDeletePayload();
         const { error } = await supabase.from('jobs').update(payload).eq('id', id);
         if (error) throw error;
+
+        // Se la commessa era stata generata da una proposta, riportala "In attesa"
+        // così l'utente può riconvertirla (riusando la stessa commessa o creandone una nuova)
+        const { data: linkedProposal } = await supabase
+            .from('client_proposals')
+            .select('id')
+            .eq('converted_job_id', id)
+            .maybeSingle();
+        if (linkedProposal) {
+            await supabase.from('client_proposals').update({ status: 'pending', updated_at: new Date().toISOString() }).eq('id', linkedProposal.id);
+        }
     },
 
     restore: async (id: string) => {

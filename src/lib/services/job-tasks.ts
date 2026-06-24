@@ -74,4 +74,8 @@ export const jobTasksApi = {
         const { error } = await supabase.from('job_tasks').delete().eq('id', id);
         if (error) throw error;
     },
+    deleteAllByJobId: async (jobId: string) => {
+        const { error } = await supabase.from('job_tasks').delete().eq('job_id', jobId);
+        if (error) throw error;
+    },
 };

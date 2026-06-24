@@ -19,7 +19,6 @@ import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/servic
 import { clientsApi } from "@/lib/api"
 import { jobsApi, jobTasksApi } from "@/lib/api"
 import { proposalTasksApi } from "@/lib/services/proposal-tasks"
-import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
 import { costAnalysisApi } from "@/lib/services/cost-analysis"
 import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
 import { proposalDocumentTypesApi } from "@/lib/services/proposal-document-types"
@@ -91,6 +90,7 @@ export default function ProposalDetailPage() {
     const [convertVersionId, setConvertVersionId] = useState<string>("")
     const [convertHasTasks, setConvertHasTasks] = useState(false)
     const [convertStartDate, setConvertStartDate] = useState("")
+    const [convertReuseJobId, setConvertReuseJobId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [useClientAddr, setUseClientAddr] = useState(false)
 
@@ -235,20 +235,37 @@ export default function ProposalDetailPage() {
                 (proposal.sitePostalCode || proposal.siteCity) && `${proposal.sitePostalCode} ${proposal.siteCity}`.trim(),
                 proposal.siteProvince && `(${proposal.siteProvince.toUpperCase()})`,
             ].filter(Boolean)
-            const job = await jobsApi.create({
-                clientId,
-                code: generateJobCode(client.name),
-                name: proposal.title,
-                description: proposal.description,
-                status: "active",
-                startDate: new Date().toISOString().split('T')[0],
-                endDate: "",
-                siteAddress: siteAddressParts.join(", "),
-                siteManager: "",
-                cig: "",
-                cup: "",
-                estimatedCost: proposal.estimatedValue,
-            })
+
+            let job
+            if (convertReuseJobId) {
+                // Caso 1: la commessa collegata esiste ancora (soft-delete attivo) -> la ripristina e aggiorna,
+                // pulendo prima cronoprogramma e conformità (l'analisi costi viene già sostituita più sotto)
+                await jobsApi.restore(convertReuseJobId)
+                job = await jobsApi.update(convertReuseJobId, {
+                    name: proposal.title,
+                    description: proposal.description,
+                    siteAddress: siteAddressParts.join(", "),
+                    estimatedCost: proposal.estimatedValue,
+                })
+                await jobTasksApi.deleteAllByJobId(convertReuseJobId)
+                await jobComplianceApi.disassociateAll(convertReuseJobId)
+            } else {
+                // Caso 2: nessuna commessa collegata, oppure è stata eliminata definitivamente -> crea una nuova commessa
+                job = await jobsApi.create({
+                    clientId,
+                    code: generateJobCode(client.name),
+                    name: proposal.title,
+                    description: proposal.description,
+                    status: "active",
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: "",
+                    siteAddress: siteAddressParts.join(", "),
+                    siteManager: "",
+                    cig: "",
+                    cup: "",
+                    estimatedCost: proposal.estimatedValue,
+                })
+            }
             await clientProposalsApi.update(proposalId, { status: "accepted", convertedJobId: job.id })
 
             // Se la proposta ha un cronoprogramma, calcola le date reali delle fasi a partire dalla data scelta
@@ -272,34 +289,9 @@ export default function ProposalDetailPage() {
                 }
             }
 
-            // Copia l'analisi costi scelta dalla proposta alla commessa (se selezionata)
+            // Copia l'analisi costi scelta dalla proposta alla commessa (se selezionata), sostituendo eventuali righe esistenti
             if (convertVersionId) {
-                const [rows, params] = await Promise.all([
-                    proposalCostAnalysisApi.getByVersionId(convertVersionId),
-                    proposalCostAnalysisApi.getParams(convertVersionId),
-                ])
-                await Promise.all([
-                    ...rows.map(row => costAnalysisApi.add(job.id, {
-                        type: row.type,
-                        itemId: row.itemId,
-                        itemName: row.itemName,
-                        itemModel: row.itemModel,
-                        itemUnit: row.itemUnit,
-                        maxPurchasePrice: row.maxPurchasePrice,
-                        unitPrice: row.unitPrice,
-                        qtyEstimated: row.qtyEstimated,
-                        qtyActual: row.qtyActual,
-                        sortOrder: row.sortOrder,
-                    })),
-                    costAnalysisApi.upsertParams(job.id, {
-                        sfrido: params.sfrido,
-                        sconto: params.sconto,
-                        trasporto: params.trasporto,
-                        posa: params.posa,
-                        ricarico: params.ricarico,
-                        margineTrattativa: params.margineTrattativa,
-                    }, convertVersionId),
-                ])
+                await costAnalysisApi.replaceFromProposalVersion(job.id, convertVersionId)
             }
 
             // Collega alla commessa i documenti già caricati sulla proposta (stessi record, nessuna copia)
@@ -317,7 +309,7 @@ export default function ProposalDetailPage() {
                 }
             }))
 
-            notify.success("Commessa creata con analisi costi copiata!")
+            notify.success(convertReuseJobId ? "Commessa esistente aggiornata!" : "Commessa creata con analisi costi copiata!")
             router.push(`/jobs/${job.id}`)
         } catch { notify.error("Errore durante la conversione") }
         finally { setConverting(false) }
@@ -360,7 +352,7 @@ export default function ProposalDetailPage() {
                     </div>
                     {canEdit && (
                         <div className="flex gap-2 shrink-0 flex-wrap sm:justify-end">
-                            {!proposal.convertedJobId && (
+                            {(!proposal.convertedJobId || proposal.status === "pending") && (
                                 <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={async () => {
                                     setConvertVersionId("")
                                     setConvertStartDate("")
@@ -369,12 +361,20 @@ export default function ProposalDetailPage() {
                                         const proposalTasks = await proposalTasksApi.getByProposalId(proposalId)
                                         setConvertHasTasks(proposalTasks.length > 0)
                                     } catch { setConvertHasTasks(false) }
+                                    if (proposal.convertedJobId) {
+                                        try {
+                                            const status = await jobsApi.getStatusById(proposal.convertedJobId)
+                                            setConvertReuseJobId(status.exists ? proposal.convertedJobId : null)
+                                        } catch { setConvertReuseJobId(null) }
+                                    } else {
+                                        setConvertReuseJobId(null)
+                                    }
                                     setConvertOpen(true)
                                 }}>
                                     <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa
                                 </Button>
                             )}
-                            {proposal.convertedJobId && (
+                            {proposal.convertedJobId && proposal.status !== "pending" && (
                                 <Link href={`/jobs/${proposal.convertedJobId}`}>
                                     <Button size="sm" variant="outline" className="text-blue-600">Vai alla Commessa</Button>
                                 </Link>
@@ -661,7 +661,11 @@ export default function ProposalDetailPage() {
                 <DialogContent>
                     <DialogHeader><DialogTitle>Converti in Commessa</DialogTitle></DialogHeader>
                     <p className="text-sm text-slate-600 dark:text-slate-400 py-2">
-                        Verrà creata una nuova commessa a partire da questa proposta con titolo, descrizione, indirizzo cantiere e valore stimato già compilati. La proposta verrà marcata come <strong>Accettata</strong>.
+                        {convertReuseJobId ? (
+                            <>La commessa precedentemente collegata a questa proposta esiste ancora (nel cestino): verrà <strong>ripristinata e aggiornata</strong> con i dati attuali della proposta (titolo, descrizione, indirizzo cantiere, valore stimato, cronoprogramma, analisi costi e conformità). I documenti restano collegati automaticamente.</>
+                        ) : (
+                            <>Verrà creata una nuova commessa a partire da questa proposta con titolo, descrizione, indirizzo cantiere e valore stimato già compilati.</>
+                        )} La proposta verrà marcata come <strong>Accettata</strong>.
                     </p>
                     <div className="space-y-1 py-2">
                         <label className="text-sm font-medium">Analisi costi da usare</label>
