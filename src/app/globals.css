@@ -335,18 +335,21 @@ body.font-opendyslexic h6 {
   /* Chrome, Safari and Opera */
 }
 
-/* Cronoprogramma - colori barre Gantt per stato fase */
-.task-status-planned .bar { fill: #94a3b8; }
-.task-status-in-progress .bar { fill: #3b82f6; }
-.task-status-completed .bar { fill: #22c55e; }
-.task-status-delayed .bar { fill: #f59e0b; }
+/* Cronoprogramma - colori barre Gantt per stato fase.
+   custom_class e' un unico token (stato + "--" + colore-commessa, senza spazi,
+   perche' frappe-gantt chiama classList.add() con l'intera stringa) quindi si
+   usa un selettore per sottostringa per matchare la parte di stato. */
+[class*="task-status-planned"] .bar { fill: #94a3b8; }
+[class*="task-status-in-progress"] .bar { fill: #3b82f6; }
+[class*="task-status-completed"] .bar { fill: #22c55e; }
+[class*="task-status-delayed"] .bar { fill: #f59e0b; }
 
 /* Cronoprogramma - sfumatura leggera per distinguere le commesse nella vista globale (contorno, non sovrascrive il colore di stato) */
-.job-color-0 .bar { stroke: #93c5fd; stroke-width: 2; }
-.job-color-1 .bar { stroke: #fca5a5; stroke-width: 2; }
-.job-color-2 .bar { stroke: #86efac; stroke-width: 2; }
-.job-color-3 .bar { stroke: #fde047; stroke-width: 2; }
-.job-color-4 .bar { stroke: #c4b5fd; stroke-width: 2; }
-.job-color-5 .bar { stroke: #fdba74; stroke-width: 2; }
-.job-color-6 .bar { stroke: #67e8f9; stroke-width: 2; }
-.job-color-7 .bar { stroke: #f9a8d4; stroke-width: 2; }
+[class*="job-color-0"] .bar { stroke: #93c5fd; stroke-width: 2; }
+[class*="job-color-1"] .bar { stroke: #fca5a5; stroke-width: 2; }
+[class*="job-color-2"] .bar { stroke: #86efac; stroke-width: 2; }
+[class*="job-color-3"] .bar { stroke: #fde047; stroke-width: 2; }
+[class*="job-color-4"] .bar { stroke: #c4b5fd; stroke-width: 2; }
+[class*="job-color-5"] .bar { stroke: #fdba74; stroke-width: 2; }
+[class*="job-color-6"] .bar { stroke: #67e8f9; stroke-width: 2; }
+[class*="job-color-7"] .bar { stroke: #f9a8d4; stroke-width: 2; }

@@ -43,7 +43,7 @@ export function TimelineChart({ tasks, taskLabel, barClass, popupContent, onTask
                 start: t.startDate,
                 end: t.endDate,
                 progress: t.progress,
-                custom_class: `${STATUS_CLASS[t.status]}${barClass ? ' ' + barClass(t) : ''}`,
+                custom_class: barClass ? `${STATUS_CLASS[t.status]}--${barClass(t)}` : STATUS_CLASS[t.status],
             }));
 
             new Gantt(containerRef.current!, ganttTasks, {
