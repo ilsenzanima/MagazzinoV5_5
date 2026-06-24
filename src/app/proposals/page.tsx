@@ -120,7 +120,7 @@ export default function ProposalsPage() {
       setProposals(props);
       setClients(cls.sort((a, b) => a.name.localeCompare(b.name, "it")));
     } catch {
-      notify.error("Errore caricamento proposte");
+      notify.error("Errore caricamento offerte");
     } finally {
       setLoading(false);
     }
@@ -224,12 +224,12 @@ export default function ProposalsPage() {
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Elenco Proposte</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Tutte le proposte di tutti i committenti</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Elenco Offerte</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Tutte le offerte di tutti i committenti</p>
           </div>
           {canEdit && (
             <Button onClick={openNewProposal} className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />Nuova Proposta
+              <Plus className="h-4 w-4 mr-2" />Nuova Offerta
             </Button>
           )}
         </div>
@@ -309,7 +309,7 @@ export default function ProposalsPage() {
         {/* Conteggio */}
         {!loading && (
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            {filtered.length} proposta{filtered.length !== 1 ? "e" : ""} trovata{filtered.length !== 1 ? "e" : ""}
+            {filtered.length} offerta{filtered.length !== 1 ? "e" : ""} trovata{filtered.length !== 1 ? "e" : ""}
             {filtered.length !== stageFiltered.length && ` (su ${stageFiltered.length} totali)`}
           </p>
         )}
@@ -322,7 +322,7 @@ export default function ProposalsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-slate-400">
             <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <p>{stageFiltered.length === 0 ? "Nessuna proposta presente." : "Nessuna proposta corrisponde ai filtri."}</p>
+            <p>{stageFiltered.length === 0 ? "Nessuna offerta presente." : "Nessuna offerta corrisponde ai filtri."}</p>
           </div>
         ) : viewMode === "list" ? (
           <div className="space-y-1.5">
@@ -401,7 +401,7 @@ export default function ProposalsPage() {
       {/* Nuova proposta dialog */}
       <Dialog open={newProposalOpen} onOpenChange={setNewProposalOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nuova Proposta</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Nuova Offerta</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
               <Label>Committente *</Label>
