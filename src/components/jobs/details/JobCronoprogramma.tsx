@@ -13,7 +13,6 @@ import { Plus, GanttChartSquare, Pencil, Trash2 } from "lucide-react"
 import { jobTasksApi, attendanceApi, JobTask, Attendance } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
-import { AttendanceStrip } from "@/components/jobs/cronoprogramma/AttendanceStrip"
 
 interface JobCronoprogrammaProps {
     jobId: string
@@ -78,12 +77,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
     }
 
     const presenceDates = new Set(attendance.filter(a => a.status === 'presence').map(a => a.date))
-    const allDates = [
-        ...tasks.flatMap(t => [t.startDate, t.endDate]),
-        ...attendance.map(a => a.date),
-    ].filter(Boolean).sort()
-    const attendanceRangeStart = allDates[0]
-    const attendanceRangeEnd = allDates[allDates.length - 1]
+    const rowPresence = () => presenceDates
 
     useEffect(() => { load() }, [jobId])
 
@@ -190,19 +184,15 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                     <TimelineChart
                         tasks={tasks}
                         popupContent={presencePopupContent}
+                        rowPresence={rowPresence}
                         onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
                         onDateChange={handleDateChange}
                         onProgressChange={handleProgressChange}
                     />
-                    {attendanceRangeStart && attendanceRangeEnd && (
-                        <div className="mt-4 pt-3 border-t">
-                            <AttendanceStrip
-                                startDate={attendanceRangeStart}
-                                endDate={attendanceRangeEnd}
-                                presenceDates={presenceDates}
-                                label="Presenze sul cantiere (almeno un lavoratore presente)"
-                            />
-                        </div>
+                    {tasks.length > 0 && (
+                        <p className="text-[11px] text-slate-400 mt-2">
+                            ● puntino verde sotto la barra = presenza registrata quel giorno
+                        </p>
                     )}
                 </CardContent>
             </Card>

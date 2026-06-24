@@ -113,6 +113,14 @@ export function CronoprogrammaGlobalView() {
         return result.filter(j => jobFilter === "all" || j.jobId === jobFilter)
     }, [jobs, attendance, tasks, jobFilter])
 
+    const jobsWithoutTasksPresence = useMemo(
+        () => jobsWithPresence.filter(j => !tasks.some(t => t.jobId === j.jobId)),
+        [jobsWithPresence, tasks]
+    )
+
+    const rowPresence = (task: JobTask) =>
+        new Set(attendance.filter(a => a.jobId === task.jobId && a.status === 'presence').map(a => a.date))
+
     const presencePopupContent = (task: JobTask) => {
         const inRange = attendance.filter(a => a.jobId === task.jobId && a.date >= task.startDate && a.date <= task.endDate && a.status === 'presence')
         const totalHours = inRange.reduce((sum, a) => sum + a.hours, 0)
@@ -266,17 +274,21 @@ export function CronoprogrammaGlobalView() {
                                 taskLabel={(t) => `${t.jobName ? t.jobName + ' · ' : ''}${t.name}`}
                                 barClass={(t) => jobColorClass(t.jobId)}
                                 popupContent={presencePopupContent}
+                                rowPresence={rowPresence}
                                 readonly={false}
                                 onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
                                 onDateChange={handleDateChange}
                                 onProgressChange={handleProgressChange}
                             />
-                            {jobsWithPresence.length > 0 && (
+                            <p className="text-[11px] text-slate-400">
+                                ● puntino verde sotto la barra = presenza registrata quel giorno sul cantiere
+                            </p>
+                            {jobsWithoutTasksPresence.length > 0 && (
                                 <div className="space-y-3 pt-3 border-t">
                                     <h2 className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                        Presenze per commessa (giorni con almeno un lavoratore in cantiere)
+                                        Commesse senza fasi pianificate ma con presenze registrate
                                     </h2>
-                                    {jobsWithPresence.map(j => (
+                                    {jobsWithoutTasksPresence.map(j => (
                                         <div key={j.jobId} className="flex items-center justify-between gap-3 flex-wrap">
                                             <AttendanceStrip
                                                 startDate={j.startDate}
@@ -284,9 +296,7 @@ export function CronoprogrammaGlobalView() {
                                                 presenceDates={j.presenceDates}
                                                 label={j.jobName}
                                             />
-                                            {!tasks.some(t => t.jobId === j.jobId) && (
-                                                <Badge variant="outline" className="text-[10px] shrink-0">Nessuna fase pianificata</Badge>
-                                            )}
+                                            <Badge variant="outline" className="text-[10px] shrink-0">Nessuna fase pianificata</Badge>
                                         </div>
                                     ))}
                                 </div>
