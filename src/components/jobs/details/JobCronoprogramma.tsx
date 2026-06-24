@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, GanttChartSquare, Pencil, Trash2 } from "lucide-react"
-import { jobTasksApi, JobTask } from "@/lib/api"
+import { jobTasksApi, attendanceApi, JobTask, Attendance } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
 
@@ -43,6 +43,7 @@ const emptyForm = {
 
 export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
     const [tasks, setTasks] = useState<JobTask[]>([])
+    const [attendance, setAttendance] = useState<Attendance[]>([])
     const [loading, setLoading] = useState(true)
     const [isFormOpen, setIsFormOpen] = useState(false)
     const [editingTask, setEditingTask] = useState<JobTask | null>(null)
@@ -51,14 +52,28 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
     const load = async () => {
         try {
             setLoading(true)
-            const data = await jobTasksApi.getByJobId(jobId)
-            setTasks(data)
+            const [tasksData, attendanceData] = await Promise.all([
+                jobTasksApi.getByJobId(jobId),
+                attendanceApi.getByJobId(jobId),
+            ])
+            setTasks(tasksData)
+            setAttendance(attendanceData)
         } catch (err) {
             console.error("Errore caricamento cronoprogramma:", err)
             notify.error("Errore nel caricamento del cronoprogramma")
         } finally {
             setLoading(false)
         }
+    }
+
+    const presencePopupContent = (task: JobTask) => {
+        const inRange = attendance.filter(a => a.date >= task.startDate && a.date <= task.endDate && a.status === 'presence')
+        const totalHours = inRange.reduce((sum, a) => sum + a.hours, 0)
+        const workers = new Set(inRange.map(a => a.workerId)).size
+        if (inRange.length === 0) {
+            return `<div class="text-xs text-slate-500">Nessuna presenza registrata nel periodo</div>`
+        }
+        return `<div class="text-xs"><strong>${workers}</strong> lavoratori · <strong>${totalHours}</strong> ore presenza nel periodo</div>`
     }
 
     useEffect(() => { load() }, [jobId])
@@ -165,6 +180,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                 <CardContent className="py-4">
                     <TimelineChart
                         tasks={tasks}
+                        popupContent={presencePopupContent}
                         onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
                         onDateChange={handleDateChange}
                         onProgressChange={handleProgressChange}

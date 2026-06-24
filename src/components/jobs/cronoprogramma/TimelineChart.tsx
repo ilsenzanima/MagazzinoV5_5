@@ -21,13 +21,15 @@ interface TimelineChartProps {
     taskLabel?: (task: JobTask) => string;
     /** Classe CSS aggiuntiva per barra (es. colore per commessa nella vista globale) */
     barClass?: (task: JobTask) => string;
+    /** HTML mostrato nel popup al click/hover sulla barra (es. presenze registrate nel periodo) */
+    popupContent?: (task: JobTask) => string;
     onTaskClick?: (taskId: string) => void;
     onDateChange?: (taskId: string, start: Date, end: Date) => void;
     onProgressChange?: (taskId: string, progress: number) => void;
     readonly?: boolean;
 }
 
-export function TimelineChart({ tasks, taskLabel, barClass, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
+export function TimelineChart({ tasks, taskLabel, barClass, popupContent, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -53,13 +55,17 @@ export function TimelineChart({ tasks, taskLabel, barClass, onTaskClick, onDateC
                 on_click: (task) => onTaskClick?.(task.id),
                 on_date_change: (task, start, end) => onDateChange?.(task.id, start, end),
                 on_progress_change: (task, progress) => onProgressChange?.(task.id, progress),
+                popup_func: popupContent ? ({ task, set_details }) => {
+                    const original = tasks.find(t => t.id === task.id);
+                    if (original) set_details(popupContent(original));
+                } : undefined,
             });
         })();
 
         return () => {
             if (containerRef.current) containerRef.current.innerHTML = "";
         };
-    }, [tasks, taskLabel, barClass, onTaskClick, onDateChange, onProgressChange, readonly]);
+    }, [tasks, taskLabel, barClass, popupContent, onTaskClick, onDateChange, onProgressChange, readonly]);
 
     if (tasks.length === 0) {
         return (
