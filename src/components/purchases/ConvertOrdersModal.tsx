@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, FileText, Calendar, ArrowRight } from "lucide-react";
+import { Loader2, FileText, Calendar, ArrowRight, Link2 } from "lucide-react";
 import { purchasesApi, Purchase } from "@/lib/api";
 
 interface Props {
@@ -21,10 +21,18 @@ export function ConvertOrdersModal({ open, onOpenChange, triggerOrder }: Props) 
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<Set<string>>(new Set([triggerOrder.id]));
 
+    // "new" creates a brand new purchase from the selected orders, "existing" links them to an already existing purchase
+    const [mode, setMode] = useState<'new' | 'existing'>('new');
+    const [existingPurchases, setExistingPurchases] = useState<Purchase[]>([]);
+    const [existingPurchaseId, setExistingPurchaseId] = useState<string>('');
+    const [linking, setLinking] = useState(false);
+
     // Load other orders from same supplier when modal opens
     useEffect(() => {
         if (!open) return;
         setSelected(new Set([triggerOrder.id]));
+        setMode('new');
+        setExistingPurchaseId('');
         setLoading(true);
         purchasesApi.getPaginated({
             page: 1, limit: 50,
@@ -35,6 +43,18 @@ export function ConvertOrdersModal({ open, onOpenChange, triggerOrder }: Props) 
             .catch(console.error)
             .finally(() => setLoading(false));
     }, [open, triggerOrder.id, triggerOrder.supplierId]);
+
+    // Load existing purchases from the same supplier, available to be linked to
+    useEffect(() => {
+        if (!open || mode !== 'existing') return;
+        purchasesApi.getPaginated({
+            page: 1, limit: 50,
+            supplierId: triggerOrder.supplierId,
+            orderType: 'purchase',
+        })
+            .then(({ data }) => setExistingPurchases(data))
+            .catch(console.error);
+    }, [open, mode, triggerOrder.supplierId]);
 
     const toggle = (id: string) => {
         // Cannot deselect the trigger order
@@ -52,6 +72,20 @@ export function ConvertOrdersModal({ open, onOpenChange, triggerOrder }: Props) 
         router.push(`/purchases/new?fromOrders=${ids}`);
     };
 
+    const handleLinkExisting = async () => {
+        if (!existingPurchaseId) return;
+        setLinking(true);
+        try {
+            await purchasesApi.markOrdersAsConverted([...selected], existingPurchaseId);
+            onOpenChange(false);
+            router.push(`/purchases/${existingPurchaseId}`);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLinking(false);
+        }
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg">
@@ -63,6 +97,29 @@ export function ConvertOrdersModal({ open, onOpenChange, triggerOrder }: Props) 
                     Fornitore: <span className="font-medium text-slate-800 dark:text-slate-200">{triggerOrder.supplierName}</span>
                     <br />
                     Seleziona gli ordini da unire in un unico acquisto.
+                </div>
+
+                <div className="flex gap-2 mb-3">
+                    <button
+                        type="button"
+                        onClick={() => setMode('new')}
+                        className={`flex-1 text-sm px-3 py-1.5 rounded-md border transition-colors
+                            ${mode === 'new'
+                                ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
+                    >
+                        Crea nuovo acquisto
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setMode('existing')}
+                        className={`flex-1 text-sm px-3 py-1.5 rounded-md border transition-colors
+                            ${mode === 'existing'
+                                ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
+                    >
+                        Associa ad acquisto esistente
+                    </button>
                 </div>
 
                 {loading ? (
@@ -110,16 +167,49 @@ export function ConvertOrdersModal({ open, onOpenChange, triggerOrder }: Props) 
                     </div>
                 )}
 
+                {mode === 'existing' && !loading && (
+                    <div className="mt-3">
+                        <label className="text-sm text-slate-500 mb-1.5 block">Acquisto a cui associare gli ordini selezionati</label>
+                        {existingPurchases.length === 0 ? (
+                            <p className="text-sm text-slate-400 italic">Nessun acquisto esistente per questo fornitore.</p>
+                        ) : (
+                            <select
+                                value={existingPurchaseId}
+                                onChange={e => setExistingPurchaseId(e.target.value)}
+                                className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-transparent px-3 py-2 text-sm"
+                            >
+                                <option value="">Seleziona un acquisto…</option>
+                                {existingPurchases.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.deliveryNoteNumber} — {new Date(p.deliveryNoteDate).toLocaleDateString('it-IT')}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                )}
+
                 <DialogFooter className="mt-4 gap-2">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
-                    <Button
-                        className="bg-blue-600 hover:bg-blue-700"
-                        onClick={handleConvert}
-                        disabled={selected.size === 0}
-                    >
-                        <ArrowRight className="h-4 w-4 mr-2" />
-                        Converti {selected.size > 1 ? `${selected.size} ordini` : "ordine"}
-                    </Button>
+                    {mode === 'new' ? (
+                        <Button
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={handleConvert}
+                            disabled={selected.size === 0}
+                        >
+                            <ArrowRight className="h-4 w-4 mr-2" />
+                            Converti {selected.size > 1 ? `${selected.size} ordini` : "ordine"}
+                        </Button>
+                    ) : (
+                        <Button
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={handleLinkExisting}
+                            disabled={selected.size === 0 || !existingPurchaseId || linking}
+                        >
+                            {linking ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Link2 className="h-4 w-4 mr-2" />}
+                            Associa {selected.size > 1 ? `${selected.size} ordini` : "ordine"}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
