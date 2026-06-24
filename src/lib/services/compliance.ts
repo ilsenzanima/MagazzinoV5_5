@@ -216,10 +216,34 @@ export const jobComplianceApi = {
 
     associate: async (jobId: string, complianceDocumentId: string): Promise<JobComplianceAssociation> => {
         const { data: { user } } = await supabase.auth.getUser();
+        const selectQuery = '*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))';
+
+        // Se esiste già un'associazione soft-deleted per la stessa coppia (es. commessa
+        // ricreata dopo cancellazione e riusata lo stesso job_id), la resuscita invece
+        // di inserirne una nuova, che andrebbe in conflitto con l'indice unico.
+        const { data: existing } = await supabase
+            .from('job_compliance_associations')
+            .select('id')
+            .eq('job_id', jobId)
+            .eq('compliance_document_id', complianceDocumentId)
+            .not('deleted_at', 'is', null)
+            .maybeSingle();
+
+        if (existing) {
+            const { data, error } = await supabase
+                .from('job_compliance_associations')
+                .update({ deleted_at: null, created_by: user?.id, created_at: new Date().toISOString() })
+                .eq('id', existing.id)
+                .select(selectQuery)
+                .single();
+            if (error) throw error;
+            return mapDbToAssociation(data);
+        }
+
         const { data, error } = await supabase
             .from('job_compliance_associations')
             .insert({ job_id: jobId, compliance_document_id: complianceDocumentId, created_by: user?.id })
-            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))')
+            .select(selectQuery)
             .single();
         if (error) throw error;
         return mapDbToAssociation(data);
@@ -284,10 +308,31 @@ export const proposalComplianceApi = {
 
     associate: async (proposalId: string, complianceDocumentId: string): Promise<ProposalComplianceAssociation> => {
         const { data: { user } } = await supabase.auth.getUser();
+        const selectQuery = '*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))';
+
+        const { data: existing } = await supabase
+            .from('proposal_compliance_associations')
+            .select('id')
+            .eq('proposal_id', proposalId)
+            .eq('compliance_document_id', complianceDocumentId)
+            .not('deleted_at', 'is', null)
+            .maybeSingle();
+
+        if (existing) {
+            const { data, error } = await supabase
+                .from('proposal_compliance_associations')
+                .update({ deleted_at: null, created_by: user?.id, created_at: new Date().toISOString() })
+                .eq('id', existing.id)
+                .select(selectQuery)
+                .single();
+            if (error) throw error;
+            return mapDbToProposalAssociation(data);
+        }
+
         const { data, error } = await supabase
             .from('proposal_compliance_associations')
             .insert({ proposal_id: proposalId, compliance_document_id: complianceDocumentId, created_by: user?.id })
-            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))')
+            .select(selectQuery)
             .single();
         if (error) throw error;
         return mapDbToProposalAssociation(data);
