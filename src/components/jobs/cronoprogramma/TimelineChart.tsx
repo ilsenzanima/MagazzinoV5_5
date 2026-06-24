@@ -12,7 +12,7 @@ const STATUS_CLASS: Record<JobTask['status'], string> = {
 };
 
 const BAR_HEIGHT = 38;
-const BAR_PADDING = 30;
+const BAR_PADDING = 34;
 const HEADER_HEIGHT = 80;
 
 function eachDate(start: string, end: string): string[] {

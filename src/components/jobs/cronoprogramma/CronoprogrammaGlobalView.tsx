@@ -14,7 +14,6 @@ import { GanttChartSquare, ExternalLink, Loader2, Plus, Trash2 } from "lucide-re
 import { jobTasksApi, jobsApi, attendanceApi, JobTask, Job, Attendance } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
-import { AttendanceStrip } from "@/components/jobs/cronoprogramma/AttendanceStrip"
 
 const STATUS_LABEL: Record<JobTask['status'], string> = {
     planned: "Pianificata",
@@ -93,30 +92,6 @@ export function CronoprogrammaGlobalView() {
     }
 
     useEffect(() => { load() }, [])
-
-    const jobsWithPresence = useMemo(() => {
-        const result: { jobId: string; jobName: string; startDate: string; endDate: string; presenceDates: Set<string> }[] = []
-        jobs.forEach(job => {
-            const jobAttendance = attendance.filter(a => a.jobId === job.id && a.status === 'presence')
-            if (jobAttendance.length === 0) return
-            const presenceDates = new Set(jobAttendance.map(a => a.date))
-            const jobTasksDates = tasks.filter(t => t.jobId === job.id).flatMap(t => [t.startDate, t.endDate])
-            const allDates = [...jobTasksDates, ...jobAttendance.map(a => a.date)].sort()
-            result.push({
-                jobId: job.id,
-                jobName: job.name,
-                startDate: allDates[0],
-                endDate: allDates[allDates.length - 1],
-                presenceDates,
-            })
-        })
-        return result.filter(j => jobFilter === "all" || j.jobId === jobFilter)
-    }, [jobs, attendance, tasks, jobFilter])
-
-    const jobsWithoutTasksPresence = useMemo(
-        () => jobsWithPresence.filter(j => !tasks.some(t => t.jobId === j.jobId)),
-        [jobsWithPresence, tasks]
-    )
 
     const rowPresence = (task: JobTask) =>
         new Set(attendance.filter(a => a.jobId === task.jobId && a.status === 'presence').map(a => a.date))
@@ -283,24 +258,6 @@ export function CronoprogrammaGlobalView() {
                             <p className="text-[11px] text-slate-400">
                                 ● puntino verde sotto la barra = presenza registrata quel giorno sul cantiere
                             </p>
-                            {jobsWithoutTasksPresence.length > 0 && (
-                                <div className="space-y-3 pt-3 border-t">
-                                    <h2 className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                        Commesse senza fasi pianificate ma con presenze registrate
-                                    </h2>
-                                    {jobsWithoutTasksPresence.map(j => (
-                                        <div key={j.jobId} className="flex items-center justify-between gap-3 flex-wrap">
-                                            <AttendanceStrip
-                                                startDate={j.startDate}
-                                                endDate={j.endDate}
-                                                presenceDates={j.presenceDates}
-                                                label={j.jobName}
-                                            />
-                                            <Badge variant="outline" className="text-[10px] shrink-0">Nessuna fase pianificata</Badge>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </CardContent>
                     </Card>
 
