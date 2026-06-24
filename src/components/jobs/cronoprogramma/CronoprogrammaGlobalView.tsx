@@ -11,9 +11,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { GanttChartSquare, ExternalLink, Loader2, Plus, Trash2 } from "lucide-react"
-import { jobTasksApi, jobsApi, JobTask, Job } from "@/lib/api"
+import { jobTasksApi, jobsApi, attendanceApi, JobTask, Job, Attendance } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
+import { AttendanceStrip } from "@/components/jobs/cronoprogramma/AttendanceStrip"
 
 const STATUS_LABEL: Record<JobTask['status'], string> = {
     planned: "Pianificata",
@@ -58,6 +59,7 @@ const emptyForm = {
 export function CronoprogrammaGlobalView() {
     const [tasks, setTasks] = useState<JobTask[]>([])
     const [jobs, setJobs] = useState<Job[]>([])
+    const [attendance, setAttendance] = useState<Attendance[]>([])
     const [loading, setLoading] = useState(true)
     const [jobFilter, setJobFilter] = useState<string>("all")
     const [isFormOpen, setIsFormOpen] = useState(false)
@@ -73,6 +75,15 @@ export function CronoprogrammaGlobalView() {
             ])
             setTasks(tasksData)
             setJobs(jobsData)
+
+            const allDates = [
+                ...jobsData.flatMap(j => [j.startDate, j.endDate]),
+                ...tasksData.flatMap(t => [t.startDate, t.endDate]),
+            ].filter(Boolean).sort()
+            if (allDates.length > 0) {
+                const attendanceData = await attendanceApi.getByRange(allDates[0], allDates[allDates.length - 1])
+                setAttendance(attendanceData)
+            }
         } catch (err) {
             console.error("Errore caricamento cronoprogramma globale:", err)
             notify.error("Errore nel caricamento del cronoprogramma")
@@ -82,6 +93,25 @@ export function CronoprogrammaGlobalView() {
     }
 
     useEffect(() => { load() }, [])
+
+    const jobsWithPresence = useMemo(() => {
+        const result: { jobId: string; jobName: string; startDate: string; endDate: string; presenceDates: Set<string> }[] = []
+        jobs.forEach(job => {
+            const jobAttendance = attendance.filter(a => a.jobId === job.id && a.status === 'presence')
+            if (jobAttendance.length === 0) return
+            const presenceDates = new Set(jobAttendance.map(a => a.date))
+            const jobTasksDates = tasks.filter(t => t.jobId === job.id).flatMap(t => [t.startDate, t.endDate])
+            const allDates = [...jobTasksDates, ...jobAttendance.map(a => a.date)].sort()
+            result.push({
+                jobId: job.id,
+                jobName: job.name,
+                startDate: allDates[0],
+                endDate: allDates[allDates.length - 1],
+                presenceDates,
+            })
+        })
+        return result.filter(j => jobFilter === "all" || j.jobId === jobFilter)
+    }, [jobs, attendance, tasks, jobFilter])
 
     const jobOptions = useMemo(() => {
         const map = new Map<string, string>()
@@ -268,6 +298,30 @@ export function CronoprogrammaGlobalView() {
                         })}
                     </div>
                 </>
+            )}
+
+            {/* Presenze per commessa - inclusi i cantieri senza fasi pianificate */}
+            {jobsWithPresence.length > 0 && (
+                <Card>
+                    <CardContent className="py-4 space-y-4">
+                        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                            Presenze per commessa (giorni con almeno un lavoratore in cantiere)
+                        </h2>
+                        {jobsWithPresence.map(j => (
+                            <div key={j.jobId} className="flex items-center justify-between gap-3 flex-wrap">
+                                <AttendanceStrip
+                                    startDate={j.startDate}
+                                    endDate={j.endDate}
+                                    presenceDates={j.presenceDates}
+                                    label={j.jobName}
+                                />
+                                {!tasks.some(t => t.jobId === j.jobId) && (
+                                    <Badge variant="outline" className="text-[10px] shrink-0">Nessuna fase pianificata</Badge>
+                                )}
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
             )}
 
             {/* Dialog creazione/modifica fase, senza dover passare dalla commessa */}

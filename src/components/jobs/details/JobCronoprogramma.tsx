@@ -13,6 +13,7 @@ import { Plus, GanttChartSquare, Pencil, Trash2 } from "lucide-react"
 import { jobTasksApi, attendanceApi, JobTask, Attendance } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
+import { AttendanceStrip } from "@/components/jobs/cronoprogramma/AttendanceStrip"
 
 interface JobCronoprogrammaProps {
     jobId: string
@@ -75,6 +76,14 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
         }
         return `<div class="text-xs"><strong>${workers}</strong> lavoratori · <strong>${totalHours}</strong> ore presenza nel periodo</div>`
     }
+
+    const presenceDates = new Set(attendance.filter(a => a.status === 'presence').map(a => a.date))
+    const allDates = [
+        ...tasks.flatMap(t => [t.startDate, t.endDate]),
+        ...attendance.map(a => a.date),
+    ].filter(Boolean).sort()
+    const attendanceRangeStart = allDates[0]
+    const attendanceRangeEnd = allDates[allDates.length - 1]
 
     useEffect(() => { load() }, [jobId])
 
@@ -185,6 +194,16 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                         onDateChange={handleDateChange}
                         onProgressChange={handleProgressChange}
                     />
+                    {attendanceRangeStart && attendanceRangeEnd && (
+                        <div className="mt-4 pt-3 border-t">
+                            <AttendanceStrip
+                                startDate={attendanceRangeStart}
+                                endDate={attendanceRangeEnd}
+                                presenceDates={presenceDates}
+                                label="Presenze sul cantiere (almeno un lavoratore presente)"
+                            />
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
