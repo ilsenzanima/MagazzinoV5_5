@@ -19,13 +19,15 @@ interface TimelineChartProps {
     tasks: JobTask[];
     /** Personalizza l'etichetta mostrata per ogni barra (es. con prefisso commessa) */
     taskLabel?: (task: JobTask) => string;
+    /** Classe CSS aggiuntiva per barra (es. colore per commessa nella vista globale) */
+    barClass?: (task: JobTask) => string;
     onTaskClick?: (taskId: string) => void;
     onDateChange?: (taskId: string, start: Date, end: Date) => void;
     onProgressChange?: (taskId: string, progress: number) => void;
     readonly?: boolean;
 }
 
-export function TimelineChart({ tasks, taskLabel, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
+export function TimelineChart({ tasks, taskLabel, barClass, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -39,7 +41,7 @@ export function TimelineChart({ tasks, taskLabel, onTaskClick, onDateChange, onP
                 start: t.startDate,
                 end: t.endDate,
                 progress: t.progress,
-                custom_class: STATUS_CLASS[t.status],
+                custom_class: `${STATUS_CLASS[t.status]}${barClass ? ' ' + barClass(t) : ''}`,
             }));
 
             new Gantt(containerRef.current!, ganttTasks, {
@@ -57,7 +59,7 @@ export function TimelineChart({ tasks, taskLabel, onTaskClick, onDateChange, onP
         return () => {
             if (containerRef.current) containerRef.current.innerHTML = "";
         };
-    }, [tasks, taskLabel, onTaskClick, onDateChange, onProgressChange, readonly]);
+    }, [tasks, taskLabel, barClass, onTaskClick, onDateChange, onProgressChange, readonly]);
 
     if (tasks.length === 0) {
         return (

@@ -35,6 +35,16 @@ const JOB_STATUS_LABEL: Record<string, string> = {
     completed: "Completata",
 }
 
+const JOB_COLOR_COUNT = 8
+
+function jobColorClass(jobId: string): string {
+    let hash = 0
+    for (let i = 0; i < jobId.length; i++) {
+        hash = (hash * 31 + jobId.charCodeAt(i)) >>> 0
+    }
+    return `job-color-${hash % JOB_COLOR_COUNT}`
+}
+
 const emptyForm = {
     jobId: "",
     name: "",
@@ -75,7 +85,7 @@ export function CronoprogrammaGlobalView() {
 
     const jobOptions = useMemo(() => {
         const map = new Map<string, string>()
-        tasks.forEach(t => map.set(t.jobId, `${t.jobCode ? t.jobCode + ' — ' : ''}${t.jobName || ''}`))
+        tasks.forEach(t => map.set(t.jobId, t.jobName || ''))
         return Array.from(map.entries())
     }, [tasks])
 
@@ -213,7 +223,8 @@ export function CronoprogrammaGlobalView() {
                         <CardContent className="py-4">
                             <TimelineChart
                                 tasks={filteredTasks}
-                                taskLabel={(t) => `${t.jobCode ? t.jobCode + ' · ' : ''}${t.name}`}
+                                taskLabel={(t) => `${t.jobName ? t.jobName + ' · ' : ''}${t.name}`}
+                                barClass={(t) => jobColorClass(t.jobId)}
                                 readonly={false}
                                 onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
                                 onDateChange={handleDateChange}
@@ -226,7 +237,7 @@ export function CronoprogrammaGlobalView() {
                     <div className="md:hidden space-y-4">
                         {Array.from(new Set(filteredTasks.map(t => t.jobId))).map(jobId => {
                             const jobTasks = filteredTasks.filter(t => t.jobId === jobId)
-                            const label = `${jobTasks[0].jobCode ? jobTasks[0].jobCode + ' — ' : ''}${jobTasks[0].jobName || ''}`
+                            const label = jobTasks[0].jobName || ''
                             return (
                                 <Card key={jobId}>
                                     <CardContent className="py-3 space-y-2">
@@ -282,9 +293,9 @@ export function CronoprogrammaGlobalView() {
                                     <SelectValue placeholder="Seleziona una commessa" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {jobs.map(job => (
+                                    {jobs.filter(job => job.status !== 'completed').map(job => (
                                         <SelectItem key={job.id} value={job.id}>
-                                            {job.code} — {job.name} ({JOB_STATUS_LABEL[job.status] || job.status})
+                                            {job.name} ({JOB_STATUS_LABEL[job.status] || job.status})
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
