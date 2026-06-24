@@ -355,9 +355,3 @@ body.font-opendyslexic h6 {
 .gantt [class*="job-color-5"] .bar { stroke: #ea580c !important; stroke-width: 3 !important; }
 .gantt [class*="job-color-6"] .bar { stroke: #0891b2 !important; stroke-width: 3 !important; }
 .gantt [class*="job-color-7"] .bar { stroke: #db2777 !important; stroke-width: 3 !important; }
-
-/* Cronoprogramma - la striscia di presenze viene disegnata appena sotto ogni barra,
-   fuori dall'altezza calcolata internamente da frappe-gantt: serve overflow-y visibile
-   sul contenitore interno della libreria (che di default clippa in verticale e mostra
-   una scrollbar) altrimenti i puntini risultano tagliati o nascosti dalla scrollbar. */
-.gantt-container { overflow-y: visible !important; }
