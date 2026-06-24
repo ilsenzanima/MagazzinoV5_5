@@ -67,6 +67,7 @@ export function TimelineChart({ tasks, taskLabel, barClass, popupContent, rowPre
                 readonly,
                 bar_height: BAR_HEIGHT,
                 padding: BAR_PADDING,
+                infinite_padding: false,
                 on_click: (task) => onTaskClick?.(task.id),
                 on_date_change: (task, start, end) => onDateChange?.(task.id, start, end),
                 on_progress_change: (task, progress) => onProgressChange?.(task.id, progress),
