@@ -14,10 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, Loader2, MapPin, Pencil, ShieldCheck, Trash2 } from "lucide-react"
+import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, GanttChartSquare, Loader2, MapPin, Pencil, ShieldCheck, Trash2 } from "lucide-react"
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals"
 import { clientsApi } from "@/lib/api"
-import { jobsApi } from "@/lib/api"
+import { jobsApi, jobTasksApi } from "@/lib/api"
+import { proposalTasksApi } from "@/lib/services/proposal-tasks"
 import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
 import { costAnalysisApi } from "@/lib/services/cost-analysis"
 import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
@@ -33,7 +34,33 @@ import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/
 import { ProposalDocuments } from "@/components/clients/detail/ProposalDocuments"
 import { ProposalConformita } from "@/components/clients/detail/ProposalConformita"
 import { ProposalDistanza } from "@/components/clients/detail/ProposalDistanza"
+import { ProposalCronoprogramma } from "@/components/clients/detail/ProposalCronoprogramma"
 import { useAuth } from "@/components/auth-provider"
+
+/** Avanza `start` di `days` giorni lavorativi (lun-ven), restituendo la data dell'ultimo giorno lavorativo occupato. */
+function addWorkingDays(start: Date, days: number): Date {
+    const d = new Date(start)
+    let remaining = days
+    while (remaining > 0) {
+        if (d.getDay() !== 0 && d.getDay() !== 6) remaining--
+        if (remaining > 0) d.setDate(d.getDate() + 1)
+    }
+    return d
+}
+
+/** Trova il primo giorno lavorativo a partire da (e incluso) `date`. */
+function firstWorkingDay(date: Date): Date {
+    const d = new Date(date)
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1)
+    return d
+}
+
+/** Giorno lavorativo successivo a `date`. */
+function nextWorkingDay(date: Date): Date {
+    const d = new Date(date)
+    d.setDate(d.getDate() + 1)
+    return firstWorkingDay(d)
+}
 
 const STATUS_LABELS: Record<ProposalStatus, string> = {
     draft: "Bozza", sent: "Inviata", pending: "In attesa", accepted: "Accettata", rejected: "Rifiutata",
@@ -62,6 +89,8 @@ export default function ProposalDetailPage() {
     const [converting, setConverting] = useState(false)
     const [costVersions, setCostVersions] = useState<ProposalCostAnalysisVersion[]>([])
     const [convertVersionId, setConvertVersionId] = useState<string>("")
+    const [convertHasTasks, setConvertHasTasks] = useState(false)
+    const [convertStartDate, setConvertStartDate] = useState("")
     const [saving, setSaving] = useState(false)
     const [useClientAddr, setUseClientAddr] = useState(false)
 
@@ -222,6 +251,27 @@ export default function ProposalDetailPage() {
             })
             await clientProposalsApi.update(proposalId, { status: "accepted", convertedJobId: job.id })
 
+            // Se la proposta ha un cronoprogramma, calcola le date reali delle fasi a partire dalla data scelta
+            if (convertHasTasks && convertStartDate) {
+                const proposalTasks = await proposalTasksApi.getByProposalId(proposalId)
+                let cursor = firstWorkingDay(new Date(convertStartDate + "T00:00:00"))
+                for (const task of proposalTasks) {
+                    const taskStart = cursor
+                    const taskEnd = addWorkingDays(taskStart, task.durationDays)
+                    await jobTasksApi.create({
+                        jobId: job.id,
+                        name: task.name,
+                        startDate: taskStart.toISOString().slice(0, 10),
+                        endDate: taskEnd.toISOString().slice(0, 10),
+                        progress: 0,
+                        status: "planned",
+                        sortOrder: task.sortOrder,
+                        notes: task.notes,
+                    })
+                    cursor = nextWorkingDay(taskEnd)
+                }
+            }
+
             // Copia l'analisi costi scelta dalla proposta alla commessa (se selezionata)
             if (convertVersionId) {
                 const [rows, params] = await Promise.all([
@@ -313,7 +363,12 @@ export default function ProposalDetailPage() {
                             {!proposal.convertedJobId && (
                                 <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={async () => {
                                     setConvertVersionId("")
+                                    setConvertStartDate("")
                                     try { setCostVersions(await proposalCostAnalysisVersionsApi.getByProposalId(proposalId)) } catch { setCostVersions([]) }
+                                    try {
+                                        const proposalTasks = await proposalTasksApi.getByProposalId(proposalId)
+                                        setConvertHasTasks(proposalTasks.length > 0)
+                                    } catch { setConvertHasTasks(false) }
                                     setConvertOpen(true)
                                 }}>
                                     <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa
@@ -346,6 +401,7 @@ export default function ProposalDetailPage() {
                         />
                     </TabsTrigger>
                     <TabsTrigger value="conformita"><ShieldCheck className="h-4 w-4 mr-2 text-green-600" />Conformità</TabsTrigger>
+                    <TabsTrigger value="cronoprogramma"><GanttChartSquare className="h-4 w-4 mr-2" />Cronoprogramma</TabsTrigger>
                 </TabsList>
 
                 {/* ── INFO ─────────────────────────────────────────────── */}
@@ -516,6 +572,11 @@ export default function ProposalDetailPage() {
                 <TabsContent value="conformita">
                     <ProposalConformita proposalId={proposalId} />
                 </TabsContent>
+
+                {/* ── CRONOPROGRAMMA ───────────────────────────────── */}
+                <TabsContent value="cronoprogramma">
+                    <ProposalCronoprogramma proposalId={proposalId} />
+                </TabsContent>
             </Tabs>
 
             {/* Edit dialog */}
@@ -614,9 +675,22 @@ export default function ProposalDetailPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                    {convertHasTasks && (
+                        <div className="space-y-1 py-2">
+                            <label className="text-sm font-medium">Data inizio cantiere</label>
+                            <p className="text-xs text-slate-500">
+                                La proposta ha un cronoprogramma: le date delle fasi verranno calcolate in giorni lavorativi a partire da questa data.
+                            </p>
+                            <Input type="date" value={convertStartDate} onChange={e => setConvertStartDate(e.target.value)} />
+                        </div>
+                    )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setConvertOpen(false)}>Annulla</Button>
-                        <Button className="bg-green-600 hover:bg-green-700" onClick={handleConvert} disabled={converting}>
+                        <Button
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={handleConvert}
+                            disabled={converting || (convertHasTasks && !convertStartDate)}
+                        >
                             {converting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Crea Commessa
                         </Button>
                     </DialogFooter>
