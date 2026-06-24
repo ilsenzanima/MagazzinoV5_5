@@ -265,7 +265,8 @@ function AssociateDialog({
     const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
     const [supplierId, setSupplierId] = useState("all")
     const [search, setSearch] = useState("")
-    const [results, setResults] = useState<ComplianceDocument[]>([])
+    const [documentTypeId, setDocumentTypeId] = useState("all")
+    const [allResults, setAllResults] = useState<ComplianceDocument[]>([])
     const [loadingResults, setLoadingResults] = useState(false)
     const [associating, setAssociating] = useState<string | null>(null)
 
@@ -288,13 +289,27 @@ function AssociateDialog({
             } else {
                 docs = await complianceApi.getAll(search || undefined)
             }
-            setResults(docs)
+            setAllResults(docs)
         } catch {
             notify.error("Errore ricerca documenti")
         } finally {
             setLoadingResults(false)
         }
     }
+
+    const availableTypes = Array.from(
+        new Map(allResults.map(d => [d.documentTypeId || d.documentTypeName, d.documentTypeName])).entries()
+    ).map(([id, name]) => ({ id, name }))
+
+    useEffect(() => {
+        if (documentTypeId !== "all" && !availableTypes.some(t => t.id === documentTypeId)) {
+            setDocumentTypeId("all")
+        }
+    }, [allResults])
+
+    const results = documentTypeId === "all"
+        ? allResults
+        : allResults.filter(d => (d.documentTypeId || d.documentTypeName) === documentTypeId)
 
     const handleAssociate = async (doc: ComplianceDocument) => {
         try {
@@ -315,13 +330,22 @@ function AssociateDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader><DialogTitle>Associa documento conformità</DialogTitle></DialogHeader>
                 <div className="space-y-3">
-                    <Select value={supplierId} onValueChange={setSupplierId}>
-                        <SelectTrigger><SelectValue placeholder="Tutti i fornitori" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tutti i fornitori</SelectItem>
-                            {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Select value={supplierId} onValueChange={setSupplierId}>
+                            <SelectTrigger><SelectValue placeholder="Tutti i fornitori" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Tutti i fornitori</SelectItem>
+                                {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Select value={documentTypeId} onValueChange={setDocumentTypeId}>
+                            <SelectTrigger><SelectValue placeholder="Tutti i tipi" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Tutti i tipi</SelectItem>
+                                {availableTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="relative">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                         <Input

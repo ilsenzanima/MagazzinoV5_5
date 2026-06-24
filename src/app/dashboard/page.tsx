@@ -33,7 +33,6 @@ export default async function DashboardPage() {
       .select(
         "id, type, number, date, created_at, jobs(code, name), delivery_note_items(quantity, inventory(name, unit))"
       )
-      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
 
@@ -41,7 +40,6 @@ export default async function DashboardPage() {
     supabase
       .from("delivery_notes")
       .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
       .gte("created_at", startOfMonth),
 
     // Ultimi 5 acquisti
