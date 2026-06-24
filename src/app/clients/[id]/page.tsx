@@ -120,7 +120,7 @@ export default function ClientDetailPage() {
 
   const loadProposals = async () => {
     try { setLoadingProposals(true); setProposals(await clientProposalsApi.getByClientId(id)); }
-    catch { notify.error("Errore caricamento proposte"); } finally { setLoadingProposals(false); }
+    catch { notify.error("Errore caricamento offerte"); } finally { setLoadingProposals(false); }
   };
 
   const handleSaveNotes = async () => {
@@ -293,7 +293,7 @@ export default function ClientDetailPage() {
               <div className="flex gap-2 flex-1 w-full">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input className="pl-9" placeholder="Cerca proposta..." value={proposalSearch} onChange={e => setProposalSearch(e.target.value)} />
+                  <Input className="pl-9" placeholder="Cerca offerta..." value={proposalSearch} onChange={e => setProposalSearch(e.target.value)} />
                 </div>
                 <Select value={proposalStatusFilter} onValueChange={setProposalStatusFilter}>
                   <SelectTrigger className="w-36"><SelectValue placeholder="Tutti gli stati" /></SelectTrigger>
@@ -306,7 +306,7 @@ export default function ClientDetailPage() {
               </div>
               {canEdit && (
                 <Button onClick={() => { setProposalForm(EMPTY_PROPOSAL_FORM); setUseClientAddr(false); setNewProposalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 shrink-0">
-                  <Plus className="h-4 w-4 mr-2" />Nuova Proposta
+                  <Plus className="h-4 w-4 mr-2" />Nuova Offerta
                 </Button>
               )}
             </div>
@@ -316,7 +316,7 @@ export default function ClientDetailPage() {
             ) : filteredProposals.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <Plus className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                <p>{proposals.length === 0 ? "Nessuna proposta ancora. Creane una!" : "Nessuna proposta corrisponde alla ricerca."}</p>
+                <p>{proposals.length === 0 ? "Nessuna offerta ancora. Creane una!" : "Nessuna offerta corrisponde alla ricerca."}</p>
               </div>
             ) : proposalsViewMode === "list" ? (
               <div className="space-y-1.5">
@@ -421,7 +421,7 @@ export default function ClientDetailPage() {
       {/* Nuova proposta dialog */}
       <Dialog open={newProposalOpen} onOpenChange={setNewProposalOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nuova Proposta</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Nuova Offerta</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
               <Label>Titolo *</Label>
