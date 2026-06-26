@@ -419,6 +419,15 @@ export const purchasesApi = {
         if (error) throw error;
     },
 
+    // Remove the link between a source order and the purchase it was converted into
+    unlinkSourceOrder: async (orderId: string) => {
+        const { error } = await supabase
+            .from('purchases')
+            .update({ converted_purchase_id: null })
+            .eq('id', orderId);
+        if (error) throw error;
+    },
+
     // Fetch orders that have been converted into this purchase (reverse lookup)
     getSourceOrders: async (purchaseId: string): Promise<{ id: string; deliveryNoteNumber: string }[]> => {
         const { data, error } = await supabase

@@ -728,30 +728,74 @@ export default function PurchaseDetailPage() {
                                     )}
                                     {/* Ordine evaso → Acquisto risultante */}
                                     {purchase.convertedPurchaseId && purchase.convertedPurchaseNumber && (
-                                        <Link
-                                            href={`/purchases/${purchase.convertedPurchaseId}`}
-                                            target={isMobile ? undefined : "_blank"}
-                                            rel={isMobile ? undefined : "noopener noreferrer"}
-                                            className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md px-3 py-1.5"
-                                        >
-                                            <ClipboardList className="h-4 w-4" />
-                                            Acquisto: {purchase.convertedPurchaseNumber}
-                                            {!isMobile && <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />}
-                                        </Link>
+                                        <div className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md px-3 py-1.5">
+                                            <Link
+                                                href={`/purchases/${purchase.convertedPurchaseId}`}
+                                                target={isMobile ? undefined : "_blank"}
+                                                rel={isMobile ? undefined : "noopener noreferrer"}
+                                                className="inline-flex items-center gap-1.5"
+                                            >
+                                                <ClipboardList className="h-4 w-4" />
+                                                Acquisto: {purchase.convertedPurchaseNumber}
+                                                {!isMobile && <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />}
+                                            </Link>
+                                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                                <button
+                                                    type="button"
+                                                    title="Annulla associazione con questo acquisto"
+                                                    onClick={async () => {
+                                                        if (!confirm(`Annullare l'associazione con l'acquisto ${purchase.convertedPurchaseNumber}?`)) return;
+                                                        try {
+                                                            await purchasesApi.unlinkSourceOrder(purchase.id);
+                                                            setPurchase(prev => prev ? { ...prev, convertedPurchaseId: null, convertedPurchaseNumber: null } : prev);
+                                                        } catch (err) {
+                                                            console.error(err);
+                                                            alert("Errore durante l'annullamento dell'associazione.");
+                                                        }
+                                                    }}
+                                                    className="p-0.5 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 rounded-full"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
                                     {/* Acquisto → Ordini sorgente */}
                                     {sourceOrders.map(order => (
-                                        <Link
+                                        <div
                                             key={order.id}
-                                            href={`/purchases/${order.id}`}
-                                            target={isMobile ? undefined : "_blank"}
-                                            rel={isMobile ? undefined : "noopener noreferrer"}
                                             className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-1.5"
                                         >
-                                            <ClipboardList className="h-4 w-4" />
-                                            Ordine: {order.deliveryNoteNumber}
-                                            {!isMobile && <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />}
-                                        </Link>
+                                            <Link
+                                                href={`/purchases/${order.id}`}
+                                                target={isMobile ? undefined : "_blank"}
+                                                rel={isMobile ? undefined : "noopener noreferrer"}
+                                                className="inline-flex items-center gap-1.5"
+                                            >
+                                                <ClipboardList className="h-4 w-4" />
+                                                Ordine: {order.deliveryNoteNumber}
+                                                {!isMobile && <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />}
+                                            </Link>
+                                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                                <button
+                                                    type="button"
+                                                    title="Annulla associazione con questo ordine"
+                                                    onClick={async () => {
+                                                        if (!confirm(`Annullare l'associazione con l'ordine ${order.deliveryNoteNumber}?`)) return;
+                                                        try {
+                                                            await purchasesApi.unlinkSourceOrder(order.id);
+                                                            setSourceOrders(prev => prev.filter(o => o.id !== order.id));
+                                                        } catch (err) {
+                                                            console.error(err);
+                                                            alert("Errore durante l'annullamento dell'associazione.");
+                                                        }
+                                                    }}
+                                                    className="p-0.5 hover:bg-amber-200 dark:hover:bg-amber-800/40 rounded-full"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
                                     ))}
                                     {/* Documenti conformità collegati */}
                                     {complianceDocs.map(doc => (
