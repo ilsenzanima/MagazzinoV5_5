@@ -129,13 +129,14 @@ export const complianceApi = {
         }
     },
 
-    uploadFile: async (file: File): Promise<string> => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `compliance_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-        const { error } = await supabase.storage.from('documents').upload(fileName, file);
-        if (error) throw error;
-        const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
-        return publicUrl;
+    uploadFile: async (file: File, supplierName: string): Promise<{ fileId: string; name: string }> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folderPath', JSON.stringify(['Fornitori', supplierName, 'Compliance']));
+        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
+        return { fileId: result.fileId, name: result.name };
     },
 
     searchPurchasesBySupplier: async (supplierId: string, search: string) => {

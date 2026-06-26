@@ -249,7 +249,9 @@ function DocumentFormDialog({
         try {
             let fileUrl = editing?.fileUrl || "";
             if (form.file) {
-                fileUrl = await complianceApi.uploadFile(form.file);
+                const supplierName = suppliers.find(s => s.id === effectiveSupplierId)?.name || effectiveSupplierId;
+                const uploaded = await complianceApi.uploadFile(form.file, supplierName);
+                fileUrl = uploaded.fileId;
             }
             let doc: ComplianceDocument;
             if (editing) {
@@ -411,6 +413,10 @@ function DocumentCard({
     const supabase = createClient();
 
     const openDocument = async () => {
+        if (!doc.fileUrl.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&fileName=${encodeURIComponent(doc.name)}`, '_blank');
+            return;
+        }
         try {
             const path = doc.fileUrl.split('/public/documents/')[1];
             if (!path) { window.open(doc.fileUrl, '_blank'); return; }
@@ -490,6 +496,10 @@ function DocumentRow({
     const supabase = createClient();
 
     const openDocument = async () => {
+        if (!doc.fileUrl.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&fileName=${encodeURIComponent(doc.name)}`, '_blank');
+            return;
+        }
         try {
             const path = doc.fileUrl.split('/public/documents/')[1];
             if (!path) { window.open(doc.fileUrl, '_blank'); return; }
