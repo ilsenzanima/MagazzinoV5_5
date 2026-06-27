@@ -142,11 +142,14 @@ export async function deleteFile(fileId: string): Promise<void> {
     await drive.files.delete({ fileId });
 }
 
-export async function downloadFile(fileId: string): Promise<Buffer> {
+export async function downloadFile(fileId: string): Promise<{ buffer: Buffer; mimeType: string }> {
     const drive = getDriveClient();
-    const res = await drive.files.get(
-        { fileId, alt: 'media' },
-        { responseType: 'arraybuffer' }
-    );
-    return Buffer.from(res.data as ArrayBuffer);
+    const [metadata, res] = await Promise.all([
+        drive.files.get({ fileId, fields: 'mimeType' }),
+        drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' }),
+    ]);
+    return {
+        buffer: Buffer.from(res.data as ArrayBuffer),
+        mimeType: metadata.data.mimeType || 'application/octet-stream',
+    };
 }

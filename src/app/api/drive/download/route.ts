@@ -18,11 +18,11 @@ export async function GET(req: NextRequest) {
     if (!fileId) return NextResponse.json({ error: 'fileId mancante' }, { status: 400 })
 
     try {
-        const buffer = await downloadFile(fileId)
+        const { buffer, mimeType } = await downloadFile(fileId)
         return new NextResponse(new Uint8Array(buffer), {
             headers: {
-                'Content-Type': 'application/octet-stream',
-                'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+                'Content-Type': mimeType,
+                'Content-Disposition': `inline; filename="${encodeURIComponent(fileName)}"`,
             },
         })
     } catch (err: any) {
