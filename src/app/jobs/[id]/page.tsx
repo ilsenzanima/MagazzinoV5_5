@@ -609,7 +609,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="conformita" className="space-y-6 focus-visible:outline-none">
-                            <JobConformita jobId={job.id} />
+                            <JobConformita jobId={job.id} jobLabel={`${job.code} ${job.name}`} />
                         </TabsContent>
 
                         <TabsContent value="documents" className="space-y-6 focus-visible:outline-none">

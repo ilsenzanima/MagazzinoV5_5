@@ -54,6 +54,7 @@ import { compressImageIfNeeded } from "@/lib/image-compress"
 
 interface JobConformitaProps {
     jobId: string
+    jobLabel?: string
 }
 
 interface PendingFile {
@@ -66,7 +67,7 @@ const UNTYPED_KEY = "__untyped__"
 
 // ─── Upload sezione ──────────────────────────────────────────────────────────
 
-function OwnDocuments({ jobId }: { jobId: string }) {
+function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string }) {
     const supabase = createClient()
     const [docs, setDocs] = useState<JobDocument[]>([])
     const [docTypes, setDocTypes] = useState<JobConformitaDocumentType[]>([])
@@ -154,15 +155,17 @@ function OwnDocuments({ jobId }: { jobId: string }) {
             for (const pf of pendingFiles) {
                 const compressed = await compressImageIfNeeded(pf.file)
                 const fileExt = compressed.name.split(".").pop() || ''
-                const fileName = `${jobId}/conformita_${Math.random().toString(36).substring(7)}_${compressed.name}`
-                const { error: upErr } = await supabase.storage.from("documents").upload(fileName, compressed)
-                if (upErr) throw upErr
-                const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(fileName)
+                const formData = new FormData()
+                formData.append('file', compressed)
+                formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Conformità']))
+                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+                const uploaded = await res.json()
+                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
                 await jobDocumentsApi.create({
                     jobId,
                     name: pf.name.trim() || pf.file.name,
                     notes: pf.notes.trim(),
-                    fileUrl: publicUrl,
+                    fileUrl: uploaded.fileId,
                     fileType: fileExt,
                     fileSize: compressed.size,
                     category: "conformita",
@@ -209,8 +212,6 @@ function OwnDocuments({ jobId }: { jobId: string }) {
     const handleDelete = async () => {
         if (!activeDoc) return
         try {
-            const path = activeDoc.fileUrl?.split("/public/documents/")[1]
-            if (path) await supabase.storage.from("documents").remove([path])
             await jobDocumentsApi.delete(activeDoc.id)
             setDocs(docs.filter(d => d.id !== activeDoc.id))
             toast.success("Documento eliminato")
@@ -224,6 +225,10 @@ function OwnDocuments({ jobId }: { jobId: string }) {
     }
 
     const openDoc = async (url: string) => {
+        if (url && !url.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento`, '_blank')
+            return
+        }
         try {
             const path = url.split("/public/documents/")[1]
             if (!path) { window.open(url, "_blank"); return }
@@ -494,6 +499,10 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     }
 
     const openDoc = async (url: string) => {
+        if (url && !url.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento`, '_blank')
+            return
+        }
         try {
             const path = url.split("/public/documents/")[1]
             if (!path) { window.open(url, "_blank"); return }
@@ -818,10 +827,10 @@ function AssociateDialog({
 
 // ─── Componente principale ───────────────────────────────────────────────────
 
-export function JobConformita({ jobId }: JobConformitaProps) {
+export function JobConformita({ jobId, jobLabel }: JobConformitaProps) {
     return (
         <div className="space-y-8">
-            <OwnDocuments jobId={jobId} />
+            <OwnDocuments jobId={jobId} jobLabel={jobLabel} />
             <div className="border-t pt-6">
                 <AssociatedDocuments jobId={jobId} />
             </div>
