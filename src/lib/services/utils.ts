@@ -11,6 +11,24 @@ export async function getSoftDeletePayload() {
     };
 }
 
+/**
+ * Elimina un file da Google Drive dato il suo fileId. Ignora silenziosamente
+ * i valori che non sono fileId Drive (URL legacy Supabase Storage con '/').
+ * Best-effort: non blocca l'operazione DB se l'eliminazione su Drive fallisce.
+ */
+export async function deleteDriveFileIfApplicable(url: string | null | undefined): Promise<void> {
+    if (!url || url.includes('/')) return;
+    try {
+        await fetch('/api/drive/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: url }),
+        });
+    } catch (err) {
+        console.error('Errore eliminazione file Drive', err);
+    }
+}
+
 export function fetchWithTimeout<T>(promise: PromiseLike<T>, ms: number = 30000): Promise<T> {
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {

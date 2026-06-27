@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { getSoftDeletePayload } from './utils';
+import { getSoftDeletePayload, deleteDriveFileIfApplicable } from './utils';
 import { compressImageIfNeeded } from '@/lib/image-compress';
 
 export type ComplianceDocumentType =
@@ -134,6 +134,12 @@ export const complianceApi = {
         if (doc.fileSize !== undefined) payload.file_size = doc.fileSize;
         if ('purchaseId' in doc) payload.purchase_id = doc.purchaseId ?? null;
 
+        let oldFileUrl: string | undefined;
+        if (doc.fileUrl !== undefined) {
+            const { data: existing } = await supabase.from('supplier_compliance_documents').select('file_url').eq('id', id).maybeSingle();
+            oldFileUrl = existing?.file_url;
+        }
+
         const { data, error } = await supabase
             .from('supplier_compliance_documents')
             .update(payload)
@@ -141,6 +147,9 @@ export const complianceApi = {
             .select(SELECT_WITH_RELATIONS)
             .single();
         if (error) throw error;
+        if (oldFileUrl && oldFileUrl !== doc.fileUrl) {
+            await deleteDriveFileIfApplicable(oldFileUrl);
+        }
         return mapDbToDoc(data);
     },
 

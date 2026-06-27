@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { compressImageIfNeeded } from '@/lib/image-compress';
+import { deleteDriveFileIfApplicable } from './utils';
 
 export interface SalCost {
     id: string;
@@ -253,8 +254,10 @@ export const salCostsApi = {
     },
 
     delete: async (id: string): Promise<void> => {
+        const { data: existing } = await supabase.from('job_sal_costs').select('document_urls').eq('id', id).maybeSingle();
         const { error } = await supabase.from('job_sal_costs').delete().eq('id', id);
         if (error) throw error;
+        await Promise.all((existing?.document_urls || []).map(deleteDriveFileIfApplicable));
     },
 
     renameSalInCosts: async (jobId: string, oldName: string, newName: string): Promise<void> => {
@@ -267,11 +270,14 @@ export const salCostsApi = {
     },
 
     updateDocumentUrls: async (id: string, documentUrls: string[]): Promise<void> => {
+        const { data: existing } = await supabase.from('job_sal_costs').select('document_urls').eq('id', id).maybeSingle();
         const { error } = await supabase
             .from('job_sal_costs')
             .update({ document_urls: documentUrls })
             .eq('id', id);
         if (error) throw error;
+        const removed = (existing?.document_urls || []).filter((u: string) => !documentUrls.includes(u));
+        await Promise.all(removed.map(deleteDriveFileIfApplicable));
     },
 
     uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {

@@ -8,6 +8,7 @@ import { useState } from "react"
 import { DocumentScanner } from "@/components/ui/document-scanner"
 import { notify } from "@/lib/notify"
 import { createClient } from "@/lib/supabase/client"
+import { deleteDriveFileIfApplicable } from "@/lib/services/utils"
 
 interface PurchaseDocumentsProps {
   purchaseId: string;
@@ -100,8 +101,10 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
     if (!confirm("Sei sicuro di voler eliminare questo documento?")) return;
     try {
       setDeletingIndex(index);
+      const removedUrl = documentUrls[index];
       const updated = documentUrls.filter((_, i) => i !== index);
       await purchasesApi.update(purchaseId, { documentUrls: updated });
+      await deleteDriveFileIfApplicable(removedUrl);
       onUpdate();
     } catch (error) {
       console.error("Failed to delete document", error);

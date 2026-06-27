@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { JobSalApprovato, JobFatturaCommittente, JobSalFatturaLink } from '@/lib/types';
 import { compressImageIfNeeded } from '@/lib/image-compress';
+import { deleteDriveFileIfApplicable } from './utils';
 
 const mapSal = (db: any): JobSalApprovato => ({
     id: db.id,
@@ -69,13 +70,25 @@ export const jobSalApprovatiApi = {
         if ('date' in payload) updates.date = payload.date ?? null;
         if ('documentUrl' in payload) updates.document_url = payload.documentUrl ?? null;
         if ('notes' in payload) updates.notes = payload.notes ?? null;
+
+        let oldDocumentUrl: string | null | undefined;
+        if ('documentUrl' in payload) {
+            const { data: existing } = await supabase.from('job_sal_approvati').select('document_url').eq('id', id).maybeSingle();
+            oldDocumentUrl = existing?.document_url;
+        }
+
         const { error } = await supabase.from('job_sal_approvati').update(updates).eq('id', id);
         if (error) throw error;
+        if (oldDocumentUrl && oldDocumentUrl !== payload.documentUrl) {
+            await deleteDriveFileIfApplicable(oldDocumentUrl);
+        }
     },
 
     delete: async (id: string): Promise<void> => {
+        const { data: existing } = await supabase.from('job_sal_approvati').select('document_url').eq('id', id).maybeSingle();
         const { error } = await supabase.from('job_sal_approvati').delete().eq('id', id);
         if (error) throw error;
+        await deleteDriveFileIfApplicable(existing?.document_url);
     },
 
     uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {
@@ -127,13 +140,25 @@ export const jobFattureCommittenteApi = {
         if ('date' in payload) updates.date = payload.date ?? null;
         if ('documentUrl' in payload) updates.document_url = payload.documentUrl ?? null;
         if ('notes' in payload) updates.notes = payload.notes ?? null;
+
+        let oldDocumentUrl: string | null | undefined;
+        if ('documentUrl' in payload) {
+            const { data: existing } = await supabase.from('job_fatture_committente').select('document_url').eq('id', id).maybeSingle();
+            oldDocumentUrl = existing?.document_url;
+        }
+
         const { error } = await supabase.from('job_fatture_committente').update(updates).eq('id', id);
         if (error) throw error;
+        if (oldDocumentUrl && oldDocumentUrl !== payload.documentUrl) {
+            await deleteDriveFileIfApplicable(oldDocumentUrl);
+        }
     },
 
     delete: async (id: string): Promise<void> => {
+        const { data: existing } = await supabase.from('job_fatture_committente').select('document_url').eq('id', id).maybeSingle();
         const { error } = await supabase.from('job_fatture_committente').delete().eq('id', id);
         if (error) throw error;
+        await deleteDriveFileIfApplicable(existing?.document_url);
     },
 
     uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {

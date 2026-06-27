@@ -7,6 +7,7 @@ import { invoicesApi } from "@/lib/api"
 import { useState } from "react"
 import { notify } from "@/lib/notify"
 import { createClient } from "@/lib/supabase/client"
+import { deleteDriveFileIfApplicable } from "@/lib/services/utils"
 
 interface InvoiceDocumentsProps {
   invoiceId: string;
@@ -73,8 +74,10 @@ export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, suppl
     if (!confirm("Sei sicuro di voler eliminare questo documento?")) return;
     try {
       setDeletingIndex(index);
+      const removedUrl = documentUrls[index];
       const updated = documentUrls.filter((_, i) => i !== index);
       await supabase.from('invoices').update({ document_urls: updated }).eq('id', invoiceId);
+      await deleteDriveFileIfApplicable(removedUrl);
       onUpdate();
     } catch (error) {
       console.error("Failed to delete document", error);

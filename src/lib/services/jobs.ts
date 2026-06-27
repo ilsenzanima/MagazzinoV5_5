@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Job, JobLog, JobDocument, Site } from '@/lib/types';
-import { fetchWithTimeout, getSoftDeletePayload } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload, deleteDriveFileIfApplicable } from './utils';
 
 // Mappers
 export const mapDbToJob = (db: any): Job => ({
@@ -431,6 +431,13 @@ export const jobDocumentsApi = {
         if (patch.fileUrl !== undefined) update.file_url = patch.fileUrl;
         if (patch.fileType !== undefined) update.file_type = patch.fileType;
         if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
+
+        let oldFileUrl: string | null | undefined;
+        if (patch.fileUrl !== undefined) {
+            const { data: existing } = await supabase.from('job_documents').select('file_url').eq('id', id).maybeSingle();
+            oldFileUrl = existing?.file_url;
+        }
+
         const { data, error } = await supabase
             .from('job_documents')
             .update(update)
@@ -438,14 +445,19 @@ export const jobDocumentsApi = {
             .select('*, profiles:uploaded_by(full_name), job_site_document_types(name), job_conformita_document_types(name)')
             .single();
         if (error) throw error;
+        if (oldFileUrl && oldFileUrl !== patch.fileUrl) {
+            await deleteDriveFileIfApplicable(oldFileUrl);
+        }
         return mapDbToJobDocument(data);
     },
     delete: async (id: string) => {
+        const { data: existing } = await supabase.from('job_documents').select('file_url').eq('id', id).maybeSingle();
         const { error } = await supabase
             .from('job_documents')
             .delete()
             .eq('id', id);
         if (error) throw error;
+        await deleteDriveFileIfApplicable(existing?.file_url);
     }
 };
 
