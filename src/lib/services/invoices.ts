@@ -126,13 +126,14 @@ export const invoicesApi = {
         if (error) throw error;
     },
 
-    uploadDocument: async (file: File): Promise<string> => {
-        const ext = file.name.split('.').pop();
-        const path = `invoices/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from('documents').upload(path, file);
-        if (error) throw error;
-        const { data } = supabase.storage.from('documents').getPublicUrl(path);
-        return data.publicUrl;
+    uploadDocument: async (file: File, supplierName?: string): Promise<string> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folderPath', JSON.stringify(['Fornitori', supplierName || 'Senza fornitore', 'Fatture']));
+        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
+        return result.fileId as string;
     },
 
     getUnlinkedPurchasesBySupplier: async (supplierId: string) => {

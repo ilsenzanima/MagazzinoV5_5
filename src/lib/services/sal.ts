@@ -273,12 +273,13 @@ export const salCostsApi = {
         if (error) throw error;
     },
 
-    uploadDocument: async (file: File): Promise<string> => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `sal_costs/${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, file);
-        if (uploadError) throw uploadError;
-        const { data } = supabase.storage.from('documents').getPublicUrl(fileName);
-        return data.publicUrl;
+    uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || 'Senza nome', 'Costi SAL']));
+        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
+        return result.fileId as string;
     },
 };

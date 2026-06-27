@@ -25,9 +25,10 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 
 interface JobDocumentsProps {
   jobId: string
+  jobLabel?: string
 }
 
-export function JobDocuments({ jobId }: JobDocumentsProps) {
+export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const [documents, setDocuments] = useState<JobDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
@@ -70,25 +71,18 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     try {
       setIsUploading(true)
 
-      // 1. Upload to Supabase Storage
       const fileExt = fileToUpload.name.split('.').pop()
-      const fileName = `${jobId}/${Math.random().toString(36).substring(7)}_${fileToUpload.name}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(fileName, fileToUpload)
+      const formData = new FormData()
+      formData.append('file', fileToUpload)
+      formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Documenti']))
+      const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+      const uploaded = await res.json()
+      if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
 
-      if (uploadError) throw uploadError
-
-      // 2. Get Public URL (or just store path if private)
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName)
-
-      // 3. Create Record in DB
       await jobDocumentsApi.create({
         jobId,
         name: fileToUpload.name,
-        fileUrl: publicUrl,
+        fileUrl: uploaded.fileId,
         fileType: fileExt,
         category: uploadCategory,
       })
@@ -105,7 +99,11 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     }
   }
 
-  const handleOpenDocument = async (fileUrl: string) => {
+  const handleOpenDocument = async (fileUrl: string, fileName?: string) => {
+    if (fileUrl && !fileUrl.includes('/')) {
+      window.open(`/api/drive/download?fileId=${encodeURIComponent(fileUrl)}&fileName=${encodeURIComponent(fileName || 'documento')}`, '_blank');
+      return;
+    }
     try {
       const path = fileUrl.split('/public/documents/')[1];
       if (!path) { window.open(fileUrl, '_blank'); return; }
@@ -121,7 +119,7 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     if (!docToDelete) return
 
     try {
-      const path = docToDelete.fileUrl?.split('/public/documents/')[1]
+      const path = docToDelete.fileUrl?.includes('/public/documents/') ? docToDelete.fileUrl.split('/public/documents/')[1] : undefined
       if (path) await supabase.storage.from('documents').remove([path])
       await jobDocumentsApi.delete(docToDelete.id)
       setDeleteDialogOpen(false)
@@ -244,7 +242,7 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
                   <div className="flex justify-between items-start">
                     <p className="font-medium truncate pr-2" title={doc.name}>{doc.name}</p>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenDocument(doc.fileUrl)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenDocument(doc.fileUrl, doc.name)}>
                         <Download className="h-3 w-3 text-slate-500" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setDocToDelete(doc); setDeleteDialogOpen(true); }}>

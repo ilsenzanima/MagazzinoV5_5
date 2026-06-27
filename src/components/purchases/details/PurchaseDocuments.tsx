@@ -14,9 +14,10 @@ interface PurchaseDocumentsProps {
   documentUrls?: string[];
   onUpdate: () => void;
   isOrder?: boolean;
+  supplierName?: string;
 }
 
-export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isOrder = false }: PurchaseDocumentsProps) {
+export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isOrder = false, supplierName }: PurchaseDocumentsProps) {
   const supabase = createClient();
   const [isUploading, setIsUploading] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
@@ -24,6 +25,10 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
   const [isDragging, setIsDragging] = useState(false);
 
   const openDocument = async (url: string) => {
+    if (!url.includes('/')) {
+      window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento.pdf`, '_blank');
+      return;
+    }
     try {
       const path = url.split('/public/documents/')[1];
       if (!path) { window.open(url, '_blank'); return; }
@@ -39,7 +44,7 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
     if (!files.length) return;
     try {
       setIsUploading(true);
-      const uploadedUrls = await Promise.all(files.map(f => purchasesApi.uploadDocument(f)));
+      const uploadedUrls = await Promise.all(files.map(f => purchasesApi.uploadDocument(f, supplierName)));
       const updated = [...documentUrls, ...uploadedUrls];
       await purchasesApi.update(purchaseId, { documentUrls: updated });
       onUpdate();
@@ -79,7 +84,7 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
     try {
       setIsUploading(true);
       const file = new File([pdfBlob], `scan_${Date.now()}.pdf`, { type: 'application/pdf' });
-      const url = await purchasesApi.uploadDocument(file);
+      const url = await purchasesApi.uploadDocument(file, supplierName);
       const updated = [...documentUrls, url];
       await purchasesApi.update(purchaseId, { documentUrls: updated });
       onUpdate();

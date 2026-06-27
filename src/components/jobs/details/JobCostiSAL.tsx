@@ -173,7 +173,8 @@ function WorkerHoursTable({ data }: { data: WorkerHoursSalData }) {
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
-export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALProps) {
+export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }: JobCostiSALProps) {
+    const jobLabel = `${jobCode ?? ''} ${jobName ?? ''}`.trim() || jobId
     const { isMobile } = useIsMobile()
     const supabase = createClient()
     // ── Data ──────────────────────────────────────────────────────────────────
@@ -869,7 +870,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             const salNameVal = newCostSal === '__none__' ? null : newCostSal
             const cost = await salCostsApi.add(jobId, desc, amount, salNameVal)
             if (newCostFiles.length > 0) {
-                const urls = await Promise.all(newCostFiles.map(f => salCostsApi.uploadDocument(f)))
+                const urls = await Promise.all(newCostFiles.map(f => salCostsApi.uploadDocument(f, jobLabel)))
                 await salCostsApi.updateDocumentUrls(cost.id, urls)
             }
             setIsAddCostOpen(false)
@@ -896,7 +897,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     const handleUploadCostDoc = async (costId: string, existingUrls: string[], file: File) => {
         try {
             setUploadingCostId(costId)
-            const url = await salCostsApi.uploadDocument(file)
+            const url = await salCostsApi.uploadDocument(file, jobLabel)
             await salCostsApi.updateDocumentUrls(costId, [...existingUrls, url])
             await loadData()
         } catch (e) {
@@ -908,6 +909,11 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
     }
     const handleDeleteCostDoc = async (costId: string, existingUrls: string[], url: string) => {
         try {
+            if (!url.includes('/')) {
+                await salCostsApi.updateDocumentUrls(costId, existingUrls.filter(u => u !== url))
+                await loadData()
+                return
+            }
             const path = url.split('/public/documents/')[1] || url.split('/documents/')[1]
             if (path) await supabase.storage.from('documents').remove([path])
             await salCostsApi.updateDocumentUrls(costId, existingUrls.filter(u => u !== url))
@@ -918,6 +924,10 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
         }
     }
     const openDocument = async (url: string) => {
+        if (!url.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento.pdf`, '_blank')
+            return
+        }
         try {
             const path = url.split('/public/documents/')[1] || url.split('/documents/')[1]
             if (!path) { window.open(url, '_blank'); return }
@@ -933,6 +943,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, movements }: JobCostiSALP
             const cost = salCosts.find(c => c.id === costId)
             if (cost?.documentUrls?.length) {
                 const paths = cost.documentUrls
+                    .filter(u => u.includes('/'))
                     .map(u => u.split('/public/documents/')[1] || u.split('/documents/')[1])
                     .filter(Boolean) as string[]
                 if (paths.length) await supabase.storage.from('documents').remove(paths)
