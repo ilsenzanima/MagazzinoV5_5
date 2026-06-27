@@ -835,6 +835,10 @@ export default function PurchaseDetailPage() {
                                 <Button
                                     onClick={async () => {
                                         if (!complianceModalDoc) return;
+                                        if (!complianceModalDoc.fileUrl.includes('/')) {
+                                            window.open(`/api/drive/download?fileId=${encodeURIComponent(complianceModalDoc.fileUrl)}&fileName=${encodeURIComponent(complianceModalDoc.name)}`, '_blank');
+                                            return;
+                                        }
                                         try {
                                             const supabase = createClient();
                                             const path = complianceModalDoc.fileUrl.split('/public/documents/')[1];
@@ -859,6 +863,7 @@ export default function PurchaseDetailPage() {
                                 documentUrls={purchase.documentUrls}
                                 onUpdate={loadData}
                                 isOrder={isOrder}
+                                supplierName={purchase.supplierName}
                             />
                         </div>
                     </div>

@@ -216,23 +216,15 @@ export const purchasesApi = {
         return mapDbToPurchase(data);
     },
 
-    uploadDocument: async (file: File) => {
+    uploadDocument: async (file: File, supplierName?: string) => {
         const compressed = await compressImageIfNeeded(file);
-        const fileExt = compressed.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-            .from('documents')
-            .upload(filePath, compressed);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-            .from('documents')
-            .getPublicUrl(filePath);
-
-        return publicUrl;
+        const formData = new FormData();
+        formData.append('file', compressed);
+        formData.append('folderPath', JSON.stringify(['Fornitori', supplierName || 'Senza fornitore', 'Acquisti']));
+        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
+        return result.fileId as string;
     },
 
     update: async (id: string, purchase: Partial<Purchase>) => {

@@ -78,14 +78,15 @@ export const jobSalApprovatiApi = {
         if (error) throw error;
     },
 
-    uploadDocument: async (file: File): Promise<string> => {
+    uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {
         const compressed = await compressImageIfNeeded(file);
-        const ext = compressed.name.split('.').pop();
-        const path = `job-billing/sal/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from('documents').upload(path, compressed);
-        if (error) throw error;
-        const { data } = supabase.storage.from('documents').getPublicUrl(path);
-        return data.publicUrl;
+        const formData = new FormData();
+        formData.append('file', compressed);
+        formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || 'Senza nome', 'SAL Approvati']));
+        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
+        return result.fileId as string;
     },
 };
 
@@ -135,14 +136,15 @@ export const jobFattureCommittenteApi = {
         if (error) throw error;
     },
 
-    uploadDocument: async (file: File): Promise<string> => {
+    uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {
         const compressed = await compressImageIfNeeded(file);
-        const ext = compressed.name.split('.').pop();
-        const path = `job-billing/fatture/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from('documents').upload(path, compressed);
-        if (error) throw error;
-        const { data } = supabase.storage.from('documents').getPublicUrl(path);
-        return data.publicUrl;
+        const formData = new FormData();
+        formData.append('file', compressed);
+        formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || 'Senza nome', 'Fatture Committente']));
+        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
+        return result.fileId as string;
     },
 };
 

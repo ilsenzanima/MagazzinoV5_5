@@ -29,6 +29,7 @@ import { compressImageIfNeeded } from "@/lib/image-compress"
 
 interface JobDocumentsProps {
   jobId: string
+  jobLabel?: string
 }
 
 interface PendingFile {
@@ -39,7 +40,7 @@ interface PendingFile {
 
 const UNTYPED_KEY = "__untyped__"
 
-export function JobDocuments({ jobId }: JobDocumentsProps) {
+export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const [documents, setDocuments] = useState<JobDocument[]>([])
   const [docTypes, setDocTypes] = useState<JobSiteDocumentType[]>([])
   const [loading, setLoading] = useState(true)
@@ -131,18 +132,19 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
       for (const pf of pendingFiles) {
         const compressed = await compressImageIfNeeded(pf.file)
         const fileExt = compressed.name.split('.').pop() || ''
-        const fileName = `${jobId}/${Math.random().toString(36).substring(7)}_${compressed.name}`
-        const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, compressed)
-        if (uploadError) throw uploadError
-
-        const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName)
+        const formData = new FormData()
+        formData.append('file', compressed)
+        formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Documenti']))
+        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+        const uploaded = await res.json()
+        if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
 
         await jobDocumentsApi.create({
           jobId,
           documentTypeId: upDocTypeId || null,
           name: pf.name.trim() || pf.file.name,
           notes: pf.notes.trim(),
-          fileUrl: publicUrl,
+          fileUrl: uploaded.fileId,
           fileType: fileExt,
           fileSize: compressed.size,
         })
@@ -179,11 +181,13 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
       if (editFile) {
         const compressed = await compressImageIfNeeded(editFile)
         const fileExt = compressed.name.split('.').pop() || ''
-        const fileName = `${jobId}/${Math.random().toString(36).substring(7)}_${compressed.name}`
-        const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, compressed)
-        if (uploadError) throw uploadError
-        const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName)
-        fileUrl = publicUrl
+        const formData = new FormData()
+        formData.append('file', compressed)
+        formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Documenti']))
+        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+        const uploaded = await res.json()
+        if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+        fileUrl = uploaded.fileId
         fileType = fileExt
         fileSize = compressed.size
       }
@@ -206,7 +210,11 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     }
   }
 
-  const handleOpenDocument = async (fileUrl: string) => {
+  const handleOpenDocument = async (fileUrl: string, fileName?: string) => {
+    if (fileUrl && !fileUrl.includes('/')) {
+      window.open(`/api/drive/download?fileId=${encodeURIComponent(fileUrl)}&fileName=${encodeURIComponent(fileName || 'documento')}`, '_blank');
+      return;
+    }
     try {
       const path = fileUrl.split('/public/documents/')[1];
       if (!path) { window.open(fileUrl, '_blank'); return; }
@@ -222,7 +230,7 @@ export function JobDocuments({ jobId }: JobDocumentsProps) {
     if (!activeDoc) return
 
     try {
-      const path = activeDoc.fileUrl?.split('/public/documents/')[1]
+      const path = activeDoc.fileUrl?.includes('/public/documents/') ? activeDoc.fileUrl.split('/public/documents/')[1] : undefined
       if (path) await supabase.storage.from('documents').remove([path])
       await jobDocumentsApi.delete(activeDoc.id)
       setDeleteOpen(false)

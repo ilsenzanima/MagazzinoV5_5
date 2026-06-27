@@ -422,7 +422,8 @@ function NewPurchaseContent() {
 
             let documentUrls: string[] = [];
             if (selectedFiles.length > 0) {
-                documentUrls = await Promise.all(selectedFiles.map(f => purchasesApi.uploadDocument(f)));
+                const supplierName = suppliers.find(s => s.id === formData.supplierId)?.name;
+                documentUrls = await Promise.all(selectedFiles.map(f => purchasesApi.uploadDocument(f, supplierName)));
             }
 
             const purchase = await purchasesApi.create({

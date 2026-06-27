@@ -12,15 +12,20 @@ interface InvoiceDocumentsProps {
   invoiceId: string;
   documentUrls?: string[];
   onUpdate: () => void;
+  supplierName?: string;
 }
 
-export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate }: InvoiceDocumentsProps) {
+export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, supplierName }: InvoiceDocumentsProps) {
   const supabase = createClient();
   const [isUploading, setIsUploading] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const openDocument = async (url: string) => {
+    if (!url.includes('/')) {
+      window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento.pdf`, '_blank');
+      return;
+    }
     try {
       const path = url.split('/public/documents/')[1];
       if (!path) { window.open(url, '_blank'); return; }
@@ -36,7 +41,7 @@ export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate }: Inv
     if (!files.length) return;
     try {
       setIsUploading(true);
-      const uploadedUrls = await Promise.all(files.map(f => invoicesApi.uploadDocument(f)));
+      const uploadedUrls = await Promise.all(files.map(f => invoicesApi.uploadDocument(f, supplierName)));
       const updated = [...documentUrls, ...uploadedUrls];
       await supabase.from('invoices').update({ document_urls: updated }).eq('id', invoiceId);
       onUpdate();

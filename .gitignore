@@ -64,6 +64,10 @@ supabase/profiles_dump.sql
 supabase/schema_dump.sql
 supabase/scripts/add_user_luisa_bertogna.sql
 
+# note/documenti locali non destinati al repo
+/docs/integrazione-onedrive.md
+/docs/procedura-attivazione-onedrive.md
+
 # log e file di debug locali
 build_err.log
 compile_errors.txt

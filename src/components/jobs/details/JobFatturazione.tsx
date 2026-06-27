@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/client"
 
 interface JobFatturazioneProps {
     jobId: string
-    job: { estimatedCost?: number | null; id: string }
+    job: { estimatedCost?: number | null; id: string; code?: string; name?: string }
     onJobUpdated: () => void
 }
 
@@ -164,6 +164,10 @@ function EntryDialog({
 // ── Apri documento con signed URL ────────────────────────────────────────────
 
 async function openDocument(url: string) {
+    if (!url.includes('/')) {
+        window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento.pdf`, '_blank')
+        return
+    }
     try {
         const supabase = createClient()
         const path = url.split('/public/documents/')[1]
@@ -306,9 +310,10 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
         setSalDocUrl(s.documentUrl)
         setSalDialogOpen(true)
     }
+    const jobLabel = `${job.code ?? ''} ${job.name ?? ''}`.trim() || job.id
     const handleSalFile = async (file: File) => {
         setUploadingSal(true)
-        try { setSalDocUrl(await jobSalApprovatiApi.uploadDocument(file)) }
+        try { setSalDocUrl(await jobSalApprovatiApi.uploadDocument(file, jobLabel)) }
         catch { notify.error("Errore upload") }
         finally { setUploadingSal(false) }
     }
@@ -340,7 +345,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
     }
     const handleFatturaFile = async (file: File) => {
         setUploadingFattura(true)
-        try { setFatturaDocUrl(await jobFattureCommittenteApi.uploadDocument(file)) }
+        try { setFatturaDocUrl(await jobFattureCommittenteApi.uploadDocument(file, jobLabel)) }
         catch { notify.error("Errore upload") }
         finally { setUploadingFattura(false) }
     }

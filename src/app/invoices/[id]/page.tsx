@@ -508,6 +508,7 @@ export default function InvoiceDetailPage() {
                         invoiceId={id}
                         documentUrls={invoice.documentUrls}
                         onUpdate={load}
+                        supplierName={invoice.supplierName}
                     />
 
                     {/* ── Bolle collegate ── */}

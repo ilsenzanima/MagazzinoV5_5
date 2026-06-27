@@ -187,6 +187,7 @@ function DocumentFormDialog({
     open,
     onOpenChange,
     supplierId,
+    suppliers,
     brands,
     docTypes,
     editing,
@@ -195,6 +196,7 @@ function DocumentFormDialog({
     open: boolean;
     onOpenChange: (v: boolean) => void;
     supplierId: string;
+    suppliers: Supplier[];
     brands: Brand[];
     docTypes: ComplianceDocumentTypeConfig[];
     editing: ComplianceDocument;
@@ -239,7 +241,9 @@ function DocumentFormDialog({
             let fileUrl = editing.fileUrl;
             let fileSize = editing.fileSize;
             if (form.file) {
-                fileUrl = await complianceApi.uploadFile(form.file);
+                const supplierName = suppliers.find(s => s.id === supplierId)?.name || supplierId;
+                const uploaded = await complianceApi.uploadFile(form.file, supplierName);
+                fileUrl = uploaded.fileId;
                 fileSize = form.file.size;
             }
             const doc = await complianceApi.update(editing.id, {
@@ -444,15 +448,16 @@ function MultiUploadDialog({
         try {
             setUploading(true);
             const uploaded: ComplianceDocument[] = [];
+            const supplierName = suppliers.find(s => s.id === effectiveSupplierId)?.name || effectiveSupplierId;
             for (const pf of pendingFiles) {
-                const fileUrl = await complianceApi.uploadFile(pf.file);
+                const result = await complianceApi.uploadFile(pf.file, supplierName);
                 const doc = await complianceApi.create({
                     supplierId: effectiveSupplierId,
                     brandId,
                     documentTypeId: documentTypeId || null,
                     name: pf.name.trim() || pf.file.name,
                     notes: pf.notes.trim() || undefined,
-                    fileUrl,
+                    fileUrl: result.fileId,
                     fileSize: pf.file.size,
                 });
                 uploaded.push(doc);
@@ -602,6 +607,10 @@ function DocumentCard({
     const supabase = createClient();
 
     const openDocument = async () => {
+        if (!doc.fileUrl.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&fileName=${encodeURIComponent(doc.name)}`, '_blank');
+            return;
+        }
         try {
             const path = doc.fileUrl.split('/public/documents/')[1];
             if (!path) { window.open(doc.fileUrl, '_blank'); return; }
@@ -682,6 +691,10 @@ function DocumentRow({
     const supabase = createClient();
 
     const openDocument = async () => {
+        if (!doc.fileUrl.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&fileName=${encodeURIComponent(doc.name)}`, '_blank');
+            return;
+        }
         try {
             const path = doc.fileUrl.split('/public/documents/')[1];
             if (!path) { window.open(doc.fileUrl, '_blank'); return; }
@@ -1003,6 +1016,7 @@ export default function CompliancePage() {
                     open={dialogOpen}
                     onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditingDoc(null); }}
                     supplierId={selectedSupplierId}
+                    suppliers={suppliers}
                     brands={brands}
                     docTypes={docTypes}
                     editing={editingDoc}
