@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { deleteFile } from "@/lib/google-drive"
 
 const THIRTY_DAYS_AGO = () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
 function extractStoragePaths(urls: (string | null | undefined)[]): string[] {
     return urls
         .filter(Boolean)
+        .filter(u => u!.includes('/public/documents/'))
         .map(u => u!.split('/public/documents/')[1])
         .filter(Boolean) as string[]
+}
+
+function extractDriveFileIds(urls: (string | null | undefined)[]): string[] {
+    return urls.filter(Boolean).filter(u => !u!.includes('/')) as string[]
 }
 
 async function deleteStorageFiles(admin: SupabaseClient, paths: string[]) {
@@ -17,6 +23,10 @@ async function deleteStorageFiles(admin: SupabaseClient, paths: string[]) {
     for (let i = 0; i < paths.length; i += 200) {
         await admin.storage.from('documents').remove(paths.slice(i, i + 200))
     }
+}
+
+async function deleteDriveFiles(fileIds: string[]) {
+    await Promise.allSettled(fileIds.map(id => deleteFile(id)))
 }
 
 export async function POST(req: NextRequest) {
@@ -46,10 +56,11 @@ export async function POST(req: NextRequest) {
         const { data } = await admin.from('purchases').select('id, document_url, document_urls')
             .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
         if (data?.length) {
-            const paths = extractStoragePaths(data.flatMap(r =>
+            const allUrls = data.flatMap(r =>
                 Array.isArray(r.document_urls) && r.document_urls.length ? r.document_urls : r.document_url ? [r.document_url] : []
-            ))
-            await deleteStorageFiles(admin, paths)
+            )
+            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+            await deleteDriveFiles(extractDriveFileIds(allUrls))
             await admin.from('purchases').delete().in('id', data.map(r => r.id))
             results.acquisti = data.length
         }
@@ -60,16 +71,45 @@ export async function POST(req: NextRequest) {
         const { data } = await admin.from('invoices').select('id, document_urls')
             .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
         if (data?.length) {
-            await deleteStorageFiles(admin, extractStoragePaths(data.flatMap(r => r.document_urls ?? [])))
+            const allUrls = data.flatMap(r => r.document_urls ?? [])
+            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+            await deleteDriveFiles(extractDriveFileIds(allUrls))
             await admin.from('invoices').delete().in('id', data.map(r => r.id))
             results.fatture = data.length
+        }
+    }
+
+    // Jobs — elimina anche i file collegati (documenti cantiere, condivisi, SAL, fatture committente)
+    {
+        const { data } = await admin.from('jobs').select('id')
+            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
+        if (data?.length) {
+            const jobIds = data.map(r => r.id)
+            const [jobDocs, sharedDocs, salCosts, salApprovati, fattureCommittente] = await Promise.all([
+                admin.from('job_documents').select('file_url').in('job_id', jobIds),
+                admin.from('shared_documents').select('file_url').in('job_id', jobIds),
+                admin.from('job_sal_costs').select('document_urls').in('job_id', jobIds),
+                admin.from('job_sal_approvati').select('document_url').in('job_id', jobIds),
+                admin.from('job_fatture_committente').select('document_url').in('job_id', jobIds),
+            ])
+            const allUrls = [
+                ...(jobDocs.data ?? []).map(r => r.file_url),
+                ...(sharedDocs.data ?? []).map(r => r.file_url),
+                ...(salCosts.data ?? []).flatMap(r => r.document_urls ?? []),
+                ...(salApprovati.data ?? []).map(r => r.document_url),
+                ...(fattureCommittente.data ?? []).map(r => r.document_url),
+            ]
+            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+            await deleteDriveFiles(extractDriveFileIds(allUrls))
+            await admin.from('jobs').delete().in('id', jobIds)
+            results.commesse = jobIds.length
         }
     }
 
     // Record senza file
     const tableLabels: Record<string, string> = {
         clients: 'committenti', suppliers: 'fornitori', inventory: 'inventario',
-        jobs: 'commesse', workers: 'operai', load_notes: 'note_carico', client_proposals: 'proposte'
+        workers: 'operai', load_notes: 'note_carico', client_proposals: 'proposte'
     }
     for (const [table, label] of Object.entries(tableLabels)) {
         const { data } = await admin.from(table).select('id')
