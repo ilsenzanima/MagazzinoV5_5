@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { deleteDriveFileIfApplicable } from './utils';
 
 export interface JobCommessaDocument {
     id: string;
@@ -79,13 +80,25 @@ export const jobCommessaDocumentsApi = {
         if (patch.fileType !== undefined) update.file_type = patch.fileType;
         if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
         if (patch.documentTypeId !== undefined) update.proposal_document_type_id = patch.documentTypeId || null;
+
+        let oldFileUrl: string | undefined;
+        if (patch.fileUrl !== undefined) {
+            const { data: existing } = await supabase.from('shared_documents').select('file_url').eq('id', id).maybeSingle();
+            oldFileUrl = existing?.file_url;
+        }
+
         const { data, error } = await supabase.from('shared_documents').update(update).eq('id', id).select('*, proposal_document_types(name)').single();
         if (error) throw error;
+        if (oldFileUrl && oldFileUrl !== patch.fileUrl) {
+            await deleteDriveFileIfApplicable(oldFileUrl);
+        }
         return map(data);
     },
 
     delete: async (id: string): Promise<void> => {
+        const { data: existing } = await supabase.from('shared_documents').select('file_url').eq('id', id).maybeSingle();
         const { error } = await supabase.from('shared_documents').delete().eq('id', id);
         if (error) throw error;
+        await deleteDriveFileIfApplicable(existing?.file_url);
     },
 };
