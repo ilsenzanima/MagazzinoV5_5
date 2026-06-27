@@ -13,6 +13,12 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 const { google } = require('googleapis');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 const datasetPath = process.argv[2];
 const outputPath = process.argv[3];
@@ -106,10 +112,18 @@ async function uploadBufferToDrive(folderId, fileName, buffer) {
     return { fileId: res.data.id, name: res.data.name, webViewLink: res.data.webViewLink };
 }
 
+function storagePathFromUrl(url) {
+    const marker = '/public/documents/';
+    const idx = url.indexOf(marker);
+    if (idx === -1) throw new Error(`URL non riconosciuto: ${url}`);
+    return decodeURIComponent(url.slice(idx + marker.length));
+}
+
 async function downloadFromUrl(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status} scaricando ${url}`);
-    const arrayBuffer = await res.arrayBuffer();
+    const objectPath = storagePathFromUrl(url);
+    const { data, error } = await supabase.storage.from('documents').download(objectPath);
+    if (error) throw new Error(`Supabase Storage: ${error.message} (${objectPath})`);
+    const arrayBuffer = await data.arrayBuffer();
     return Buffer.from(arrayBuffer);
 }
 
