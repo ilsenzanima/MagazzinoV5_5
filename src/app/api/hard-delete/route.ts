@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { deleteFile } from "@/lib/google-drive"
+import { deleteFile, markFolderDeleted } from "@/lib/google-drive"
 
 const TABLE_MAP: Record<string, string> = {
     purchases: "purchases",
@@ -77,7 +77,8 @@ export async function POST(req: NextRequest) {
             await deleteDriveFiles(extractDriveFileIds(data.document_urls))
         }
     } else if (section === "jobs") {
-        const [jobDocs, sharedDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
+        const [job, jobDocs, sharedDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
+            admin.from('jobs').select('code, name').eq('id', id).single(),
             admin.from('job_documents').select('file_url').eq('job_id', id),
             admin.from('shared_documents').select('file_url').eq('job_id', id),
             admin.from('shared_supplier_offers').select('file_url').eq('job_id', id),
@@ -95,6 +96,9 @@ export async function POST(req: NextRequest) {
         ]
         await deleteStorageFiles(admin, extractStoragePaths(allUrls))
         await deleteDriveFiles(extractDriveFileIds(allUrls))
+        if (job.data) {
+            await markFolderDeleted(['Cantieri', `${job.data.code} ${job.data.name}`]).catch(() => {})
+        }
     } else if (section === "proposals") {
         const [sharedDocs, supplierOffers] = await Promise.all([
             admin.from('shared_documents').select('file_url').eq('proposal_id', id),
@@ -106,6 +110,7 @@ export async function POST(req: NextRequest) {
         ]
         await deleteStorageFiles(admin, extractStoragePaths(allUrls))
         await deleteDriveFiles(extractDriveFileIds(allUrls))
+        await markFolderDeleted(['Proposte', id]).catch(() => {})
     }
 
     let error: any

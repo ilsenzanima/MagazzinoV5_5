@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { deleteFile } from "@/lib/google-drive"
+import { deleteFile, markFolderDeleted } from "@/lib/google-drive"
 
 const THIRTY_DAYS_AGO = () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
 
     // Jobs — elimina anche i file collegati (documenti cantiere, condivisi, SAL, fatture committente)
     {
-        const { data } = await admin.from('jobs').select('id')
+        const { data } = await admin.from('jobs').select('id, code, name')
             .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
         if (data?.length) {
             const jobIds = data.map(r => r.id)
@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
             await deleteStorageFiles(admin, extractStoragePaths(allUrls))
             await deleteDriveFiles(extractDriveFileIds(allUrls))
             await admin.from('jobs').delete().in('id', jobIds)
+            await Promise.allSettled(data.map(job => markFolderDeleted(['Cantieri', `${job.code} ${job.name}`])))
             results.commesse = jobIds.length
         }
     }
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest) {
             await deleteStorageFiles(admin, extractStoragePaths(allUrls))
             await deleteDriveFiles(extractDriveFileIds(allUrls))
             await admin.from('client_proposals').delete().in('id', proposalIds)
+            await Promise.allSettled(proposalIds.map(id => markFolderDeleted(['Proposte', id])))
             results.proposte = proposalIds.length
         }
     }

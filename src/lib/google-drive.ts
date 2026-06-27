@@ -142,6 +142,43 @@ export async function deleteFile(fileId: string): Promise<void> {
     await drive.files.delete({ fileId });
 }
 
+/**
+ * Trova una sottocartella per nome dentro il parent indicato, senza crearla.
+ */
+async function findFolder(name: string, parentId: string): Promise<string | null> {
+    const drive = getDriveClient();
+    const safeName = name.replace(/'/g, "\\'");
+
+    const existing = await drive.files.list({
+        q: `'${parentId}' in parents and name = '${safeName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+        fields: 'files(id, name)',
+        spaces: 'drive',
+    });
+
+    return existing.data.files?.[0]?.id ?? null;
+}
+
+/**
+ * Rinomina la cartella al percorso indicato aggiungendo il prefisso "ELIMINATO - ",
+ * per segnalare visivamente su Drive che l'entità collegata è stata eliminata
+ * definitivamente (la cartella non viene rimossa, va pulita manualmente).
+ * Non fa nulla se la cartella non esiste o è già marcata.
+ */
+export async function markFolderDeleted(segments: string[]): Promise<void> {
+    let parentId = getRootFolderId();
+    for (const segment of segments) {
+        const id = await findFolder(segment, parentId);
+        if (!id) return;
+        parentId = id;
+    }
+
+    const drive = getDriveClient();
+    const current = await drive.files.get({ fileId: parentId, fields: 'name' });
+    const name = current.data.name || '';
+    if (name.startsWith('ELIMINATO - ')) return;
+    await drive.files.update({ fileId: parentId, requestBody: { name: `ELIMINATO - ${name}` } });
+}
+
 export async function downloadFile(fileId: string): Promise<{ buffer: Buffer; mimeType: string }> {
     const drive = getDriveClient();
     const [metadata, res] = await Promise.all([
