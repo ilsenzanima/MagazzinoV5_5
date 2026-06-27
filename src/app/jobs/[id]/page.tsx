@@ -618,7 +618,7 @@ export default function JobDetailsPage() {
 
                         {(userRole === 'admin' || userRole === 'operativo') && (
                             <TabsContent value="commessa-documents" className="space-y-6 focus-visible:outline-none">
-                                <JobCommessaDocuments jobId={job.id} />
+                                <JobCommessaDocuments jobId={job.id} jobLabel={`${job.code} ${job.name}`} />
                             </TabsContent>
                         )}
 

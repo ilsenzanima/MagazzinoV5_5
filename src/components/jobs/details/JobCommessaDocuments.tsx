@@ -23,6 +23,7 @@ import { compressImageIfNeeded } from "@/lib/image-compress"
 
 interface Props {
     jobId: string
+    jobLabel?: string
 }
 
 interface PendingFile {
@@ -33,7 +34,7 @@ interface PendingFile {
 
 const UNTYPED_KEY = "__untyped__"
 
-export function JobCommessaDocuments({ jobId }: Props) {
+export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
     const [documents, setDocuments] = useState<JobCommessaDocument[]>([])
     const [docTypes, setDocTypes] = useState<ProposalDocumentType[]>([])
     const [loading, setLoading] = useState(true)
@@ -74,7 +75,11 @@ export function JobCommessaDocuments({ jobId }: Props) {
         finally { setLoading(false) }
     }
 
-    const openDoc = async (fileUrl: string) => {
+    const openDoc = async (fileUrl: string, fileName?: string) => {
+        if (fileUrl && !fileUrl.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(fileUrl)}&fileName=${encodeURIComponent(fileName || 'documento')}`, '_blank')
+            return
+        }
         try {
             const path = fileUrl.split('/public/documents/')[1]
             if (!path) { window.open(fileUrl, '_blank'); return }
@@ -138,16 +143,19 @@ export function JobCommessaDocuments({ jobId }: Props) {
             for (const pf of pendingFiles) {
                 const compressed = await compressImageIfNeeded(pf.file)
                 const ext = compressed.name.split('.').pop() || ''
-                const path = `jobs/${jobId}/commessa/${Math.random().toString(36).slice(2)}_${compressed.name}`
-                const { error: upErr } = await supabase.storage.from('documents').upload(path, compressed)
-                if (upErr) throw upErr
-                const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
+                const formData = new FormData()
+                formData.append('file', compressed)
+                formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Commessa']))
+                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+                const uploaded = await res.json()
+                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+
                 await jobCommessaDocumentsApi.create({
                     jobId,
                     documentTypeId: upDocTypeId || null,
                     name: pf.name.trim() || pf.file.name,
                     notes: pf.notes.trim(),
-                    fileUrl: publicUrl,
+                    fileUrl: uploaded.fileId,
                     fileType: ext,
                     fileSize: compressed.size,
                     uploadedBy: '',
@@ -172,11 +180,13 @@ export function JobCommessaDocuments({ jobId }: Props) {
             if (editFile) {
                 const compressed = await compressImageIfNeeded(editFile)
                 const ext = compressed.name.split('.').pop() || ''
-                const path = `jobs/${jobId}/commessa/${Math.random().toString(36).slice(2)}_${compressed.name}`
-                const { error: upErr } = await supabase.storage.from('documents').upload(path, compressed)
-                if (upErr) throw upErr
-                const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
-                fileUrl = publicUrl
+                const formData = new FormData()
+                formData.append('file', compressed)
+                formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Commessa']))
+                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+                const uploaded = await res.json()
+                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+                fileUrl = uploaded.fileId
                 fileType = ext
                 fileSize = compressed.size
             }
@@ -213,7 +223,7 @@ export function JobCommessaDocuments({ jobId }: Props) {
         <Card
             key={doc.id}
             className="hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => openDoc(doc.fileUrl)}
+            onClick={() => openDoc(doc.fileUrl, doc.name)}
         >
             <CardContent className="p-4 flex items-start gap-3">
                 <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
@@ -243,7 +253,7 @@ export function JobCommessaDocuments({ jobId }: Props) {
         <div
             key={doc.id}
             className="flex items-center gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors cursor-pointer"
-            onClick={() => openDoc(doc.fileUrl)}
+            onClick={() => openDoc(doc.fileUrl, doc.name)}
         >
             <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
             <div className="flex-1 min-w-0">
