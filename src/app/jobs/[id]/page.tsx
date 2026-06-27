@@ -645,7 +645,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="ordini" className="space-y-6 focus-visible:outline-none">
-                            <JobOrdiniDocumenti jobId={job.id} jobCode={job.code} />
+                            <JobOrdiniDocumenti jobId={job.id} jobCode={job.code} jobLabel={`${job.code} ${job.name}`} />
                         </TabsContent>
 
                         {(userRole === 'admin' || userRole === 'operativo') && (

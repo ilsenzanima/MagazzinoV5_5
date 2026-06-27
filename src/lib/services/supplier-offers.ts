@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { deleteDriveFileIfApplicable } from './utils';
 
 export interface SupplierOffer {
     id: string;
@@ -91,8 +92,10 @@ export const supplierOffersApi = {
     },
 
     delete: async (id: string): Promise<void> => {
+        const { data: existing } = await supabase.from('shared_supplier_offers').select('file_url').eq('id', id).maybeSingle();
         const { error } = await supabase.from('shared_supplier_offers').delete().eq('id', id);
         if (error) throw error;
+        await deleteDriveFileIfApplicable(existing?.file_url);
     },
 
     // Collega alla commessa appena creata tutte le offerte già caricate sulla proposta,

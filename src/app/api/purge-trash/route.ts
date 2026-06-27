@@ -85,9 +85,10 @@ export async function POST(req: NextRequest) {
             .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
         if (data?.length) {
             const jobIds = data.map(r => r.id)
-            const [jobDocs, sharedDocs, salCosts, salApprovati, fattureCommittente] = await Promise.all([
+            const [jobDocs, sharedDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
                 admin.from('job_documents').select('file_url').in('job_id', jobIds),
                 admin.from('shared_documents').select('file_url').in('job_id', jobIds),
+                admin.from('shared_supplier_offers').select('file_url').in('job_id', jobIds),
                 admin.from('job_sal_costs').select('document_urls').in('job_id', jobIds),
                 admin.from('job_sal_approvati').select('document_url').in('job_id', jobIds),
                 admin.from('job_fatture_committente').select('document_url').in('job_id', jobIds),
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
             const allUrls = [
                 ...(jobDocs.data ?? []).map(r => r.file_url),
                 ...(sharedDocs.data ?? []).map(r => r.file_url),
+                ...(supplierOffers.data ?? []).map(r => r.file_url),
                 ...(salCosts.data ?? []).flatMap(r => r.document_urls ?? []),
                 ...(salApprovati.data ?? []).map(r => r.document_url),
                 ...(fattureCommittente.data ?? []).map(r => r.document_url),
@@ -106,10 +108,31 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    // Proposte — elimina anche i file collegati (documenti condivisi, offerte fornitori)
+    {
+        const { data } = await admin.from('client_proposals').select('id')
+            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
+        if (data?.length) {
+            const proposalIds = data.map(r => r.id)
+            const [sharedDocs, supplierOffers] = await Promise.all([
+                admin.from('shared_documents').select('file_url').in('proposal_id', proposalIds),
+                admin.from('shared_supplier_offers').select('file_url').in('proposal_id', proposalIds),
+            ])
+            const allUrls = [
+                ...(sharedDocs.data ?? []).map(r => r.file_url),
+                ...(supplierOffers.data ?? []).map(r => r.file_url),
+            ]
+            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+            await deleteDriveFiles(extractDriveFileIds(allUrls))
+            await admin.from('client_proposals').delete().in('id', proposalIds)
+            results.proposte = proposalIds.length
+        }
+    }
+
     // Record senza file
     const tableLabels: Record<string, string> = {
         clients: 'committenti', suppliers: 'fornitori', inventory: 'inventario',
-        workers: 'operai', load_notes: 'note_carico', client_proposals: 'proposte'
+        workers: 'operai', load_notes: 'note_carico'
     }
     for (const [table, label] of Object.entries(tableLabels)) {
         const { data } = await admin.from(table).select('id')

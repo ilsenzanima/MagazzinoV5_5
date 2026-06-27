@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { deleteDriveFileIfApplicable } from './utils';
 
 export interface ProposalDocument {
     id: string;
@@ -85,8 +86,10 @@ export const proposalDocumentsApi = {
     },
 
     delete: async (id: string): Promise<void> => {
+        const { data: existing } = await supabase.from('shared_documents').select('file_url').eq('id', id).maybeSingle();
         const { error } = await supabase.from('shared_documents').delete().eq('id', id);
         if (error) throw error;
+        await deleteDriveFileIfApplicable(existing?.file_url);
     },
 
     // Collega alla commessa appena creata tutti i documenti già caricati sulla proposta,

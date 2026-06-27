@@ -7,9 +7,10 @@ import { JobOrdini } from "@/components/jobs/details/JobOrdini"
 interface Props {
     jobId: string
     jobCode?: string
+    jobLabel?: string
 }
 
-export function JobOrdiniDocumenti({ jobId, jobCode }: Props) {
+export function JobOrdiniDocumenti({ jobId, jobCode, jobLabel }: Props) {
     return (
         <Tabs defaultValue="offerte" className="space-y-4">
             <TabsList>
@@ -18,7 +19,7 @@ export function JobOrdiniDocumenti({ jobId, jobCode }: Props) {
             </TabsList>
 
             <TabsContent value="offerte" className="space-y-4">
-                <SupplierOffers jobId={jobId} />
+                <SupplierOffers jobId={jobId} jobLabel={jobLabel} />
             </TabsContent>
 
             <TabsContent value="conferme" className="space-y-4">

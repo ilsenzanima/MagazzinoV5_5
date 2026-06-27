@@ -77,9 +77,10 @@ export async function POST(req: NextRequest) {
             await deleteDriveFiles(extractDriveFileIds(data.document_urls))
         }
     } else if (section === "jobs") {
-        const [jobDocs, sharedDocs, salCosts, salApprovati, fattureCommittente] = await Promise.all([
+        const [jobDocs, sharedDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
             admin.from('job_documents').select('file_url').eq('job_id', id),
             admin.from('shared_documents').select('file_url').eq('job_id', id),
+            admin.from('shared_supplier_offers').select('file_url').eq('job_id', id),
             admin.from('job_sal_costs').select('document_urls').eq('job_id', id),
             admin.from('job_sal_approvati').select('document_url').eq('job_id', id),
             admin.from('job_fatture_committente').select('document_url').eq('job_id', id),
@@ -87,9 +88,21 @@ export async function POST(req: NextRequest) {
         const allUrls = [
             ...(jobDocs.data ?? []).map(r => r.file_url),
             ...(sharedDocs.data ?? []).map(r => r.file_url),
+            ...(supplierOffers.data ?? []).map(r => r.file_url),
             ...(salCosts.data ?? []).flatMap(r => r.document_urls ?? []),
             ...(salApprovati.data ?? []).map(r => r.document_url),
             ...(fattureCommittente.data ?? []).map(r => r.document_url),
+        ]
+        await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+        await deleteDriveFiles(extractDriveFileIds(allUrls))
+    } else if (section === "proposals") {
+        const [sharedDocs, supplierOffers] = await Promise.all([
+            admin.from('shared_documents').select('file_url').eq('proposal_id', id),
+            admin.from('shared_supplier_offers').select('file_url').eq('proposal_id', id),
+        ])
+        const allUrls = [
+            ...(sharedDocs.data ?? []).map(r => r.file_url),
+            ...(supplierOffers.data ?? []).map(r => r.file_url),
         ]
         await deleteStorageFiles(admin, extractStoragePaths(allUrls))
         await deleteDriveFiles(extractDriveFileIds(allUrls))

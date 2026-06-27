@@ -75,6 +75,10 @@ export function ProposalDocuments({ proposalId }: Props) {
     }
 
     const openDoc = async (fileUrl: string) => {
+        if (fileUrl && !fileUrl.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(fileUrl)}&fileName=documento`, '_blank')
+            return
+        }
         try {
             const path = fileUrl.split('/public/documents/')[1]
             if (!path) { window.open(fileUrl, '_blank'); return }
@@ -138,16 +142,18 @@ export function ProposalDocuments({ proposalId }: Props) {
             for (const pf of pendingFiles) {
                 const compressed = await compressImageIfNeeded(pf.file)
                 const ext = compressed.name.split('.').pop() || ''
-                const path = `proposals/${proposalId}/${Math.random().toString(36).slice(2)}_${compressed.name}`
-                const { error: upErr } = await supabase.storage.from('documents').upload(path, compressed)
-                if (upErr) throw upErr
-                const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
+                const formData = new FormData()
+                formData.append('file', compressed)
+                formData.append('folderPath', JSON.stringify(['Proposte', proposalId, 'Documenti']))
+                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+                const uploaded = await res.json()
+                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
                 await proposalDocumentsApi.create({
                     proposalId,
                     documentTypeId: upDocTypeId || null,
                     name: pf.name.trim() || pf.file.name,
                     notes: pf.notes.trim(),
-                    fileUrl: publicUrl,
+                    fileUrl: uploaded.fileId,
                     fileType: ext,
                     fileSize: compressed.size,
                     uploadedBy: '',
@@ -172,11 +178,13 @@ export function ProposalDocuments({ proposalId }: Props) {
             if (editFile) {
                 const compressed = await compressImageIfNeeded(editFile)
                 const ext = compressed.name.split('.').pop() || ''
-                const path = `proposals/${proposalId}/${Math.random().toString(36).slice(2)}_${compressed.name}`
-                const { error: upErr } = await supabase.storage.from('documents').upload(path, compressed)
-                if (upErr) throw upErr
-                const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
-                fileUrl = publicUrl
+                const formData = new FormData()
+                formData.append('file', compressed)
+                formData.append('folderPath', JSON.stringify(['Proposte', proposalId, 'Documenti']))
+                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+                const uploaded = await res.json()
+                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+                fileUrl = uploaded.fileId
                 fileType = ext
                 fileSize = compressed.size
             }

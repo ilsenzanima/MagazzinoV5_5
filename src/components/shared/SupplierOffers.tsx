@@ -27,9 +27,10 @@ interface PendingFile {
 interface Props {
     jobId?: string
     proposalId?: string
+    jobLabel?: string
 }
 
-export function SupplierOffers({ jobId, proposalId }: Props) {
+export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     const [documents, setDocuments] = useState<SupplierOffer[]>([])
     const [loading, setLoading] = useState(true)
     const [uploadOpen, setUploadOpen] = useState(false)
@@ -52,7 +53,7 @@ export function SupplierOffers({ jobId, proposalId }: Props) {
     const [editNotes, setEditNotes] = useState("")
 
     const ownerId = jobId || proposalId
-    const storagePrefix = jobId ? `jobs/${jobId}` : `proposals/${proposalId}`
+    const folderPath = jobId ? ['Cantieri', jobLabel || jobId, 'Offerte Fornitori'] : ['Proposte', proposalId || '', 'Offerte Fornitori']
 
     useEffect(() => {
         if (ownerId) load()
@@ -116,17 +117,19 @@ export function SupplierOffers({ jobId, proposalId }: Props) {
             for (const pending of pendingFiles) {
                 const compressed = await compressImageIfNeeded(pending.file)
                 const fileExt = compressed.name.split('.').pop() || ''
-                const path = `${storagePrefix}/offerte-fornitori/${Math.random().toString(36).substring(7)}_${compressed.name}`
-                const { error: uploadError } = await supabase.storage.from('documents').upload(path, compressed)
-                if (uploadError) throw uploadError
-                const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
+                const formData = new FormData()
+                formData.append('file', compressed)
+                formData.append('folderPath', JSON.stringify(folderPath))
+                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+                const uploaded = await res.json()
+                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
 
                 await supplierOffersApi.create({
                     jobId,
                     proposalId,
                     name: pending.name.trim() || pending.file.name,
                     notes: pending.notes.trim(),
-                    fileUrl: publicUrl,
+                    fileUrl: uploaded.fileId,
                     fileType: fileExt,
                 })
             }
@@ -167,6 +170,10 @@ export function SupplierOffers({ jobId, proposalId }: Props) {
     }
 
     const handleOpenDocument = async (fileUrl: string) => {
+        if (fileUrl && !fileUrl.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(fileUrl)}&fileName=documento`, '_blank')
+            return
+        }
         try {
             const path = fileUrl.split('/public/documents/')[1]
             if (!path) { window.open(fileUrl, '_blank'); return }
