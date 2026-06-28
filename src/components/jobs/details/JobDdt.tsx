@@ -80,6 +80,10 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   }
 
   const openSupplierDoc = async (url: string) => {
+    if (url && !url.includes('/')) {
+      window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}`, '_blank')
+      return
+    }
     try {
       const path = url.split('/public/documents/')[1]
       if (!path) { window.open(url, '_blank'); return }
@@ -117,11 +121,15 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
 
       for (const doc of supplierDocs) {
         try {
-          const path = doc.url.split('/public/documents/')[1]
           let fetchUrl = doc.url
-          if (path) {
-            const { data } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
-            if (data?.signedUrl) fetchUrl = data.signedUrl
+          if (doc.url && !doc.url.includes('/')) {
+            fetchUrl = `/api/drive/download?fileId=${encodeURIComponent(doc.url)}`
+          } else {
+            const path = doc.url.split('/public/documents/')[1]
+            if (path) {
+              const { data } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+              if (data?.signedUrl) fetchUrl = data.signedUrl
+            }
           }
           const res = await fetch(fetchUrl)
           const blob = await res.blob()
