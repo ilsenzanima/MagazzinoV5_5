@@ -62,6 +62,8 @@ import {
 } from "@/lib/services/compliance";
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
 import { Supplier, Brand } from "@/lib/types";
+import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload";
+import { UploadStatusBar } from "@/components/ui/upload-status-row";
 
 const UNTYPED_KEY = "__untyped__";
 
@@ -416,12 +418,21 @@ function MultiUploadDialog({
 
     const handleFilesSelected = (files: FileList | null) => {
         if (!files || files.length === 0) return;
-        const newPending: PendingComplianceFile[] = Array.from(files).map((f) => ({
-            file: f,
-            name: f.name.replace(/\.[^.]+$/, ''),
-            notes: "",
-        }));
-        setPendingFiles((prev) => [...prev, ...newPending]);
+        setPendingFiles((prev) => {
+            const room = MAX_BATCH_UPLOAD_FILES - prev.length;
+            if (room <= 0) {
+                toast.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta`);
+                return prev;
+            }
+            const selected = Array.from(files);
+            if (selected.length > room) toast.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta, aggiunti solo i primi ${room}`);
+            const newPending: PendingComplianceFile[] = selected.slice(0, room).map((f) => ({
+                file: f,
+                name: f.name.replace(/\.[^.]+$/, ''),
+                notes: "",
+            }));
+            return [...prev, ...newPending];
+        });
     };
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -443,33 +454,39 @@ function MultiUploadDialog({
         setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
     };
 
+    const batchUpload = useBatchUpload();
+
     const handleUploadAll = async () => {
         if (pendingFiles.length === 0) return;
-        try {
-            setUploading(true);
-            const uploaded: ComplianceDocument[] = [];
-            const supplierName = suppliers.find(s => s.id === effectiveSupplierId)?.name || effectiveSupplierId;
-            for (const pf of pendingFiles) {
-                const result = await complianceApi.uploadFile(pf.file, supplierName);
-                const doc = await complianceApi.create({
-                    supplierId: effectiveSupplierId,
-                    brandId,
-                    documentTypeId: documentTypeId || null,
-                    name: pf.name.trim() || pf.file.name,
-                    notes: pf.notes.trim() || undefined,
-                    fileUrl: result.fileId,
-                    fileSize: pf.file.size,
-                });
-                uploaded.push(doc);
-            }
+        setUploading(true);
+        const supplierName = suppliers.find(s => s.id === effectiveSupplierId)?.name || effectiveSupplierId;
+        const uploaded: ComplianceDocument[] = [];
+        const { okCount, failedCount } = await batchUpload.run(pendingFiles, async pf => {
+            const result = await complianceApi.uploadFile(pf.file, supplierName);
+            const doc = await complianceApi.create({
+                supplierId: effectiveSupplierId,
+                brandId,
+                documentTypeId: documentTypeId || null,
+                name: pf.name.trim() || pf.file.name,
+                notes: pf.notes.trim() || undefined,
+                fileUrl: result.fileId,
+                fileSize: pf.file.size,
+            });
+            uploaded.push(doc);
+        });
+        setUploading(false);
+        if (uploaded.length > 0) {
             if (!supplierId) onSupplierSelected(effectiveSupplierId);
             onUploaded(uploaded);
-            toast.success(uploaded.length > 1 ? "Documenti caricati" : "Documento caricato");
+        }
+        if (failedCount === 0) {
+            toast.success(okCount > 1 ? "Documenti caricati" : "Documento caricato");
             onOpenChange(false);
-        } catch (e: any) {
-            toast.error(e.message || "Errore durante il caricamento");
-        } finally {
-            setUploading(false);
+        } else if (okCount === 0) {
+            toast.error("Nessun documento caricato, riprova");
+        } else {
+            toast.error(`${okCount} caricati, ${failedCount} falliti. Riprova con i file rimasti.`);
+            setPendingFiles(prev => prev.filter((_, i) => batchUpload.statuses[i]?.status === 'error'));
         }
     };
 
@@ -553,18 +570,19 @@ function MultiUploadDialog({
                         <p className="text-xs text-muted-foreground">Per ogni file inserisci nome e nota (opzionale).</p>
                         {pendingFiles.map((pf, idx) => (
                             <div key={idx} className="border rounded-lg p-3 space-y-2 relative">
-                                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => removePending(idx)}>
+                                <Button variant="ghost" size="icon" disabled={batchUpload.statuses[idx]?.status === 'uploading'} className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => removePending(idx)}>
                                     <X className="h-3.5 w-3.5" />
                                 </Button>
                                 <p className="text-xs text-muted-foreground truncate pr-6">{pf.file.name}</p>
                                 <div className="space-y-1">
                                     <Label className="text-xs">Nome documento</Label>
-                                    <Input value={pf.name} onChange={(e) => updatePending(idx, { name: e.target.value })} />
+                                    <Input value={pf.name} disabled={batchUpload.statuses[idx]?.status === 'uploading'} onChange={(e) => updatePending(idx, { name: e.target.value })} />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs">Nota (opzionale)</Label>
-                                    <Input value={pf.notes} onChange={(e) => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
+                                    <Input value={pf.notes} disabled={batchUpload.statuses[idx]?.status === 'uploading'} onChange={(e) => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
                                 </div>
+                                <UploadStatusBar state={batchUpload.statuses[idx]} />
                             </div>
                         ))}
                         {pendingFiles.length === 0 && (

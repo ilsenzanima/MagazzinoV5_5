@@ -17,6 +17,8 @@ import { getFileIcon } from "@/lib/file-icon"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
+import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
+import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
 interface PendingFile {
     file: File
@@ -79,12 +81,21 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     }
 
     const addFiles = (files: FileList | File[]) => {
-        const arr = Array.from(files).map(file => ({
-            file,
-            name: file.name.replace(/\.[^.]+$/, ''),
-            notes: "",
-        }))
-        setPendingFiles(prev => [...prev, ...arr])
+        setPendingFiles(prev => {
+            const room = MAX_BATCH_UPLOAD_FILES - prev.length
+            if (room <= 0) {
+                notify.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta`)
+                return prev
+            }
+            const selected = Array.from(files)
+            if (selected.length > room) notify.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta, aggiunti solo i primi ${room}`)
+            const arr = selected.slice(0, room).map(file => ({
+                file,
+                name: file.name.replace(/\.[^.]+$/, ''),
+                notes: "",
+            }))
+            return [...prev, ...arr]
+        })
     }
 
     const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,38 +121,41 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         setPendingFiles(prev => prev.filter((_, i) => i !== index))
     }
 
+    const batchUpload = useBatchUpload()
+
     const handleUploadAll = async () => {
         if (pendingFiles.length === 0 || !ownerId) return
-        try {
-            setUploading(true)
-            for (const pending of pendingFiles) {
-                const compressed = await compressImageIfNeeded(pending.file)
-                const fileExt = compressed.name.split('.').pop() || ''
-                const formData = new FormData()
-                formData.append('file', compressed)
-                formData.append('folderPath', JSON.stringify(folderPath))
-                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
-                const uploaded = await res.json()
-                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+        setUploading(true)
+        const { okCount, failedCount } = await batchUpload.run(pendingFiles, async pending => {
+            const compressed = await compressImageIfNeeded(pending.file)
+            const fileExt = compressed.name.split('.').pop() || ''
+            const formData = new FormData()
+            formData.append('file', compressed)
+            formData.append('folderPath', JSON.stringify(folderPath))
+            const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+            const uploaded = await res.json()
+            if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
 
-                await supplierOffersApi.create({
-                    jobId,
-                    proposalId,
-                    name: pending.name.trim() || pending.file.name,
-                    notes: pending.notes.trim(),
-                    fileUrl: uploaded.fileId,
-                    fileType: fileExt,
-                })
-            }
-            notify.success("Documenti caricati con successo")
+            await supplierOffersApi.create({
+                jobId,
+                proposalId,
+                name: pending.name.trim() || pending.file.name,
+                notes: pending.notes.trim(),
+                fileUrl: uploaded.fileId,
+                fileType: fileExt,
+            })
+        })
+        setUploading(false)
+        if (failedCount === 0) {
+            notify.success(okCount > 1 ? "Documenti caricati con successo" : "Documento caricato con successo")
             setUploadOpen(false)
-            load()
-        } catch (error) {
-            console.error("Upload failed", error)
-            notify.error("Errore durante il caricamento")
-        } finally {
-            setUploading(false)
+        } else if (okCount === 0) {
+            notify.error("Nessun documento caricato, riprova")
+        } else {
+            notify.error(`${okCount} caricati, ${failedCount} falliti. Riprova con i file rimasti.`)
+            setPendingFiles(prev => prev.filter((_, i) => batchUpload.statuses[i]?.status === 'error'))
         }
+        load()
     }
 
     const openEdit = (doc: SupplierOffer) => {
@@ -326,12 +340,13 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                                     <p className="text-xs text-slate-400 truncate">{p.file.name}</p>
                                     <div className="space-y-1">
                                         <Label>Nome documento</Label>
-                                        <Input value={p.name} onChange={e => updatePending(i, { name: e.target.value })} />
+                                        <Input value={p.name} disabled={batchUpload.statuses[i]?.status === 'uploading'} onChange={e => updatePending(i, { name: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
                                         <Label>Nota (opzionale)</Label>
-                                        <Input value={p.notes} onChange={e => updatePending(i, { notes: e.target.value })} />
+                                        <Input value={p.notes} disabled={batchUpload.statuses[i]?.status === 'uploading'} onChange={e => updatePending(i, { notes: e.target.value })} />
                                     </div>
+                                    <UploadStatusBar state={batchUpload.statuses[i]} />
                                 </div>
                             ))}
                         </div>
@@ -345,9 +360,9 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                         ) : (
                             <>
                                 <Button variant="outline" onClick={() => setUpStep(1)}>Indietro</Button>
-                                <Button onClick={handleUploadAll} disabled={uploading}>
+                                <Button onClick={handleUploadAll} disabled={uploading || pendingFiles.length === 0}>
                                     {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Carica
+                                    Carica {pendingFiles.length > 1 ? `(${pendingFiles.length})` : ""}
                                 </Button>
                             </>
                         )}

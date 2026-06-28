@@ -20,6 +20,8 @@ import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
 import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 import { compressImageIfNeeded } from "@/lib/image-compress"
+import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
+import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
 interface Props {
     jobId: string
@@ -109,12 +111,21 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
 
     const handleFilesSelected = (files: FileList | null) => {
         if (!files || files.length === 0) return
-        const newPending: PendingFile[] = Array.from(files).map(f => ({
-            file: f,
-            name: f.name.replace(/\.[^.]+$/, ''),
-            notes: "",
-        }))
-        setPendingFiles(prev => [...prev, ...newPending])
+        setPendingFiles(prev => {
+            const room = MAX_BATCH_UPLOAD_FILES - prev.length
+            if (room <= 0) {
+                notify.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta`)
+                return prev
+            }
+            const selected = Array.from(files)
+            if (selected.length > room) notify.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta, aggiunti solo i primi ${room}`)
+            const newPending: PendingFile[] = selected.slice(0, room).map(f => ({
+                file: f,
+                name: f.name.replace(/\.[^.]+$/, ''),
+                notes: "",
+            }))
+            return [...prev, ...newPending]
+        })
     }
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -136,37 +147,44 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
         setPendingFiles(prev => prev.filter((_, i) => i !== idx))
     }
 
+    const batchUpload = useBatchUpload()
+
     const handleUploadAll = async () => {
         if (pendingFiles.length === 0) return
-        try {
-            setUploading(true)
-            for (const pf of pendingFiles) {
-                const compressed = await compressImageIfNeeded(pf.file)
-                const ext = compressed.name.split('.').pop() || ''
-                const formData = new FormData()
-                formData.append('file', compressed)
-                formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Commessa']))
-                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
-                const uploaded = await res.json()
-                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+        setUploading(true)
+        const { okCount, failedCount } = await batchUpload.run(pendingFiles, async pf => {
+            const compressed = await compressImageIfNeeded(pf.file)
+            const ext = compressed.name.split('.').pop() || ''
+            const formData = new FormData()
+            formData.append('file', compressed)
+            formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Commessa']))
+            const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+            const uploaded = await res.json()
+            if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
 
-                await jobCommessaDocumentsApi.create({
-                    jobId,
-                    documentTypeId: upDocTypeId || null,
-                    name: pf.name.trim() || pf.file.name,
-                    notes: pf.notes.trim(),
-                    fileUrl: uploaded.fileId,
-                    fileType: ext,
-                    fileSize: compressed.size,
-                    uploadedBy: '',
-                    uploadedByName: '',
-                })
-            }
-            notify.success(pendingFiles.length > 1 ? "Documenti caricati" : "Documento caricato")
+            await jobCommessaDocumentsApi.create({
+                jobId,
+                documentTypeId: upDocTypeId || null,
+                name: pf.name.trim() || pf.file.name,
+                notes: pf.notes.trim(),
+                fileUrl: uploaded.fileId,
+                fileType: ext,
+                fileSize: compressed.size,
+                uploadedBy: '',
+                uploadedByName: '',
+            })
+        })
+        setUploading(false)
+        if (failedCount === 0) {
+            notify.success(okCount > 1 ? "Documenti caricati" : "Documento caricato")
             setUploadOpen(false)
-            await load()
-        } catch (e: any) { notify.error("Errore upload: " + e.message) }
-        finally { setUploading(false) }
+        } else if (okCount === 0) {
+            notify.error("Nessun documento caricato, riprova")
+        } else {
+            notify.error(`${okCount} caricati, ${failedCount} falliti. Riprova con i file rimasti.`)
+            setPendingFiles(prev => prev.filter((_, i) => batchUpload.statuses[i]?.status === 'error'))
+        }
+        await load()
     }
 
     const handleSaveEdit = async () => {
@@ -383,18 +401,21 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
                             <p className="text-xs text-slate-500">Per ogni file inserisci nome e nota (opzionale).</p>
                             {pendingFiles.map((pf, idx) => (
                                 <div key={idx} className="border rounded-lg p-3 space-y-2 relative">
-                                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600" onClick={() => removePending(idx)}>
-                                        <X className="h-3.5 w-3.5" />
-                                    </Button>
+                                    {!uploading && (
+                                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600" onClick={() => removePending(idx)}>
+                                            <X className="h-3.5 w-3.5" />
+                                        </Button>
+                                    )}
                                     <p className="text-xs text-slate-400 truncate pr-6">{pf.file.name}</p>
                                     <div className="space-y-1">
                                         <Label className="text-xs">Nome documento</Label>
-                                        <Input value={pf.name} onChange={e => updatePending(idx, { name: e.target.value })} />
+                                        <Input disabled={uploading} value={pf.name} onChange={e => updatePending(idx, { name: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-xs">Nota (opzionale)</Label>
-                                        <Input value={pf.notes} onChange={e => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
+                                        <Input disabled={uploading} value={pf.notes} onChange={e => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
                                     </div>
+                                    <UploadStatusBar state={batchUpload.statuses[idx]} />
                                 </div>
                             ))}
                             {pendingFiles.length === 0 && (
