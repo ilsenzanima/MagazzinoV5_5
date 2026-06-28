@@ -95,6 +95,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     setUpDocTypeId("")
     setPendingFiles([])
     setDragOver(false)
+    batchUpload.reset()
     setUploadOpen(true)
   }
 

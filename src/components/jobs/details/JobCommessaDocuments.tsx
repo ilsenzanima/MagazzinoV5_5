@@ -106,6 +106,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
         setUpDocTypeId("")
         setPendingFiles([])
         setDragOver(false)
+        batchUpload.reset()
         setUploadOpen(true)
     }
 

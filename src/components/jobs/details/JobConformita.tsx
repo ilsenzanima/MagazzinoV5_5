@@ -118,6 +118,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         setUpDocTypeId("")
         setPendingFiles([])
         setDragOver(false)
+        batchUpload.reset()
         setUploadOpen(true)
     }
 

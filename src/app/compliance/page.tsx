@@ -411,6 +411,7 @@ function MultiUploadDialog({
             setDocumentTypeId("");
             setPendingFiles([]);
             setDragOver(false);
+            batchUpload.reset();
         }
     }, [open, supplierId]);
 

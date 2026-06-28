@@ -105,6 +105,7 @@ export function ProposalDocuments({ proposalId }: Props) {
         setUpDocTypeId("")
         setPendingFiles([])
         setDragOver(false)
+        batchUpload.reset()
         setUploadOpen(true)
     }
 

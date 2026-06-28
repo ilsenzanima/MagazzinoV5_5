@@ -77,6 +77,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     const openUpload = () => {
         setUpStep(1)
         setPendingFiles([])
+        batchUpload.reset()
         setUploadOpen(true)
     }
 
