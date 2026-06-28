@@ -190,3 +190,113 @@ export async function downloadFile(fileId: string): Promise<{ buffer: Buffer; mi
         mimeType: metadata.data.mimeType || 'application/octet-stream',
     };
 }
+
+/**
+ * --- Funzioni generiche per la migrazione one-off verso una nuova credenziale OAuth ---
+ * Permettono di operare su un client Drive arbitrario (vecchio o nuovo refresh token)
+ * invece di quello di default letto dalle env var.
+ */
+
+export function createDriveClient(refreshToken: string) {
+    const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) throw new Error('Variabili GOOGLE_DRIVE_* non configurate');
+    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    return google.drive({ version: 'v3', auth: oauth2Client });
+}
+
+/**
+ * Risale la catena di cartelle genitrici del file partendo dal vecchio client,
+ * fino alla cartella radice indicata (esclusa), per ricostruire il percorso reale
+ * (es. ["Cantieri", "COM-001 Nome", "Commessa"]) senza doverlo indovinare dal codice.
+ */
+export async function resolveFilePath(
+    drive: ReturnType<typeof createDriveClient>,
+    fileId: string,
+    rootFolderId: string
+): Promise<{ name: string; mimeType: string; segments: string[] }> {
+    const file = await drive.files.get({ fileId, fields: 'name, mimeType, parents' });
+    const name = file.data.name || fileId;
+    const mimeType = file.data.mimeType || 'application/octet-stream';
+
+    const segments: string[] = [];
+    let currentParents = file.data.parents;
+    let guard = 0;
+    while (currentParents && currentParents.length > 0 && currentParents[0] !== rootFolderId && guard < 20) {
+        const parentId = currentParents[0];
+        const parent = await drive.files.get({ fileId: parentId, fields: 'name, parents' });
+        segments.unshift(parent.data.name || parentId);
+        currentParents = parent.data.parents;
+        guard++;
+    }
+
+    return { name, mimeType, segments };
+}
+
+async function findOrCreateFolderWith(
+    drive: ReturnType<typeof createDriveClient>,
+    name: string,
+    parentId: string
+): Promise<string> {
+    const safeName = name.replace(/'/g, "\\'");
+    const existing = await drive.files.list({
+        q: `'${parentId}' in parents and name = '${safeName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+        fields: 'files(id, name)',
+        spaces: 'drive',
+    });
+    if (existing.data.files && existing.data.files.length > 0) return existing.data.files[0].id!;
+
+    const created = await drive.files.create({
+        requestBody: { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
+        fields: 'id',
+    });
+    return created.data.id!;
+}
+
+export async function ensureFolderPathWith(
+    drive: ReturnType<typeof createDriveClient>,
+    rootFolderId: string,
+    segments: string[]
+): Promise<string> {
+    let parentId = rootFolderId;
+    for (const segment of segments) {
+        parentId = await findOrCreateFolderWith(drive, segment, parentId);
+    }
+    return parentId;
+}
+
+export async function createRootFolder(
+    drive: ReturnType<typeof createDriveClient>,
+    name: string
+): Promise<string> {
+    const created = await drive.files.create({
+        requestBody: { name, mimeType: 'application/vnd.google-apps.folder' },
+        fields: 'id',
+    });
+    return created.data.id!;
+}
+
+export async function downloadFileWith(
+    drive: ReturnType<typeof createDriveClient>,
+    fileId: string
+): Promise<Buffer> {
+    const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' });
+    return Buffer.from(res.data as ArrayBuffer);
+}
+
+export async function uploadFileWith(
+    drive: ReturnType<typeof createDriveClient>,
+    folderId: string,
+    fileName: string,
+    mimeType: string,
+    body: Buffer
+): Promise<string> {
+    const { Readable } = await import('stream');
+    const res = await drive.files.create({
+        requestBody: { name: fileName, parents: [folderId] },
+        media: { mimeType, body: Readable.from(body) },
+        fields: 'id',
+    });
+    return res.data.id!;
+}
