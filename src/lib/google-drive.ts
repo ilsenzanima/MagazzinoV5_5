@@ -137,6 +137,40 @@ export async function makeFileLinkShareable(fileId: string): Promise<void> {
     });
 }
 
+/**
+ * Come makeFileLinkShareable, ma non crea un permesso duplicato se il file
+ * è già condiviso "anyone: reader" (idempotente).
+ */
+export async function ensureFileLinkShareable(fileId: string): Promise<void> {
+    const drive = getDriveClient();
+    const { data } = await drive.permissions.list({ fileId, fields: 'permissions(type, role)' });
+    const alreadyShared = data.permissions?.some(p => p.type === 'anyone' && p.role === 'reader');
+    if (alreadyShared) return;
+    await drive.permissions.create({
+        fileId,
+        requestBody: { role: 'reader', type: 'anyone' },
+    });
+}
+
+const OFFICE_MIME_TYPES = new Set([
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+
+export function isOfficeMimeType(mimeType: string): boolean {
+    return OFFICE_MIME_TYPES.has(mimeType);
+}
+
+export async function getFileMetadata(fileId: string): Promise<{ mimeType: string; name: string }> {
+    const drive = getDriveClient();
+    const { data } = await drive.files.get({ fileId, fields: 'mimeType, name' });
+    return { mimeType: data.mimeType || 'application/octet-stream', name: data.name || 'documento' };
+}
+
 export async function deleteFile(fileId: string): Promise<void> {
     const drive = getDriveClient();
     await drive.files.delete({ fileId });
