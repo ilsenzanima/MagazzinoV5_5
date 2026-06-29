@@ -478,6 +478,9 @@ export default function JobDetailsPage() {
                             <span className="hidden md:inline">Torna alle Commesse</span>
                         </Button>
                     </Link>
+                    <h1 className="flex-1 text-center text-sm md:text-lg font-semibold text-slate-800 dark:text-slate-100 truncate px-2">
+                        {job?.name}
+                    </h1>
                     {(userRole === 'admin' || userRole === 'operativo') && (
                         <Button variant="outline" size="sm" onClick={handlePrint} className="px-2 md:px-4">
                             <Printer className="h-4 w-4 md:mr-2" />
