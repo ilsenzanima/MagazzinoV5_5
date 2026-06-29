@@ -14,11 +14,17 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
     const fileId = req.nextUrl.searchParams.get('fileId')
-    const fileName = req.nextUrl.searchParams.get('fileName') ?? 'documento'
+    const requestedName = req.nextUrl.searchParams.get('fileName')
     if (!fileId) return NextResponse.json({ error: 'fileId mancante' }, { status: 400 })
 
     try {
-        const { buffer, mimeType } = await downloadFile(fileId)
+        const { buffer, mimeType, name } = await downloadFile(fileId)
+        // Il nome richiesto dal client spesso non ha estensione (es. nome
+        // personalizzato del documento): usiamo il nome reale del file su
+        // Drive, che la conserva sempre, a meno che il nome richiesto non
+        // abbia già un'estensione esplicita.
+        const hasExtension = !!requestedName && /\.[a-zA-Z0-9]{2,5}$/.test(requestedName)
+        const fileName = hasExtension ? requestedName! : name
         return new NextResponse(new Uint8Array(buffer), {
             headers: {
                 'Content-Type': mimeType,

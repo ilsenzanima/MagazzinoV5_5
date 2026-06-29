@@ -179,15 +179,16 @@ export async function markFolderDeleted(segments: string[]): Promise<void> {
     await drive.files.update({ fileId: parentId, requestBody: { name: `ELIMINATO - ${name}` } });
 }
 
-export async function downloadFile(fileId: string): Promise<{ buffer: Buffer; mimeType: string }> {
+export async function downloadFile(fileId: string): Promise<{ buffer: Buffer; mimeType: string; name: string }> {
     const drive = getDriveClient();
     const [metadata, res] = await Promise.all([
-        drive.files.get({ fileId, fields: 'mimeType' }),
+        drive.files.get({ fileId, fields: 'mimeType, name' }),
         drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' }),
     ]);
     return {
         buffer: Buffer.from(res.data as ArrayBuffer),
         mimeType: metadata.data.mimeType || 'application/octet-stream',
+        name: metadata.data.name || 'documento',
     };
 }
 
