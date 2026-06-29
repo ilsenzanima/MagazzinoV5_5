@@ -58,7 +58,7 @@ export const RecentMovements = memo(function RecentMovements({ data }: RecentMov
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Truck className="h-4 w-4 text-amber-500" />
-            Ultimi DDT
+            Ultimi DDT interni
           </CardTitle>
           <Link
             href="/movements"

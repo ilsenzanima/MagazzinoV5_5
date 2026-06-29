@@ -36,7 +36,7 @@ export function RecentPurchasesCard({ data }: RecentPurchasesCardProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <ShoppingCart className="h-4 w-4 text-emerald-500" />
-            Ultimi Acquisti
+            Ultimi DDT acquisti
           </CardTitle>
           <Link
             href="/purchases"
