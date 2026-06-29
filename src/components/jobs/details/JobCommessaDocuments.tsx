@@ -322,7 +322,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
                     <div className="flex justify-end">
                         <ViewToggle mode={viewMode} onChange={setViewMode} />
                     </div>
-                    {groups.length <= 1 ? (
+                    {groups.length === 0 ? (
                         viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {documents.map(renderDocCard)}

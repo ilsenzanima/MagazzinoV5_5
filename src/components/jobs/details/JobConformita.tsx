@@ -321,7 +321,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
             ) : docs.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento caricato</p>
-            ) : groups.length <= 1 ? (
+            ) : groups.length === 0 ? (
                 viewMode === 'list' ? (
                     <div className="space-y-1.5">
                         {docs.map(renderDocRow)}
@@ -566,6 +566,69 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
         load()
     }
 
+    const renderAssocCard = (assoc: JobComplianceAssociation) => {
+        const doc = assoc.document
+        const displayName = assoc.customName || doc?.name || "—"
+        return (
+            <Card key={assoc.id} className="group hover:shadow-sm transition-shadow">
+                <CardContent className="p-3 flex items-start gap-3">
+                    <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
+                        <ShieldCheck className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{displayName}</p>
+                        {assoc.customName && doc?.name && (
+                            <p className="text-xs text-slate-400">Originale: {doc.name}</p>
+                        )}
+                        {assoc.customNotes && (
+                            <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap">{assoc.customNotes}</p>
+                        )}
+                        {doc && (
+                            <div className="flex flex-wrap gap-2 mt-1">
+                                {doc.brandName && (
+                                    <span className="text-[10px] uppercase tracking-wide bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-semibold">
+                                        {doc.brandName}
+                                    </span>
+                                )}
+                                <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
+                                    {doc.documentTypeName}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                    <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
+                        {doc?.fileUrl && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDoc(doc.fileUrl)}>
+                                <ExternalLink className="h-3 w-3 text-slate-500" />
+                            </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                            setEditing(assoc)
+                            setEditName(assoc.customName || "")
+                            setEditNotes(assoc.customNotes || "")
+                            setEditOpen(true)
+                        }}>
+                            <Pencil className="h-3 w-3 text-slate-500" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }}>
+                            <Unlink className="h-3 w-3 text-red-500" />
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    const assocGroups: { key: string; label: string; items: JobComplianceAssociation[] }[] = Object.values(
+        associations.reduce((acc, assoc) => {
+            const label = assoc.document?.documentTypeName || "Senza tipo"
+            const key = label
+            if (!acc[key]) acc[key] = { key, label, items: [] }
+            acc[key].items.push(assoc)
+            return acc
+        }, {} as Record<string, { key: string; label: string; items: JobComplianceAssociation[] }>)
+    )
+
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -581,61 +644,28 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
             ) : associations.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento associato</p>
-            ) : (
+            ) : assocGroups.length === 0 ? (
                 <div className="space-y-2">
-                    {associations.map(assoc => {
-                        const doc = assoc.document
-                        const displayName = assoc.customName || doc?.name || "—"
-                        return (
-                            <Card key={assoc.id} className="group hover:shadow-sm transition-shadow">
-                                <CardContent className="p-3 flex items-start gap-3">
-                                    <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
-                                        <ShieldCheck className="h-6 w-6 text-green-600" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-sm">{displayName}</p>
-                                        {assoc.customName && doc?.name && (
-                                            <p className="text-xs text-slate-400">Originale: {doc.name}</p>
-                                        )}
-                                        {assoc.customNotes && (
-                                            <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap">{assoc.customNotes}</p>
-                                        )}
-                                        {doc && (
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                                {doc.brandName && (
-                                                    <span className="text-[10px] uppercase tracking-wide bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-semibold">
-                                                        {doc.brandName}
-                                                    </span>
-                                                )}
-                                                <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                                    {doc.documentTypeName}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                                        {doc?.fileUrl && (
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDoc(doc.fileUrl)}>
-                                                <ExternalLink className="h-3 w-3 text-slate-500" />
-                                            </Button>
-                                        )}
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                                            setEditing(assoc)
-                                            setEditName(assoc.customName || "")
-                                            setEditNotes(assoc.customNotes || "")
-                                            setEditOpen(true)
-                                        }}>
-                                            <Pencil className="h-3 w-3 text-slate-500" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }}>
-                                            <Unlink className="h-3 w-3 text-red-500" />
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
+                    {associations.map(renderAssocCard)}
                 </div>
+            ) : (
+                <Tabs defaultValue={assocGroups[0]?.key}>
+                    <TabsList className="flex-wrap h-auto gap-1">
+                        {assocGroups.map(g => (
+                            <TabsTrigger key={g.key} value={g.key}>
+                                {g.label}
+                                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
+                                    {g.items.length}
+                                </span>
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                    {assocGroups.map(g => (
+                        <TabsContent key={g.key} value={g.key} className="pt-4 space-y-2">
+                            {g.items.map(renderAssocCard)}
+                        </TabsContent>
+                    ))}
+                </Tabs>
             )}
 
             {/* Edit dialog */}
@@ -846,11 +876,17 @@ function AssociateDialog({
 
 export function JobConformita({ jobId, jobLabel }: JobConformitaProps) {
     return (
-        <div className="space-y-8">
-            <OwnDocuments jobId={jobId} jobLabel={jobLabel} />
-            <div className="border-t pt-6">
+        <Tabs defaultValue="own" className="space-y-4">
+            <TabsList>
+                <TabsTrigger value="own">Documenti caricati</TabsTrigger>
+                <TabsTrigger value="associated">Documenti associati</TabsTrigger>
+            </TabsList>
+            <TabsContent value="own">
+                <OwnDocuments jobId={jobId} jobLabel={jobLabel} />
+            </TabsContent>
+            <TabsContent value="associated">
                 <AssociatedDocuments jobId={jobId} />
-            </div>
-        </div>
+            </TabsContent>
+        </Tabs>
     )
 }

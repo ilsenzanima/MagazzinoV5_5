@@ -508,29 +508,29 @@ export default function JobDetailsPage() {
                         </div>
 
                         {/* Tab del gruppo selezionato (max 5 voci, sempre con etichetta visibile) */}
-                        <TabsList className="print:hidden w-full justify-start border-b rounded-none p-0 h-auto bg-transparent">
+                        <TabsList className="print:hidden w-full justify-start border-b rounded-none p-0 h-auto bg-transparent flex-nowrap overflow-x-auto overflow-y-hidden">
                             {activeGroup === 'generale' && (
                                 <>
-                                    <TabsTrigger value="overview" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="overview" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <Info className="h-4 w-4 mr-1" />Dettagli
                                     </TabsTrigger>
-                                    <TabsTrigger value="cronoprogramma" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="cronoprogramma" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <GanttChartSquare className="h-4 w-4 mr-1" />Cronoprogramma
                                     </TabsTrigger>
-                                    <TabsTrigger value="stock" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="stock" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <Package className="h-4 w-4 mr-1" />Materiali
                                     </TabsTrigger>
-                                    <TabsTrigger value="attendance" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="attendance" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <Clock className="h-4 w-4 mr-1" />Ore
                                     </TabsTrigger>
-                                    <TabsTrigger value="eccedenze" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="eccedenze" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <Recycle className="h-4 w-4 mr-1 text-violet-500" />Eccedenze
                                     </TabsTrigger>
                                 </>
                             )}
                             {activeGroup === 'documenti' && (
                                 <>
-                                    <TabsTrigger value="conformita" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-green-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="conformita" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-green-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <ShieldCheck className="h-4 w-4 mr-1 text-green-600" />Conformità
                                         <HelpTip
                                             title="Documenti Conformità Cantiere"
@@ -539,7 +539,7 @@ export default function JobDetailsPage() {
                                             emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
                                         />
                                     </TabsTrigger>
-                                    <TabsTrigger value="documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <FileText className="h-4 w-4 mr-1" />Documenti Cantiere
                                         <HelpTip
                                             title="Documenti Cantiere"
@@ -549,7 +549,7 @@ export default function JobDetailsPage() {
                                         />
                                     </TabsTrigger>
                                     {(userRole === 'admin' || userRole === 'operativo') && (
-                                        <TabsTrigger value="commessa-documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                        <TabsTrigger value="commessa-documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                             <Folder className="h-4 w-4 mr-1" />Documenti Commessa
                                             <HelpTip
                                                 title="Documenti Commessa"
@@ -559,23 +559,23 @@ export default function JobDetailsPage() {
                                             />
                                         </TabsTrigger>
                                     )}
-                                    <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini
                                     </TabsTrigger>
-                                    <TabsTrigger value="ddt" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="ddt" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <Truck className="h-4 w-4 mr-1" />DDT
                                     </TabsTrigger>
                                 </>
                             )}
                             {activeGroup === 'economico' && (userRole === 'admin' || userRole === 'operativo') && (
                                 <>
-                                    <TabsTrigger value="costi-sal" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="costi-sal" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <Euro className="h-4 w-4 mr-1" />Costi
                                     </TabsTrigger>
-                                    <TabsTrigger value="analisi-costi" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-emerald-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="analisi-costi" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-emerald-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <BarChart2 className="h-4 w-4 mr-1 text-emerald-600" />Analisi Costi
                                     </TabsTrigger>
-                                    <TabsTrigger value="fatturazione" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-teal-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm">
+                                    <TabsTrigger value="fatturazione" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-teal-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <Receipt className="h-4 w-4 mr-1 text-teal-600" />Fatturazione
                                     </TabsTrigger>
                                 </>
