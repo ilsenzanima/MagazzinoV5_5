@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Loader2, Save, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, clientsApi, Client } from "@/lib/api";
@@ -60,7 +61,8 @@ function NewJobForm() {
     endDate: "",
     siteManager: "",
     cig: "",
-    cup: ""
+    cup: "",
+    isSaleOnly: false
   });
 
   const [siteFields, setSiteFields] = useState({
@@ -335,6 +337,20 @@ function NewJobForm() {
                       <SelectItem value="suspended">Sospesa</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+                  <div>
+                    <Label htmlFor="isSaleOnly" className="text-sm">Causale vendita</Label>
+                    <p className="text-xs text-slate-500">
+                      Commessa usata solo per archiviare documentazione di vendita, senza un vero cantiere.
+                    </p>
+                  </div>
+                  <Switch
+                    id="isSaleOnly"
+                    checked={formData.isSaleOnly}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isSaleOnly: checked })}
+                  />
                 </div>
               </div>
 

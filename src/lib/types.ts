@@ -124,6 +124,7 @@ export interface Job {
     cig?: string;
     cup?: string;
     estimatedCost?: number | null;
+    isSaleOnly?: boolean;
 }
 
 export interface JobSalApprovato {

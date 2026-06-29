@@ -25,6 +25,7 @@ export const mapDbToJob = (db: any): Job => ({
     cig: db.cig,
     cup: db.cup,
     estimatedCost: db.estimated_cost ?? null,
+    isSaleOnly: db.is_sale_only ?? false,
 });
 
 const mapJobToDb = (job: Partial<Job>) => {
@@ -42,6 +43,7 @@ const mapJobToDb = (job: Partial<Job>) => {
     if (job.cup !== undefined) dbJob.cup = job.cup;
     if ('estimatedCost' in job) dbJob.estimated_cost = job.estimatedCost ?? null;
     if (job.createdAt !== undefined) dbJob.created_at = job.createdAt;
+    if (job.isSaleOnly !== undefined) dbJob.is_sale_only = job.isSaleOnly;
 
     // Handle nullable fields - only include when explicitly passed
     if ('endDate' in job) {
@@ -135,7 +137,7 @@ export const jobsApi = {
         if (error) throw error;
         return data.map(mapDbToJob);
     },
-    getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '' }) => {
+    getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '', isSaleOnly }: { page?: number; limit?: number; search?: string; clientId?: string; status?: string; isSaleOnly?: boolean } = {}) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -150,6 +152,10 @@ export const jobsApi = {
 
         if (status) {
             query = query.eq('status', status);
+        }
+
+        if (isSaleOnly !== undefined) {
+            query = query.eq('is_sale_only', isSaleOnly);
         }
 
         if (search) {

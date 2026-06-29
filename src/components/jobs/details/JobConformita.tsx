@@ -501,6 +501,7 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     const [editNotes, setEditNotes] = useState("")
     const [saving, setSaving] = useState(false)
     const [toDisassociate, setToDisassociate] = useState<JobComplianceAssociation | null>(null)
+    const [viewMode, setViewMode] = useViewMode('job-conformita-associated', 'list')
 
     useEffect(() => { load() }, [jobId])
 
@@ -635,9 +636,12 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                     Documenti associati dalla gestione conformità
                 </h3>
+                <div className="flex items-center gap-2">
+                {associations.length > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
                 <Button size="sm" variant="outline" onClick={() => setSearchOpen(true)}>
                     <Link2 className="h-3.5 w-3.5 mr-1.5" />Associa
                 </Button>
+                </div>
             </div>
 
             {loading ? (
@@ -645,9 +649,15 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
             ) : associations.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento associato</p>
             ) : assocGroups.length === 0 ? (
-                <div className="space-y-2">
-                    {associations.map(renderAssocCard)}
-                </div>
+                viewMode === 'list' ? (
+                    <div className="space-y-2">
+                        {associations.map(renderAssocCard)}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {associations.map(renderAssocCard)}
+                    </div>
+                )
             ) : (
                 <Tabs defaultValue={assocGroups[0]?.key}>
                     <TabsList className="flex-wrap h-auto gap-1">
@@ -661,8 +671,16 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                         ))}
                     </TabsList>
                     {assocGroups.map(g => (
-                        <TabsContent key={g.key} value={g.key} className="pt-4 space-y-2">
-                            {g.items.map(renderAssocCard)}
+                        <TabsContent key={g.key} value={g.key} className="pt-4">
+                            {viewMode === 'list' ? (
+                                <div className="space-y-2">
+                                    {g.items.map(renderAssocCard)}
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {g.items.map(renderAssocCard)}
+                                </div>
+                            )}
                         </TabsContent>
                     ))}
                 </Tabs>

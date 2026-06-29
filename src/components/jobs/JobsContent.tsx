@@ -25,6 +25,7 @@ import Link from "next/link";
 import { Job, jobsApi } from "@/lib/api";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface JobsContentProps {
   initialJobs: Job[];
@@ -51,6 +52,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const [pageSize, setPageSize] = usePageSize('commesse');
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterKind, setFilterKind] = useState<'all' | 'job' | 'sale'>('all');
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   // Reset page on search or page size change
   useEffect(() => {
     setPage(1);
-  }, [deferredSearchTerm, filterClientId, pageSize]);
+  }, [deferredSearchTerm, filterClientId, pageSize, filterKind]);
 
   // Sync state with props when validation/refresh happens
   useEffect(() => {
@@ -79,12 +81,12 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
 
   // Load Jobs (Server Side Search & Pagination)
   useEffect(() => {
-    if (page === 1 && !deferredSearchTerm && !filterClientId && jobs === initialJobs && initialJobs.length > 0 && pageSize === 12) {
+    if (page === 1 && !deferredSearchTerm && !filterClientId && filterKind === 'all' && jobs === initialJobs && initialJobs.length > 0 && pageSize === 12) {
       return;
     }
     loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, deferredSearchTerm, filterClientId, pageSize]);
+  }, [page, deferredSearchTerm, filterClientId, pageSize, filterKind]);
 
   const loadJobs = async () => {
     try {
@@ -95,7 +97,8 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         page,
         limit,
         search: deferredSearchTerm,
-        clientId: filterClientId || ''
+        clientId: filterClientId || '',
+        isSaleOnly: filterKind === 'all' ? undefined : filterKind === 'sale'
       });
 
       // Sort: active → suspended → completed
@@ -149,6 +152,14 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
             </Link>
           )}
         </div>
+
+        <Tabs value={filterKind} onValueChange={(v) => setFilterKind(v as 'all' | 'job' | 'sale')}>
+          <TabsList>
+            <TabsTrigger value="all">Tutte</TabsTrigger>
+            <TabsTrigger value="job">Commesse</TabsTrigger>
+            <TabsTrigger value="sale">Vendite</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -211,6 +222,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 truncate">
                       {job.name}
                     </span>
+                    {job.isSaleOnly && (
+                      <Badge className="shrink-0 text-[10px] bg-purple-600">Vendita</Badge>
+                    )}
                     <span className="text-slate-500 dark:text-slate-400 text-sm w-36 shrink-0 truncate hidden sm:block">
                       {job.clientName || '—'}
                     </span>
@@ -260,6 +274,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                         <CardTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-white break-words" title={job.name}>{job.name}</CardTitle>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
                       </div>
+                      {job.isSaleOnly && (
+                        <Badge className="shrink-0 text-[10px] bg-purple-600">Vendita</Badge>
+                      )}
                     </div>
 
                     {/* Status buttons */}
