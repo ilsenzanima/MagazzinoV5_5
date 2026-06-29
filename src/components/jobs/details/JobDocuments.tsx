@@ -349,7 +349,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
             <p className="text-slate-500 dark:text-slate-400">Carica progetti, permessi, o foto del cantiere.</p>
           </CardContent>
         </Card>
-      ) : groups.length <= 1 ? (
+      ) : groups.length === 0 ? (
         viewMode === 'list' ? (
           <div className="space-y-1.5">
             {documents.map(renderDocRow)}
