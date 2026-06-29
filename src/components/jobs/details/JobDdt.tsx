@@ -43,7 +43,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       ])
       setOpiNotes(notes)
       const docs: SupplierDoc[] = []
-      purchases.forEach(p => {
+      purchases.filter(p => p.orderType !== 'order').forEach(p => {
         (p.documentUrls || []).forEach((url, index) => docs.push({ purchase: p, url, index }))
       })
       setSupplierDocs(docs)
