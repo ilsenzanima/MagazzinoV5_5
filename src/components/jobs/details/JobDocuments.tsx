@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, Upload, Trash2, Loader2, Pencil, X } from "lucide-react"
+import { FileText, Upload, Trash2, Loader2, Pencil, X, Download } from "lucide-react"
 import { JobDocument, jobDocumentsApi } from "@/lib/api"
 import { jobSiteDocumentTypesApi, JobSiteDocumentType } from "@/lib/services/job-site-document-types"
 import { createClient } from "@/lib/supabase/client"
@@ -41,6 +41,7 @@ interface PendingFile {
 }
 
 const UNTYPED_KEY = "__untyped__"
+const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'])
 
 export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const [documents, setDocuments] = useState<JobDocument[]>([])
@@ -272,14 +273,16 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         <div className="flex-1 overflow-hidden min-w-0">
           <div className="flex justify-between items-start gap-1">
             <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-              onClick={e => openEdit(doc, e)}
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
+            <div className="flex gap-0.5 shrink-0">
+              {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
+                  <Download className="h-3 w-3" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700" onClick={e => openEdit(doc, e)}>
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
           {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
           <p className="text-xs text-slate-400 mt-1">
@@ -308,14 +311,16 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         {format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}
         {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
       </p>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-        onClick={e => openEdit(doc, e)}
-      >
-        <Pencil className="h-3 w-3" />
-      </Button>
+      <div className="flex gap-0.5 shrink-0">
+        {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
+            <Download className="h-3 w-3" />
+          </Button>
+        )}
+        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700" onClick={e => openEdit(doc, e)}>
+          <Pencil className="h-3 w-3" />
+        </Button>
+      </div>
     </div>
   )
 

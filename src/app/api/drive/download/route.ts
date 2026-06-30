@@ -15,30 +15,28 @@ export async function GET(req: NextRequest) {
 
     const fileId = req.nextUrl.searchParams.get('fileId')
     const requestedName = req.nextUrl.searchParams.get('fileName')
+    const forceDownload = req.nextUrl.searchParams.get('download') === '1'
     if (!fileId) return NextResponse.json({ error: 'fileId mancante' }, { status: 400 })
 
     try {
-        // I documenti Office (Word/Excel/PowerPoint) non si aprono in modo
-        // leggibile come download grezzo: li mostriamo invece con il viewer
-        // di Google Drive, in sola lettura (il file resta condiviso solo
-        // in lettura, non modificabile dal link).
-        const { mimeType: previewMimeType } = await getFileMetadata(fileId)
-        if (isOfficeMimeType(previewMimeType)) {
-            await ensureFileLinkShareable(fileId)
-            return NextResponse.redirect(`https://drive.google.com/file/d/${fileId}/view`)
+        // I documenti Office vengono aperti nel viewer di Google Drive in sola
+        // lettura, a meno che non sia richiesto il download diretto (download=1).
+        if (!forceDownload) {
+            const { mimeType: previewMimeType } = await getFileMetadata(fileId)
+            if (isOfficeMimeType(previewMimeType)) {
+                await ensureFileLinkShareable(fileId)
+                return NextResponse.redirect(`https://drive.google.com/file/d/${fileId}/view`)
+            }
         }
 
         const { buffer, mimeType, name } = await downloadFile(fileId)
-        // Il nome richiesto dal client spesso non ha estensione (es. nome
-        // personalizzato del documento): usiamo il nome reale del file su
-        // Drive, che la conserva sempre, a meno che il nome richiesto non
-        // abbia già un'estensione esplicita.
         const hasExtension = !!requestedName && /\.[a-zA-Z0-9]{2,5}$/.test(requestedName)
         const fileName = hasExtension ? requestedName! : name
+        const disposition = forceDownload ? 'attachment' : 'inline'
         return new NextResponse(new Uint8Array(buffer), {
             headers: {
                 'Content-Type': mimeType,
-                'Content-Disposition': `inline; filename="${encodeURIComponent(fileName)}"`,
+                'Content-Disposition': `${disposition}; filename="${encodeURIComponent(fileName)}"`,
             },
         })
     } catch (err: any) {

@@ -24,6 +24,7 @@ import {
     ExternalLink,
     ShieldCheck,
     X,
+    Download,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -66,6 +67,7 @@ interface PendingFile {
 }
 
 const UNTYPED_KEY = "__untyped__"
+const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'])
 
 // ─── Upload sezione ──────────────────────────────────────────────────────────
 
@@ -93,6 +95,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const [editName, setEditName] = useState("")
     const [editNotes, setEditNotes] = useState("")
     const [editDocTypeId, setEditDocTypeId] = useState("")
+    const [editFile, setEditFile] = useState<File | null>(null)
     const editRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => { load() }, [jobId])
@@ -203,6 +206,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         setEditName(doc.name)
         setEditNotes(doc.notes || "")
         setEditDocTypeId(doc.conformitaDocumentTypeId || "")
+        setEditFile(null)
         setEditOpen(true)
     }
 
@@ -210,10 +214,31 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         if (!activeDoc) return
         try {
             setSaving(true)
+            let fileUrl = activeDoc.fileUrl
+            let fileType = activeDoc.fileType
+            let fileSize = activeDoc.fileSize
+
+            if (editFile) {
+                const compressed = await compressImageIfNeeded(editFile)
+                const fileExt = compressed.name.split('.').pop() || ''
+                const formData = new FormData()
+                formData.append('file', compressed)
+                formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Conformità']))
+                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
+                const uploaded = await res.json()
+                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+                fileUrl = uploaded.fileId
+                fileType = fileExt
+                fileSize = compressed.size
+            }
+
             await jobDocumentsApi.update(activeDoc.id, {
                 name: editName.trim() || activeDoc.name,
                 notes: editNotes.trim(),
                 conformitaDocumentTypeId: editDocTypeId || null,
+                fileUrl,
+                fileType,
+                fileSize,
             })
             toast.success("Documento aggiornato")
             setEditOpen(false)
@@ -269,6 +294,11 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                     </p>
                 </div>
                 <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
+                    {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
+                            <Download className="h-3 w-3 text-slate-500" />
+                        </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); openEdit(doc) }}>
                         <Pencil className="h-3 w-3 text-slate-500" />
                     </Button>
@@ -291,6 +321,11 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
             </p>
             <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
+                {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
+                        <Download className="h-3 w-3 text-slate-500" />
+                    </Button>
+                )}
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); openEdit(doc) }}>
                     <Pencil className="h-3 w-3 text-slate-500" />
                 </Button>
@@ -458,6 +493,18 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                         <div className="space-y-1.5">
                             <Label>Nota</Label>
                             <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Breve descrizione" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Sostituisci file (opzionale)</Label>
+                            <div
+                                className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                onClick={() => editRef.current?.click()}
+                            >
+                                <input type="file" className="hidden" ref={editRef} onChange={e => setEditFile(e.target.files?.[0] || null)} />
+                                <Upload className="h-6 w-6 text-slate-400 mb-1" />
+                                <p className="text-sm text-slate-600">{editFile ? editFile.name : "Clicca per sostituire il file"}</p>
+                                {!editFile && activeDoc && <p className="text-xs text-slate-400 mt-0.5">Attuale: {activeDoc.name}</p>}
+                            </div>
                         </div>
                     </div>
                     <DialogFooter className="flex-col sm:flex-row gap-2">

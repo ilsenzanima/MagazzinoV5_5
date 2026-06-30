@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, Upload, Trash2, Loader2, Pencil, X } from "lucide-react"
+import { FileText, Upload, Trash2, Loader2, Pencil, X, Download } from "lucide-react"
 import { jobCommessaDocumentsApi, JobCommessaDocument } from "@/lib/services/job-commessa-documents"
 import { proposalDocumentTypesApi, ProposalDocumentType } from "@/lib/services/proposal-document-types"
 import { supabase } from "@/lib/supabase"
@@ -35,6 +35,7 @@ interface PendingFile {
 }
 
 const UNTYPED_KEY = "__untyped__"
+const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'])
 
 export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
     const [documents, setDocuments] = useState<JobCommessaDocument[]>([])
@@ -249,14 +250,16 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
                 <div className="flex-1 overflow-hidden min-w-0">
                     <div className="flex justify-between items-start gap-1">
                         <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-                            onClick={e => openEdit(doc, e)}
-                        >
-                            <Pencil className="h-3 w-3" />
-                        </Button>
+                        <div className="flex gap-0.5 shrink-0">
+                            {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
+                                    <Download className="h-3 w-3" />
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700" onClick={e => openEdit(doc, e)}>
+                                <Pencil className="h-3 w-3" />
+                            </Button>
+                        </div>
                     </div>
                     {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
                     <p className="text-xs text-slate-400 mt-1">
@@ -283,14 +286,16 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
                 </div>
                 {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
             </div>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700"
-                onClick={e => openEdit(doc, e)}
-            >
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
+            <div className="flex gap-0.5 shrink-0">
+                {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
+                        <Download className="h-3.5 w-3.5" />
+                    </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700" onClick={e => openEdit(doc, e)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                </Button>
+            </div>
         </div>
     )
 
