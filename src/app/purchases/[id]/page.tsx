@@ -29,6 +29,7 @@ import {
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocuments";
+import { PurchaseDDTConformita } from "@/components/purchases/details/PurchaseDDTConformita";
 import { useAuth } from "@/components/auth-provider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -856,16 +857,22 @@ export default function PurchaseDetailPage() {
                         </DialogContent>
                     </Dialog>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-2">
-                            <PurchaseDocuments
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <PurchaseDocuments
+                            purchaseId={id}
+                            documentUrls={purchase.documentUrls}
+                            onUpdate={loadData}
+                            isOrder={isOrder}
+                            supplierName={purchase.supplierName}
+                        />
+                        {!isOrder && (
+                            <PurchaseDDTConformita
                                 purchaseId={id}
-                                documentUrls={purchase.documentUrls}
-                                onUpdate={loadData}
-                                isOrder={isOrder}
+                                supplierId={purchase.supplierId}
                                 supplierName={purchase.supplierName}
+                                onUpdate={loadData}
                             />
-                        </div>
+                        )}
                     </div>
 
                     {/* Items List */}

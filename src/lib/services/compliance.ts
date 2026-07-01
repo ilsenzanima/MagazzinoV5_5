@@ -86,6 +86,61 @@ export const complianceApi = {
         return (data || []).map(mapDbToDoc);
     },
 
+    getByPurchaseId: async (purchaseId: string): Promise<ComplianceDocument[]> => {
+        const { data, error } = await supabase
+            .from('supplier_compliance_documents')
+            .select(SELECT_WITH_RELATIONS)
+            .eq('purchase_id', purchaseId)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapDbToDoc);
+    },
+
+    getByJobIdFromDDT: async (jobId: string): Promise<ComplianceDocument[]> => {
+        // Docs directly created from purchases linked to this job (purchases.job_id)
+        const { data: directDocs, error: e1 } = await supabase
+            .from('supplier_compliance_documents')
+            .select(`${SELECT_WITH_RELATIONS}, purchases!inner(job_id)`)
+            .eq('purchases.job_id', jobId)
+            .is('deleted_at', null);
+        if (e1) throw e1;
+
+        // Docs from purchases linked via purchase_items.job_id
+        const { data: itemDocs, error: e2 } = await supabase
+            .from('supplier_compliance_documents')
+            .select(`${SELECT_WITH_RELATIONS}, purchases!inner(id, purchase_items!inner(job_id))`)
+            .eq('purchases.purchase_items.job_id', jobId)
+            .is('deleted_at', null);
+        if (e2) throw e2;
+
+        // Docs associated via purchase_compliance_associations to purchases of this job
+        const { data: assocDocs, error: e3 } = await supabase
+            .from('purchase_compliance_associations')
+            .select(`supplier_compliance_documents(${SELECT_WITH_RELATIONS}), purchases!inner(job_id, purchase_items(job_id))`)
+            .eq('purchases.job_id', jobId)
+            .is('deleted_at', null);
+        if (e3) throw e3;
+
+        const { data: assocItemDocs, error: e4 } = await supabase
+            .from('purchase_compliance_associations')
+            .select(`supplier_compliance_documents(${SELECT_WITH_RELATIONS}), purchases!inner(id, purchase_items!inner(job_id))`)
+            .eq('purchases.purchase_items.job_id', jobId)
+            .is('deleted_at', null);
+        if (e4) throw e4;
+
+        const seen = new Set<string>();
+        const result: ComplianceDocument[] = [];
+        const addDoc = (doc: ComplianceDocument) => {
+            if (!seen.has(doc.id)) { seen.add(doc.id); result.push(doc); }
+        };
+        (directDocs || []).map(mapDbToDoc).forEach(addDoc);
+        (itemDocs || []).map(mapDbToDoc).forEach(addDoc);
+        (assocDocs || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
+        (assocItemDocs || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
+        return result;
+    },
+
     create: async (doc: {
         supplierId: string;
         brandId: string;
@@ -359,6 +414,77 @@ export const proposalComplianceApi = {
     disassociate: async (id: string): Promise<void> => {
         const { error } = await supabase
             .from('proposal_compliance_associations')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
+        if (error) throw error;
+    },
+};
+
+// ─── Purchase (DDT) ↔ Compliance associations ────────────────────────────────
+
+export interface PurchaseComplianceAssociation {
+    id: string;
+    purchaseId: string;
+    complianceDocumentId: string;
+    createdAt: string;
+    document?: ComplianceDocument;
+}
+
+const mapDbToPurchaseAssociation = (db: any): PurchaseComplianceAssociation => ({
+    id: db.id,
+    purchaseId: db.purchase_id,
+    complianceDocumentId: db.compliance_document_id,
+    createdAt: db.created_at,
+    document: db.supplier_compliance_documents ? mapDbToDoc(db.supplier_compliance_documents) : undefined,
+});
+
+export const purchaseComplianceApi = {
+    getByPurchaseId: async (purchaseId: string): Promise<PurchaseComplianceAssociation[]> => {
+        const { data, error } = await supabase
+            .from('purchase_compliance_associations')
+            .select('*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))')
+            .eq('purchase_id', purchaseId)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapDbToPurchaseAssociation);
+    },
+
+    associate: async (purchaseId: string, complianceDocumentId: string): Promise<PurchaseComplianceAssociation> => {
+        const { data: { user } } = await supabase.auth.getUser();
+        const selectQuery = '*, supplier_compliance_documents(*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name))';
+
+        const { data: existing } = await supabase
+            .from('purchase_compliance_associations')
+            .select('id')
+            .eq('purchase_id', purchaseId)
+            .eq('compliance_document_id', complianceDocumentId)
+            .not('deleted_at', 'is', null)
+            .maybeSingle();
+
+        if (existing) {
+            const { data, error } = await supabase
+                .from('purchase_compliance_associations')
+                .update({ deleted_at: null, created_by: user?.id, created_at: new Date().toISOString() })
+                .eq('id', existing.id)
+                .select(selectQuery)
+                .single();
+            if (error) throw error;
+            return mapDbToPurchaseAssociation(data);
+        }
+
+        const { data, error } = await supabase
+            .from('purchase_compliance_associations')
+            .insert({ purchase_id: purchaseId, compliance_document_id: complianceDocumentId, created_by: user?.id })
+            .select(selectQuery)
+            .single();
+        if (error) throw error;
+        return mapDbToPurchaseAssociation(data);
+    },
+
+    disassociate: async (id: string): Promise<void> => {
+        const { error } = await supabase
+            .from('purchase_compliance_associations')
             .update({ deleted_at: new Date().toISOString() })
             .eq('id', id);
         if (error) throw error;

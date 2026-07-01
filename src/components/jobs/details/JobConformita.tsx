@@ -937,6 +937,97 @@ function AssociateDialog({
     )
 }
 
+// ─── Documenti da DDT ────────────────────────────────────────────────────────
+
+function DDTDocuments({ jobId }: { jobId: string }) {
+    const supabase = createClient()
+    const [docs, setDocs] = useState<ComplianceDocument[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => { load() }, [jobId])
+
+    const load = async () => {
+        try {
+            setLoading(true)
+            setDocs(await complianceApi.getByJobIdFromDDT(jobId))
+        } catch {
+            toast.error("Errore nel caricamento dei documenti da DDT")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const openDoc = async (url: string) => {
+        if (url && !url.includes('/')) {
+            window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento`, '_blank')
+            return
+        }
+        try {
+            const path = url.split("/public/documents/")[1]
+            if (!path) { window.open(url, "_blank"); return }
+            const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600)
+            if (error || !data?.signedUrl) { window.open(url, "_blank"); return }
+            window.open(data.signedUrl, "_blank")
+        } catch { window.open(url, "_blank") }
+    }
+
+    if (loading) {
+        return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+    }
+
+    if (docs.length === 0) {
+        return (
+            <div className="text-center py-10 text-slate-400 border-2 border-dashed dark:border-slate-700 rounded-lg">
+                <ShieldCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Nessun documento di conformità proveniente da DDT</p>
+                <p className="text-xs mt-1 text-slate-300 dark:text-slate-600">
+                    Compaiono automaticamente quando materiali acquistati con conformità vengono usati in questa commessa
+                </p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-2">
+            {docs.map(doc => (
+                <Card key={doc.id} className="hover:shadow-sm transition-shadow">
+                    <CardContent className="p-3 flex items-start gap-3">
+                        <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
+                            <ShieldCheck className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm">{doc.name}</p>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                                {doc.documentTypeName && (
+                                    <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
+                                        {doc.documentTypeName}
+                                    </span>
+                                )}
+                                {doc.purchaseNumber && (
+                                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                                        DDT {doc.purchaseNumber}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        {doc.fileUrl && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 shrink-0"
+                                onClick={() => openDoc(doc.fileUrl)}
+                                title="Apri documento"
+                            >
+                                <ExternalLink className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    )
+}
+
 // ─── Componente principale ───────────────────────────────────────────────────
 
 export function JobConformita({ jobId, jobLabel }: JobConformitaProps) {
@@ -945,12 +1036,16 @@ export function JobConformita({ jobId, jobLabel }: JobConformitaProps) {
             <TabsList>
                 <TabsTrigger value="own">Documenti caricati</TabsTrigger>
                 <TabsTrigger value="associated">Documenti associati</TabsTrigger>
+                <TabsTrigger value="ddt">Documenti da DDT</TabsTrigger>
             </TabsList>
             <TabsContent value="own">
                 <OwnDocuments jobId={jobId} jobLabel={jobLabel} />
             </TabsContent>
             <TabsContent value="associated">
                 <AssociatedDocuments jobId={jobId} />
+            </TabsContent>
+            <TabsContent value="ddt">
+                <DDTDocuments jobId={jobId} />
             </TabsContent>
         </Tabs>
     )
