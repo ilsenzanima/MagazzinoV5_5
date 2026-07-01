@@ -177,6 +177,22 @@ export async function deleteFile(fileId: string): Promise<void> {
 }
 
 /**
+ * Sposta un file da una cartella all'altra su Drive (rimuove il vecchio
+ * parent e aggiunge il nuovo), per la funzione "sposta in cartella".
+ */
+export async function moveFile(fileId: string, newParentId: string): Promise<void> {
+    const drive = getDriveClient();
+    const current = await drive.files.get({ fileId, fields: 'parents' });
+    const previousParents = (current.data.parents || []).join(',');
+    await drive.files.update({
+        fileId,
+        addParents: newParentId,
+        removeParents: previousParents,
+        fields: 'id, parents',
+    });
+}
+
+/**
  * Trova una sottocartella per nome dentro il parent indicato, senza crearla.
  */
 async function findFolder(name: string, parentId: string): Promise<string | null> {

@@ -142,6 +142,25 @@ export const complianceApi = {
             .is('deleted_at', null);
         if (e4) throw e4;
 
+        // Docs from purchases il cui lotto (purchase_item) è stato usato come
+        // riferimento in un movimento verso questa commessa: copre sia le uscite
+        // reali di magazzino (materiale acquistato altrove e poi mandato in
+        // cantiere) sia i movimenti "fittizi", per i quali viene comunque scelto
+        // un lotto/DDT di riferimento ai fini del prezzo.
+        const { data: movementDocs, error: e5 } = await supabase
+            .from('supplier_compliance_documents')
+            .select(`${SELECT_WITH_RELATIONS}, purchases!inner(id, purchase_items!inner(id, movements!inner(job_id)))`)
+            .eq('purchases.purchase_items.movements.job_id', jobId)
+            .is('deleted_at', null);
+        if (e5) throw e5;
+
+        const { data: assocMovementDocs, error: e6 } = await supabase
+            .from('purchase_compliance_associations')
+            .select(`supplier_compliance_documents(${SELECT_WITH_RELATIONS}), purchases!inner(id, purchase_items!inner(id, movements!inner(job_id)))`)
+            .eq('purchases.purchase_items.movements.job_id', jobId)
+            .is('deleted_at', null);
+        if (e6) throw e6;
+
         const seen = new Set<string>();
         const result: ComplianceDocument[] = [];
         const addDoc = (doc: ComplianceDocument) => {
@@ -151,6 +170,8 @@ export const complianceApi = {
         (itemDocs || []).map(mapDbToDoc).forEach(addDoc);
         (assocDocs || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
         (assocItemDocs || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
+        (movementDocs || []).map(mapDbToDoc).forEach(addDoc);
+        (assocMovementDocs || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
         return result;
     },
 

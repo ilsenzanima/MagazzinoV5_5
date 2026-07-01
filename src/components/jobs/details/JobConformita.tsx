@@ -25,11 +25,15 @@ import {
     ShieldCheck,
     X,
     Download,
+    FolderInput,
+    FolderPlus,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { jobDocumentsApi, JobDocument } from "@/lib/api"
 import { jobConformitaDocumentTypesApi, JobConformitaDocumentType } from "@/lib/services/job-conformita-document-types"
+import { jobDocumentFoldersApi, JobDocumentFolder } from "@/lib/services/job-document-folders"
+import { jobDdtDocumentExclusionsApi } from "@/lib/services/job-ddt-document-exclusions"
 import {
     complianceApi,
     jobComplianceApi,
@@ -75,6 +79,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const supabase = createClient()
     const [docs, setDocs] = useState<JobDocument[]>([])
     const [docTypes, setDocTypes] = useState<JobConformitaDocumentType[]>([])
+    const [folders, setFolders] = useState<JobDocumentFolder[]>([])
     const [loading, setLoading] = useState(true)
     const [uploadOpen, setUploadOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
@@ -83,13 +88,27 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [activeDoc, setActiveDoc] = useState<JobDocument | null>(null)
     const [viewMode, setViewMode] = useViewMode('job-conformita-own-documents', 'grid')
+    const [activeFolderByType, setActiveFolderByType] = useState<Record<string, string>>({})
 
     // Upload wizard state
     const [upStep, setUpStep] = useState<1 | 2>(1)
     const [upDocTypeId, setUpDocTypeId] = useState("")
+    const [upFolderId, setUpFolderId] = useState("")
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
     const [dragOver, setDragOver] = useState(false)
     const upRef = useRef<HTMLInputElement>(null)
+
+    // New folder dialog
+    const [newFolderOpen, setNewFolderOpen] = useState(false)
+    const [newFolderTypeId, setNewFolderTypeId] = useState("")
+    const [newFolderName, setNewFolderName] = useState("")
+    const [creatingFolder, setCreatingFolder] = useState(false)
+
+    // Move to folder dialog
+    const [moveOpen, setMoveOpen] = useState(false)
+    const [movingDoc, setMovingDoc] = useState<JobDocument | null>(null)
+    const [moveFolderId, setMoveFolderId] = useState("root")
+    const [moving, setMoving] = useState(false)
 
     // Edit form
     const [editName, setEditName] = useState("")
@@ -103,12 +122,14 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const load = async () => {
         try {
             setLoading(true)
-            const [all, types] = await Promise.all([
+            const [all, types, jobFolders] = await Promise.all([
                 jobDocumentsApi.getByJobId(jobId),
                 jobConformitaDocumentTypesApi.getAll(),
+                jobDocumentFoldersApi.getByJobId(jobId),
             ])
             setDocs(all.filter(d => d.category === "conformita"))
             setDocTypes(types)
+            setFolders(jobFolders)
         } catch {
             toast.error("Errore nel caricamento dei documenti")
         } finally {
@@ -116,13 +137,104 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         }
     }
 
+    // Percorso Drive base per un tipo documento: se il tipo consente cartelle,
+    // i suoi file vivono in una sottocartella dedicata al tipo, altrimenti
+    // restano nella cartella piatta "Conformità" (comportamento storico).
+    const typeBaseSegments = (type?: JobConformitaDocumentType) => {
+        const base = ['Cantieri', jobLabel || jobId, 'Conformità']
+        return type?.allowsFolders ? [...base, type.name] : base
+    }
+
     const openUpload = () => {
         setUpStep(1)
         setUpDocTypeId("")
+        setUpFolderId("")
         setPendingFiles([])
         setDragOver(false)
         batchUpload.reset()
         setUploadOpen(true)
+    }
+
+    const openNewFolder = (typeId: string) => {
+        setNewFolderTypeId(typeId)
+        setNewFolderName("")
+        setNewFolderOpen(true)
+    }
+
+    const handleCreateFolder = async () => {
+        const name = newFolderName.trim()
+        const type = docTypes.find(t => t.id === newFolderTypeId)
+        if (!name || !type) return
+        try {
+            setCreatingFolder(true)
+            const res = await fetch('/api/drive/ensure-folder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ segments: [...typeBaseSegments(type), name] }),
+            })
+            const result = await res.json()
+            if (!res.ok) throw new Error(result.error || 'Errore creazione cartella')
+            const folder = await jobDocumentFoldersApi.create({
+                jobId,
+                documentTypeId: newFolderTypeId,
+                name,
+                driveFolderId: result.folderId,
+            })
+            setFolders(prev => [...prev, folder])
+            if (upDocTypeId === newFolderTypeId) setUpFolderId(folder.id)
+            setActiveFolderByType(prev => ({ ...prev, [newFolderTypeId]: folder.id }))
+            toast.success("Cartella creata")
+            setNewFolderOpen(false)
+        } catch {
+            toast.error("Errore durante la creazione della cartella")
+        } finally {
+            setCreatingFolder(false)
+        }
+    }
+
+    const openMove = (doc: JobDocument) => {
+        setMovingDoc(doc)
+        setMoveFolderId(doc.folderId || "root")
+        setMoveOpen(true)
+    }
+
+    const handleMove = async () => {
+        if (!movingDoc) return
+        const targetFolderId = moveFolderId === "root" ? null : moveFolderId
+        if (targetFolderId === (movingDoc.folderId || null)) { setMoveOpen(false); return }
+        try {
+            setMoving(true)
+            const type = docTypes.find(t => t.id === movingDoc.conformitaDocumentTypeId)
+            const targetFolder = targetFolderId ? folders.find(f => f.id === targetFolderId) : undefined
+            const segments = targetFolder ? [...typeBaseSegments(type), targetFolder.name] : typeBaseSegments(type)
+
+            // Il file su Drive va spostato solo se è un vero id Drive (non un vecchio path Supabase)
+            if (movingDoc.fileUrl && !movingDoc.fileUrl.includes('/')) {
+                const ensureRes = await fetch('/api/drive/ensure-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ segments }),
+                })
+                const ensured = await ensureRes.json()
+                if (!ensureRes.ok) throw new Error(ensured.error || 'Errore risoluzione cartella')
+                const moveRes = await fetch('/api/drive/move-file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileId: movingDoc.fileUrl, newParentId: ensured.folderId }),
+                })
+                const moved = await moveRes.json()
+                if (!moveRes.ok) throw new Error(moved.error || 'Errore spostamento file')
+            }
+
+            await jobDocumentsApi.update(movingDoc.id, { folderId: targetFolderId })
+            toast.success("Documento spostato")
+            setMoveOpen(false)
+            load()
+        } catch {
+            toast.error("Errore durante lo spostamento")
+        } finally {
+            setMoving(false)
+        }
     }
 
     const handleFilesSelected = (files: FileList | null) => {
@@ -168,12 +280,17 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const handleUploadAll = async () => {
         if (pendingFiles.length === 0) return
         setUploading(true)
+        const selectedType = docTypes.find(t => t.id === upDocTypeId)
+        const selectedFolder = upFolderId ? folders.find(f => f.id === upFolderId) : undefined
+        const segments = selectedFolder
+            ? [...typeBaseSegments(selectedType), selectedFolder.name]
+            : typeBaseSegments(selectedType)
         const { okCount, failedCount } = await batchUpload.run(pendingFiles, async pf => {
             const compressed = await compressImageIfNeeded(pf.file)
             const fileExt = compressed.name.split(".").pop() || ''
             const formData = new FormData()
             formData.append('file', compressed)
-            formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Conformità']))
+            formData.append('folderPath', JSON.stringify(segments))
             const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
             const uploaded = await res.json()
             if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
@@ -186,6 +303,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 fileSize: compressed.size,
                 category: "conformita",
                 conformitaDocumentTypeId: upDocTypeId || null,
+                folderId: upFolderId || null,
             })
         })
         setUploading(false)
@@ -299,6 +417,11 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                             <Download className="h-3 w-3 text-slate-500" />
                         </Button>
                     )}
+                    {docTypes.find(t => t.id === doc.conformitaDocumentTypeId)?.allowsFolders && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Sposta in cartella" onClick={e => { e.stopPropagation(); openMove(doc) }}>
+                            <FolderInput className="h-3 w-3 text-slate-500" />
+                        </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); openEdit(doc) }}>
                         <Pencil className="h-3 w-3 text-slate-500" />
                     </Button>
@@ -324,6 +447,11 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
                     <Button variant="ghost" size="icon" className="h-6 w-6" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
                         <Download className="h-3 w-3 text-slate-500" />
+                    </Button>
+                )}
+                {docTypes.find(t => t.id === doc.conformitaDocumentTypeId)?.allowsFolders && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Sposta in cartella" onClick={e => { e.stopPropagation(); openMove(doc) }}>
+                        <FolderInput className="h-3 w-3 text-slate-500" />
                     </Button>
                 )}
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); openEdit(doc) }}>
@@ -378,19 +506,52 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                             </TabsTrigger>
                         ))}
                     </TabsList>
-                    {groups.map(g => (
-                        <TabsContent key={g.key} value={g.key} className="pt-4">
-                            {viewMode === 'list' ? (
-                                <div className="space-y-1.5">
-                                    {g.docs.map(renderDocRow)}
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {g.docs.map(renderDocCard)}
-                                </div>
-                            )}
-                        </TabsContent>
-                    ))}
+                    {groups.map(g => {
+                        const type = docTypes.find(t => t.id === g.key)
+                        const typeFolders = type ? folders.filter(f => f.documentTypeId === type.id) : []
+                        const activeFolder = activeFolderByType[g.key] || 'all'
+                        const shownDocs = !type?.allowsFolders
+                            ? g.docs
+                            : activeFolder === 'all'
+                                ? g.docs
+                                : activeFolder === 'root'
+                                    ? g.docs.filter(d => !d.folderId)
+                                    : g.docs.filter(d => d.folderId === activeFolder)
+                        return (
+                            <TabsContent key={g.key} value={g.key} className="pt-4 space-y-3">
+                                {type?.allowsFolders && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        {[{ id: 'all', name: 'Tutte' }, { id: 'root', name: 'Senza cartella' }, ...typeFolders].map(f => (
+                                            <button
+                                                key={f.id}
+                                                onClick={() => setActiveFolderByType(prev => ({ ...prev, [g.key]: f.id }))}
+                                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${activeFolder === f.id
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                                    }`}
+                                            >
+                                                {f.name}
+                                            </button>
+                                        ))}
+                                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openNewFolder(g.key)}>
+                                            <FolderPlus className="h-3.5 w-3.5 mr-1" />Nuova cartella
+                                        </Button>
+                                    </div>
+                                )}
+                                {shownDocs.length === 0 ? (
+                                    <p className="text-sm text-slate-400 py-4 text-center">Nessun documento in questa cartella</p>
+                                ) : viewMode === 'list' ? (
+                                    <div className="space-y-1.5">
+                                        {shownDocs.map(renderDocRow)}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {shownDocs.map(renderDocCard)}
+                                    </div>
+                                )}
+                            </TabsContent>
+                        )
+                    })}
                 </Tabs>
             )}
 
@@ -402,7 +563,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                         <div className="space-y-4 py-2">
                             <div className="space-y-1">
                                 <Label>Tipo documento</Label>
-                                <Select value={upDocTypeId} onValueChange={setUpDocTypeId}>
+                                <Select value={upDocTypeId} onValueChange={v => { setUpDocTypeId(v); setUpFolderId("") }}>
                                     <SelectTrigger><SelectValue placeholder="Seleziona tipo documento" /></SelectTrigger>
                                     <SelectContent>
                                         {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
@@ -412,6 +573,25 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                                     <p className="text-xs text-slate-400">Nessun tipo configurato. Vai in Impostazioni &gt; Dati &gt; Documenti Conformità Cantiere per crearne uno.</p>
                                 )}
                             </div>
+                            {docTypes.find(t => t.id === upDocTypeId)?.allowsFolders && (
+                                <div className="space-y-1">
+                                    <Label>Cartella (opzionale)</Label>
+                                    <div className="flex gap-2">
+                                        <Select value={upFolderId || "root"} onValueChange={v => setUpFolderId(v === "root" ? "" : v)}>
+                                            <SelectTrigger><SelectValue placeholder="Nessuna cartella" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="root">Nessuna cartella</SelectItem>
+                                                {folders.filter(f => f.documentTypeId === upDocTypeId).map(f => (
+                                                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <Button type="button" variant="outline" size="icon" onClick={() => openNewFolder(upDocTypeId)} title="Nuova cartella">
+                                            <FolderPlus className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                             <div className="space-y-1">
                                 <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
                                 <div
@@ -530,6 +710,53 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 description={`Il documento "${activeDoc?.name}" verrà eliminato definitivamente.`}
                 onConfirm={handleDelete}
             />
+
+            {/* Nuova cartella */}
+            <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader><DialogTitle>Nuova cartella</DialogTitle></DialogHeader>
+                    <div className="space-y-1.5 py-2">
+                        <Label>Nome cartella</Label>
+                        <Input
+                            value={newFolderName}
+                            onChange={e => setNewFolderName(e.target.value)}
+                            placeholder="Es. Piano 1"
+                            onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setNewFolderOpen(false)}>Annulla</Button>
+                        <Button onClick={handleCreateFolder} disabled={creatingFolder || !newFolderName.trim()}>
+                            {creatingFolder && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Crea
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Sposta in cartella */}
+            <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader><DialogTitle>Sposta in cartella</DialogTitle></DialogHeader>
+                    <div className="space-y-1.5 py-2">
+                        <Label>Cartella di destinazione</Label>
+                        <Select value={moveFolderId} onValueChange={setMoveFolderId}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="root">Nessuna cartella</SelectItem>
+                                {folders.filter(f => f.documentTypeId === movingDoc?.conformitaDocumentTypeId).map(f => (
+                                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setMoveOpen(false)}>Annulla</Button>
+                        <Button onClick={handleMove} disabled={moving}>
+                            {moving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Sposta
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
@@ -997,18 +1224,42 @@ function AssociateDialog({
 function DDTDocuments({ jobId }: { jobId: string }) {
     const supabase = createClient()
     const [docs, setDocs] = useState<ComplianceDocument[]>([])
+    const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set())
     const [loading, setLoading] = useState(true)
+    const [togglingId, setTogglingId] = useState<string | null>(null)
 
     useEffect(() => { load() }, [jobId])
 
     const load = async () => {
         try {
             setLoading(true)
-            setDocs(await complianceApi.getByJobIdFromDDT(jobId))
+            const [ddtDocs, excluded] = await Promise.all([
+                complianceApi.getByJobIdFromDDT(jobId),
+                jobDdtDocumentExclusionsApi.getExcludedIds(jobId),
+            ])
+            setDocs(ddtDocs)
+            setExcludedIds(excluded)
         } catch {
             toast.error("Errore nel caricamento dei documenti da DDT")
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleSetIncluded = async (docId: string, included: boolean) => {
+        try {
+            setTogglingId(docId)
+            if (included) {
+                await jobDdtDocumentExclusionsApi.include(jobId, docId)
+                setExcludedIds(prev => { const next = new Set(prev); next.delete(docId); return next })
+            } else {
+                await jobDdtDocumentExclusionsApi.exclude(jobId, docId)
+                setExcludedIds(prev => new Set(prev).add(docId))
+            }
+        } catch {
+            toast.error("Errore durante l'aggiornamento dello stato")
+        } finally {
+            setTogglingId(null)
         }
     }
 
@@ -1044,41 +1295,60 @@ function DDTDocuments({ jobId }: { jobId: string }) {
 
     return (
         <div className="space-y-2">
-            {docs.map(doc => (
-                <Card key={doc.id} className="hover:shadow-sm transition-shadow">
-                    <CardContent className="p-3 flex items-start gap-3">
-                        <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
-                            <ShieldCheck className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm">{doc.name}</p>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                                {doc.documentTypeName && (
-                                    <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                        {doc.documentTypeName}
-                                    </span>
-                                )}
-                                {doc.purchaseNumber && (
-                                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
-                                        DDT {doc.purchaseNumber}
-                                    </span>
-                                )}
+            {docs.map(doc => {
+                const isExcluded = excludedIds.has(doc.id)
+                return (
+                    <Card key={doc.id} className={`hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
+                        <CardContent className="p-3 flex items-start gap-3">
+                            <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
+                                <ShieldCheck className="h-6 w-6 text-green-600" />
                             </div>
-                        </div>
-                        {doc.fileUrl && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 shrink-0"
-                                onClick={() => openDoc(doc.fileUrl)}
-                                title="Apri documento"
-                            >
-                                <ExternalLink className="h-4 w-4" />
-                            </Button>
-                        )}
-                    </CardContent>
-                </Card>
-            ))}
+                            <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm">{doc.name}</p>
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    {doc.documentTypeName && (
+                                        <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
+                                            {doc.documentTypeName}
+                                        </span>
+                                    )}
+                                    {doc.purchaseNumber && (
+                                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                                            DDT {doc.purchaseNumber}
+                                        </span>
+                                    )}
+                                    <div className="inline-flex rounded-full overflow-hidden border border-slate-200 dark:border-slate-700 ml-auto">
+                                        <button
+                                            disabled={togglingId === doc.id}
+                                            onClick={() => handleSetIncluded(doc.id, true)}
+                                            className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${!isExcluded ? 'bg-emerald-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                        >
+                                            Incluso
+                                        </button>
+                                        <button
+                                            disabled={togglingId === doc.id}
+                                            onClick={() => handleSetIncluded(doc.id, false)}
+                                            className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${isExcluded ? 'bg-slate-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                        >
+                                            Escluso
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {doc.fileUrl && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 shrink-0"
+                                    onClick={() => openDoc(doc.fileUrl)}
+                                    title="Apri documento"
+                                >
+                                    <ExternalLink className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+                )
+            })}
         </div>
     )
 }

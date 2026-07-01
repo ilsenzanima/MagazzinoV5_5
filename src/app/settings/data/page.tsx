@@ -94,6 +94,7 @@ export default function SettingsInventoryPage() {
     const [jobConformitaDocTypes, setJobConformitaDocTypes] = useState<JobConformitaDocumentType[]>([]);
     const [loadingJobConformitaDocTypes, setLoadingJobConformitaDocTypes] = useState(true);
     const [newJobConformitaDocTypeName, setNewJobConformitaDocTypeName] = useState("");
+    const [newJobConformitaDocTypeAllowsFolders, setNewJobConformitaDocTypeAllowsFolders] = useState(false);
     const [addingJobConformitaDocType, setAddingJobConformitaDocType] = useState(false);
 
     // Rename dialog state
@@ -589,14 +590,25 @@ export default function SettingsInventoryPage() {
         }
         try {
             setAddingJobConformitaDocType(true);
-            const newType = await jobConformitaDocumentTypesApi.create(nameToAdd);
+            const newType = await jobConformitaDocumentTypesApi.create(nameToAdd, newJobConformitaDocTypeAllowsFolders);
             setJobConformitaDocTypes([...jobConformitaDocTypes, newType].sort((a, b) => a.name.localeCompare(b.name)));
             setNewJobConformitaDocTypeName("");
+            setNewJobConformitaDocTypeAllowsFolders(false);
         } catch (error) {
             console.error("Failed to add job conformita document type", error);
             notify.error("Errore nell'aggiunta del tipo di documento");
         } finally {
             setAddingJobConformitaDocType(false);
+        }
+    };
+
+    const handleToggleJobConformitaDocTypeFolders = async (id: string, allowsFolders: boolean) => {
+        try {
+            const updated = await jobConformitaDocumentTypesApi.setAllowsFolders(id, allowsFolders);
+            setJobConformitaDocTypes(prev => prev.map(t => t.id === id ? updated : t));
+        } catch (error) {
+            console.error("Failed to toggle allowsFolders", error);
+            notify.error("Errore nell'aggiornamento del tipo di documento");
         }
     };
 
@@ -1261,7 +1273,7 @@ export default function SettingsInventoryPage() {
                             <CardDescription>Tipi di documento selezionabili quando si carica un documento nella tab Conformità di una commessa.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Input
                                     placeholder="Nuovo Tipo Documento..."
                                     className="max-w-sm"
@@ -1269,6 +1281,14 @@ export default function SettingsInventoryPage() {
                                     onChange={(e) => setNewJobConformitaDocTypeName(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleAddJobConformitaDocType()}
                                 />
+                                <div className="flex items-center gap-1.5">
+                                    <Switch
+                                        id="newJobConformitaDocTypeAllowsFolders"
+                                        checked={newJobConformitaDocTypeAllowsFolders}
+                                        onCheckedChange={setNewJobConformitaDocTypeAllowsFolders}
+                                    />
+                                    <Label htmlFor="newJobConformitaDocTypeAllowsFolders" className="text-xs cursor-pointer text-slate-600">Consenti cartelle</Label>
+                                </div>
                                 <Button
                                     size="icon"
                                     className="bg-blue-600 hover:bg-blue-700"
@@ -1283,23 +1303,32 @@ export default function SettingsInventoryPage() {
                                     <Loader2 className="h-4 w-4 animate-spin" /> Caricamento tipi documento...
                                 </div>
                             ) : (
-                                <div className="flex flex-wrap gap-2">
+                                <div className="space-y-1.5">
                                     {jobConformitaDocTypes.map(docType => (
-                                        <Badge key={docType.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
-                                            {docType.name}
-                                            <button
-                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
-                                                onClick={() => openRename("jobConformitaDocType", docType.id, docType.name)}
-                                            >
-                                                <Pencil className="h-3 w-3 text-slate-500" />
-                                            </button>
-                                            <button
-                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
-                                                onClick={() => handleDeleteJobConformitaDocType(docType.id)}
-                                            >
-                                                <X className="h-3 w-3 text-slate-500" />
-                                            </button>
-                                        </Badge>
+                                        <div key={docType.id} className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-md border bg-slate-50 dark:bg-slate-800">
+                                            <span className="text-sm font-medium">{docType.name}</span>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Switch
+                                                        checked={docType.allowsFolders}
+                                                        onCheckedChange={(v) => handleToggleJobConformitaDocTypeFolders(docType.id, v)}
+                                                    />
+                                                    <span className="text-xs text-slate-500">Consenti cartelle</span>
+                                                </div>
+                                                <button
+                                                    className="hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full p-1 transition-colors"
+                                                    onClick={() => openRename("jobConformitaDocType", docType.id, docType.name)}
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5 text-slate-500" />
+                                                </button>
+                                                <button
+                                                    className="hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full p-1 transition-colors"
+                                                    onClick={() => handleDeleteJobConformitaDocType(docType.id)}
+                                                >
+                                                    <X className="h-3.5 w-3.5 text-slate-500" />
+                                                </button>
+                                            </div>
+                                        </div>
                                     ))}
                                     {jobConformitaDocTypes.length === 0 && (
                                         <p className="text-sm text-muted-foreground italic">Nessun tipo di documento presente.</p>

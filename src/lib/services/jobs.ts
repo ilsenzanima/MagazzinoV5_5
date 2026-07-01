@@ -95,6 +95,7 @@ const mapDbToJobDocument = (db: any): JobDocument => ({
     documentTypeName: db.job_site_document_types?.name || '',
     conformitaDocumentTypeId: db.conformita_document_type_id || null,
     conformitaDocumentTypeName: db.job_conformita_document_types?.name || '',
+    folderId: db.folder_id || null,
     uploadedBy: db.uploaded_by,
     uploadedByName: db.profiles?.full_name,
     createdAt: db.created_at
@@ -110,6 +111,7 @@ const mapJobDocumentToDb = (doc: Partial<JobDocument>) => ({
     category: doc.category,
     document_type_id: doc.documentTypeId || null,
     conformita_document_type_id: doc.conformitaDocumentTypeId || null,
+    folder_id: doc.folderId ?? null,
     uploaded_by: doc.uploadedBy
 });
 
@@ -428,7 +430,7 @@ export const jobDocumentsApi = {
         if (error) throw error;
         return mapDbToJobDocument(data);
     },
-    update: async (id: string, patch: Partial<Pick<JobDocument, 'name' | 'notes' | 'documentTypeId' | 'conformitaDocumentTypeId' | 'fileUrl' | 'fileType' | 'fileSize'>>) => {
+    update: async (id: string, patch: Partial<Pick<JobDocument, 'name' | 'notes' | 'documentTypeId' | 'conformitaDocumentTypeId' | 'fileUrl' | 'fileType' | 'fileSize' | 'folderId'>>) => {
         const update: any = {};
         if (patch.name !== undefined) update.name = patch.name;
         if (patch.notes !== undefined) update.notes = patch.notes || null;
@@ -437,6 +439,7 @@ export const jobDocumentsApi = {
         if (patch.fileUrl !== undefined) update.file_url = patch.fileUrl;
         if (patch.fileType !== undefined) update.file_type = patch.fileType;
         if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
+        if ('folderId' in patch) update.folder_id = patch.folderId ?? null;
 
         let oldFileUrl: string | null | undefined;
         if (patch.fileUrl !== undefined) {

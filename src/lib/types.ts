@@ -206,6 +206,7 @@ export interface JobDocument {
     documentTypeName?: string;
     conformitaDocumentTypeId?: string | null;
     conformitaDocumentTypeName?: string;
+    folderId?: string | null;
     uploadedBy: string;
     uploadedByName?: string;
     createdAt: string;
