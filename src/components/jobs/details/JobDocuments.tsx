@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FileText, Upload, Trash2, Loader2, Pencil, X, Download } from "lucide-react"
-import { JobDocument, jobDocumentsApi } from "@/lib/api"
+import { jobSiteDocumentsApi, SiteDocument } from "@/lib/services/job-site-documents"
 import { jobSiteDocumentTypesApi, JobSiteDocumentType } from "@/lib/services/job-site-document-types"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -44,13 +44,13 @@ const UNTYPED_KEY = "__untyped__"
 const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'])
 
 export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
-  const [documents, setDocuments] = useState<JobDocument[]>([])
+  const [documents, setDocuments] = useState<SiteDocument[]>([])
   const [docTypes, setDocTypes] = useState<JobSiteDocumentType[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [activeDoc, setActiveDoc] = useState<JobDocument | null>(null)
+  const [activeDoc, setActiveDoc] = useState<SiteDocument | null>(null)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
@@ -78,10 +78,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     try {
       setLoading(true)
       const [all, types] = await Promise.all([
-        jobDocumentsApi.getByJobId(jobId),
+        jobSiteDocumentsApi.getByJobId(jobId),
         jobSiteDocumentTypesApi.getAll(),
       ])
-      setDocuments(all.filter(d => d.category !== "conformita" && d.category !== "offerte-fornitori"))
+      setDocuments(all)
       setDocTypes(types)
     } catch (error) {
       console.error("Failed to load documents", error)
@@ -153,7 +153,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
       const uploaded = await res.json()
       if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
 
-      await jobDocumentsApi.create({
+      await jobSiteDocumentsApi.create({
         jobId,
         documentTypeId: upDocTypeId || null,
         name: pf.name.trim() || pf.file.name,
@@ -161,6 +161,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         fileUrl: uploaded.fileId,
         fileType: fileExt,
         fileSize: compressed.size,
+        uploadedBy: '',
+        uploadedByName: '',
       })
     })
     setUploading(false)
@@ -176,7 +178,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     loadDocuments()
   }
 
-  const openEdit = (doc: JobDocument, e: React.MouseEvent) => {
+  const openEdit = (doc: SiteDocument, e: React.MouseEvent) => {
     e.stopPropagation()
     setActiveDoc(doc)
     setEditName(doc.name)
@@ -208,7 +210,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         fileSize = compressed.size
       }
 
-      await jobDocumentsApi.update(activeDoc.id, {
+      await jobSiteDocumentsApi.update(activeDoc.id, {
         name: editName.trim() || activeDoc.name,
         notes: editNotes.trim(),
         documentTypeId: editDocTypeId || null,
@@ -248,7 +250,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     try {
       const path = activeDoc.fileUrl?.includes('/public/documents/') ? activeDoc.fileUrl.split('/public/documents/')[1] : undefined
       if (path) await supabase.storage.from('documents').remove([path])
-      await jobDocumentsApi.delete(activeDoc.id)
+      await jobSiteDocumentsApi.delete(activeDoc.id)
       setDeleteOpen(false)
       setEditOpen(false)
       toast.success("Documento eliminato")
@@ -260,7 +262,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     }
   }
 
-  const renderDocCard = (doc: JobDocument) => (
+  const renderDocCard = (doc: SiteDocument) => (
     <Card
       key={doc.id}
       className="hover:shadow-md transition-shadow cursor-pointer"
@@ -294,7 +296,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     </Card>
   )
 
-  const renderDocRow = (doc: JobDocument) => (
+  const renderDocRow = (doc: SiteDocument) => (
     <div
       key={doc.id}
       className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer"
@@ -324,7 +326,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     </div>
   )
 
-  const groups: { key: string; label: string; docs: JobDocument[] }[] = [
+  const groups: { key: string; label: string; docs: SiteDocument[] }[] = [
     ...docTypes.map(t => ({ key: t.id, label: t.name, docs: documents.filter(d => d.documentTypeId === t.id) })),
     { key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) },
   ].filter(g => g.docs.length > 0)

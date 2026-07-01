@@ -33,6 +33,9 @@ import { it } from "date-fns/locale"
 import { ProposalCostAnalysisVersions } from "@/components/clients/detail/ProposalCostAnalysisVersions"
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { ProposalDocuments } from "@/components/clients/detail/ProposalDocuments"
+import { ProposalSiteDocuments } from "@/components/clients/detail/ProposalSiteDocuments"
+import { proposalSiteDocumentsApi } from "@/lib/services/proposal-site-documents"
+import { jobSiteDocumentTypesApi } from "@/lib/services/job-site-document-types"
 import { ProposalConformita } from "@/components/clients/detail/ProposalConformita"
 import { ProposalDistanza } from "@/components/clients/detail/ProposalDistanza"
 import { ProposalCronoprogramma } from "@/components/clients/detail/ProposalCronoprogramma"
@@ -298,6 +301,7 @@ export default function ProposalDetailPage() {
 
             // Collega alla commessa i documenti già caricati sulla proposta (stessi record, nessuna copia)
             await proposalDocumentsApi.linkToJob(proposalId, job.id)
+            await proposalSiteDocumentsApi.linkToJob(proposalId, job.id)
             await supplierOffersApi.linkToJob(proposalId, job.id)
 
             // Associa i documenti di conformità della proposta alla commessa (tab Conformità)
@@ -395,12 +399,21 @@ export default function ProposalDetailPage() {
                     <TabsTrigger value="info"><FileText className="h-4 w-4 mr-2" />Info</TabsTrigger>
                     <TabsTrigger value="costi"><Calculator className="h-4 w-4 mr-2" />Analisi Costi</TabsTrigger>
                     <TabsTrigger value="documenti">
-                        <BarChart2 className="h-4 w-4 mr-2" />Documenti
+                        <BarChart2 className="h-4 w-4 mr-2" />Documenti Commessa
                         <HelpTip
-                            title="Documenti"
+                            title="Documenti Commessa"
                             description="Tipi disponibili per i documenti caricati in questa sezione (condivisi con le commesse)."
                             fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => t.name)}
                             emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
+                        />
+                    </TabsTrigger>
+                    <TabsTrigger value="documenti-cantiere">
+                        <FileText className="h-4 w-4 mr-2" />Documenti Cantiere
+                        <HelpTip
+                            title="Documenti Cantiere"
+                            description="Tipi disponibili per i documenti caricati in questa sezione (condivisi con le commesse)."
+                            fetchItems={async () => (await jobSiteDocumentTypesApi.getAll()).map(t => t.name)}
+                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Cantiere per crearne uno."
                         />
                     </TabsTrigger>
                     <TabsTrigger value="conformita"><ShieldCheck className="h-4 w-4 mr-2 text-green-600" />Conformità</TabsTrigger>
@@ -570,6 +583,10 @@ export default function ProposalDetailPage() {
                 {/* ── DOCUMENTI ─────────────────────────────────────── */}
                 <TabsContent value="documenti">
                     <ProposalDocuments proposalId={proposalId} />
+                </TabsContent>
+
+                <TabsContent value="documenti-cantiere">
+                    <ProposalSiteDocuments proposalId={proposalId} />
                 </TabsContent>
 
                 {/* ── CONFORMITÀ ────────────────────────────────────── */}

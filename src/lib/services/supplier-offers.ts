@@ -55,6 +55,7 @@ export const supplierOffersApi = {
         // Se l'offerta viene caricata sulla proposta ed è già stata convertita in commessa,
         // è subito visibile anche lì (stesso record, nessuna copia).
         let jobId = doc.jobId || null;
+        let proposalId = doc.proposalId || null;
         if (doc.proposalId && !jobId) {
             const { data: proposal } = await supabase
                 .from('client_proposals')
@@ -62,11 +63,20 @@ export const supplierOffersApi = {
                 .eq('id', doc.proposalId)
                 .single();
             jobId = proposal?.converted_job_id || null;
+        } else if (doc.jobId && !proposalId) {
+            // Se l'offerta viene caricata sulla commessa e questa proviene da una
+            // proposta, è subito visibile anche lì (stesso record, nessuna copia).
+            const { data: proposal } = await supabase
+                .from('client_proposals')
+                .select('id')
+                .eq('converted_job_id', doc.jobId)
+                .maybeSingle();
+            proposalId = proposal?.id || null;
         }
         const { data, error } = await supabase
             .from('shared_supplier_offers')
             .insert({
-                proposal_id: doc.proposalId || null,
+                proposal_id: proposalId,
                 job_id: jobId,
                 name: doc.name,
                 notes: doc.notes || null,
