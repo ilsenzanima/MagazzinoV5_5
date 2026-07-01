@@ -28,6 +28,7 @@ import { useViewMode } from "@/hooks/useViewMode"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
+import { OldRevCheckboxes, OldRevBadges } from "@/components/documents/OldRevControls"
 
 interface JobDocumentsProps {
   jobId: string
@@ -38,6 +39,8 @@ interface PendingFile {
   file: File
   name: string
   notes: string
+  isOld: boolean
+  isRev: boolean
 }
 
 const UNTYPED_KEY = "__untyped__"
@@ -68,6 +71,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const [editNotes, setEditNotes] = useState("")
   const [editDocTypeId, setEditDocTypeId] = useState("")
   const [editFile, setEditFile] = useState<File | null>(null)
+  const [editIsOld, setEditIsOld] = useState(false)
+  const [editIsRev, setEditIsRev] = useState(false)
   const editRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -114,6 +119,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         file: f,
         name: f.name.replace(/\.[^.]+$/, ''),
         notes: "",
+        isOld: false,
+        isRev: false,
       }))
       return [...prev, ...newPending]
     })
@@ -163,6 +170,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         fileSize: compressed.size,
         uploadedBy: '',
         uploadedByName: '',
+        isOld: pf.isOld,
+        isRev: pf.isRev,
       })
     })
     setUploading(false)
@@ -185,6 +194,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     setEditNotes(doc.notes || "")
     setEditDocTypeId(doc.documentTypeId || "")
     setEditFile(null)
+    setEditIsOld(doc.isOld)
+    setEditIsRev(doc.isRev)
     setEditOpen(true)
   }
 
@@ -217,6 +228,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         fileUrl,
         fileType,
         fileSize,
+        isOld: editIsOld,
+        isRev: editIsRev,
       })
       toast.success("Documento aggiornato")
       setEditOpen(false)
@@ -274,7 +287,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         </div>
         <div className="flex-1 overflow-hidden min-w-0">
           <div className="flex justify-between items-start gap-1">
-            <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
+              <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
+            </div>
             <div className="flex gap-0.5 shrink-0">
               {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
                 <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
@@ -306,7 +322,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         {getFileIcon(doc.fileType, "h-5 w-5")}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
+          <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
+        </div>
         {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
       </div>
       <p className="text-xs text-slate-400 shrink-0">
@@ -448,6 +467,13 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                     <Label className="text-xs">Nota (opzionale)</Label>
                     <Input value={pf.notes} disabled={batchUpload.statuses[idx]?.status === 'uploading'} onChange={e => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
                   </div>
+                  <OldRevCheckboxes
+                    idPrefix={`up-${idx}`}
+                    isOld={pf.isOld}
+                    isRev={pf.isRev}
+                    onOldChange={v => updatePending(idx, { isOld: v })}
+                    onRevChange={v => updatePending(idx, { isRev: v })}
+                  />
                   <UploadStatusBar state={batchUpload.statuses[idx]} />
                 </div>
               ))}
@@ -496,6 +522,13 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
               <Label>Nota</Label>
               <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Breve descrizione" />
             </div>
+            <OldRevCheckboxes
+              idPrefix="edit"
+              isOld={editIsOld}
+              isRev={editIsRev}
+              onOldChange={setEditIsOld}
+              onRevChange={setEditIsRev}
+            />
             <div className="space-y-1">
               <Label>Sostituisci file (opzionale)</Label>
               <div

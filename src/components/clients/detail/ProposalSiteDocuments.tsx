@@ -23,6 +23,7 @@ import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
+import { OldRevCheckboxes, OldRevBadges } from "@/components/documents/OldRevControls"
 
 interface Props {
     proposalId: string
@@ -32,6 +33,8 @@ interface PendingFile {
     file: File
     name: string
     notes: string
+    isOld: boolean
+    isRev: boolean
 }
 
 const UNTYPED_KEY = "__untyped__"
@@ -59,6 +62,8 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     const [editName, setEditName] = useState("")
     const [editNotes, setEditNotes] = useState("")
     const [editDocTypeId, setEditDocTypeId] = useState("")
+    const [editIsOld, setEditIsOld] = useState(false)
+    const [editIsRev, setEditIsRev] = useState(false)
     const [editFile, setEditFile] = useState<File | null>(null)
     const editRef = useRef<HTMLInputElement>(null)
 
@@ -97,6 +102,8 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
         setEditName(doc.name)
         setEditNotes(doc.notes || "")
         setEditDocTypeId(doc.documentTypeId || "")
+        setEditIsOld(doc.isOld || false)
+        setEditIsRev(doc.isRev || false)
         setEditFile(null)
         setEditOpen(true)
     }
@@ -124,6 +131,8 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                 file: f,
                 name: f.name.replace(/\.[^.]+$/, ''),
                 notes: "",
+                isOld: false,
+                isRev: false,
             }))
             return [...prev, ...newPending]
         })
@@ -172,6 +181,8 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                 fileSize: compressed.size,
                 uploadedBy: '',
                 uploadedByName: '',
+                isOld: pf.isOld,
+                isRev: pf.isRev,
             })
         })
         setUploading(false)
@@ -216,6 +227,8 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                 fileUrl,
                 fileType,
                 fileSize,
+                isOld: editIsOld,
+                isRev: editIsRev,
             })
             notify.success("Documento aggiornato")
             setEditOpen(false)
@@ -247,7 +260,10 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                 <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
                 <div className="flex-1 overflow-hidden min-w-0">
                     <div className="flex justify-between items-start gap-1">
-                        <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
+                        <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                            <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
+                            <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
+                        </div>
                         <Button
                             variant="ghost"
                             size="icon"
@@ -277,6 +293,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
             <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                     <span className="font-medium text-sm truncate" title={doc.name}>{doc.name}</span>
+                    <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
                     <span className="text-xs text-slate-400">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</span>
                     {doc.fileSize != null && <span className="text-xs text-slate-400">{formatFileSize(doc.fileSize)}</span>}
                 </div>
@@ -415,6 +432,13 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                                         <Label className="text-xs">Nota (opzionale)</Label>
                                         <Input value={pf.notes} disabled={batchUpload.statuses[idx]?.status === 'uploading'} onChange={e => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
                                     </div>
+                                    <OldRevCheckboxes
+                                        idPrefix={`up-${idx}`}
+                                        isOld={pf.isOld}
+                                        isRev={pf.isRev}
+                                        onOldChange={v => updatePending(idx, { isOld: v })}
+                                        onRevChange={v => updatePending(idx, { isRev: v })}
+                                    />
                                     <UploadStatusBar state={batchUpload.statuses[idx]} />
                                 </div>
                             ))}
@@ -463,6 +487,13 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                             <Label>Nota</Label>
                             <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Breve descrizione" />
                         </div>
+                        <OldRevCheckboxes
+                            idPrefix="edit"
+                            isOld={editIsOld}
+                            isRev={editIsRev}
+                            onOldChange={setEditIsOld}
+                            onRevChange={setEditIsRev}
+                        />
                         <div className="space-y-1">
                             <Label>Sostituisci file (opzionale)</Label>
                             <div

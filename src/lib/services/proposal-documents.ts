@@ -15,6 +15,8 @@ export interface ProposalDocument {
     uploadedBy: string;
     uploadedByName: string;
     createdAt: string;
+    isOld: boolean;
+    isRev: boolean;
 }
 
 const map = (db: any): ProposalDocument => ({
@@ -31,6 +33,8 @@ const map = (db: any): ProposalDocument => ({
     uploadedBy: db.uploaded_by || '',
     uploadedByName: db.uploaded_by_name || '',
     createdAt: db.created_at,
+    isOld: db.is_old === true,
+    isRev: db.is_rev === true,
 });
 
 export const proposalDocumentsApi = {
@@ -65,6 +69,8 @@ export const proposalDocumentsApi = {
                 file_size: doc.fileSize ?? null,
                 uploaded_by: doc.uploadedBy || null,
                 uploaded_by_name: doc.uploadedByName || null,
+                is_old: doc.isOld ?? false,
+                is_rev: doc.isRev ?? false,
             })
             .select('*, proposal_document_types(name)')
             .single();
@@ -72,7 +78,7 @@ export const proposalDocumentsApi = {
         return map(data);
     },
 
-    update: async (id: string, patch: Partial<Pick<ProposalDocument, 'name' | 'notes' | 'fileUrl' | 'fileType' | 'fileSize' | 'documentTypeId'>>): Promise<ProposalDocument> => {
+    update: async (id: string, patch: Partial<Pick<ProposalDocument, 'name' | 'notes' | 'fileUrl' | 'fileType' | 'fileSize' | 'documentTypeId' | 'isOld' | 'isRev'>>): Promise<ProposalDocument> => {
         const update: any = {};
         if (patch.name !== undefined) update.name = patch.name;
         if (patch.notes !== undefined) update.notes = patch.notes || null;
@@ -80,6 +86,8 @@ export const proposalDocumentsApi = {
         if (patch.fileType !== undefined) update.file_type = patch.fileType;
         if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
         if (patch.documentTypeId !== undefined) update.proposal_document_type_id = patch.documentTypeId || null;
+        if (patch.isOld !== undefined) update.is_old = patch.isOld;
+        if (patch.isRev !== undefined) update.is_rev = patch.isRev;
         const { data, error } = await supabase.from('shared_documents').update(update).eq('id', id).select('*, proposal_document_types(name)').single();
         if (error) throw error;
         return map(data);

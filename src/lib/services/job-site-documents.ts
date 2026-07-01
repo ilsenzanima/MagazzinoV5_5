@@ -15,6 +15,8 @@ export interface SiteDocument {
     uploadedBy: string;
     uploadedByName: string;
     createdAt: string;
+    isOld: boolean;
+    isRev: boolean;
 }
 
 const map = (db: any): SiteDocument => ({
@@ -31,6 +33,8 @@ const map = (db: any): SiteDocument => ({
     uploadedBy: db.uploaded_by || '',
     uploadedByName: db.uploaded_by_name || '',
     createdAt: db.created_at,
+    isOld: db.is_old === true,
+    isRev: db.is_rev === true,
 });
 
 const SELECT_WITH_TYPE = '*, job_site_document_types(name)';
@@ -69,6 +73,8 @@ export const jobSiteDocumentsApi = {
                 file_size: doc.fileSize ?? null,
                 uploaded_by: doc.uploadedBy || null,
                 uploaded_by_name: doc.uploadedByName || null,
+                is_old: doc.isOld ?? false,
+                is_rev: doc.isRev ?? false,
             })
             .select(SELECT_WITH_TYPE)
             .single();
@@ -76,7 +82,7 @@ export const jobSiteDocumentsApi = {
         return map(data);
     },
 
-    update: async (id: string, patch: Partial<Pick<SiteDocument, 'name' | 'notes' | 'fileUrl' | 'fileType' | 'fileSize' | 'documentTypeId'>>): Promise<SiteDocument> => {
+    update: async (id: string, patch: Partial<Pick<SiteDocument, 'name' | 'notes' | 'fileUrl' | 'fileType' | 'fileSize' | 'documentTypeId' | 'isOld' | 'isRev'>>): Promise<SiteDocument> => {
         const update: any = {};
         if (patch.name !== undefined) update.name = patch.name;
         if (patch.notes !== undefined) update.notes = patch.notes || null;
@@ -84,6 +90,8 @@ export const jobSiteDocumentsApi = {
         if (patch.fileType !== undefined) update.file_type = patch.fileType;
         if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
         if (patch.documentTypeId !== undefined) update.document_type_id = patch.documentTypeId || null;
+        if (patch.isOld !== undefined) update.is_old = patch.isOld;
+        if (patch.isRev !== undefined) update.is_rev = patch.isRev;
 
         let oldFileUrl: string | undefined;
         if (patch.fileUrl !== undefined) {
