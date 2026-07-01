@@ -62,6 +62,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
+import { ItemConformita } from "@/components/inventory/ItemConformita";
 import dynamic from "next/dynamic";
 import { loadNotesService } from "@/lib/services/load-notes";
 const ImageCropper = dynamic(
@@ -1038,9 +1039,10 @@ export default function InventoryDetailPage() {
 
             {/* Tabs: Lotti / Storico Movimenti */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="lots">Lotti</TabsTrigger>
                 <TabsTrigger value="movements">Storico Movimenti</TabsTrigger>
+                <TabsTrigger value="conformita">Certificazione</TabsTrigger>
               </TabsList>
 
               <TabsContent value="lots" className="mt-4">
@@ -1194,6 +1196,10 @@ export default function InventoryDetailPage() {
                     </Table>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="conformita" className="mt-4">
+                <ItemConformita itemId={id} />
               </TabsContent>
             </Tabs>
 

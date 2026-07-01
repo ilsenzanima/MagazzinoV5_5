@@ -34,6 +34,8 @@ import { jobDocumentsApi, JobDocument } from "@/lib/api"
 import { jobConformitaDocumentTypesApi, JobConformitaDocumentType } from "@/lib/services/job-conformita-document-types"
 import { jobDocumentFoldersApi, JobDocumentFolder } from "@/lib/services/job-document-folders"
 import { jobDdtDocumentExclusionsApi } from "@/lib/services/job-ddt-document-exclusions"
+import { jobArticlesApi, JobArticle } from "@/lib/services/job-articles"
+import { itemComplianceApi } from "@/lib/services/item-compliance"
 import {
     complianceApi,
     jobComplianceApi,
@@ -1138,6 +1140,13 @@ function AssociateDialog({
     const [ddtDocs, setDdtDocs] = useState<ComplianceDocument[]>([])
     const [loadingDdt, setLoadingDdt] = useState(true)
 
+    // Suggeriti da articoli
+    const [jobArticles, setJobArticles] = useState<JobArticle[]>([])
+    const [loadingArticles, setLoadingArticles] = useState(true)
+    const [selectedArticleId, setSelectedArticleId] = useState("")
+    const [articleDocs, setArticleDocs] = useState<ComplianceDocument[]>([])
+    const [loadingArticleDocs, setLoadingArticleDocs] = useState(false)
+
     useEffect(() => {
         suppliersApi.getAll().then(s => setSuppliers(s)).catch(() => {})
     }, [])
@@ -1149,6 +1158,23 @@ function AssociateDialog({
             .catch(() => toast.error("Errore nel caricamento dei documenti da DDT"))
             .finally(() => setLoadingDdt(false))
     }, [jobId])
+
+    useEffect(() => {
+        setLoadingArticles(true)
+        jobArticlesApi.getItemsForJob(jobId)
+            .then(setJobArticles)
+            .catch(() => toast.error("Errore nel caricamento degli articoli"))
+            .finally(() => setLoadingArticles(false))
+    }, [jobId])
+
+    useEffect(() => {
+        if (!selectedArticleId) { setArticleDocs([]); return }
+        setLoadingArticleDocs(true)
+        itemComplianceApi.getByItemId(selectedArticleId)
+            .then(assocs => setArticleDocs(assocs.map(a => a.document).filter((d): d is ComplianceDocument => !!d)))
+            .catch(() => toast.error("Errore nel caricamento dei certificati dell'articolo"))
+            .finally(() => setLoadingArticleDocs(false))
+    }, [selectedArticleId])
 
     useEffect(() => {
         const t = setTimeout(() => fetchResults(), 300)
@@ -1210,6 +1236,7 @@ function AssociateDialog({
                     <TabsList>
                         <TabsTrigger value="search">Cerca tutti</TabsTrigger>
                         <TabsTrigger value="ddt">Suggeriti dal DDT</TabsTrigger>
+                        <TabsTrigger value="articles">Suggeriti da articoli</TabsTrigger>
                     </TabsList>
                     <TabsContent value="search" className="space-y-3">
                         <div className="grid grid-cols-2 gap-2">
@@ -1255,6 +1282,32 @@ function AssociateDialog({
                             onAssociate={handleAssociate}
                             emptyMessage="Nessun documento di conformità proveniente da DDT per questa commessa"
                         />
+                    </TabsContent>
+                    <TabsContent value="articles" className="space-y-3">
+                        <Select value={selectedArticleId} onValueChange={setSelectedArticleId} disabled={loadingArticles}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={loadingArticles ? "Caricamento articoli..." : "Seleziona un articolo..."} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {jobArticles.map(a => (
+                                    <SelectItem key={a.id} value={a.id}>{a.name}{a.model ? ` (${a.model})` : ''}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {!loadingArticles && jobArticles.length === 0 ? (
+                            <p className="text-sm text-slate-400 text-center py-4">Nessun articolo passato da questa commessa</p>
+                        ) : !selectedArticleId ? (
+                            <p className="text-sm text-slate-400 text-center py-4">Seleziona un articolo per vedere i certificati collegati</p>
+                        ) : (
+                            <AssociateResultsList
+                                loading={loadingArticleDocs}
+                                results={articleDocs}
+                                existingIds={existingIds}
+                                associatingId={associating}
+                                onAssociate={handleAssociate}
+                                emptyMessage="Nessun certificato associato a questo articolo"
+                            />
+                        )}
                     </TabsContent>
                 </Tabs>
                 <DialogFooter>

@@ -23,6 +23,7 @@ import { usePageSize } from "@/hooks/usePageSize";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Job, jobsApi } from "@/lib/api";
+import { JobCategory, JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,7 +53,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const [pageSize, setPageSize] = usePageSize('commesse');
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterKind, setFilterKind] = useState<'all' | 'job' | 'sale'>('all');
+  const [filterKind, setFilterKind] = useState<'all' | JobCategory>('all');
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +99,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         limit,
         search: deferredSearchTerm,
         clientId: filterClientId || '',
-        isSaleOnly: filterKind === 'all' ? undefined : filterKind === 'sale'
+        category: filterKind === 'all' ? undefined : filterKind
       });
 
       // Sort: active → suspended → completed
@@ -153,11 +154,12 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
           )}
         </div>
 
-        <Tabs value={filterKind} onValueChange={(v) => setFilterKind(v as 'all' | 'job' | 'sale')}>
-          <TabsList>
+        <Tabs value={filterKind} onValueChange={(v) => setFilterKind(v as 'all' | JobCategory)}>
+          <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="all">Tutte</TabsTrigger>
-            <TabsTrigger value="job">Commesse</TabsTrigger>
-            <TabsTrigger value="sale">Vendite</TabsTrigger>
+            <TabsTrigger value="fornitura_posa">{JOB_CATEGORY_LABELS.fornitura_posa}</TabsTrigger>
+            <TabsTrigger value="solo_fornitura">{JOB_CATEGORY_LABELS.solo_fornitura}</TabsTrigger>
+            <TabsTrigger value="solo_posa">{JOB_CATEGORY_LABELS.solo_posa}</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -222,9 +224,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 truncate">
                       {job.name}
                     </span>
-                    {job.isSaleOnly && (
-                      <Badge className="shrink-0 text-[10px] bg-purple-600">Vendita</Badge>
-                    )}
+                    <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
+                      {JOB_CATEGORY_LABELS[job.category]}
+                    </Badge>
                     <span className="text-slate-500 dark:text-slate-400 text-sm w-36 shrink-0 truncate hidden sm:block">
                       {job.clientName || '—'}
                     </span>
@@ -274,9 +276,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                         <CardTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-white break-words" title={job.name}>{job.name}</CardTitle>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
                       </div>
-                      {job.isSaleOnly && (
-                        <Badge className="shrink-0 text-[10px] bg-purple-600">Vendita</Badge>
-                      )}
+                      <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
+                        {JOB_CATEGORY_LABELS[job.category]}
+                      </Badge>
                     </div>
 
                     {/* Status buttons */}

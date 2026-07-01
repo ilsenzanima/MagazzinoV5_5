@@ -32,7 +32,8 @@ import { JobMap } from "./JobMap"
 import { JobWeatherWidget } from "./JobWeatherWidget"
 
 import { Checkbox } from "@/components/ui/checkbox"
-import { Switch } from "@/components/ui/switch"
+import { JobCategorySelector } from "@/components/jobs/JobCategorySelector"
+import { JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types"
 
 interface JobOverviewProps {
   job: Job
@@ -70,7 +71,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
       cup: job.cup || '',
       clientId: job.clientId,
       createdAt: job.createdAt,
-      isSaleOnly: job.isSaleOnly || false
+      category: job.category || 'fornitura_posa'
     })
     setUpdateExistingMovements(false)
     setIsEditOpen(true)
@@ -125,11 +126,9 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
               }`}>
               {job.status === 'active' ? 'Attiva' : job.status === 'completed' ? 'Completata' : 'Sospesa'}
             </Badge>
-            {job.isSaleOnly && (
-              <Badge className="shrink-0 text-xs bg-purple-600">
-                Causale vendita
-              </Badge>
-            )}
+            <Badge className={`shrink-0 text-xs ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
+              {JOB_CATEGORY_LABELS[job.category]}
+            </Badge>
           </div>
           <div className="flex gap-2 shrink-0">
             {(userRole === 'admin' || userRole === 'operativo') && (
@@ -310,6 +309,11 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            <JobCategorySelector
+              value={editForm.category || 'fornitura_posa'}
+              onChange={(category) => setEditForm({ ...editForm, category })}
+            />
+
             <div className="space-y-2">
               <Label htmlFor="committente">Committente *</Label>
               <Select
@@ -377,20 +381,6 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
                   onChange={(e) => setEditForm({ ...editForm, siteManager: e.target.value })}
                 />
               </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-              <div>
-                <Label htmlFor="isSaleOnly" className="text-sm">Causale vendita</Label>
-                <p className="text-xs text-slate-500">
-                  Commessa usata solo per archiviare documentazione di vendita, senza un vero cantiere.
-                </p>
-              </div>
-              <Switch
-                id="isSaleOnly"
-                checked={editForm.isSaleOnly || false}
-                onCheckedChange={(checked) => setEditForm({ ...editForm, isSaleOnly: checked })}
-              />
             </div>
 
             <div className="space-y-2">

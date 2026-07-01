@@ -124,8 +124,25 @@ export interface Job {
     cig?: string;
     cup?: string;
     estimatedCost?: number | null;
-    isSaleOnly?: boolean;
+    category: JobCategory;
 }
+
+// Fornitura e posa: commessa completa (materiali + manodopera).
+// Solo fornitura: ex "Vendita", solo materiali senza cantiere vero e proprio.
+// Solo posa: solo manodopera, senza fornitura di materiali.
+export type JobCategory = 'fornitura_posa' | 'solo_fornitura' | 'solo_posa';
+
+export const JOB_CATEGORY_LABELS: Record<JobCategory, string> = {
+    fornitura_posa: 'Fornitura e Posa',
+    solo_fornitura: 'Solo Fornitura',
+    solo_posa: 'Solo Posa',
+};
+
+export const JOB_CATEGORY_BADGE_COLORS: Record<JobCategory, string> = {
+    fornitura_posa: 'bg-blue-600',
+    solo_fornitura: 'bg-purple-600',
+    solo_posa: 'bg-orange-500',
+};
 
 export interface JobSalApprovato {
     id: string;

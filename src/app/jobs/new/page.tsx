@@ -10,11 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ArrowLeft, Loader2, Save, RefreshCw, Plus } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, clientsApi, Client } from "@/lib/api";
+import { JobCategory } from "@/lib/types";
+import { JobCategorySelector } from "@/components/jobs/JobCategorySelector";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 
@@ -68,7 +69,7 @@ function NewJobForm() {
     siteManager: "",
     cig: "",
     cup: "",
-    isSaleOnly: false
+    category: "fornitura_posa" as JobCategory
   });
 
   const [siteFields, setSiteFields] = useState({
@@ -122,6 +123,7 @@ function NewJobForm() {
           cig: "",
           cup: "",
           code,
+          category: job.category || "fornitura_posa",
         }));
       } catch (err) {
         console.error("Errore caricamento commessa da clonare", err);
@@ -252,6 +254,14 @@ function NewJobForm() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
 
+              {/* Sezione Tipologia */}
+              <div className="space-y-4 border-b pb-4">
+                <JobCategorySelector
+                  value={formData.category}
+                  onChange={(category) => setFormData({ ...formData, category })}
+                />
+              </div>
+
               {/* Sezione Committente */}
               <div className="space-y-4 border-b pb-4">
                 <h3 className="font-semibold text-slate-700">Committente</h3>
@@ -379,20 +389,6 @@ function NewJobForm() {
                       <SelectItem value="suspended">Sospesa</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-                  <div>
-                    <Label htmlFor="isSaleOnly" className="text-sm">Causale vendita</Label>
-                    <p className="text-xs text-slate-500">
-                      Commessa usata solo per archiviare documentazione di vendita, senza un vero cantiere.
-                    </p>
-                  </div>
-                  <Switch
-                    id="isSaleOnly"
-                    checked={formData.isSaleOnly}
-                    onCheckedChange={(checked) => setFormData({ ...formData, isSaleOnly: checked })}
-                  />
                 </div>
               </div>
 
