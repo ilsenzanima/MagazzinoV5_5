@@ -111,55 +111,58 @@ export const complianceApi = {
     },
 
     getByJobIdFromDDT: async (jobId: string): Promise<ComplianceDocument[]> => {
-        // Docs directly created from purchases linked to this job (purchases.job_id)
+        // Raccoglie gli id degli acquisti collegati a questa commessa, per tre vie:
+        // - l'intero acquisto è assegnato alla commessa (purchases.job_id)
+        // - singole righe dell'acquisto sono assegnate alla commessa (purchase_items.job_id)
+        // - il materiale è stato mandato/reso in cantiere tramite un DDT di
+        //   movimentazione (delivery_notes.job_id) che referenzia quel lotto
+        //   (delivery_note_items.purchase_item_id), incluso il caso "fittizio"
+        //   in cui viene comunque scelto un lotto di riferimento per il prezzo.
+        const [directPurchases, itemPurchases, deliveryItems] = await Promise.all([
+            supabase.from('purchases').select('id').eq('job_id', jobId).is('deleted_at', null),
+            supabase.from('purchase_items').select('purchase_id').eq('job_id', jobId),
+            supabase
+                .from('delivery_note_items')
+                .select('purchase_item_id, delivery_notes!inner(job_id)')
+                .eq('delivery_notes.job_id', jobId)
+                .not('purchase_item_id', 'is', null),
+        ]);
+        if (directPurchases.error) throw directPurchases.error;
+        if (itemPurchases.error) throw itemPurchases.error;
+        if (deliveryItems.error) throw deliveryItems.error;
+
+        const purchaseIds = new Set<string>();
+        (directPurchases.data || []).forEach((p: any) => purchaseIds.add(p.id));
+        (itemPurchases.data || []).forEach((pi: any) => { if (pi.purchase_id) purchaseIds.add(pi.purchase_id); });
+
+        const purchaseItemIds = (deliveryItems.data || []).map((d: any) => d.purchase_item_id).filter(Boolean);
+        if (purchaseItemIds.length > 0) {
+            const { data: piRows, error: piError } = await supabase
+                .from('purchase_items')
+                .select('id, purchase_id')
+                .in('id', purchaseItemIds);
+            if (piError) throw piError;
+            (piRows || []).forEach((pi: any) => { if (pi.purchase_id) purchaseIds.add(pi.purchase_id); });
+        }
+
+        if (purchaseIds.size === 0) return [];
+        const purchaseIdList = Array.from(purchaseIds);
+
+        // Documenti creati direttamente su questi acquisti
         const { data: directDocs, error: e1 } = await supabase
             .from('supplier_compliance_documents')
-            .select(`${SELECT_WITH_RELATIONS}, purchases!inner(job_id)`)
-            .eq('purchases.job_id', jobId)
+            .select(SELECT_WITH_RELATIONS)
+            .in('purchase_id', purchaseIdList)
             .is('deleted_at', null);
         if (e1) throw e1;
 
-        // Docs from purchases linked via purchase_items.job_id
-        const { data: itemDocs, error: e2 } = await supabase
-            .from('supplier_compliance_documents')
-            .select(`${SELECT_WITH_RELATIONS}, purchases!inner(id, purchase_items!inner(job_id))`)
-            .eq('purchases.purchase_items.job_id', jobId)
+        // Documenti associati manualmente a questi acquisti (certificati riutilizzabili)
+        const { data: assocRows, error: e2 } = await supabase
+            .from('purchase_compliance_associations')
+            .select(`supplier_compliance_documents(${SELECT_WITH_RELATIONS})`)
+            .in('purchase_id', purchaseIdList)
             .is('deleted_at', null);
         if (e2) throw e2;
-
-        // Docs associated via purchase_compliance_associations to purchases of this job
-        const { data: assocDocs, error: e3 } = await supabase
-            .from('purchase_compliance_associations')
-            .select(`supplier_compliance_documents(${SELECT_WITH_RELATIONS}), purchases!inner(job_id, purchase_items(job_id))`)
-            .eq('purchases.job_id', jobId)
-            .is('deleted_at', null);
-        if (e3) throw e3;
-
-        const { data: assocItemDocs, error: e4 } = await supabase
-            .from('purchase_compliance_associations')
-            .select(`supplier_compliance_documents(${SELECT_WITH_RELATIONS}), purchases!inner(id, purchase_items!inner(job_id))`)
-            .eq('purchases.purchase_items.job_id', jobId)
-            .is('deleted_at', null);
-        if (e4) throw e4;
-
-        // Docs from purchases il cui lotto (purchase_item) è stato usato come
-        // riferimento in un movimento verso questa commessa: copre sia le uscite
-        // reali di magazzino (materiale acquistato altrove e poi mandato in
-        // cantiere) sia i movimenti "fittizi", per i quali viene comunque scelto
-        // un lotto/DDT di riferimento ai fini del prezzo.
-        const { data: movementDocs, error: e5 } = await supabase
-            .from('supplier_compliance_documents')
-            .select(`${SELECT_WITH_RELATIONS}, purchases!inner(id, purchase_items!inner(id, movements!inner(job_id)))`)
-            .eq('purchases.purchase_items.movements.job_id', jobId)
-            .is('deleted_at', null);
-        if (e5) throw e5;
-
-        const { data: assocMovementDocs, error: e6 } = await supabase
-            .from('purchase_compliance_associations')
-            .select(`supplier_compliance_documents(${SELECT_WITH_RELATIONS}), purchases!inner(id, purchase_items!inner(id, movements!inner(job_id)))`)
-            .eq('purchases.purchase_items.movements.job_id', jobId)
-            .is('deleted_at', null);
-        if (e6) throw e6;
 
         const seen = new Set<string>();
         const result: ComplianceDocument[] = [];
@@ -167,11 +170,7 @@ export const complianceApi = {
             if (!seen.has(doc.id)) { seen.add(doc.id); result.push(doc); }
         };
         (directDocs || []).map(mapDbToDoc).forEach(addDoc);
-        (itemDocs || []).map(mapDbToDoc).forEach(addDoc);
-        (assocDocs || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
-        (assocItemDocs || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
-        (movementDocs || []).map(mapDbToDoc).forEach(addDoc);
-        (assocMovementDocs || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
+        (assocRows || []).flatMap((r: any) => r.supplier_compliance_documents ? [mapDbToDoc(r.supplier_compliance_documents)] : []).forEach(addDoc);
         return result;
     },
 
