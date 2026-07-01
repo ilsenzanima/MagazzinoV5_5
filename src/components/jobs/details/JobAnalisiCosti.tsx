@@ -5,7 +5,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, RefreshCw } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, RefreshCw, Info } from "lucide-react"
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams } from "@/lib/services/cost-analysis"
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { clientProposalsApi } from "@/lib/services/client-proposals"
@@ -16,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { notify } from "@/lib/notify"
 import type { InventoryItem, Movement } from "@/lib/types"
 import * as XLSX from "xlsx-js-style"
+import { ProposalCostAnalysisVersions } from "@/components/clients/detail/ProposalCostAnalysisVersions"
 
 interface JobAnalisiCostiProps {
     jobId: string
@@ -237,6 +239,7 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
     const autoImported = useRef(false)
 
     const [proposalId, setProposalId] = useState<string | null>(null)
+    const [subTab, setSubTab] = useState<'prezzi' | 'offerta'>('prezzi')
     const [changeOpen, setChangeOpen] = useState(false)
     const [proposalVersions, setProposalVersions] = useState<ProposalCostAnalysisVersion[]>([])
     const [selectedVersionId, setSelectedVersionId] = useState<string>("")
@@ -467,23 +470,39 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
     )
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-end gap-2">
-                {proposalId && (
-                    <Button size="sm" variant="outline" onClick={openChangeDialog}>
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Cambia analisi costi
-                    </Button>
-                )}
-                <Button size="sm" variant="outline" onClick={handleExport}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Excel
-                </Button>
-            </div>
+        <div className="space-y-4">
+            <Tabs value={subTab} onValueChange={v => setSubTab(v as 'prezzi' | 'offerta')}>
+                <TabsList>
+                    <TabsTrigger value="prezzi">
+                        <Package className="h-4 w-4 mr-1" />Prezzi Materiali
+                    </TabsTrigger>
+                    <TabsTrigger value="offerta">
+                        <Calculator className="h-4 w-4 mr-1" />Analisi Costi Offerta
+                    </TabsTrigger>
+                </TabsList>
 
-            {/* ── Materiali da Magazzino ───────────────────────────────────── */}
-            <Card>
+                <TabsContent value="prezzi" className="space-y-6 pt-4">
+                    <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
+                        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
+                        Qui sono raccolti i materiali e le voci di costo usati per determinare i prezzi di questa commessa: questi valori alimentano i calcoli dei SAL. Le modifiche fatte qui restano locali alla commessa e non toccano l'analisi costi dell'offerta di origine.
+                    </p>
+
+                    {/* Header */}
+                    <div className="flex items-center justify-end gap-2">
+                        {proposalId && (
+                            <Button size="sm" variant="outline" onClick={openChangeDialog}>
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                                Cambia analisi costi
+                            </Button>
+                        )}
+                        <Button size="sm" variant="outline" onClick={handleExport}>
+                            <Download className="h-4 w-4 mr-1" />
+                            Excel
+                        </Button>
+                    </div>
+
+                    {/* ── Materiali da Magazzino ───────────────────────────────────── */}
+                    <Card>
                 <div className="flex items-center gap-3 p-4 border-b">
                     <Package className="h-5 w-5 text-blue-600" />
                     <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Materiali da Magazzino</span>
@@ -595,6 +614,22 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
                     </div>
                 </CardContent>
             </Card>
+                </TabsContent>
+
+                <TabsContent value="offerta" className="space-y-4 pt-4">
+                    <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
+                        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
+                        Qui trovi le analisi costi create nell'offerta di origine di questa commessa, suddivise per attività/lavorazione. Puoi consultarle e modificarle: le modifiche aggiornano l'offerta, ma non si riflettono automaticamente sui "Prezzi Materiali" della commessa.
+                    </p>
+                    {proposalId ? (
+                        <ProposalCostAnalysisVersions proposalId={proposalId} />
+                    ) : (
+                        <p className="text-sm text-slate-400 text-center py-12">
+                            Questa commessa non è collegata a nessuna offerta: non ci sono analisi costi da mostrare.
+                        </p>
+                    )}
+                </TabsContent>
+            </Tabs>
 
             <ItemSelectorDialog
                 open={selectorOpen}
