@@ -273,7 +273,7 @@ export default function DashboardLayout({
 
       {/* Sidebar Desktop */}
       <div className={cn(
-        "hidden md:flex h-screen w-64 flex-col fixed left-0 border-r border-sidebar-border z-50 transition-all",
+        "hidden lg:flex h-screen w-64 flex-col fixed left-0 border-r border-sidebar-border z-50 transition-all",
         simulatedRole ? "top-10 h-[calc(100vh-40px)]" : "top-0"
       )}>
         <Sidebar />
@@ -281,7 +281,7 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className={cn(
-        "flex-1 md:pl-64 flex flex-col min-h-screen transition-all pb-24 md:pb-0 min-w-0", // min-w-0 prevents flex expansion
+        "flex-1 lg:pl-64 flex flex-col min-h-screen transition-all pb-24 lg:pb-0 min-w-0", // min-w-0 prevents flex expansion
         simulatedRole ? "pt-10" : ""
       )}>
 
@@ -296,7 +296,7 @@ export default function DashboardLayout({
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 p-2 md:p-8 overflow-y-auto overflow-x-hidden min-w-0">
+        <main className="flex-1 p-2 lg:p-8 overflow-y-auto overflow-x-hidden min-w-0">
           {children}
         </main>
 

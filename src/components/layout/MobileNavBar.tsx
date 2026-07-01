@@ -30,7 +30,7 @@ export function MobileNavBar({ onOpenMenu }: MobileNavBarProps) {
     const isActive = (path: string) => pathname === path || pathname?.startsWith(path + "/");
 
     return (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-t dark:border-slate-800 z-50 flex items-center justify-around px-2 pb-safe-area-bottom shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-t dark:border-slate-800 z-50 flex items-center justify-around px-2 pb-safe-area-bottom shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
             {/* 1. Dashboard */}
             <Link
                 href="/dashboard"
