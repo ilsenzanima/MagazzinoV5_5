@@ -610,7 +610,6 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     }
 
     const handleAssociated = () => {
-        setSearchOpen(false)
         load()
     }
 
@@ -934,21 +933,11 @@ function AssociateDialog({
         <Dialog open onOpenChange={v => !v && onClose()}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader><DialogTitle>Associa documento conformità</DialogTitle></DialogHeader>
-                <Tabs defaultValue="ddt" className="space-y-3">
+                <Tabs defaultValue="search" className="space-y-3">
                     <TabsList>
-                        <TabsTrigger value="ddt">Suggeriti dal DDT</TabsTrigger>
                         <TabsTrigger value="search">Cerca tutti</TabsTrigger>
+                        <TabsTrigger value="ddt">Suggeriti dal DDT</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="ddt" className="space-y-3">
-                        <AssociateResultsList
-                            loading={loadingDdt}
-                            results={ddtDocs}
-                            existingIds={existingIds}
-                            associatingId={associating}
-                            onAssociate={handleAssociate}
-                            emptyMessage="Nessun documento di conformità proveniente da DDT per questa commessa"
-                        />
-                    </TabsContent>
                     <TabsContent value="search" className="space-y-3">
                         <div className="grid grid-cols-2 gap-2">
                             <Select value={supplierId} onValueChange={setSupplierId}>
@@ -982,6 +971,16 @@ function AssociateDialog({
                             associatingId={associating}
                             onAssociate={handleAssociate}
                             emptyMessage="Nessun documento trovato"
+                        />
+                    </TabsContent>
+                    <TabsContent value="ddt" className="space-y-3">
+                        <AssociateResultsList
+                            loading={loadingDdt}
+                            results={ddtDocs}
+                            existingIds={existingIds}
+                            associatingId={associating}
+                            onAssociate={handleAssociate}
+                            emptyMessage="Nessun documento di conformità proveniente da DDT per questa commessa"
                         />
                     </TabsContent>
                 </Tabs>

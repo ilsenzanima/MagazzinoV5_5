@@ -113,7 +113,6 @@ export function ProposalConformita({ proposalId }: Props) {
     }
 
     const handleAssociated = () => {
-        setSearchOpen(false)
         load()
     }
 
@@ -253,7 +252,7 @@ export function ProposalConformita({ proposalId }: Props) {
 
 function AssociateDialog({
     proposalId,
-    existingIds,
+    existingIds: initialExistingIds,
     onClose,
     onAssociated,
 }: {
@@ -262,6 +261,7 @@ function AssociateDialog({
     onClose: () => void
     onAssociated: () => void
 }) {
+    const [existingIds, setExistingIds] = useState(initialExistingIds)
     const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
     const [supplierId, setSupplierId] = useState("all")
     const [search, setSearch] = useState("")
@@ -316,6 +316,7 @@ function AssociateDialog({
             setAssociating(doc.id)
             await proposalComplianceApi.associate(proposalId, doc.id)
             notify.success("Documento associato")
+            setExistingIds(prev => [...prev, doc.id])
             onAssociated()
         } catch (e: any) {
             if (e?.code === "23505") notify.error("Documento già associato")

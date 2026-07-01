@@ -913,9 +913,17 @@ export default function CompliancePage() {
         setDocuments(prev => [...docs, ...prev]);
     };
 
+    const [scopeTab, setScopeTab] = useState<'reusable' | 'ddt_specific'>('reusable');
+
     const filteredDocuments = search.trim()
         ? documents.filter(d => d.name.toLowerCase().includes(search.trim().toLowerCase()))
         : documents;
+
+    const reusableCount = filteredDocuments.filter(d => d.documentScope !== 'ddt_specific').length;
+    const ddtSpecificCount = filteredDocuments.filter(d => d.documentScope === 'ddt_specific').length;
+    const scopedDocuments = filteredDocuments.filter(d =>
+        scopeTab === 'ddt_specific' ? d.documentScope === 'ddt_specific' : d.documentScope !== 'ddt_specific'
+    );
 
     const handleDelete = async () => {
         if (!deletingDoc) return;
@@ -1009,18 +1017,48 @@ export default function CompliancePage() {
                             </div>
                         ) : (
                             <>
-                                <div className="flex items-center justify-end gap-2">
-                                    <PageSizeSelector value={pageSize} onChange={setPageSize} />
-                                    <ViewToggle mode={viewMode} onChange={setViewMode} />
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <Tabs value={scopeTab} onValueChange={v => setScopeTab(v as 'reusable' | 'ddt_specific')}>
+                                        <TabsList>
+                                            <TabsTrigger value="reusable">
+                                                Certificati
+                                                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{reusableCount}</span>
+                                            </TabsTrigger>
+                                            <TabsTrigger value="ddt_specific">
+                                                Documenti da Acquisti
+                                                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{ddtSpecificCount}</span>
+                                            </TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
+                                    <div className="flex items-center gap-2">
+                                        <PageSizeSelector value={pageSize} onChange={setPageSize} />
+                                        <ViewToggle mode={viewMode} onChange={setViewMode} />
+                                    </div>
                                 </div>
-                                <DocumentTypeTabs
-                                    docs={filteredDocuments}
-                                    docTypes={docTypes}
-                                    viewMode={viewMode}
-                                    pageSize={pageSize}
-                                    onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
-                                    onDelete={setDeletingDoc}
-                                />
+                                {scopeTab === 'ddt_specific' && (
+                                    <p className="text-xs text-muted-foreground -mt-2">
+                                        Documenti caricati direttamente da un acquisto/DDT: sono prove specifiche di quella bolla e non riutilizzabili su altre commesse.
+                                    </p>
+                                )}
+                                {scopedDocuments.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
+                                        <FileText className="h-10 w-10 opacity-30" />
+                                        <p className="text-sm">
+                                            {scopeTab === 'ddt_specific'
+                                                ? "Nessun documento caricato da acquisti per questo fornitore."
+                                                : "Nessun certificato riutilizzabile per questo fornitore."}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <DocumentTypeTabs
+                                        docs={scopedDocuments}
+                                        docTypes={docTypes}
+                                        viewMode={viewMode}
+                                        pageSize={pageSize}
+                                        onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
+                                        onDelete={setDeletingDoc}
+                                    />
+                                )}
                             </>
                         )}
                     </>
