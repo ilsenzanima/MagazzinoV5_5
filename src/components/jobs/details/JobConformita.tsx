@@ -893,6 +893,52 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
         )
     }
 
+    const renderAssocRow = (assoc: JobComplianceAssociation) => {
+        const doc = assoc.document
+        const displayName = assoc.customName || doc?.name || "—"
+        return (
+            <div key={assoc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
+                <div className="bg-green-50 dark:bg-green-950/30 p-1 rounded shrink-0">
+                    <ShieldCheck className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate" title={displayName}>{displayName}</p>
+                    {assoc.customNotes && <p className="text-xs text-slate-500 italic truncate">{assoc.customNotes}</p>}
+                </div>
+                {doc && (
+                    <div className="flex flex-wrap gap-2 shrink-0">
+                        {doc.brandName && (
+                            <span className="text-[10px] uppercase tracking-wide bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-semibold">
+                                {doc.brandName}
+                            </span>
+                        )}
+                        <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
+                            {doc.documentTypeName}
+                        </span>
+                    </div>
+                )}
+                <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
+                    {doc?.fileUrl && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDoc(doc.fileUrl)}>
+                            <ExternalLink className="h-3 w-3 text-slate-500" />
+                        </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                        setEditing(assoc)
+                        setEditName(assoc.customName || "")
+                        setEditNotes(assoc.customNotes || "")
+                        setEditOpen(true)
+                    }}>
+                        <Pencil className="h-3 w-3 text-slate-500" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }}>
+                        <Unlink className="h-3 w-3 text-red-500" />
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
     const assocGroups: { key: string; label: string; items: JobComplianceAssociation[] }[] = Object.values(
         associations.reduce((acc, assoc) => {
             const label = assoc.document?.documentTypeName || "Senza tipo"
@@ -923,8 +969,8 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento associato</p>
             ) : assocGroups.length === 0 ? (
                 viewMode === 'list' ? (
-                    <div className="space-y-2">
-                        {associations.map(renderAssocCard)}
+                    <div className="space-y-1.5">
+                        {associations.map(renderAssocRow)}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -946,8 +992,8 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                     {assocGroups.map(g => (
                         <TabsContent key={g.key} value={g.key} className="pt-4">
                             {viewMode === 'list' ? (
-                                <div className="space-y-2">
-                                    {g.items.map(renderAssocCard)}
+                                <div className="space-y-1.5">
+                                    {g.items.map(renderAssocRow)}
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1227,6 +1273,7 @@ function DDTDocuments({ jobId }: { jobId: string }) {
     const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set())
     const [loading, setLoading] = useState(true)
     const [togglingId, setTogglingId] = useState<string | null>(null)
+    const [viewMode, setViewMode] = useViewMode('job-conformita-ddt', 'list')
 
     useEffect(() => { load() }, [jobId])
 
@@ -1277,78 +1324,130 @@ function DDTDocuments({ jobId }: { jobId: string }) {
         } catch { window.open(url, "_blank") }
     }
 
-    if (loading) {
-        return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+    const renderInclusionToggle = (doc: ComplianceDocument, isExcluded: boolean) => (
+        <div className="inline-flex rounded-full overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0">
+            <button
+                disabled={togglingId === doc.id}
+                onClick={() => handleSetIncluded(doc.id, true)}
+                className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${!isExcluded ? 'bg-emerald-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+            >
+                Incluso
+            </button>
+            <button
+                disabled={togglingId === doc.id}
+                onClick={() => handleSetIncluded(doc.id, false)}
+                className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${isExcluded ? 'bg-slate-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+            >
+                Escluso
+            </button>
+        </div>
+    )
+
+    const renderDocCard = (doc: ComplianceDocument) => {
+        const isExcluded = excludedIds.has(doc.id)
+        return (
+            <Card key={doc.id} className={`hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
+                <CardContent className="p-3 flex items-start gap-3">
+                    <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
+                        <ShieldCheck className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{doc.name}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                            {doc.documentTypeName && (
+                                <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
+                                    {doc.documentTypeName}
+                                </span>
+                            )}
+                            {doc.purchaseNumber && (
+                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                                    DDT {doc.purchaseNumber}
+                                </span>
+                            )}
+                            <div className="ml-auto">{renderInclusionToggle(doc, isExcluded)}</div>
+                        </div>
+                    </div>
+                    {doc.fileUrl && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => openDoc(doc.fileUrl)}
+                            title="Apri documento"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                        </Button>
+                    )}
+                </CardContent>
+            </Card>
+        )
     }
 
-    if (docs.length === 0) {
+    const renderDocRow = (doc: ComplianceDocument) => {
+        const isExcluded = excludedIds.has(doc.id)
         return (
-            <div className="text-center py-10 text-slate-400 border-2 border-dashed dark:border-slate-700 rounded-lg">
-                <ShieldCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">Nessun documento di conformità proveniente da DDT</p>
-                <p className="text-xs mt-1 text-slate-300 dark:text-slate-600">
-                    Compaiono automaticamente quando materiali acquistati con conformità vengono usati in questa commessa
-                </p>
+            <div key={doc.id} className={`group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
+                <div className="bg-green-50 dark:bg-green-950/30 p-1 rounded shrink-0">
+                    <ShieldCheck className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {doc.documentTypeName && (
+                        <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
+                            {doc.documentTypeName}
+                        </span>
+                    )}
+                    {doc.purchaseNumber && (
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                            DDT {doc.purchaseNumber}
+                        </span>
+                    )}
+                    {renderInclusionToggle(doc, isExcluded)}
+                </div>
+                {doc.fileUrl && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => openDoc(doc.fileUrl)}
+                        title="Apri documento"
+                    >
+                        <ExternalLink className="h-3 w-3 text-slate-500" />
+                    </Button>
+                )}
             </div>
         )
     }
 
     return (
-        <div className="space-y-2">
-            {docs.map(doc => {
-                const isExcluded = excludedIds.has(doc.id)
-                return (
-                    <Card key={doc.id} className={`hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
-                        <CardContent className="p-3 flex items-start gap-3">
-                            <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
-                                <ShieldCheck className="h-6 w-6 text-green-600" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm">{doc.name}</p>
-                                <div className="flex flex-wrap items-center gap-2 mt-1">
-                                    {doc.documentTypeName && (
-                                        <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                            {doc.documentTypeName}
-                                        </span>
-                                    )}
-                                    {doc.purchaseNumber && (
-                                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
-                                            DDT {doc.purchaseNumber}
-                                        </span>
-                                    )}
-                                    <div className="inline-flex rounded-full overflow-hidden border border-slate-200 dark:border-slate-700 ml-auto">
-                                        <button
-                                            disabled={togglingId === doc.id}
-                                            onClick={() => handleSetIncluded(doc.id, true)}
-                                            className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${!isExcluded ? 'bg-emerald-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                                        >
-                                            Incluso
-                                        </button>
-                                        <button
-                                            disabled={togglingId === doc.id}
-                                            onClick={() => handleSetIncluded(doc.id, false)}
-                                            className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${isExcluded ? 'bg-slate-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                                        >
-                                            Escluso
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            {doc.fileUrl && (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 shrink-0"
-                                    onClick={() => openDoc(doc.fileUrl)}
-                                    title="Apri documento"
-                                >
-                                    <ExternalLink className="h-4 w-4" />
-                                </Button>
-                            )}
-                        </CardContent>
-                    </Card>
-                )
-            })}
+        <div className="space-y-3">
+            {docs.length > 0 && (
+                <div className="flex items-center justify-end">
+                    <ViewToggle mode={viewMode} onChange={setViewMode} />
+                </div>
+            )}
+
+            {loading ? (
+                <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+            ) : docs.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 border-2 border-dashed dark:border-slate-700 rounded-lg">
+                    <ShieldCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Nessun documento di conformità proveniente da DDT</p>
+                    <p className="text-xs mt-1 text-slate-300 dark:text-slate-600">
+                        Compaiono automaticamente quando materiali acquistati con conformità vengono usati in questa commessa
+                    </p>
+                </div>
+            ) : viewMode === 'list' ? (
+                <div className="space-y-1.5">
+                    {docs.map(renderDocRow)}
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {docs.map(renderDocCard)}
+                </div>
+            )}
         </div>
     )
 }
