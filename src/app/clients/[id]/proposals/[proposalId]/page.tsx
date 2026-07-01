@@ -304,17 +304,9 @@ export default function ProposalDetailPage() {
             await proposalSiteDocumentsApi.linkToJob(proposalId, job.id)
             await supplierOffersApi.linkToJob(proposalId, job.id)
 
-            // Associa i documenti di conformità della proposta alla commessa (tab Conformità)
-            const proposalComplianceDocs = await proposalComplianceApi.getByProposalId(proposalId)
-            await Promise.all(proposalComplianceDocs.map(async assoc => {
-                const jobAssoc = await jobComplianceApi.associate(job.id, assoc.complianceDocumentId)
-                if (assoc.customName || assoc.customNotes) {
-                    await jobComplianceApi.update(jobAssoc.id, {
-                        customName: assoc.customName ?? null,
-                        customNotes: assoc.customNotes ?? null,
-                    })
-                }
-            }))
+            // Collega alla commessa le associazioni di conformità già presenti sulla
+            // proposta (stesse righe, nessuna copia: restano sincronizzate tra le due pagine)
+            await proposalComplianceApi.linkToJob(proposalId, job.id)
 
             notify.success(convertReuseJobId ? "Commessa esistente aggiornata!" : "Commessa creata con analisi costi copiata!")
             router.push(`/jobs/${job.id}`)
