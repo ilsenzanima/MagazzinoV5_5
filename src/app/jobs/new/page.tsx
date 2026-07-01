@@ -11,11 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Loader2, Save, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Loader2, Save, RefreshCw, Plus } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, clientsApi, Client } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
+
+const EMPTY_QUICK_CLIENT_FORM = {
+  name: "", street: "", streetNumber: "", postalCode: "", city: "", province: "",
+  vatNumber: "", email: "", phone: "",
+};
 
 export default function NewJobPage() {
   return (
@@ -72,6 +78,11 @@ function NewJobForm() {
     city: "",
     province: "",
   });
+
+  // Nuovo committente rapido
+  const [quickClientOpen, setQuickClientOpen] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState(EMPTY_QUICK_CLIENT_FORM);
+  const [savingQuickClient, setSavingQuickClient] = useState(false);
 
   useEffect(() => {
     const loadClients = async () => {
@@ -157,6 +168,30 @@ function NewJobForm() {
     }));
   };
 
+  const handleQuickClient = async () => {
+    if (!quickClientForm.name.trim()) { notify.warning("Il nome del committente è obbligatorio"); return; }
+    try {
+      setSavingQuickClient(true);
+      const created = await clientsApi.create({
+        name: quickClientForm.name.trim(),
+        street: quickClientForm.street,
+        streetNumber: quickClientForm.streetNumber,
+        postalCode: quickClientForm.postalCode,
+        city: quickClientForm.city,
+        province: quickClientForm.province,
+        vatNumber: quickClientForm.vatNumber,
+        email: quickClientForm.email,
+        phone: quickClientForm.phone,
+      });
+      setClients(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "it")));
+      handleClientChange(created.id);
+      setQuickClientForm(EMPTY_QUICK_CLIENT_FORM);
+      setQuickClientOpen(false);
+      notify.success("Committente creato");
+    } catch { notify.error("Errore durante la creazione del committente"); }
+    finally { setSavingQuickClient(false); }
+  };
+
   const regenerateCode = () => {
     const selectedClient = clients.find(c => c.id === formData.clientId);
     if (selectedClient) {
@@ -222,18 +257,25 @@ function NewJobForm() {
                 <h3 className="font-semibold text-slate-700">Committente</h3>
                 <div className="space-y-2">
                   <Label htmlFor="client">Seleziona Committente *</Label>
-                  <SearchableSelect
-                    options={clients.map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                      description: c.address || undefined
-                    }))}
-                    value={formData.clientId}
-                    onValueChange={handleClientChange}
-                    placeholder="Cerca committente..."
-                    searchPlaceholder="Digita per cercare..."
-                    emptyMessage="Nessun committente trovato."
-                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <SearchableSelect
+                        options={clients.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                          description: c.address || undefined
+                        }))}
+                        value={formData.clientId}
+                        onValueChange={handleClientChange}
+                        placeholder="Cerca committente..."
+                        searchPlaceholder="Digita per cercare..."
+                        emptyMessage="Nessun committente trovato."
+                      />
+                    </div>
+                    <Button type="button" variant="outline" size="icon" onClick={() => setQuickClientOpen(true)} title="Nuovo committente">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -455,6 +497,66 @@ function NewJobForm() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Nuovo committente rapido */}
+      <Dialog open={quickClientOpen} onOpenChange={setQuickClientOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Nuovo Committente</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Ragione Sociale / Nome *</Label>
+              <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Inserisci il nome dell'azienda o del cliente" />
+            </div>
+            <div className="space-y-4 border-t border-b py-4 border-slate-100">
+              <h3 className="font-medium text-slate-900 dark:text-white text-sm">Indirizzo Sede</h3>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="col-span-3 space-y-1">
+                  <Label>Via / Piazza</Label>
+                  <Input value={quickClientForm.street} onChange={e => setQuickClientForm({ ...quickClientForm, street: e.target.value })} placeholder="Via Roma" />
+                </div>
+                <div className="col-span-1 space-y-1">
+                  <Label>N. Civico</Label>
+                  <Input value={quickClientForm.streetNumber} onChange={e => setQuickClientForm({ ...quickClientForm, streetNumber: e.target.value })} placeholder="10" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="md:col-span-1 space-y-1">
+                  <Label>CAP</Label>
+                  <Input value={quickClientForm.postalCode} onChange={e => setQuickClientForm({ ...quickClientForm, postalCode: e.target.value })} placeholder="00100" />
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <Label>Città</Label>
+                  <Input value={quickClientForm.city} onChange={e => setQuickClientForm({ ...quickClientForm, city: e.target.value })} placeholder="Milano" />
+                </div>
+                <div className="md:col-span-1 space-y-1">
+                  <Label>Provincia</Label>
+                  <Input value={quickClientForm.province} onChange={e => setQuickClientForm({ ...quickClientForm, province: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Partita IVA / Codice Fiscale</Label>
+                <Input value={quickClientForm.vatNumber} onChange={e => setQuickClientForm({ ...quickClientForm, vatNumber: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label>Telefono</Label>
+                <Input type="tel" value={quickClientForm.phone} onChange={e => setQuickClientForm({ ...quickClientForm, phone: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <Input type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickClientOpen(false)}>Annulla</Button>
+            <Button onClick={handleQuickClient} disabled={savingQuickClient} className="bg-blue-600 hover:bg-blue-700">
+              {savingQuickClient && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Crea Committente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

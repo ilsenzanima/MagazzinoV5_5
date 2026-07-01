@@ -794,9 +794,57 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
 
 // ─── Dialogo di ricerca e associazione ───────────────────────────────────────
 
+function AssociateResultsList({
+    loading,
+    results,
+    existingIds,
+    associatingId,
+    onAssociate,
+    emptyMessage,
+}: {
+    loading: boolean
+    results: ComplianceDocument[]
+    existingIds: string[]
+    associatingId: string | null
+    onAssociate: (doc: ComplianceDocument) => void
+    emptyMessage: string
+}) {
+    return (
+        <div className="max-h-80 overflow-y-auto space-y-1.5 pr-1">
+            {loading ? (
+                <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+            ) : results.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">{emptyMessage}</p>
+            ) : results.map(doc => {
+                const already = existingIds.includes(doc.id)
+                return (
+                    <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg border hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <ShieldCheck className="h-5 w-5 text-green-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{doc.name}</p>
+                            <p className="text-xs text-slate-400">{doc.brandName} · {doc.documentTypeName}</p>
+                        </div>
+                        <Button
+                            size="sm"
+                            variant={already ? "ghost" : "outline"}
+                            disabled={already || associatingId === doc.id}
+                            onClick={() => onAssociate(doc)}
+                            className="shrink-0"
+                        >
+                            {associatingId === doc.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : already ? "Già associato" : "Associa"}
+                        </Button>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
 function AssociateDialog({
     jobId,
-    existingIds,
+    existingIds: initialExistingIds,
     onClose,
     onAssociated,
 }: {
@@ -805,6 +853,7 @@ function AssociateDialog({
     onClose: () => void
     onAssociated: () => void
 }) {
+    const [existingIds, setExistingIds] = useState(initialExistingIds)
     const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
     const [supplierId, setSupplierId] = useState("all")
     const [search, setSearch] = useState("")
@@ -813,9 +862,21 @@ function AssociateDialog({
     const [loadingResults, setLoadingResults] = useState(false)
     const [associating, setAssociating] = useState<string | null>(null)
 
+    // Suggeriti dal DDT
+    const [ddtDocs, setDdtDocs] = useState<ComplianceDocument[]>([])
+    const [loadingDdt, setLoadingDdt] = useState(true)
+
     useEffect(() => {
         suppliersApi.getAll().then(s => setSuppliers(s)).catch(() => {})
     }, [])
+
+    useEffect(() => {
+        setLoadingDdt(true)
+        complianceApi.getByJobIdFromDDT(jobId)
+            .then(setDdtDocs)
+            .catch(() => toast.error("Errore nel caricamento dei documenti da DDT"))
+            .finally(() => setLoadingDdt(false))
+    }, [jobId])
 
     useEffect(() => {
         const t = setTimeout(() => fetchResults(), 300)
@@ -859,6 +920,7 @@ function AssociateDialog({
             setAssociating(doc.id)
             await jobComplianceApi.associate(jobId, doc.id)
             toast.success("Documento associato")
+            setExistingIds(prev => [...prev, doc.id])
             onAssociated()
         } catch (e: any) {
             if (e?.code === "23505") toast.error("Documento già associato")
@@ -870,65 +932,59 @@ function AssociateDialog({
 
     return (
         <Dialog open onOpenChange={v => !v && onClose()}>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-2xl">
                 <DialogHeader><DialogTitle>Associa documento conformità</DialogTitle></DialogHeader>
-                <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                        <Select value={supplierId} onValueChange={setSupplierId}>
-                            <SelectTrigger><SelectValue placeholder="Tutti i fornitori" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Tutti i fornitori</SelectItem>
-                                {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Select value={documentTypeId} onValueChange={setDocumentTypeId}>
-                            <SelectTrigger><SelectValue placeholder="Tutti i tipi" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Tutti i tipi</SelectItem>
-                                {availableTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                        <Input
-                            className="pl-8"
-                            placeholder="Cerca per nome..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
+                <Tabs defaultValue="ddt" className="space-y-3">
+                    <TabsList>
+                        <TabsTrigger value="ddt">Suggeriti dal DDT</TabsTrigger>
+                        <TabsTrigger value="search">Cerca tutti</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="ddt" className="space-y-3">
+                        <AssociateResultsList
+                            loading={loadingDdt}
+                            results={ddtDocs}
+                            existingIds={existingIds}
+                            associatingId={associating}
+                            onAssociate={handleAssociate}
+                            emptyMessage="Nessun documento di conformità proveniente da DDT per questa commessa"
                         />
-                    </div>
-
-                    <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
-                        {loadingResults ? (
-                            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
-                        ) : results.length === 0 ? (
-                            <p className="text-sm text-slate-400 text-center py-4">Nessun documento trovato</p>
-                        ) : results.map(doc => {
-                            const already = existingIds.includes(doc.id)
-                            return (
-                                <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg border hover:bg-slate-50 dark:hover:bg-slate-800">
-                                    <ShieldCheck className="h-5 w-5 text-green-500 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{doc.name}</p>
-                                        <p className="text-xs text-slate-400">{doc.brandName} · {doc.documentTypeName}</p>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        variant={already ? "ghost" : "outline"}
-                                        disabled={already || associating === doc.id}
-                                        onClick={() => handleAssociate(doc)}
-                                        className="shrink-0"
-                                    >
-                                        {associating === doc.id
-                                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                                            : already ? "Già associato" : "Associa"}
-                                    </Button>
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
+                    </TabsContent>
+                    <TabsContent value="search" className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                            <Select value={supplierId} onValueChange={setSupplierId}>
+                                <SelectTrigger><SelectValue placeholder="Tutti i fornitori" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Tutti i fornitori</SelectItem>
+                                    {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Select value={documentTypeId} onValueChange={setDocumentTypeId}>
+                                <SelectTrigger><SelectValue placeholder="Tutti i tipi" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Tutti i tipi</SelectItem>
+                                    {availableTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                            <Input
+                                className="pl-8"
+                                placeholder="Cerca per nome..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <AssociateResultsList
+                            loading={loadingResults}
+                            results={results}
+                            existingIds={existingIds}
+                            associatingId={associating}
+                            onAssociate={handleAssociate}
+                            emptyMessage="Nessun documento trovato"
+                        />
+                    </TabsContent>
+                </Tabs>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Chiudi</Button>
                 </DialogFooter>
