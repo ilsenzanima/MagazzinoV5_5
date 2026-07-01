@@ -888,10 +888,10 @@ function AssociateDialog({
             setLoadingResults(true)
             let docs: ComplianceDocument[]
             if (supplierId && supplierId !== "all") {
-                docs = await complianceApi.getBySupplier(supplierId)
+                docs = await complianceApi.getBySupplier(supplierId, true)
                 if (search) docs = docs.filter(d => d.name.toLowerCase().includes(search.toLowerCase()))
             } else {
-                docs = await complianceApi.getAll(search || undefined)
+                docs = await complianceApi.getAll(search || undefined, true)
             }
             setAllResults(docs)
         } catch {

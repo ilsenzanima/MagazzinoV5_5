@@ -657,6 +657,11 @@ function DocumentCard({
                                         {doc.brandName}
                                     </span>
                                 )}
+                                {doc.documentScope === 'ddt_specific' && (
+                                    <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 px-2 py-0.5 rounded-full shrink-0">
+                                        Specifico DDT
+                                    </span>
+                                )}
                             </div>
                             {doc.notes && (
                                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{doc.notes}</p>
@@ -735,6 +740,11 @@ function DocumentRow({
                     <span className="font-medium text-sm">{doc.name}</span>
                     {doc.brandName && (
                         <span className="text-xs text-muted-foreground">{doc.brandName}</span>
+                    )}
+                    {doc.documentScope === 'ddt_specific' && (
+                        <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 px-2 py-0.5 rounded-full">
+                            Specifico DDT
+                        </span>
                     )}
                     {doc.purchaseNumber && (
                         <span className="text-xs text-muted-foreground">Acquisto: <span className="font-medium">{doc.purchaseNumber}</span></span>

@@ -17,6 +17,11 @@ export const DOCUMENT_TYPE_LABELS: Record<ComplianceDocumentType, string> = {
     OMOLOGAZIONE_MINISTERIALE: 'Omologazione Ministeriale',
 };
 
+// 'reusable': certificato generico di Gestione Conformità, associabile a più
+// DDT/commesse. 'ddt_specific': prova rilasciata dal produttore per un DDT
+// preciso (riporta numero/data di quel DDT) e non riutilizzabile altrove.
+export type ComplianceDocumentScope = 'reusable' | 'ddt_specific';
+
 export interface ComplianceDocument {
     id: string;
     supplierId: string;
@@ -31,6 +36,7 @@ export interface ComplianceDocument {
     fileSize: number | null;
     purchaseId?: string;
     purchaseNumber?: string;
+    documentScope: ComplianceDocumentScope;
     createdBy?: string;
     createdAt: string;
     updatedAt: string;
@@ -53,6 +59,7 @@ const mapDbToDoc = (db: any): ComplianceDocument => {
         fileSize: db.file_size !== null && db.file_size !== undefined ? Number(db.file_size) : null,
         purchaseId: purchaseDeleted ? undefined : db.purchase_id,
         purchaseNumber: purchaseDeleted ? undefined : db.purchases?.delivery_note_number,
+        documentScope: db.document_scope === 'ddt_specific' ? 'ddt_specific' : 'reusable',
         createdBy: db.created_by,
         createdAt: db.created_at,
         updatedAt: db.updated_at,
@@ -62,7 +69,10 @@ const mapDbToDoc = (db: any): ComplianceDocument => {
 const SELECT_WITH_RELATIONS = '*, brands(name), purchases(delivery_note_number, deleted_at), compliance_document_types(name)';
 
 export const complianceApi = {
-    getAll: async (search?: string): Promise<ComplianceDocument[]> => {
+    // `excludeDdtSpecific`: da usare quando si cercano certificati da associare
+    // ad ALTRI DDT/commesse (es. dialoghi "Associa esistente"), per non proporre
+    // documenti che sono prova di un DDT specifico e non riutilizzabili altrove.
+    getAll: async (search?: string, excludeDdtSpecific = false): Promise<ComplianceDocument[]> => {
         let query = supabase
             .from('supplier_compliance_documents')
             .select(SELECT_WITH_RELATIONS)
@@ -70,18 +80,21 @@ export const complianceApi = {
             .order('created_at', { ascending: false })
             .limit(50);
         if (search) query = query.ilike('name', `%${search}%`);
+        if (excludeDdtSpecific) query = query.eq('document_scope', 'reusable');
         const { data, error } = await query;
         if (error) throw error;
         return (data || []).map(mapDbToDoc);
     },
 
-    getBySupplier: async (supplierId: string): Promise<ComplianceDocument[]> => {
-        const { data, error } = await supabase
+    getBySupplier: async (supplierId: string, excludeDdtSpecific = false): Promise<ComplianceDocument[]> => {
+        let query = supabase
             .from('supplier_compliance_documents')
             .select(SELECT_WITH_RELATIONS)
             .eq('supplier_id', supplierId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false });
+        if (excludeDdtSpecific) query = query.eq('document_scope', 'reusable');
+        const { data, error } = await query;
         if (error) throw error;
         return (data || []).map(mapDbToDoc);
     },
@@ -150,6 +163,7 @@ export const complianceApi = {
         fileUrl: string;
         fileSize?: number | null;
         purchaseId?: string;
+        documentScope?: ComplianceDocumentScope;
     }): Promise<ComplianceDocument> => {
         const { data: { user } } = await supabase.auth.getUser();
         const { data, error } = await supabase
@@ -163,6 +177,7 @@ export const complianceApi = {
                 file_url: doc.fileUrl,
                 file_size: doc.fileSize ?? null,
                 purchase_id: doc.purchaseId || null,
+                document_scope: doc.documentScope || 'reusable',
                 created_by: user?.id,
             })
             .select(SELECT_WITH_RELATIONS)

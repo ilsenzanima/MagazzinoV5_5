@@ -142,6 +142,7 @@ export function PurchaseDDTConformita({
                 fileUrl: result.fileId,
                 fileSize: compressed.size,
                 purchaseId,
+                documentScope: "ddt_specific",
             })
             toast.success("Documento caricato")
             setUploadOpen(false)
@@ -171,7 +172,7 @@ export function PurchaseDDTConformita({
     const fetchAssocResults = async () => {
         try {
             setAssocLoading(true)
-            let docs = await complianceApi.getBySupplier(supplierId)
+            let docs = await complianceApi.getBySupplier(supplierId, true)
             if (assocSearch) docs = docs.filter(d => d.name.toLowerCase().includes(assocSearch.toLowerCase()))
             const existingOwnIds = new Set(ownDocs.map(d => d.id))
             const existingAssocIds = new Set(associations.map(a => a.complianceDocumentId))
@@ -298,8 +299,10 @@ export function PurchaseDDTConformita({
                                                         {doc.documentTypeName}
                                                     </span>
                                                 )}
-                                                {assocId && (
-                                                    <span className="text-[10px] text-slate-400">associato</span>
+                                                {assocId ? (
+                                                    <span className="text-[10px] text-slate-400">certificato associato</span>
+                                                ) : (
+                                                    <span className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded">specifico di questo DDT</span>
                                                 )}
                                             </div>
                                             <button
