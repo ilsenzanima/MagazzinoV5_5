@@ -252,12 +252,12 @@ export function PurchaseDDTConformita({
     return (
         <>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between py-4">
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 py-4">
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
                         <ShieldCheck className="h-4 w-4 text-green-600" />
                         Conformità associate al DDT
                     </CardTitle>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0">
                         <Button variant="outline" size="sm" onClick={openAssociate}>
                             <Link2 className="mr-2 h-4 w-4" />
                             <span className="hidden sm:inline">Associa esistente</span>

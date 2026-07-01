@@ -122,9 +122,9 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <CardHeader className="flex flex-row items-center justify-between py-4">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 py-4">
           <CardTitle className="text-base font-semibold">{isOrder ? "Documenti (Ordine)" : "Documenti (DDT / Fattura)"}</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <Button
               variant="outline"
               size="sm"
