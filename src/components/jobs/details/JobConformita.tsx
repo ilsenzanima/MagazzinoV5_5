@@ -36,6 +36,7 @@ import { jobDocumentFoldersApi, JobDocumentFolder } from "@/lib/services/job-doc
 import { jobDdtDocumentExclusionsApi } from "@/lib/services/job-ddt-document-exclusions"
 import { jobArticlesApi, JobArticle } from "@/lib/services/job-articles"
 import { itemComplianceApi } from "@/lib/services/item-compliance"
+import { JobDdt } from "./JobDdt"
 import {
     complianceApi,
     jobComplianceApi,
@@ -64,6 +65,7 @@ import { UploadStatusBar } from "@/components/ui/upload-status-row"
 interface JobConformitaProps {
     jobId: string
     jobLabel?: string
+    jobName?: string
 }
 
 interface PendingFile {
@@ -465,14 +467,14 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
 
     const groups: { key: string; label: string; docs: JobDocument[] }[] = [
         ...docTypes.map(t => ({ key: t.id, label: t.name, docs: docs.filter(d => d.conformitaDocumentTypeId === t.id) })),
-        { key: UNTYPED_KEY, label: "Senza tipo", docs: docs.filter(d => !d.conformitaDocumentTypeId) },
-    ].filter(g => g.docs.length > 0)
+        ...(docs.some(d => !d.conformitaDocumentTypeId) ? [{ key: UNTYPED_KEY, label: "Senza tipo", docs: docs.filter(d => !d.conformitaDocumentTypeId) }] : []),
+    ]
 
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                    Documenti caricati
+                    Conformità Personalizzata
                 </h3>
                 <div className="flex items-center gap-2">
                     {docs.length > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
@@ -484,9 +486,9 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
-            ) : docs.length === 0 ? (
+            ) : docTypes.length === 0 && docs.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento caricato</p>
-            ) : groups.length === 0 ? (
+            ) : docTypes.length === 0 ? (
                 viewMode === 'list' ? (
                     <div className="space-y-1.5">
                         {docs.map(renderDocRow)}
@@ -541,7 +543,9 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                                     </div>
                                 )}
                                 {shownDocs.length === 0 ? (
-                                    <p className="text-sm text-slate-400 py-4 text-center">Nessun documento in questa cartella</p>
+                                    <p className="text-sm text-slate-400 py-4 text-center">
+                                        {type?.allowsFolders ? "Nessun documento in questa cartella" : "Nessun documento di questo tipo"}
+                                    </p>
                                 ) : viewMode === 'list' ? (
                                     <div className="space-y-1.5">
                                         {shownDocs.map(renderDocRow)}
@@ -779,17 +783,131 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     const [toDisassociate, setToDisassociate] = useState<JobComplianceAssociation | null>(null)
     const [viewMode, setViewMode] = useViewMode('job-conformita-associated', 'list')
 
+    // Conf. Ass. DDT: documenti di conformità tracciati automaticamente dai DDT
+    const [ddtDocs, setDdtDocs] = useState<ComplianceDocument[]>([])
+    const [ddtExcludedIds, setDdtExcludedIds] = useState<Set<string>>(new Set())
+    const [ddtTogglingId, setDdtTogglingId] = useState<string | null>(null)
+
     useEffect(() => { load() }, [jobId])
 
     const load = async () => {
         try {
             setLoading(true)
-            setAssociations(await jobComplianceApi.getByJobId(jobId))
+            const [assocs, ddt, excluded] = await Promise.all([
+                jobComplianceApi.getByJobId(jobId),
+                complianceApi.getByJobIdFromDDT(jobId),
+                jobDdtDocumentExclusionsApi.getExcludedIds(jobId),
+            ])
+            setAssociations(assocs)
+            setDdtDocs(ddt)
+            setDdtExcludedIds(excluded)
         } catch {
             toast.error("Errore nel caricamento delle associazioni")
         } finally {
             setLoading(false)
         }
+    }
+
+    const handleSetDdtIncluded = async (docId: string, included: boolean) => {
+        try {
+            setDdtTogglingId(docId)
+            if (included) {
+                await jobDdtDocumentExclusionsApi.include(jobId, docId)
+                setDdtExcludedIds(prev => { const next = new Set(prev); next.delete(docId); return next })
+            } else {
+                await jobDdtDocumentExclusionsApi.exclude(jobId, docId)
+                setDdtExcludedIds(prev => new Set(prev).add(docId))
+            }
+        } catch {
+            toast.error("Errore durante l'aggiornamento dello stato")
+        } finally {
+            setDdtTogglingId(null)
+        }
+    }
+
+    const renderDdtInclusionToggle = (doc: ComplianceDocument, isExcluded: boolean) => (
+        <div className="inline-flex rounded-full overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0">
+            <button
+                disabled={ddtTogglingId === doc.id}
+                onClick={() => handleSetDdtIncluded(doc.id, true)}
+                className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${!isExcluded ? 'bg-emerald-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+            >
+                Incluso
+            </button>
+            <button
+                disabled={ddtTogglingId === doc.id}
+                onClick={() => handleSetDdtIncluded(doc.id, false)}
+                className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${isExcluded ? 'bg-slate-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+            >
+                Escluso
+            </button>
+        </div>
+    )
+
+    const renderDdtCard = (doc: ComplianceDocument) => {
+        const isExcluded = ddtExcludedIds.has(doc.id)
+        return (
+            <Card key={doc.id} className={`hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
+                <CardContent className="p-3 flex items-start gap-3">
+                    <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
+                        <ShieldCheck className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{doc.name}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                            {doc.documentTypeName && (
+                                <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
+                                    {doc.documentTypeName}
+                                </span>
+                            )}
+                            {doc.purchaseNumber && (
+                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                                    DDT {doc.purchaseNumber}
+                                </span>
+                            )}
+                            <div className="ml-auto">{renderDdtInclusionToggle(doc, isExcluded)}</div>
+                        </div>
+                    </div>
+                    {doc.fileUrl && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => openDoc(doc.fileUrl)} title="Apri documento">
+                            <ExternalLink className="h-4 w-4" />
+                        </Button>
+                    )}
+                </CardContent>
+            </Card>
+        )
+    }
+
+    const renderDdtRow = (doc: ComplianceDocument) => {
+        const isExcluded = ddtExcludedIds.has(doc.id)
+        return (
+            <div key={doc.id} className={`group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
+                <div className="bg-green-50 dark:bg-green-950/30 p-1 rounded shrink-0">
+                    <ShieldCheck className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {doc.documentTypeName && (
+                        <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
+                            {doc.documentTypeName}
+                        </span>
+                    )}
+                    {doc.purchaseNumber && (
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                            DDT {doc.purchaseNumber}
+                        </span>
+                    )}
+                    {renderDdtInclusionToggle(doc, isExcluded)}
+                </div>
+                {doc.fileUrl && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => openDoc(doc.fileUrl)} title="Apri documento">
+                        <ExternalLink className="h-3 w-3 text-slate-500" />
+                    </Button>
+                )}
+            </div>
+        )
     }
 
     const openDoc = async (url: string) => {
@@ -941,15 +1059,22 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
         )
     }
 
-    const assocGroups: { key: string; label: string; items: JobComplianceAssociation[] }[] = Object.values(
-        associations.reduce((acc, assoc) => {
-            const label = assoc.document?.documentTypeName || "Senza tipo"
-            const key = label
-            if (!acc[key]) acc[key] = { key, label, items: [] }
-            acc[key].items.push(assoc)
-            return acc
-        }, {} as Record<string, { key: string; label: string; items: JobComplianceAssociation[] }>)
-    )
+    type AssocGroup =
+        | { key: string; label: string; kind: 'manual'; items: JobComplianceAssociation[] }
+        | { key: string; label: string; kind: 'ddt'; items: ComplianceDocument[] }
+
+    const assocGroups: AssocGroup[] = [
+        ...Object.values(
+            associations.reduce((acc, assoc) => {
+                const label = assoc.document?.documentTypeName || "Senza tipo"
+                const key = label
+                if (!acc[key]) acc[key] = { key, label, kind: 'manual', items: [] }
+                acc[key].items.push(assoc)
+                return acc
+            }, {} as Record<string, { key: string; label: string; kind: 'manual'; items: JobComplianceAssociation[] }>)
+        ),
+        { key: '__ddt__', label: 'Conf. Ass. DDT', kind: 'ddt', items: ddtDocs },
+    ]
 
     return (
         <div className="space-y-3">
@@ -967,18 +1092,6 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
-            ) : associations.length === 0 ? (
-                <p className="text-sm text-slate-400 py-4 text-center">Nessun documento associato</p>
-            ) : assocGroups.length === 0 ? (
-                viewMode === 'list' ? (
-                    <div className="space-y-1.5">
-                        {associations.map(renderAssocRow)}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {associations.map(renderAssocCard)}
-                    </div>
-                )
             ) : (
                 <Tabs defaultValue={assocGroups[0]?.key}>
                     <TabsList className="flex-wrap h-auto gap-1">
@@ -993,7 +1106,23 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                     </TabsList>
                     {assocGroups.map(g => (
                         <TabsContent key={g.key} value={g.key} className="pt-4">
-                            {viewMode === 'list' ? (
+                            {g.items.length === 0 ? (
+                                <p className="text-sm text-slate-400 py-4 text-center">
+                                    {g.kind === 'ddt'
+                                        ? "Nessun documento di conformità proveniente da DDT per questa commessa"
+                                        : "Nessun documento associato"}
+                                </p>
+                            ) : g.kind === 'ddt' ? (
+                                viewMode === 'list' ? (
+                                    <div className="space-y-1.5">
+                                        {g.items.map(renderDdtRow)}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {g.items.map(renderDdtCard)}
+                                    </div>
+                                )
+                            ) : viewMode === 'list' ? (
                                 <div className="space-y-1.5">
                                     {g.items.map(renderAssocRow)}
                                 </div>
@@ -1136,11 +1265,7 @@ function AssociateDialog({
     const [loadingResults, setLoadingResults] = useState(false)
     const [associating, setAssociating] = useState<string | null>(null)
 
-    // Suggeriti dal DDT
-    const [ddtDocs, setDdtDocs] = useState<ComplianceDocument[]>([])
-    const [loadingDdt, setLoadingDdt] = useState(true)
-
-    // Suggeriti da articoli
+    // Cerca per articolo Commessa
     const [jobArticles, setJobArticles] = useState<JobArticle[]>([])
     const [loadingArticles, setLoadingArticles] = useState(true)
     const [selectedArticleId, setSelectedArticleId] = useState("")
@@ -1150,14 +1275,6 @@ function AssociateDialog({
     useEffect(() => {
         suppliersApi.getAll().then(s => setSuppliers(s)).catch(() => {})
     }, [])
-
-    useEffect(() => {
-        setLoadingDdt(true)
-        complianceApi.getByJobIdFromDDT(jobId)
-            .then(setDdtDocs)
-            .catch(() => toast.error("Errore nel caricamento dei documenti da DDT"))
-            .finally(() => setLoadingDdt(false))
-    }, [jobId])
 
     useEffect(() => {
         setLoadingArticles(true)
@@ -1235,8 +1352,7 @@ function AssociateDialog({
                 <Tabs defaultValue="search" className="space-y-3">
                     <TabsList>
                         <TabsTrigger value="search">Cerca tutti</TabsTrigger>
-                        <TabsTrigger value="ddt">Suggeriti dal DDT</TabsTrigger>
-                        <TabsTrigger value="articles">Suggeriti da articoli</TabsTrigger>
+                        <TabsTrigger value="articles">Cerca per articolo Commessa</TabsTrigger>
                     </TabsList>
                     <TabsContent value="search" className="space-y-3">
                         <div className="grid grid-cols-2 gap-2">
@@ -1271,16 +1387,6 @@ function AssociateDialog({
                             associatingId={associating}
                             onAssociate={handleAssociate}
                             emptyMessage="Nessun documento trovato"
-                        />
-                    </TabsContent>
-                    <TabsContent value="ddt" className="space-y-3">
-                        <AssociateResultsList
-                            loading={loadingDdt}
-                            results={ddtDocs}
-                            existingIds={existingIds}
-                            associatingId={associating}
-                            onAssociate={handleAssociate}
-                            emptyMessage="Nessun documento di conformità proveniente da DDT per questa commessa"
                         />
                     </TabsContent>
                     <TabsContent value="articles" className="space-y-3">
@@ -1318,202 +1424,15 @@ function AssociateDialog({
     )
 }
 
-// ─── Documenti da DDT ────────────────────────────────────────────────────────
-
-function DDTDocuments({ jobId }: { jobId: string }) {
-    const supabase = createClient()
-    const [docs, setDocs] = useState<ComplianceDocument[]>([])
-    const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set())
-    const [loading, setLoading] = useState(true)
-    const [togglingId, setTogglingId] = useState<string | null>(null)
-    const [viewMode, setViewMode] = useViewMode('job-conformita-ddt', 'list')
-
-    useEffect(() => { load() }, [jobId])
-
-    const load = async () => {
-        try {
-            setLoading(true)
-            const [ddtDocs, excluded] = await Promise.all([
-                complianceApi.getByJobIdFromDDT(jobId),
-                jobDdtDocumentExclusionsApi.getExcludedIds(jobId),
-            ])
-            setDocs(ddtDocs)
-            setExcludedIds(excluded)
-        } catch {
-            toast.error("Errore nel caricamento dei documenti da DDT")
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const handleSetIncluded = async (docId: string, included: boolean) => {
-        try {
-            setTogglingId(docId)
-            if (included) {
-                await jobDdtDocumentExclusionsApi.include(jobId, docId)
-                setExcludedIds(prev => { const next = new Set(prev); next.delete(docId); return next })
-            } else {
-                await jobDdtDocumentExclusionsApi.exclude(jobId, docId)
-                setExcludedIds(prev => new Set(prev).add(docId))
-            }
-        } catch {
-            toast.error("Errore durante l'aggiornamento dello stato")
-        } finally {
-            setTogglingId(null)
-        }
-    }
-
-    const openDoc = async (url: string) => {
-        if (url && !url.includes('/')) {
-            window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento`, '_blank')
-            return
-        }
-        try {
-            const path = url.split("/public/documents/")[1]
-            if (!path) { window.open(url, "_blank"); return }
-            const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600)
-            if (error || !data?.signedUrl) { window.open(url, "_blank"); return }
-            window.open(data.signedUrl, "_blank")
-        } catch { window.open(url, "_blank") }
-    }
-
-    const renderInclusionToggle = (doc: ComplianceDocument, isExcluded: boolean) => (
-        <div className="inline-flex rounded-full overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0">
-            <button
-                disabled={togglingId === doc.id}
-                onClick={() => handleSetIncluded(doc.id, true)}
-                className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${!isExcluded ? 'bg-emerald-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-            >
-                Incluso
-            </button>
-            <button
-                disabled={togglingId === doc.id}
-                onClick={() => handleSetIncluded(doc.id, false)}
-                className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${isExcluded ? 'bg-slate-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-            >
-                Escluso
-            </button>
-        </div>
-    )
-
-    const renderDocCard = (doc: ComplianceDocument) => {
-        const isExcluded = excludedIds.has(doc.id)
-        return (
-            <Card key={doc.id} className={`hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
-                <CardContent className="p-3 flex items-start gap-3">
-                    <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
-                        <ShieldCheck className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{doc.name}</p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                            {doc.documentTypeName && (
-                                <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                    {doc.documentTypeName}
-                                </span>
-                            )}
-                            {doc.purchaseNumber && (
-                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
-                                    DDT {doc.purchaseNumber}
-                                </span>
-                            )}
-                            <div className="ml-auto">{renderInclusionToggle(doc, isExcluded)}</div>
-                        </div>
-                    </div>
-                    {doc.fileUrl && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0"
-                            onClick={() => openDoc(doc.fileUrl)}
-                            title="Apri documento"
-                        >
-                            <ExternalLink className="h-4 w-4" />
-                        </Button>
-                    )}
-                </CardContent>
-            </Card>
-        )
-    }
-
-    const renderDocRow = (doc: ComplianceDocument) => {
-        const isExcluded = excludedIds.has(doc.id)
-        return (
-            <div key={doc.id} className={`group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
-                <div className="bg-green-50 dark:bg-green-950/30 p-1 rounded shrink-0">
-                    <ShieldCheck className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    {doc.documentTypeName && (
-                        <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                            {doc.documentTypeName}
-                        </span>
-                    )}
-                    {doc.purchaseNumber && (
-                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
-                            DDT {doc.purchaseNumber}
-                        </span>
-                    )}
-                    {renderInclusionToggle(doc, isExcluded)}
-                </div>
-                {doc.fileUrl && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0"
-                        onClick={() => openDoc(doc.fileUrl)}
-                        title="Apri documento"
-                    >
-                        <ExternalLink className="h-3 w-3 text-slate-500" />
-                    </Button>
-                )}
-            </div>
-        )
-    }
-
-    return (
-        <div className="space-y-3">
-            {docs.length > 0 && (
-                <div className="flex items-center justify-end">
-                    <ViewToggle mode={viewMode} onChange={setViewMode} />
-                </div>
-            )}
-
-            {loading ? (
-                <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
-            ) : docs.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 border-2 border-dashed dark:border-slate-700 rounded-lg">
-                    <ShieldCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">Nessun documento di conformità proveniente da DDT</p>
-                    <p className="text-xs mt-1 text-slate-300 dark:text-slate-600">
-                        Compaiono automaticamente quando materiali acquistati con conformità vengono usati in questa commessa
-                    </p>
-                </div>
-            ) : viewMode === 'list' ? (
-                <div className="space-y-1.5">
-                    {docs.map(renderDocRow)}
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {docs.map(renderDocCard)}
-                </div>
-            )}
-        </div>
-    )
-}
-
 // ─── Componente principale ───────────────────────────────────────────────────
 
-export function JobConformita({ jobId, jobLabel }: JobConformitaProps) {
+export function JobConformita({ jobId, jobLabel, jobName }: JobConformitaProps) {
     return (
         <Tabs defaultValue="own" className="space-y-4">
             <TabsList>
-                <TabsTrigger value="own">Documenti caricati</TabsTrigger>
+                <TabsTrigger value="own">Conformità Personalizzata</TabsTrigger>
                 <TabsTrigger value="associated">Documenti associati</TabsTrigger>
-                <TabsTrigger value="ddt">Documenti da DDT</TabsTrigger>
+                <TabsTrigger value="ddt-bolle">DDT/bolle</TabsTrigger>
             </TabsList>
             <TabsContent value="own">
                 <OwnDocuments jobId={jobId} jobLabel={jobLabel} />
@@ -1521,8 +1440,8 @@ export function JobConformita({ jobId, jobLabel }: JobConformitaProps) {
             <TabsContent value="associated">
                 <AssociatedDocuments jobId={jobId} />
             </TabsContent>
-            <TabsContent value="ddt">
-                <DDTDocuments jobId={jobId} />
+            <TabsContent value="ddt-bolle">
+                <JobDdt jobId={jobId} jobName={jobName || jobLabel || jobId} />
             </TabsContent>
         </Tabs>
     )

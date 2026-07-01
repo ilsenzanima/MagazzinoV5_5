@@ -301,8 +301,8 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
 
     const groups: { key: string; label: string; docs: JobCommessaDocument[] }[] = [
         ...docTypes.map(t => ({ key: t.id, label: t.name, docs: documents.filter(d => d.documentTypeId === t.id) })),
-        { key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) },
-    ].filter(g => g.docs.length > 0)
+        ...(documents.some(d => !d.documentTypeId) ? [{ key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) }] : []),
+    ]
 
     return (
         <div className="space-y-6">
@@ -315,7 +315,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
 
             {loading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
-            ) : documents.length === 0 ? (
+            ) : docTypes.length === 0 && documents.length === 0 ? (
                 <Card className="border-dashed">
                     <CardContent className="py-12 text-center text-slate-500">
                         <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
@@ -327,7 +327,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
                     <div className="flex justify-end">
                         <ViewToggle mode={viewMode} onChange={setViewMode} />
                     </div>
-                    {groups.length === 0 ? (
+                    {docTypes.length === 0 ? (
                         viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {documents.map(renderDocCard)}
@@ -351,7 +351,9 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
                             </TabsList>
                             {groups.map(g => (
                                 <TabsContent key={g.key} value={g.key} className="pt-4">
-                                    {viewMode === 'grid' ? (
+                                    {g.docs.length === 0 ? (
+                                        <p className="text-sm text-slate-400 py-4 text-center">Nessun documento di questo tipo</p>
+                                    ) : viewMode === 'grid' ? (
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {g.docs.map(renderDocCard)}
                                         </div>

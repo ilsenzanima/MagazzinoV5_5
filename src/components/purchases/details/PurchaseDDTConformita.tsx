@@ -22,12 +22,10 @@ import {
 import {
     ShieldCheck,
     Upload,
-    Link2,
     Unlink,
     Loader2,
     ExternalLink,
     Plus,
-    Search,
     X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -67,13 +65,6 @@ export function PurchaseDDTConformita({
     const [upName, setUpName] = useState("")
     const [uploading, setUploading] = useState(false)
     const upRef = useRef<HTMLInputElement>(null)
-
-    // Associate existing
-    const [assocOpen, setAssocOpen] = useState(false)
-    const [assocSearch, setAssocSearch] = useState("")
-    const [assocResults, setAssocResults] = useState<ComplianceDocument[]>([])
-    const [assocLoading, setAssocLoading] = useState(false)
-    const [associating, setAssociating] = useState<string | null>(null)
 
     // Disassociate
     const [disassocOpen, setDisassocOpen] = useState(false)
@@ -155,48 +146,6 @@ export function PurchaseDDTConformita({
         }
     }
 
-    // ── Associate existing ────────────────────────────────────────────────────
-
-    const openAssociate = () => {
-        setAssocSearch("")
-        setAssocResults([])
-        setAssocOpen(true)
-    }
-
-    useEffect(() => {
-        if (!assocOpen) return
-        const t = setTimeout(() => fetchAssocResults(), 300)
-        return () => clearTimeout(t)
-    }, [assocSearch, assocOpen])
-
-    const fetchAssocResults = async () => {
-        try {
-            setAssocLoading(true)
-            let docs = await complianceApi.getBySupplier(supplierId, true)
-            if (assocSearch) docs = docs.filter(d => d.name.toLowerCase().includes(assocSearch.toLowerCase()))
-            const existingOwnIds = new Set(ownDocs.map(d => d.id))
-            const existingAssocIds = new Set(associations.map(a => a.complianceDocumentId))
-            setAssocResults(docs.filter(d => !existingOwnIds.has(d.id) && !existingAssocIds.has(d.id)))
-        } catch {
-            toast.error("Errore ricerca documenti")
-        } finally {
-            setAssocLoading(false)
-        }
-    }
-
-    const handleAssociate = async (doc: ComplianceDocument) => {
-        try {
-            setAssociating(doc.id)
-            await purchaseComplianceApi.associate(purchaseId, doc.id)
-            toast.success("Documento associato")
-            load()
-        } catch {
-            toast.error("Errore durante l'associazione")
-        } finally {
-            setAssociating(null)
-        }
-    }
-
     const confirmDisassoc = (assoc: PurchaseComplianceAssociation) => {
         setToDisassoc(assoc)
         setDisassocOpen(true)
@@ -258,10 +207,6 @@ export function PurchaseDDTConformita({
                         Conformità associate al DDT
                     </CardTitle>
                     <div className="flex gap-2 shrink-0">
-                        <Button variant="outline" size="sm" onClick={openAssociate}>
-                            <Link2 className="mr-2 h-4 w-4" />
-                            <span className="hidden sm:inline">Associa esistente</span>
-                        </Button>
                         <Button variant="outline" size="sm" onClick={openUpload}>
                             <Upload className="mr-2 h-4 w-4" />
                             <span className="hidden sm:inline">Carica</span>
@@ -409,64 +354,6 @@ export function PurchaseDDTConformita({
                                 </Button>
                             </>
                         )}
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Associate existing dialog */}
-            <Dialog open={assocOpen} onOpenChange={setAssocOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Associa certificato esistente</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3 py-2">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input
-                                className="pl-9"
-                                placeholder="Cerca per nome..."
-                                value={assocSearch}
-                                onChange={e => setAssocSearch(e.target.value)}
-                            />
-                        </div>
-                        <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
-                            {assocLoading ? (
-                                <div className="flex justify-center py-6">
-                                    <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                                </div>
-                            ) : assocResults.length === 0 ? (
-                                <p className="text-sm text-slate-400 text-center py-4">
-                                    {assocSearch ? "Nessun documento trovato" : "Nessun documento disponibile per questo fornitore"}
-                                </p>
-                            ) : (
-                                assocResults.map(doc => (
-                                    <div
-                                        key={doc.id}
-                                        className="flex items-center gap-3 p-2 rounded-lg border hover:bg-slate-50 dark:hover:bg-slate-800"
-                                    >
-                                        <ShieldCheck className="h-5 w-5 text-green-500 shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">{doc.name}</p>
-                                            <p className="text-xs text-slate-400">{doc.documentTypeName}</p>
-                                        </div>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            disabled={associating === doc.id}
-                                            onClick={() => handleAssociate(doc)}
-                                            className="shrink-0"
-                                        >
-                                            {associating === doc.id
-                                                ? <Loader2 className="h-3 w-3 animate-spin" />
-                                                : "Associa"}
-                                        </Button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setAssocOpen(false)}>Chiudi</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

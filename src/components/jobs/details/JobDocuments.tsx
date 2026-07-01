@@ -328,8 +328,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
 
   const groups: { key: string; label: string; docs: SiteDocument[] }[] = [
     ...docTypes.map(t => ({ key: t.id, label: t.name, docs: documents.filter(d => d.documentTypeId === t.id) })),
-    { key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) },
-  ].filter(g => g.docs.length > 0)
+    ...(documents.some(d => !d.documentTypeId) ? [{ key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) }] : []),
+  ]
 
   return (
     <div className="space-y-6">
@@ -348,7 +348,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
         </div>
-      ) : documents.length === 0 ? (
+      ) : docTypes.length === 0 && documents.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center text-slate-500">
             <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
@@ -356,7 +356,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
             <p className="text-slate-500 dark:text-slate-400">Carica progetti, permessi, o foto del cantiere.</p>
           </CardContent>
         </Card>
-      ) : groups.length === 0 ? (
+      ) : docTypes.length === 0 ? (
         viewMode === 'list' ? (
           <div className="space-y-1.5">
             {documents.map(renderDocRow)}
@@ -380,7 +380,9 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
           </TabsList>
           {groups.map(g => (
             <TabsContent key={g.key} value={g.key} className="pt-4">
-              {viewMode === 'list' ? (
+              {g.docs.length === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center">Nessun documento di questo tipo</p>
+              ) : viewMode === 'list' ? (
                 <div className="space-y-1.5">
                   {g.docs.map(renderDocRow)}
                 </div>

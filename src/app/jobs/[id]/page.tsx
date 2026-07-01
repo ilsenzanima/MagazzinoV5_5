@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, Truck, GanttChartSquare } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -24,7 +24,6 @@ import { proposalDocumentTypesApi } from "@/lib/services/proposal-document-types
 import { JobOverview } from "@/components/jobs/details/JobOverview";
 import { JobStock } from "@/components/jobs/details/JobStock";
 import { JobDocuments } from "@/components/jobs/details/JobDocuments";
-import { JobDdt } from "@/components/jobs/details/JobDdt";
 import { JobCommessaDocuments } from "@/components/jobs/details/JobCommessaDocuments";
 import { JobConformita } from "@/components/jobs/details/JobConformita";
 import { JobAttendance } from "@/components/jobs/details/JobAttendance";
@@ -565,9 +564,6 @@ export default function JobDetailsPage() {
                                     <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                                         <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini
                                     </TabsTrigger>
-                                    <TabsTrigger value="ddt" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <Truck className="h-4 w-4 mr-1" />DDT
-                                    </TabsTrigger>
                                 </>
                             )}
                             {activeGroup === 'economico' && (userRole === 'admin' || userRole === 'operativo') && (
@@ -612,7 +608,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="conformita" className="space-y-6 focus-visible:outline-none">
-                            <JobConformita jobId={job.id} jobLabel={`${job.code} ${job.name}`} />
+                            <JobConformita jobId={job.id} jobLabel={`${job.code} ${job.name}`} jobName={job.name} />
                         </TabsContent>
 
                         <TabsContent value="documents" className="space-y-6 focus-visible:outline-none">
@@ -624,10 +620,6 @@ export default function JobDetailsPage() {
                                 <JobCommessaDocuments jobId={job.id} jobLabel={`${job.code} ${job.name}`} />
                             </TabsContent>
                         )}
-
-                        <TabsContent value="ddt" className="space-y-6 focus-visible:outline-none">
-                            <JobDdt jobId={job.id} jobName={job.name} />
-                        </TabsContent>
 
                         <TabsContent value="attendance" className="space-y-6 focus-visible:outline-none">
                             <JobAttendance jobId={job.id} />

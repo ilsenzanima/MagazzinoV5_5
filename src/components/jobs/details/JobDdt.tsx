@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Loader2, Download, Truck, Building2 } from "lucide-react"
+import { FileText, Loader2, Truck, Building2 } from "lucide-react"
 import { deliveryNotesApi, purchasesApi } from "@/lib/api"
 import { DeliveryNote, DeliveryNoteItem, Purchase } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
@@ -24,7 +24,6 @@ type SupplierDoc = { purchase: Purchase; url: string; index: number }
 export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const [subTab, setSubTab] = useState<"opi" | "fornitori">("opi")
   const [loading, setLoading] = useState(true)
-  const [zipping, setZipping] = useState(false)
   const [opiNotes, setOpiNotes] = useState<DeliveryNote[]>([])
   const [supplierDocs, setSupplierDocs] = useState<SupplierDoc[]>([])
   const supabase = createClient()
@@ -95,66 +94,6 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
     }
   }
 
-  const handleDownloadZip = async () => {
-    try {
-      setZipping(true)
-      const { default: JSZip } = await import("jszip")
-      const zip = new JSZip()
-      const opiFolder = zip.folder("DDT OPI")
-      const fornitoriFolder = zip.folder("DDT fornitori")
-
-      for (const note of opiNotes) {
-        const { generateDeliveryNotePdfBlob } = await import("@/lib/pdf/delivery-note-pdf")
-        const grouped = new Map<string, DeliveryNoteItem>()
-        ;(note.items || []).forEach(item => {
-          const key = item.inventoryId
-          if (grouped.has(key)) {
-            const existing = grouped.get(key)!
-            grouped.set(key, { ...existing, quantity: existing.quantity + item.quantity })
-          } else {
-            grouped.set(key, { ...item })
-          }
-        })
-        const blob = await generateDeliveryNotePdfBlob(note, Array.from(grouped.values()))
-        opiFolder?.file(`${note.number.replace('/', '_')}.pdf`, blob)
-      }
-
-      for (const doc of supplierDocs) {
-        try {
-          let fetchUrl = doc.url
-          if (doc.url && !doc.url.includes('/')) {
-            fetchUrl = `/api/drive/download?fileId=${encodeURIComponent(doc.url)}`
-          } else {
-            const path = doc.url.split('/public/documents/')[1]
-            if (path) {
-              const { data } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
-              if (data?.signedUrl) fetchUrl = data.signedUrl
-            }
-          }
-          const res = await fetch(fetchUrl)
-          const blob = await res.blob()
-          const ext = doc.url.split('.').pop()?.split('?')[0] || 'pdf'
-          const safeName = (doc.purchase.deliveryNoteNumber || doc.purchase.id).replace(/[^a-zA-Z0-9_-]/g, '_')
-          fornitoriFolder?.file(`${safeName}_${doc.index + 1}.${ext}`, blob)
-        } catch (e) {
-          console.error("Failed to fetch supplier doc", e)
-        }
-      }
-
-      const zipBlob = await zip.generateAsync({ type: "blob" })
-      const safeJobName = jobName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 30) || jobId
-      const link = document.createElement("a")
-      link.href = URL.createObjectURL(zipBlob)
-      link.download = `DDT_${safeJobName}.zip`
-      link.click()
-      URL.revokeObjectURL(link.href)
-    } catch (error) {
-      console.error("Failed to generate zip", error)
-      toast.error("Errore durante la creazione dello zip")
-    } finally {
-      setZipping(false)
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -171,19 +110,9 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="flex items-center gap-2">
-          {((subTab === "opi" && opiNotes.length > 0) || (subTab === "fornitori" && supplierDocs.length > 0)) && (
-            <ViewToggle mode={viewMode} onChange={setViewMode} />
-          )}
-          <Button
-            variant="outline"
-            onClick={handleDownloadZip}
-            disabled={zipping || (opiNotes.length === 0 && supplierDocs.length === 0)}
-          >
-            {zipping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-            Scarica tutto (ZIP)
-          </Button>
-        </div>
+        {((subTab === "opi" && opiNotes.length > 0) || (subTab === "fornitori" && supplierDocs.length > 0)) && (
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+        )}
       </div>
 
       {loading ? (
