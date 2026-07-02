@@ -14,6 +14,7 @@ import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
 import { notify } from "@/lib/notify"
 import type { InventoryItem, Client } from "@/lib/types"
 import { generateCostAnalysisPDF } from "@/lib/pdf/cost-analysis-pdf"
+import { generateCostAnalysisExcel } from "@/lib/excel/cost-analysis-excel"
 
 interface Props {
     proposalId: string
@@ -157,6 +158,7 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, versi
     const [proposalTitle, setProposalTitle] = useState('')
     const [client, setClient] = useState<Client | null>(null)
     const [exportingPdf, setExportingPdf] = useState(false)
+    const [exportingExcel, setExportingExcel] = useState(false)
 
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
@@ -263,6 +265,17 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, versi
         finally { setExportingPdf(false) }
     }
 
+    const handleExportExcel = async () => {
+        try {
+            setExportingExcel(true)
+            await generateCostAnalysisExcel({
+                client, proposalTitle, versionName, createdAt: versionCreatedAt,
+                inventoryRows, genericRows, params,
+            })
+        } catch { notify.error("Errore durante la generazione dell'Excel") }
+        finally { setExportingExcel(false) }
+    }
+
     if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
 
     return (
@@ -273,6 +286,9 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, versi
                     <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{versionName}</span>
                     <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={exportingPdf}>
                         {exportingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}PDF
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleExportExcel} disabled={exportingExcel}>
+                        {exportingExcel ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}Excel
                     </Button>
                 </div>
             </div>
