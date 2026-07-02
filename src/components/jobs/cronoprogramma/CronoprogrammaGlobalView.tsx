@@ -93,8 +93,14 @@ export function CronoprogrammaGlobalView() {
 
     useEffect(() => { load() }, [])
 
-    const rowPresence = (task: JobTask) =>
-        new Set(attendance.filter(a => a.jobId === task.jobId && a.status === 'presence').map(a => a.date))
+    const rowPresence = (task: JobTask) => {
+        const workersByDate = new Map<string, Set<string>>()
+        attendance.filter(a => a.jobId === task.jobId && a.status === 'presence').forEach(a => {
+            if (!workersByDate.has(a.date)) workersByDate.set(a.date, new Set())
+            workersByDate.get(a.date)!.add(a.workerId)
+        })
+        return new Map(Array.from(workersByDate, ([date, workers]) => [date, workers.size]))
+    }
 
     const presencePopupContent = (task: JobTask) => {
         const inRange = attendance.filter(a => a.jobId === task.jobId && a.date >= task.startDate && a.date <= task.endDate && a.status === 'presence')
@@ -256,7 +262,7 @@ export function CronoprogrammaGlobalView() {
                                 onProgressChange={handleProgressChange}
                             />
                             <p className="text-[11px] text-slate-400">
-                                ● puntino verde sotto la barra = presenza registrata quel giorno sul cantiere
+                                <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-emerald-500 text-white text-[8px] align-middle">n</span> sotto la barra = numero di lavoratori presenti quel giorno sul cantiere
                             </p>
                         </CardContent>
                     </Card>

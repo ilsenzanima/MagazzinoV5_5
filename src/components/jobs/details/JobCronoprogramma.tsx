@@ -76,8 +76,13 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
         return `<div class="text-xs"><strong>${workers}</strong> lavoratori · <strong>${totalHours}</strong> ore presenza nel periodo</div>`
     }
 
-    const presenceDates = new Set(attendance.filter(a => a.status === 'presence').map(a => a.date))
-    const rowPresence = () => presenceDates
+    const workersByDate = new Map<string, Set<string>>()
+    attendance.filter(a => a.status === 'presence').forEach(a => {
+        if (!workersByDate.has(a.date)) workersByDate.set(a.date, new Set())
+        workersByDate.get(a.date)!.add(a.workerId)
+    })
+    const presenceCounts = new Map(Array.from(workersByDate, ([date, workers]) => [date, workers.size]))
+    const rowPresence = () => presenceCounts
 
     useEffect(() => { load() }, [jobId])
 
@@ -191,7 +196,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                     />
                     {tasks.length > 0 && (
                         <p className="text-[11px] text-slate-400 mt-2">
-                            ● puntino verde sotto la barra = presenza registrata quel giorno
+                            <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-emerald-500 text-white text-[8px] align-middle">n</span> sotto la barra = numero di lavoratori presenti quel giorno
                         </p>
                     )}
                 </CardContent>

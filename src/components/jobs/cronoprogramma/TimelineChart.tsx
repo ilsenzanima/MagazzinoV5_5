@@ -34,8 +34,8 @@ interface TimelineChartProps {
     barClass?: (task: JobTask) => string;
     /** HTML mostrato nel popup al click/hover sulla barra (es. presenze registrate nel periodo) */
     popupContent?: (task: JobTask) => string;
-    /** Date (YYYY-MM-DD) con almeno una presenza per il cantiere della fase, da disegnare come striscia sotto la barra */
-    rowPresence?: (task: JobTask) => Set<string>;
+    /** Numero di lavoratori presenti per data (YYYY-MM-DD) nel cantiere della fase, da disegnare come striscia sotto la barra */
+    rowPresence?: (task: JobTask) => Map<string, number>;
     onTaskClick?: (taskId: string) => void;
     onDateChange?: (taskId: string, start: Date, end: Date) => void;
     onProgressChange?: (taskId: string, progress: number) => void;
@@ -89,8 +89,8 @@ export function TimelineChart({ tasks, taskLabel, barClass, popupContent, rowPre
                 ganttContainer.querySelectorAll(".presence-row-overlay").forEach(el => el.remove());
 
                 tasks.forEach(t => {
-                    const presenceDates = rowPresence(t);
-                    if (!presenceDates || presenceDates.size === 0) return;
+                    const presenceCounts = rowPresence(t);
+                    if (!presenceCounts || presenceCounts.size === 0) return;
                     const wrapper = ganttContainer.querySelector(`.bar-wrapper[data-id="${t.id}"]`);
                     const bar = wrapper?.querySelector(".bar");
                     if (!bar) return;
@@ -104,25 +104,31 @@ export function TimelineChart({ tasks, taskLabel, barClass, popupContent, rowPre
                     const overlay = document.createElement("div");
                     overlay.className = "presence-row-overlay absolute pointer-events-none";
                     overlay.style.left = `${x}px`;
-                    overlay.style.top = `${y + height + 3}px`;
+                    overlay.style.top = `${y + height + 2}px`;
                     overlay.style.width = `${width}px`;
-                    overlay.style.height = "8px";
+                    overlay.style.height = "12px";
                     overlay.style.zIndex = "5";
 
                     const dayWidth = width / days.length;
                     days.forEach((date, i) => {
-                        const present = presenceDates.has(date);
-                        const size = present ? 6 : 3;
-                        const dot = document.createElement("div");
-                        dot.title = `${date}${present ? " · presenza registrata" : ""}`;
-                        dot.className = present
-                            ? "absolute rounded-full bg-emerald-500"
-                            : "absolute rounded-full bg-slate-300 dark:bg-slate-600";
-                        dot.style.left = `${i * dayWidth + dayWidth / 2 - size / 2}px`;
-                        dot.style.top = "0px";
-                        dot.style.width = `${size}px`;
-                        dot.style.height = `${size}px`;
-                        overlay.appendChild(dot);
+                        const count = presenceCounts.get(date) || 0;
+                        const present = count > 0;
+                        const size = present ? Math.max(12, 8 + String(count).length * 5) : 3;
+                        const mark = document.createElement("div");
+                        mark.title = `${date}${present ? ` · ${count} lavorator${count === 1 ? "e" : "i"} presenti` : ""}`;
+                        if (present) {
+                            mark.className = "absolute rounded-full bg-emerald-500 text-white flex items-center justify-center leading-none";
+                            mark.style.fontSize = "8px";
+                            mark.style.fontWeight = "600";
+                            mark.textContent = String(count);
+                        } else {
+                            mark.className = "absolute rounded-full bg-slate-300 dark:bg-slate-600";
+                        }
+                        mark.style.left = `${i * dayWidth + dayWidth / 2 - size / 2}px`;
+                        mark.style.top = "0px";
+                        mark.style.width = `${size}px`;
+                        mark.style.height = `${size}px`;
+                        overlay.appendChild(mark);
                     });
                     ganttContainer.appendChild(overlay);
                 });
