@@ -230,15 +230,10 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
     const [addingGeneric, setAddingGeneric] = useState(false)
     const [newGenericName, setNewGenericName] = useState('')
     const autoImported = useRef(false)
+    const proposalPriceMapRef = useRef<Map<string, number>>(new Map())
 
     const [proposalId, setProposalId] = useState<string | null>(null)
     const [subTab, setSubTab] = useState<'prezzi' | 'offerta'>('prezzi')
-
-    useEffect(() => {
-        clientProposalsApi.getByConvertedJobId(jobId)
-            .then(proposal => setProposalId(proposal?.id ?? null))
-            .catch(() => setProposalId(null))
-    }, [jobId])
 
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
@@ -256,6 +251,13 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
 
             if (!autoImported.current) {
                 autoImported.current = true
+
+                const proposal = await clientProposalsApi.getByConvertedJobId(jobId).catch(() => null)
+                setProposalId(proposal?.id ?? null)
+                proposalPriceMapRef.current = proposal?.id
+                    ? await costAnalysisApi.getProposalPriceLookup(proposal.id).catch(() => new Map<string, number>())
+                    : new Map<string, number>()
+
                 const existingIds = new Set(existing.filter(r => r.type === 'inventory').map(r => r.itemId).filter(Boolean))
                 const uniqueItems = new Map<string, Movement>()
                 for (const m of movements) {
@@ -272,7 +274,8 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
                             itemName: m.itemName || m.itemCode || '',
                             itemModel: m.itemModel || '', itemUnit: m.itemUnit || '',
                             maxPurchasePrice: priceMap.get(m.itemId) ?? null,
-                            unitPrice: null, qtyEstimated: 0, qtyActual: 0, sortOrder: sortBase++,
+                            unitPrice: proposalPriceMapRef.current.get(m.itemId) ?? null,
+                            qtyEstimated: 0, qtyActual: 0, sortOrder: sortBase++,
                         })
                         added.push(row)
                     }
@@ -304,7 +307,7 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
             const newRow = await costAnalysisApi.add(jobId, {
                 type: 'inventory', itemId: item.id, itemName: item.name,
                 itemModel: item.model || '', itemUnit: (item as any).unit || '',
-                maxPurchasePrice: maxPrice, unitPrice: null,
+                maxPurchasePrice: maxPrice, unitPrice: proposalPriceMapRef.current.get(item.id) ?? null,
                 qtyEstimated: 0, qtyActual: 0, sortOrder: inventoryRows.length,
             })
             setRows(prev => [...prev, newRow])
@@ -387,7 +390,7 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
                 <TabsContent value="prezzi" className="space-y-6 pt-4">
                     <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
                         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
-                        Qui sono raccolti i materiali e le voci di costo usati per determinare i prezzi di questa commessa: questi valori alimentano i calcoli dei SAL. Le modifiche fatte qui restano locali alla commessa e non toccano l'analisi costi dell'offerta di origine.
+                        Qui sono raccolti i materiali e le voci di costo usati per determinare i prezzi di questa commessa: questi valori alimentano i calcoli dei SAL. Quando un materiale viene aggiunto (in automatico dai movimenti di magazzino, o manualmente), il prezzo unitario viene precompilato con quello impostato nelle analisi costi dell'offerta di origine, se presente. Le modifiche fatte qui restano locali alla commessa e non toccano l'analisi costi dell'offerta.
                     </p>
 
                     {/* ── Materiali da Magazzino ───────────────────────────────────── */}
