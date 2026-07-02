@@ -301,7 +301,7 @@ export const jobsApi = {
         // Blocca se ci sono movimenti (delivery_notes) collegati alla commessa
         const { count: movCount } = await supabase
             .from('delivery_notes')
-            .select('*', { count: 'estimated', head: true })
+            .select('*', { count: 'exact', head: true })
             .eq('job_id', id);
         if (movCount && movCount > 0) {
             throw new Error(`Impossibile eliminare la commessa: ha ${movCount} ${movCount === 1 ? 'movimento' : 'movimenti'} collegati. Eliminare prima i movimenti.`);
@@ -310,7 +310,7 @@ export const jobsApi = {
         // Blocca se ci sono acquisti collegati alla commessa
         const { count: purCount } = await supabase
             .from('purchases')
-            .select('*', { count: 'estimated', head: true })
+            .select('*', { count: 'exact', head: true })
             .eq('job_id', id)
             .is('deleted_at', null);
         if (purCount && purCount > 0) {

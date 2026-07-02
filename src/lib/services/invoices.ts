@@ -183,7 +183,7 @@ export const invoicesApi = {
         // Blocca se ci sono bolle collegate — devono essere scollegate prima
         const { count } = await supabase
             .from('purchases')
-            .select('*', { count: 'estimated', head: true })
+            .select('*', { count: 'exact', head: true })
             .eq('invoice_id', id)
             .is('deleted_at', null);
         if (count && count > 0) {

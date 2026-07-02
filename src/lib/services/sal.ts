@@ -79,12 +79,13 @@ export const salApi = {
 
     tagItem: async (jobId: string, salName: string, itemType: 'movement' | 'purchase', itemId: string): Promise<SalItem> => {
         // Delete existing entry first to avoid unique conflict, then insert
-        await supabase.from('job_sal_items')
+        const { error: delError } = await supabase.from('job_sal_items')
             .delete()
             .eq('job_id', jobId)
             .eq('sal_name', salName)
             .eq('item_type', itemType)
             .eq('item_id', itemId);
+        if (delError) throw delError;
 
         const { data, error } = await supabase
             .from('job_sal_items')
@@ -100,12 +101,13 @@ export const salApi = {
 
         // Delete existing entries for these items+SAL, then re-insert
         for (const item of items) {
-            await supabase.from('job_sal_items')
+            const { error: delError } = await supabase.from('job_sal_items')
                 .delete()
                 .eq('job_id', jobId)
                 .eq('sal_name', salName)
                 .eq('item_type', item.itemType)
                 .eq('item_id', item.itemId);
+            if (delError) throw delError;
         }
 
         const rows = items.map(item => ({

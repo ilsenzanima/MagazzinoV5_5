@@ -147,7 +147,22 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         warehousesApi.getPrimary().then(setPrimaryWarehouse).catch(console.error);
     }, []);
 
+    // In modifica, i campi causale/luoghi/note salvati non vanno sovrascritti
+    // con i default finché l'utente non cambia tab o cantiere
+    const editingDefaultsSuppressed = useRef(isEditing);
+    const initialTabJob = useRef({ tab: activeTab, jobId: selectedJob?.id ?? null });
+
     useEffect(() => {
+        if (editingDefaultsSuppressed.current) {
+            if (
+                activeTab === initialTabJob.current.tab &&
+                (selectedJob?.id ?? null) === initialTabJob.current.jobId
+            ) {
+                return;
+            }
+            editingDefaultsSuppressed.current = false;
+        }
+
         let jobAddress = "";
         if (selectedJob) {
             if (selectedJob.clientName) {
@@ -713,7 +728,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 if (line.purchaseItemId && batch) {
                     const pieces = parseFloat(line.pieces);
                     const qty = parseFloat(line.quantity);
-                    if (!isNaN(pieces) && batch.remainingPieces !== undefined && pieces > batch.remainingPieces) {
+                    if (!isNaN(pieces) && batch.remainingPieces != null && pieces > batch.remainingPieces) {
                         notify.warning(
                             `Quantità eccessiva per "${line.itemName}". Disponibile: ${batch.remainingPieces} pezzi`
                         );

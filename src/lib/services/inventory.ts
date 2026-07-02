@@ -210,7 +210,7 @@ export const inventoryApi = {
         }
         const { count: batchCount } = await supabase
             .from('purchase_batch_availability')
-            .select('*', { count: 'estimated', head: true })
+            .select('*', { count: 'exact', head: true })
             .eq('item_id', id);
         if (batchCount && batchCount > 0) {
             throw new Error("Impossibile eliminare: l'articolo ha lotti con quantità residua. Movimentare o eliminare prima gli acquisti collegati.");

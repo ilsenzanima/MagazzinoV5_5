@@ -266,7 +266,7 @@ export const purchasesApi = {
         if (itemIds.length > 0) {
             const { count } = await supabase
                 .from('delivery_note_items')
-                .select('id', { count: 'estimated', head: true })
+                .select('id', { count: 'exact', head: true })
                 .in('purchase_item_id', itemIds);
             if (count && count > 0) {
                 throw new Error("Impossibile eliminare l'acquisto: alcuni articoli sono già stati movimentati in bolle di uscita/vendita. Eliminare prima le bolle collegate.");
@@ -481,7 +481,7 @@ export const purchasesApi = {
 
         // Update each item: add transport per unit to price, mark transport_applied = true
         const updates = items.map(item => {
-            const transportPerUnit = transportPerRow / item.quantity;
+            const transportPerUnit = item.quantity > 0 ? transportPerRow / item.quantity : 0;
             const newPrice = parseFloat((item.price + transportPerUnit).toFixed(5));
             return supabase
                 .from('purchase_items')
@@ -489,7 +489,9 @@ export const purchasesApi = {
                 .eq('id', item.id);
         });
 
-        await Promise.all(updates);
+        const results = await Promise.all(updates);
+        const failed = results.find(r => r.error);
+        if (failed?.error) throw failed.error;
 
         // Save transport_cost on the purchase record
         const { error } = await supabase
@@ -510,7 +512,9 @@ export const purchasesApi = {
                 .update({ price: originalPrice, transport_applied: false, transport_unit_cost: 0 })
                 .eq('id', item.id);
         });
-        await Promise.all(updates);
+        const results = await Promise.all(updates);
+        const failed = results.find(r => r.error);
+        if (failed?.error) throw failed.error;
     },
 
     // Save transport cost without applying to items
