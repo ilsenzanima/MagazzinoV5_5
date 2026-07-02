@@ -167,13 +167,12 @@ export const costAnalysisApi = {
     },
 
     // Prezzi unitari impostati nelle analisi costi di un'offerta, per articolo.
-    // Se più versioni dell'offerta prezzano lo stesso articolo, vince la versione più recente.
+    // Se più versioni dell'offerta prezzano lo stesso articolo, vince il prezzo più alto.
     getProposalPriceLookup: async (proposalId: string): Promise<Map<string, number>> => {
         const { data: versions, error: vErr } = await supabase
             .from('proposal_cost_analysis_versions')
             .select('id')
-            .eq('proposal_id', proposalId)
-            .order('created_at', { ascending: false });
+            .eq('proposal_id', proposalId);
         if (vErr) throw vErr;
         const versionIds = (versions || []).map(v => v.id as string);
         if (versionIds.length === 0) return new Map();
@@ -186,16 +185,11 @@ export const costAnalysisApi = {
             .not('unit_price', 'is', null);
         if (rErr) throw rErr;
 
-        const versionRank = new Map(versionIds.map((id, idx) => [id, idx]));
-        const bestRank = new Map<string, number>();
         const priceMap = new Map<string, number>();
         for (const r of rows || []) {
-            const rank = versionRank.get(r.version_id) ?? Infinity;
-            const current = bestRank.get(r.item_id);
-            if (current === undefined || rank < current) {
-                bestRank.set(r.item_id, rank);
-                priceMap.set(r.item_id, Number(r.unit_price));
-            }
+            const price = Number(r.unit_price);
+            const current = priceMap.get(r.item_id);
+            if (current === undefined || price > current) priceMap.set(r.item_id, price);
         }
         return priceMap;
     },
