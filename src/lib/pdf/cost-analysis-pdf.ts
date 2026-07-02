@@ -83,54 +83,67 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
     // --- 3. Committente + Dati offerta box ---
     const col1W = contentWidth / 2;
     const col2W = contentWidth - col1W;
-    const boxH = 28;
+    const lineH = 4;
 
     drawHeaderBox(margin, currentY, col1W, 6, "COMMITTENTE", 7, true);
     drawHeaderBox(margin + col1W, currentY, col2W, 6, "OFFERTA / ANALISI COSTI", 7, true);
     currentY += 6;
 
+    // Col 1: Client data (each entry is one visual line, may wrap)
+    const c = input.client;
+    const addressLine = c ? [c.street, c.streetNumber].filter(Boolean).join(' ') : '';
+    const cityLine = c ? [c.postalCode, c.city, c.province].filter(Boolean).join(' ') : '';
+    const col1Entries: { text: string; bold?: boolean }[] = [{ text: c?.name || "—", bold: true }];
+    if (addressLine) col1Entries.push({ text: addressLine });
+    if (cityLine) col1Entries.push({ text: cityLine });
+    if (c?.vatNumber) col1Entries.push({ text: `P.IVA: ${c.vatNumber}` });
+    if (c?.email) col1Entries.push({ text: c.email });
+    if (c?.phone) col1Entries.push({ text: c.phone });
+
+    doc.setFontSize(8.5);
+    const col1Wrapped = col1Entries.map(e => ({ ...e, lines: doc.splitTextToSize(e.text, col1W - 4) as string[] }));
+    const col1LineCount = col1Wrapped.reduce((s, e) => s + e.lines.length, 0);
+
+    // Col 2: Offerta / analisi costi fields, label above value (wraps independently)
+    const col2Fields = [
+        { label: 'Offerta', value: input.proposalTitle || '—' },
+        { label: 'Analisi costi', value: input.versionName || '—' },
+        { label: 'Data creazione', value: input.createdAt ? format(new Date(input.createdAt), 'dd/MM/yyyy', { locale: it }) : '—' },
+        { label: 'Data stampa', value: format(new Date(), 'dd/MM/yyyy', { locale: it }) },
+    ];
+    doc.setFontSize(8.5);
+    const col2Wrapped = col2Fields.map(f => ({ ...f, lines: doc.splitTextToSize(f.value, col2W - 4) as string[] }));
+    const col2LineCount = col2Wrapped.reduce((s, f) => s + 1 + f.lines.length, 0); // label line + value lines
+
+    const boxH = Math.max(col1LineCount * lineH + 4, col2LineCount * lineH + 4, 10);
+
     drawBox(margin, currentY, col1W, boxH);
     drawBox(margin + col1W, currentY, col2W, boxH);
 
-    // Col 1: Client data
-    const c = input.client;
-    doc.setTextColor(0);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(c?.name || "—", margin + 2, currentY + 5, { maxWidth: col1W - 4 });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    let cy = currentY + 10;
-    const addressLine = c ? [c.street, c.streetNumber].filter(Boolean).join(' ') : '';
-    const cityLine = c ? [c.postalCode, c.city, c.province].filter(Boolean).join(' ') : '';
-    if (addressLine) { doc.text(addressLine, margin + 2, cy); cy += 4; }
-    if (cityLine) { doc.text(cityLine, margin + 2, cy); cy += 4; }
-    if (c?.vatNumber) { doc.text(`P.IVA: ${c.vatNumber}`, margin + 2, cy); cy += 4; }
-    if (c?.email) { doc.text(c.email, margin + 2, cy); cy += 4; }
-    if (c?.phone) { doc.text(c.phone, margin + 2, cy); }
+    // Draw col 1
+    let cy = currentY + 4;
+    for (const e of col1Wrapped) {
+        doc.setFont("helvetica", e.bold ? "bold" : "normal");
+        doc.setFontSize(e.bold ? 9 : 8.5);
+        doc.setTextColor(e.bold ? 0 : 60);
+        doc.text(e.lines, margin + 2, cy);
+        cy += e.lines.length * lineH;
+    }
 
-    // Col 2: Proposal / cost analysis data
-    let ry = currentY + 5;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("Offerta:", margin + col1W + 2, ry);
-    doc.setFont("helvetica", "normal");
-    doc.text(input.proposalTitle || "—", margin + col1W + 20, ry, { maxWidth: col2W - 22 });
-    ry += 5;
-    doc.setFont("helvetica", "bold");
-    doc.text("Analisi costi:", margin + col1W + 2, ry);
-    doc.setFont("helvetica", "normal");
-    doc.text(input.versionName || "—", margin + col1W + 26, ry, { maxWidth: col2W - 28 });
-    ry += 5;
-    doc.setFont("helvetica", "bold");
-    doc.text("Data creazione:", margin + col1W + 2, ry);
-    doc.setFont("helvetica", "normal");
-    doc.text(input.createdAt ? format(new Date(input.createdAt), 'dd/MM/yyyy', { locale: it }) : "—", margin + col1W + 30, ry);
-    ry += 5;
-    doc.setFont("helvetica", "bold");
-    doc.text("Data stampa:", margin + col1W + 2, ry);
-    doc.setFont("helvetica", "normal");
-    doc.text(format(new Date(), 'dd/MM/yyyy', { locale: it }), margin + col1W + 27, ry);
+    // Draw col 2
+    let ry = currentY + 4;
+    for (const f of col2Wrapped) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        doc.setTextColor(90);
+        doc.text(`${f.label}:`, margin + col1W + 2, ry);
+        ry += lineH;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(0);
+        doc.text(f.lines, margin + col1W + 2, ry);
+        ry += f.lines.length * lineH;
+    }
 
     currentY += boxH + 6;
 
