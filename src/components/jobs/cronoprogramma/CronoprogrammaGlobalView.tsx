@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { GanttChartSquare, ExternalLink, Loader2, Plus, Trash2 } from "lucide-react"
-import { jobTasksApi, jobsApi, attendanceApi, JobTask, Job, Attendance } from "@/lib/api"
+import { GanttChartSquare, ExternalLink, Loader2, Plus, Trash2, Users } from "lucide-react"
+import { jobTasksApi, jobsApi, attendanceApi, jobTaskAssignmentsApi, workersApi, JobTask, Job, Attendance, JobTaskAssignment, Worker } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
 
@@ -53,12 +54,16 @@ const emptyForm = {
     progress: 0,
     status: "planned" as JobTask['status'],
     notes: "",
+    plannedWorkers: "" as number | "",
+    assignedWorkerIds: [] as string[],
 }
 
 export function CronoprogrammaGlobalView() {
     const [tasks, setTasks] = useState<JobTask[]>([])
     const [jobs, setJobs] = useState<Job[]>([])
     const [attendance, setAttendance] = useState<Attendance[]>([])
+    const [assignments, setAssignments] = useState<JobTaskAssignment[]>([])
+    const [workers, setWorkers] = useState<Worker[]>([])
     const [loading, setLoading] = useState(true)
     const [jobFilter, setJobFilter] = useState<string>("all")
     const [isFormOpen, setIsFormOpen] = useState(false)
@@ -68,12 +73,17 @@ export function CronoprogrammaGlobalView() {
     const load = async () => {
         try {
             setLoading(true)
-            const [tasksData, jobsData] = await Promise.all([
+            const [tasksData, jobsData, workersData] = await Promise.all([
                 jobTasksApi.getAll(),
                 jobsApi.getAll(),
+                workersApi.getAll(),
             ])
             setTasks(tasksData)
             setJobs(jobsData)
+            setWorkers(workersData)
+
+            const assignmentsData = await jobTaskAssignmentsApi.getByTaskIds(tasksData.map(t => t.id))
+            setAssignments(assignmentsData)
 
             const allDates = [
                 ...jobsData.flatMap(j => [j.startDate, j.endDate]),
@@ -93,6 +103,8 @@ export function CronoprogrammaGlobalView() {
 
     useEffect(() => { load() }, [])
 
+    const assignmentsByTask = (taskId: string) => assignments.filter(a => a.taskId === taskId)
+
     const rowPresence = (task: JobTask) => {
         const workersByDate = new Map<string, Set<string>>()
         attendance.filter(a => a.jobId === task.jobId && (a.status === 'presence' || a.status === 'transfer')).forEach(a => {
@@ -105,11 +117,26 @@ export function CronoprogrammaGlobalView() {
     const presencePopupContent = (task: JobTask) => {
         const inRange = attendance.filter(a => a.jobId === task.jobId && a.date >= task.startDate && a.date <= task.endDate && (a.status === 'presence' || a.status === 'transfer'))
         const totalHours = inRange.reduce((sum, a) => sum + a.hours, 0)
-        const workers = new Set(inRange.map(a => a.workerId)).size
-        if (inRange.length === 0) {
-            return `<div class="text-xs text-slate-500">Nessuna presenza registrata nel periodo</div>`
+        const presentWorkerIds = new Set(inRange.map(a => a.workerId))
+        const planned = assignmentsByTask(task.id)
+
+        const parts: string[] = []
+        if (planned.length > 0) {
+            const rows = planned.map(p => {
+                const showedUp = presentWorkerIds.has(p.workerId)
+                return `<div class="flex items-center gap-1">${showedUp ? '✅' : '⬜'} ${p.workerName || 'Operaio'}</div>`
+            }).join('')
+            parts.push(`<div class="text-xs mb-1"><strong>Pianificati (${planned.length}):</strong>${rows}</div>`)
+        } else if (task.plannedWorkers) {
+            parts.push(`<div class="text-xs mb-1"><strong>${task.plannedWorkers}</strong> operai previsti (nomi non ancora assegnati)</div>`)
         }
-        return `<div class="text-xs"><strong>${workers}</strong> lavoratori · <strong>${totalHours}</strong> ore presenza nel periodo</div>`
+
+        if (inRange.length === 0) {
+            parts.push(`<div class="text-xs text-slate-500">Nessuna presenza registrata nel periodo</div>`)
+        } else {
+            parts.push(`<div class="text-xs"><strong>${presentWorkerIds.size}</strong> lavoratori · <strong>${totalHours}</strong> ore presenza effettiva nel periodo</div>`)
+        }
+        return parts.join('')
     }
 
     const jobOptions = useMemo(() => {
@@ -139,8 +166,20 @@ export function CronoprogrammaGlobalView() {
             progress: task.progress,
             status: task.status,
             notes: task.notes || "",
+            plannedWorkers: task.plannedWorkers ?? "",
+            assignedWorkerIds: assignmentsByTask(task.id).map(a => a.workerId),
         })
         setIsFormOpen(true)
+    }
+
+    const toggleAssignedWorker = (workerId: string) => {
+        setForm(f => {
+            const isSelected = f.assignedWorkerIds.includes(workerId)
+            const assignedWorkerIds = isSelected
+                ? f.assignedWorkerIds.filter(id => id !== workerId)
+                : [...f.assignedWorkerIds, workerId]
+            return { ...f, assignedWorkerIds }
+        })
     }
 
     const handleSave = async () => {
@@ -156,12 +195,16 @@ export function CronoprogrammaGlobalView() {
             notify.error("La data fine non può precedere la data inizio")
             return
         }
+        const plannedWorkers = form.assignedWorkerIds.length > 0
+            ? form.assignedWorkerIds.length
+            : (form.plannedWorkers === "" ? null : Number(form.plannedWorkers))
+        const { assignedWorkerIds, ...taskFields } = form
+        const payload = { ...taskFields, plannedWorkers }
         try {
-            if (editingTask) {
-                await jobTasksApi.update(editingTask.id, form)
-            } else {
-                await jobTasksApi.create({ ...form, sortOrder: tasks.filter(t => t.jobId === form.jobId).length })
-            }
+            const savedTask = editingTask
+                ? await jobTasksApi.update(editingTask.id, payload)
+                : await jobTasksApi.create({ ...payload, sortOrder: tasks.filter(t => t.jobId === form.jobId).length })
+            await jobTaskAssignmentsApi.setForTask(savedTask.id, assignedWorkerIds)
             setIsFormOpen(false)
             await load()
         } catch (err) {
@@ -290,6 +333,14 @@ export function CronoprogrammaGlobalView() {
                                                 <div className="min-w-0">
                                                     <p className="text-sm font-medium truncate">{task.name}</p>
                                                     <p className="text-xs text-slate-500">{task.startDate} → {task.endDate} · {task.progress}%</p>
+                                                    {(task.plannedWorkers || assignmentsByTask(task.id).length > 0) && (
+                                                        <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                                            <Users className="h-3 w-3" />
+                                                            {assignmentsByTask(task.id).length > 0
+                                                                ? assignmentsByTask(task.id).map(a => a.workerName).join(', ')
+                                                                : `${task.plannedWorkers} operai previsti`}
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <Badge className={`${STATUS_BADGE[task.status]} text-white text-[10px] shrink-0`}>
                                                     {STATUS_LABEL[task.status]}
@@ -390,6 +441,44 @@ export function CronoprogrammaGlobalView() {
                                 onChange={e => setForm({ ...form, notes: e.target.value })}
                                 placeholder="Note opzionali sulla fase"
                             />
+                        </div>
+                        <div className="space-y-2 pt-2 border-t">
+                            <div className="flex items-center justify-between">
+                                <Label className="flex items-center gap-1"><Users className="h-4 w-4" />Operai da mandare</Label>
+                                {form.assignedWorkerIds.length === 0 && (
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        className="w-24 h-8"
+                                        placeholder="Numero"
+                                        value={form.plannedWorkers}
+                                        onChange={e => setForm({ ...form, plannedWorkers: e.target.value === "" ? "" : Number(e.target.value) })}
+                                    />
+                                )}
+                            </div>
+                            {form.assignedWorkerIds.length === 0 ? (
+                                <p className="text-xs text-slate-400">
+                                    Indica solo il numero previsto, oppure seleziona i nominativi qui sotto.
+                                </p>
+                            ) : (
+                                <p className="text-xs text-slate-500">
+                                    {form.assignedWorkerIds.length} operai selezionati
+                                </p>
+                            )}
+                            <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-1">
+                                {workers.filter(w => w.isActive).map(worker => (
+                                    <label key={worker.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
+                                        <Checkbox
+                                            checked={form.assignedWorkerIds.includes(worker.id)}
+                                            onCheckedChange={() => toggleAssignedWorker(worker.id)}
+                                        />
+                                        {worker.firstName} {worker.lastName}
+                                    </label>
+                                ))}
+                                {workers.filter(w => w.isActive).length === 0 && (
+                                    <p className="text-xs text-slate-400 py-1">Nessun operaio attivo disponibile</p>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <DialogFooter className="flex items-center justify-between sm:justify-between">
