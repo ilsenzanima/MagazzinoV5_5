@@ -59,13 +59,14 @@ export function PurchaseDDTConformita({
     const [docTypes, setDocTypes] = useState<ComplianceDocumentTypeConfig[]>([])
     const [loading, setLoading] = useState(true)
 
-    // Upload wizard
+    // Upload (schermata unica, drag&drop)
     const [uploadOpen, setUploadOpen] = useState(false)
-    const [upStep, setUpStep] = useState<1 | 2>(1)
     const [upDocTypeId, setUpDocTypeId] = useState("")
     const [upFile, setUpFile] = useState<File | null>(null)
     const [upName, setUpName] = useState("")
     const [uploading, setUploading] = useState(false)
+    const [dragOver, setDragOver] = useState(false)
+    const [cardDragOver, setCardDragOver] = useState(false)
     const upRef = useRef<HTMLInputElement>(null)
     const batchUpload = useBatchUpload()
 
@@ -97,21 +98,37 @@ export function PurchaseDDTConformita({
 
     // ── Upload wizard ─────────────────────────────────────────────────────────
 
-    const openUpload = () => {
-        setUpStep(1)
+    const openUpload = (file?: File) => {
         setUpDocTypeId("")
-        setUpFile(null)
-        setUpName("")
+        setUpFile(file ?? null)
+        setUpName(file ? file.name.replace(/\.[^.]+$/, "") : "")
         batchUpload.reset()
         setUploadOpen(true)
     }
 
-    const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const f = e.target.files?.[0]
-        if (!f) return
+    const setFile = (f: File) => {
         setUpFile(f)
         setUpName(f.name.replace(/\.[^.]+$/, ""))
+    }
+
+    const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0]
+        if (f) setFile(f)
         e.target.value = ""
+    }
+
+    const handleDialogDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        setDragOver(false)
+        const f = e.dataTransfer.files?.[0]
+        if (f) setFile(f)
+    }
+
+    const handleCardDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        setCardDragOver(false)
+        const f = e.dataTransfer.files?.[0]
+        if (f) openUpload(f)
     }
 
     const handleUpload = async () => {
@@ -205,14 +222,19 @@ export function PurchaseDDTConformita({
 
     return (
         <>
-            <Card>
+            <Card
+                className={`transition-colors duration-200 ${cardDragOver ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                onDragOver={e => { e.preventDefault(); setCardDragOver(true) }}
+                onDragLeave={e => { e.preventDefault(); setCardDragOver(false) }}
+                onDrop={handleCardDrop}
+            >
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 py-4">
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
                         <ShieldCheck className="h-4 w-4 text-green-600" />
                         Conformità associate al DDT
                     </CardTitle>
                     <div className="flex gap-2 shrink-0">
-                        <Button variant="outline" size="sm" onClick={openUpload}>
+                        <Button variant="outline" size="sm" onClick={() => openUpload()}>
                             <Upload className="mr-2 h-4 w-4" />
                             <span className="hidden sm:inline">Carica</span>
                         </Button>
@@ -226,7 +248,9 @@ export function PurchaseDDTConformita({
                     ) : allDocs.length === 0 ? (
                         <div className="text-center py-6 text-slate-400 dark:text-slate-500 border-2 border-dashed dark:border-slate-600 rounded-md bg-slate-50/50 dark:bg-slate-800/50">
                             <ShieldCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                            <p className="text-sm">Nessun documento di conformità associato</p>
+                            <p className="text-sm">
+                                {cardDragOver ? "Rilascia il file qui..." : "Nessun documento di conformità associato, trascina qui un file o usa il pulsante Carica"}
+                            </p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -283,85 +307,76 @@ export function PurchaseDDTConformita({
                 </CardContent>
             </Card>
 
-            {/* Upload wizard */}
+            {/* Upload: schermata unica */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>Carica documento di conformità</DialogTitle>
                     </DialogHeader>
 
-                    {upStep === 1 ? (
-                        <div className="space-y-4 py-2">
-                            <div className="space-y-1.5">
-                                <Label>Tipo di documento *</Label>
-                                <Select value={upDocTypeId} onValueChange={setUpDocTypeId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleziona tipo..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {docTypes.map(t => (
-                                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-1.5">
+                            <Label>Tipo di documento *</Label>
+                            <Select value={upDocTypeId} onValueChange={setUpDocTypeId} disabled={uploading}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleziona tipo..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {docTypes.map(t => (
+                                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
-                    ) : (
-                        <div className="space-y-4 py-2">
+                        <div className="space-y-1.5">
+                            <Label>File * (clicca o trascina qui)</Label>
+                            <div
+                                className={`border-2 border-dashed rounded-md p-4 text-center transition-colors ${uploading ? "opacity-60" : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"} ${dragOver ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                                onClick={() => !uploading && upRef.current?.click()}
+                                onDragOver={e => { e.preventDefault(); if (!uploading) setDragOver(true) }}
+                                onDragLeave={e => { e.preventDefault(); setDragOver(false) }}
+                                onDrop={e => !uploading && handleDialogDrop(e)}
+                            >
+                                {upFile ? (
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{upFile.name}</p>
+                                ) : (
+                                    <>
+                                        <Upload className="h-6 w-6 mx-auto mb-1 text-slate-400" />
+                                        <p className="text-sm text-slate-400">
+                                            {dragOver ? "Rilascia il file qui..." : "Clicca o trascina qui un file"}
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                            {uploading && <UploadStatusBar state={batchUpload.statuses[0]} />}
+                            <input
+                                ref={upRef}
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                disabled={uploading}
+                                onChange={handleFileSelected}
+                            />
+                        </div>
+                        {upFile && (
                             <div className="space-y-1.5">
-                                <Label>File *</Label>
-                                <div
-                                    className={`border-2 border-dashed rounded-md p-4 text-center transition-colors ${uploading ? "opacity-60" : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"}`}
-                                    onClick={() => !uploading && upRef.current?.click()}
-                                >
-                                    {upFile ? (
-                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{upFile.name}</p>
-                                    ) : (
-                                        <>
-                                            <Upload className="h-6 w-6 mx-auto mb-1 text-slate-400" />
-                                            <p className="text-sm text-slate-400">Clicca per selezionare un file</p>
-                                        </>
-                                    )}
-                                </div>
-                                {uploading && <UploadStatusBar state={batchUpload.statuses[0]} />}
-                                <input
-                                    ref={upRef}
-                                    type="file"
-                                    className="hidden"
-                                    accept=".pdf,.jpg,.jpeg,.png"
+                                <Label>Nome documento</Label>
+                                <Input
+                                    value={upName}
                                     disabled={uploading}
-                                    onChange={handleFileSelected}
+                                    onChange={e => setUpName(e.target.value)}
+                                    placeholder="Nome del documento"
                                 />
                             </div>
-                            {upFile && (
-                                <div className="space-y-1.5">
-                                    <Label>Nome documento</Label>
-                                    <Input
-                                        value={upName}
-                                        disabled={uploading}
-                                        onChange={e => setUpName(e.target.value)}
-                                        placeholder="Nome del documento"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     <DialogFooter>
-                        {upStep === 1 ? (
-                            <>
-                                <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
-                                <Button onClick={() => setUpStep(2)} disabled={!upDocTypeId}>Avanti</Button>
-                            </>
-                        ) : (
-                            <>
-                                <Button variant="outline" onClick={() => setUpStep(1)}>Indietro</Button>
-                                <Button onClick={handleUpload} disabled={!upFile || uploading}>
-                                    {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Carica
-                                </Button>
-                            </>
-                        )}
+                        <Button variant="outline" onClick={() => setUploadOpen(false)} disabled={uploading}>Annulla</Button>
+                        <Button onClick={handleUpload} disabled={!upFile || !upDocTypeId || uploading}>
+                            {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Carica
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
