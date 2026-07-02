@@ -15,6 +15,7 @@ const mapDbToJobTask = (db: any): JobTask => ({
     status: db.status,
     sortOrder: db.sort_order ?? 0,
     notes: db.notes || '',
+    plannedWorkers: db.planned_workers ?? null,
     createdAt: db.created_at,
 });
 
@@ -28,6 +29,7 @@ const mapJobTaskToDb = (task: Partial<JobTask>) => {
     if (task.status !== undefined) dbTask.status = task.status;
     if (task.sortOrder !== undefined) dbTask.sort_order = task.sortOrder;
     if (task.notes !== undefined) dbTask.notes = task.notes || null;
+    if (task.plannedWorkers !== undefined) dbTask.planned_workers = task.plannedWorkers;
     return dbTask;
 };
 

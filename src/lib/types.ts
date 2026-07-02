@@ -207,7 +207,17 @@ export interface JobTask {
     status: 'planned' | 'in_progress' | 'completed' | 'delayed';
     sortOrder: number;
     notes?: string;
+    plannedWorkers?: number | null;
     createdAt: string;
+}
+
+// Job Task Assignments (operai pianificati per una fase del cronoprogramma)
+export interface JobTaskAssignment {
+    id: string;
+    taskId: string;
+    workerId: string;
+    workerName?: string;
+    createdAt?: string;
 }
 
 export interface JobDocument {
