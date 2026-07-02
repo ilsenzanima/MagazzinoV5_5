@@ -631,7 +631,7 @@ export default function JobDetailsPage() {
 
                         {(userRole === 'admin' || userRole === 'operativo') && (
                             <TabsContent value="analisi-costi" className="space-y-6 focus-visible:outline-none">
-                                <JobAnalisiCosti jobId={job.id} jobCode={job.code} jobName={job.name} movements={movements} />
+                                <JobAnalisiCosti jobId={job.id} movements={movements} />
                             </TabsContent>
                         )}
 

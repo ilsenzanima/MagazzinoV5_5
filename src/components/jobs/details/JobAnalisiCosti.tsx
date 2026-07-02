@@ -5,27 +5,22 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, RefreshCw } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info } from "lucide-react"
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams } from "@/lib/services/cost-analysis"
-import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { inventoryApi } from "@/lib/api"
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { notify } from "@/lib/notify"
 import type { InventoryItem, Movement } from "@/lib/types"
-import * as XLSX from "xlsx-js-style"
+import { ProposalCostAnalysisVersions } from "@/components/clients/detail/ProposalCostAnalysisVersions"
 
 interface JobAnalisiCostiProps {
     jobId: string
-    jobCode?: string
-    jobName?: string
     movements: Movement[]
 }
 
 const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const fmtN = (n: number) => Math.round(n * 100) / 100
 
 // ── Cella numerica editabile ─────────────────────────────────────────────────
 function EditCell({ value, onSave, placeholder = '—' }: {
@@ -225,7 +220,7 @@ const DEFAULT_PARAMS: Omit<CostAnalysisParams, 'jobId'> = {
     sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10,
 }
 
-export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnalisiCostiProps) {
+export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
     const [rows, setRows] = useState<CostAnalysisRow[]>([])
     const [params, setParams] = useState<CostAnalysisParams>({ jobId, ...DEFAULT_PARAMS })
     const [loading, setLoading] = useState(true)
@@ -235,42 +230,10 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
     const [addingGeneric, setAddingGeneric] = useState(false)
     const [newGenericName, setNewGenericName] = useState('')
     const autoImported = useRef(false)
+    const proposalPriceMapRef = useRef<Map<string, number>>(new Map())
 
     const [proposalId, setProposalId] = useState<string | null>(null)
-    const [changeOpen, setChangeOpen] = useState(false)
-    const [proposalVersions, setProposalVersions] = useState<ProposalCostAnalysisVersion[]>([])
-    const [selectedVersionId, setSelectedVersionId] = useState<string>("")
-    const [changing, setChanging] = useState(false)
-
-    useEffect(() => {
-        clientProposalsApi.getByConvertedJobId(jobId)
-            .then(proposal => setProposalId(proposal?.id ?? null))
-            .catch(() => setProposalId(null))
-    }, [jobId])
-
-    const openChangeDialog = async () => {
-        if (!proposalId) return
-        try {
-            const versions = await proposalCostAnalysisVersionsApi.getByProposalId(proposalId)
-            setProposalVersions(versions)
-            const currentSource = await costAnalysisApi.getSourceProposalVersionId(jobId)
-            setSelectedVersionId(currentSource ?? "")
-            setChangeOpen(true)
-        } catch { notify.error("Errore nel caricamento delle analisi costi della proposta") }
-    }
-
-    const handleChangeVersion = async () => {
-        if (!selectedVersionId) return
-        try {
-            setChanging(true)
-            await costAnalysisApi.replaceFromProposalVersion(jobId, selectedVersionId)
-            notify.success("Analisi costi aggiornata")
-            setChangeOpen(false)
-            autoImported.current = true
-            await loadRows()
-        } catch { notify.error("Errore durante l'aggiornamento dell'analisi costi") }
-        finally { setChanging(false) }
-    }
+    const [subTab, setSubTab] = useState<'prezzi' | 'offerta'>('prezzi')
 
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
@@ -288,6 +251,13 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
 
             if (!autoImported.current) {
                 autoImported.current = true
+
+                const proposal = await clientProposalsApi.getByConvertedJobId(jobId).catch(() => null)
+                setProposalId(proposal?.id ?? null)
+                proposalPriceMapRef.current = proposal?.id
+                    ? await costAnalysisApi.getProposalPriceLookup(proposal.id).catch(() => new Map<string, number>())
+                    : new Map<string, number>()
+
                 const existingIds = new Set(existing.filter(r => r.type === 'inventory').map(r => r.itemId).filter(Boolean))
                 const uniqueItems = new Map<string, Movement>()
                 for (const m of movements) {
@@ -304,7 +274,8 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
                             itemName: m.itemName || m.itemCode || '',
                             itemModel: m.itemModel || '', itemUnit: m.itemUnit || '',
                             maxPurchasePrice: priceMap.get(m.itemId) ?? null,
-                            unitPrice: null, qtyEstimated: 0, qtyActual: 0, sortOrder: sortBase++,
+                            unitPrice: proposalPriceMapRef.current.get(m.itemId) ?? null,
+                            qtyEstimated: 0, qtyActual: 0, sortOrder: sortBase++,
                         })
                         added.push(row)
                     }
@@ -336,7 +307,7 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
             const newRow = await costAnalysisApi.add(jobId, {
                 type: 'inventory', itemId: item.id, itemName: item.name,
                 itemModel: item.model || '', itemUnit: (item as any).unit || '',
-                maxPurchasePrice: maxPrice, unitPrice: null,
+                maxPurchasePrice: maxPrice, unitPrice: proposalPriceMapRef.current.get(item.id) ?? null,
                 qtyEstimated: 0, qtyActual: 0, sortOrder: inventoryRows.length,
             })
             setRows(prev => [...prev, newRow])
@@ -397,68 +368,6 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
     const marg_delta    = conRicarico * params.margineTrattativa / 100
     const totaleFinalE  = conRicarico + marg_delta
 
-    // ── Export Excel ──────────────────────────────────────────────────────────
-    const handleExport = () => {
-        const wb = XLSX.utils.book_new()
-        const today = new Date().toISOString().slice(0, 10)
-        const jobSlug = [jobCode, jobName].filter(Boolean).join('_').replace(/[^a-zA-Z0-9_\-àáèéìíòóùú]/g, '_').replace(/_+/g, '_').slice(0, 40)
-        type XS = Record<string, any>
-        const xc = (v: any, s: XS = {}) => ({ v, t: typeof v === 'number' ? 'n' : 's', s })
-        const hdr = (v: string) => xc(v, { fill: { patternType: 'solid', fgColor: { rgb: 'FF334155' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } } })
-        const tot = (v: any) => xc(v, { fill: { patternType: 'solid', fgColor: { rgb: 'FF1E3A5F' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } } })
-        const accent = (v: any) => xc(v, { fill: { patternType: 'solid', fgColor: { rgb: 'FF1D4ED8' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } } })
-
-        // Sheet 1 — Materiali
-        const ws1 = XLSX.utils.aoa_to_sheet([
-            ['Articolo', 'Variante', '€/U.M.', 'Prezzo max acq.', 'Prezzo unitario', 'Qtà presunta', 'Tot. presunto'].map(hdr),
-            ...inventoryRows.map(r => [
-                xc(r.itemName), xc(r.itemModel), xc(r.itemUnit ? `€/${r.itemUnit}` : '€'),
-                xc(r.maxPurchasePrice !== null ? fmtN(r.maxPurchasePrice) : ''),
-                xc(r.unitPrice !== null ? fmtN(r.unitPrice) : ''),
-                xc(fmtN(r.qtyEstimated)),
-                xc(r.unitPrice !== null ? fmtN(r.unitPrice * r.qtyEstimated) : ''),
-            ]),
-            [xc(''), xc(''), xc(''), xc(''), xc(''), tot('TOTALE'), tot(fmtN(inventoryRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)))],
-        ])
-        ws1['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 14 }]
-        XLSX.utils.book_append_sheet(wb, ws1, 'Materiali')
-
-        // Sheet 2 — Voci Generiche
-        const ws2 = XLSX.utils.aoa_to_sheet([
-            ['Voce', 'Prezzo unitario (€)', 'Qtà presunta', 'Tot. presunto'].map(hdr),
-            ...genericRows.map(r => [
-                xc(r.itemName),
-                xc(r.unitPrice !== null ? fmtN(r.unitPrice) : ''),
-                xc(fmtN(r.qtyEstimated)),
-                xc(r.unitPrice !== null ? fmtN(r.unitPrice * r.qtyEstimated) : ''),
-            ]),
-            [xc(''), tot('TOTALE'), xc(''), tot(fmtN(genericRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)))],
-        ])
-        ws2['!cols'] = [{ wch: 35 }, { wch: 16 }, { wch: 12 }, { wch: 14 }]
-        XLSX.utils.book_append_sheet(wb, ws2, 'Voci Generiche')
-
-        // Sheet 3 — Riepilogo Prezzi
-        const ws3 = XLSX.utils.aoa_to_sheet([
-            ['Voce', 'Incremento', 'Valore (€)'].map(hdr),
-            [xc('Tot. materiali + voci'), xc(''), tot(fmtN(totBase))],
-            [xc(`+ Sfrido (${params.sfrido}%)`), xc(`+${fmtN(sfrido_delta)}`), xc(fmtN(totListino))],
-            [xc('TOT materiali listino'), xc(''), tot(fmtN(totListino))],
-            [xc(`- Sconto (${params.sconto}%)`), xc(`-${fmtN(sconto_delta)}`), xc(fmtN(totSconto))],
-            [xc('TOT materiali sconto'), xc(''), tot(fmtN(totSconto))],
-            [xc(`+ Trasporto (A)`), xc(`+${fmtN(params.trasporto)}`), xc(fmtN(costoFranco))],
-            [xc('Costo franco'), xc(''), tot(fmtN(costoFranco))],
-            [xc(`+ Posa (B)`), xc(`+${fmtN(params.posa)}`), xc(fmtN(costoTot))],
-            [xc('Costo TOT (TC)'), xc(''), tot(fmtN(costoTot))],
-            [xc(`+ Ricarico (${params.ricarico}%)`), xc(`+${fmtN(ric_delta)}`), xc(fmtN(conRicarico))],
-            [xc(`+ Margine trattativa (${params.margineTrattativa}%)`), xc(`+${fmtN(marg_delta)}`), xc(fmtN(totaleFinalE))],
-            [accent('TOTALE FINALE'), accent(''), accent(fmtN(totaleFinalE))],
-        ])
-        ws3['!cols'] = [{ wch: 35 }, { wch: 16 }, { wch: 16 }]
-        XLSX.utils.book_append_sheet(wb, ws3, 'Riepilogo Prezzi')
-
-        XLSX.writeFile(wb, `${[jobSlug, 'Analisi_Costi', today].filter(Boolean).join('_')}.xlsx`)
-    }
-
     // ── Render ────────────────────────────────────────────────────────────────
     if (loading) return (
         <div className="flex justify-center py-12">
@@ -467,23 +376,25 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
     )
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-end gap-2">
-                {proposalId && (
-                    <Button size="sm" variant="outline" onClick={openChangeDialog}>
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Cambia analisi costi
-                    </Button>
-                )}
-                <Button size="sm" variant="outline" onClick={handleExport}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Excel
-                </Button>
-            </div>
+        <div className="space-y-4">
+            <Tabs value={subTab} onValueChange={v => setSubTab(v as 'prezzi' | 'offerta')}>
+                <TabsList>
+                    <TabsTrigger value="prezzi">
+                        <Package className="h-4 w-4 mr-1" />Prezzi Materiali
+                    </TabsTrigger>
+                    <TabsTrigger value="offerta">
+                        <Calculator className="h-4 w-4 mr-1" />Analisi Costi Offerta
+                    </TabsTrigger>
+                </TabsList>
 
-            {/* ── Materiali da Magazzino ───────────────────────────────────── */}
-            <Card>
+                <TabsContent value="prezzi" className="space-y-6 pt-4">
+                    <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
+                        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
+                        Qui sono raccolti i materiali e le voci di costo usati per determinare i prezzi di questa commessa: questi valori alimentano i calcoli dei SAL. Quando un materiale viene aggiunto (in automatico dai movimenti di magazzino, o manualmente), il prezzo unitario viene precompilato con quello impostato nelle analisi costi dell'offerta di origine, se presente. Le modifiche fatte qui restano locali alla commessa e non toccano l'analisi costi dell'offerta.
+                    </p>
+
+                    {/* ── Materiali da Magazzino ───────────────────────────────────── */}
+                    <Card>
                 <div className="flex items-center gap-3 p-4 border-b">
                     <Package className="h-5 w-5 text-blue-600" />
                     <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Materiali da Magazzino</span>
@@ -595,6 +506,22 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
                     </div>
                 </CardContent>
             </Card>
+                </TabsContent>
+
+                <TabsContent value="offerta" className="space-y-4 pt-4">
+                    <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
+                        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
+                        Qui trovi le analisi costi create nell'offerta di origine di questa commessa, suddivise per attività/lavorazione. Puoi consultarle e modificarle: le modifiche aggiornano l'offerta, ma non si riflettono automaticamente sui "Prezzi Materiali" della commessa.
+                    </p>
+                    {proposalId ? (
+                        <ProposalCostAnalysisVersions proposalId={proposalId} />
+                    ) : (
+                        <p className="text-sm text-slate-400 text-center py-12">
+                            Questa commessa non è collegata a nessuna offerta: non ci sono analisi costi da mostrare.
+                        </p>
+                    )}
+                </TabsContent>
+            </Tabs>
 
             <ItemSelectorDialog
                 open={selectorOpen}
@@ -604,32 +531,6 @@ export function JobAnalisiCosti({ jobId, jobCode, jobName, movements }: JobAnali
                 onSearch={handleItemSearch}
                 loading={invLoading}
             />
-
-            <Dialog open={changeOpen} onOpenChange={setChangeOpen}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Cambia analisi costi</DialogTitle></DialogHeader>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 py-2">
-                        Seleziona quale analisi costi della proposta usare. Le righe e i parametri attuali della commessa verranno sostituiti.
-                    </p>
-                    <div className="space-y-1 py-2">
-                        <label className="text-sm font-medium">Analisi costi</label>
-                        <Select value={selectedVersionId} onValueChange={setSelectedVersionId}>
-                            <SelectTrigger><SelectValue placeholder="Seleziona analisi costi" /></SelectTrigger>
-                            <SelectContent>
-                                {proposalVersions.map(v => (
-                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setChangeOpen(false)}>Annulla</Button>
-                        <Button onClick={handleChangeVersion} disabled={!selectedVersionId || changing}>
-                            {changing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Applica
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     )
 }

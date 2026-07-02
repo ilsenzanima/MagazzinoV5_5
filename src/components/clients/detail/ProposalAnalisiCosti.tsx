@@ -8,21 +8,22 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, ArrowLeft } from "lucide-react"
 import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams } from "@/lib/services/cost-analysis"
-import { inventoryApi } from "@/lib/api"
+import { inventoryApi, clientsApi } from "@/lib/api"
+import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
 import { notify } from "@/lib/notify"
-import type { InventoryItem } from "@/lib/types"
-import * as XLSX from "xlsx-js-style"
+import type { InventoryItem, Client } from "@/lib/types"
+import { generateCostAnalysisPDF } from "@/lib/pdf/cost-analysis-pdf"
 
 interface Props {
     proposalId: string
     versionId: string
     versionName: string
+    versionCreatedAt: string
     onBack: () => void
 }
 
 const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const fmtN = (n: number) => Math.round(n * 100) / 100
 
 function EditCell({ value, onSave, placeholder = '—' }: { value: number | null; onSave: (v: number | null) => void; placeholder?: string }) {
     const [editing, setEditing] = useState(false)
@@ -144,7 +145,7 @@ function SummaryRow({ label, value, delta, subtotal }: { label: string; value: n
 
 const DEFAULT_PARAMS = { sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10 }
 
-export function ProposalAnalisiCosti({ proposalId, versionId, versionName, onBack }: Props) {
+export function ProposalAnalisiCosti({ proposalId, versionId, versionName, versionCreatedAt, onBack }: Props) {
     const [rows, setRows] = useState<CostAnalysisRow[]>([])
     const [params, setParams] = useState<CostAnalysisParams>({ jobId: versionId, ...DEFAULT_PARAMS })
     const [loading, setLoading] = useState(true)
@@ -153,6 +154,9 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, onBac
     const [invLoading, setInvLoading] = useState(false)
     const [addingGeneric, setAddingGeneric] = useState(false)
     const [newGenericName, setNewGenericName] = useState('')
+    const [proposalTitle, setProposalTitle] = useState('')
+    const [client, setClient] = useState<Client | null>(null)
+    const [exportingPdf, setExportingPdf] = useState(false)
 
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
@@ -171,6 +175,15 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, onBac
     }
 
     useEffect(() => { loadRows() }, [versionId])
+
+    useEffect(() => {
+        clientProposalsApi.getById(proposalId)
+            .then(async proposal => {
+                setProposalTitle(proposal?.title ?? '')
+                if (proposal?.clientId) setClient(await clientsApi.getById(proposal.clientId))
+            })
+            .catch(() => { setProposalTitle(''); setClient(null) })
+    }, [proposalId])
 
     const handleItemSearch = useCallback(async (term: string) => {
         setInvLoading(true)
@@ -239,47 +252,15 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, onBac
     const marg_delta = conRicarico * params.margineTrattativa / 100
     const totaleFinalE = conRicarico + marg_delta
 
-    const handleExport = () => {
-        const wb = XLSX.utils.book_new()
-        const today = new Date().toISOString().slice(0, 10)
-        const slug = (versionName || 'Proposta').replace(/[^a-zA-Z0-9_\-àáèéìíòóùú]/g, '_').slice(0, 40)
-        type XS = Record<string, any>
-        const xc = (v: any, s: XS = {}) => ({ v, t: typeof v === 'number' ? 'n' : 's', s })
-        const hdr = (v: string) => xc(v, { fill: { patternType: 'solid', fgColor: { rgb: 'FF334155' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } } })
-        const tot = (v: any) => xc(v, { fill: { patternType: 'solid', fgColor: { rgb: 'FF1E3A5F' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } } })
-        const accent = (v: any) => xc(v, { fill: { patternType: 'solid', fgColor: { rgb: 'FF1D4ED8' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } } })
-        const ws1 = XLSX.utils.aoa_to_sheet([
-            ['Articolo', 'Variante', '€/U.M.', 'Prezzo max acq.', 'Prezzo unitario', 'Qtà presunta', 'Tot. presunto'].map(hdr),
-            ...inventoryRows.map(r => [xc(r.itemName), xc(r.itemModel), xc(r.itemUnit ? `€/${r.itemUnit}` : '€'), xc(r.maxPurchasePrice !== null ? fmtN(r.maxPurchasePrice) : ''), xc(r.unitPrice !== null ? fmtN(r.unitPrice) : ''), xc(fmtN(r.qtyEstimated)), xc(r.unitPrice !== null ? fmtN(r.unitPrice * r.qtyEstimated) : '')]),
-            [xc(''), xc(''), xc(''), xc(''), xc(''), tot('TOTALE'), tot(fmtN(inventoryRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)))],
-        ])
-        ws1['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 14 }]
-        XLSX.utils.book_append_sheet(wb, ws1, 'Materiali')
-        const ws2 = XLSX.utils.aoa_to_sheet([
-            ['Voce', 'Prezzo unitario (€)', 'Qtà presunta', 'Tot. presunto'].map(hdr),
-            ...genericRows.map(r => [xc(r.itemName), xc(r.unitPrice !== null ? fmtN(r.unitPrice) : ''), xc(fmtN(r.qtyEstimated)), xc(r.unitPrice !== null ? fmtN(r.unitPrice * r.qtyEstimated) : '')]),
-            [xc(''), tot('TOTALE'), xc(''), tot(fmtN(genericRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)))],
-        ])
-        ws2['!cols'] = [{ wch: 35 }, { wch: 16 }, { wch: 12 }, { wch: 14 }]
-        XLSX.utils.book_append_sheet(wb, ws2, 'Voci Generiche')
-        const ws3 = XLSX.utils.aoa_to_sheet([
-            ['Voce', 'Incremento', 'Valore (€)'].map(hdr),
-            [xc('Tot. materiali + voci'), xc(''), tot(fmtN(totBase))],
-            [xc(`+ Sfrido (${params.sfrido}%)`), xc(`+${fmtN(sfrido_delta)}`), xc(fmtN(totListino))],
-            [xc('TOT materiali listino'), xc(''), tot(fmtN(totListino))],
-            [xc(`- Sconto (${params.sconto}%)`), xc(`-${fmtN(sconto_delta)}`), xc(fmtN(totSconto))],
-            [xc('TOT materiali sconto'), xc(''), tot(fmtN(totSconto))],
-            [xc(`+ Trasporto (A)`), xc(`+${fmtN(params.trasporto)}`), xc(fmtN(costoFranco))],
-            [xc('Costo franco'), xc(''), tot(fmtN(costoFranco))],
-            [xc(`+ Posa (B)`), xc(`+${fmtN(params.posa)}`), xc(fmtN(costoTot))],
-            [xc('Costo TOT (TC)'), xc(''), tot(fmtN(costoTot))],
-            [xc(`+ Ricarico (${params.ricarico}%)`), xc(`+${fmtN(ric_delta)}`), xc(fmtN(conRicarico))],
-            [xc(`+ Margine trattativa (${params.margineTrattativa}%)`), xc(`+${fmtN(marg_delta)}`), xc(fmtN(totaleFinalE))],
-            [accent('TOTALE FINALE'), accent(''), accent(fmtN(totaleFinalE))],
-        ])
-        ws3['!cols'] = [{ wch: 35 }, { wch: 16 }, { wch: 16 }]
-        XLSX.utils.book_append_sheet(wb, ws3, 'Riepilogo Prezzi')
-        XLSX.writeFile(wb, `${slug}_Analisi_Costi_${today}.xlsx`)
+    const handleExportPdf = async () => {
+        try {
+            setExportingPdf(true)
+            await generateCostAnalysisPDF({
+                client, proposalTitle, versionName, createdAt: versionCreatedAt,
+                inventoryRows, genericRows, params,
+            })
+        } catch { notify.error("Errore durante la generazione del PDF") }
+        finally { setExportingPdf(false) }
     }
 
     if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
@@ -290,7 +271,9 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, onBac
                 <Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" />Torna alle versioni</Button>
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{versionName}</span>
-                    <Button size="sm" variant="outline" onClick={handleExport}><Download className="h-4 w-4 mr-1" />Excel</Button>
+                    <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={exportingPdf}>
+                        {exportingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}PDF
+                    </Button>
                 </div>
             </div>
 
