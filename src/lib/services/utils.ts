@@ -29,6 +29,28 @@ export async function deleteDriveFileIfApplicable(url: string | null | undefined
     }
 }
 
+/**
+ * Esegue una query Supabase paginandola per superare il limite di default
+ * di PostgREST (1000 righe per richiesta). `queryFactory` deve costruire una
+ * query nuova ad ogni chiamata (senza `.range()`), a cui viene applicato il range.
+ */
+export async function fetchAllRows<T>(
+    queryFactory: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+    pageSize: number = 1000
+): Promise<T[]> {
+    const rows: T[] = [];
+    let from = 0;
+    while (true) {
+        const { data, error } = await queryFactory(from, from + pageSize - 1);
+        if (error) throw error;
+        const page = data || [];
+        rows.push(...page);
+        if (page.length < pageSize) break;
+        from += pageSize;
+    }
+    return rows;
+}
+
 export function fetchWithTimeout<T>(promise: PromiseLike<T>, ms: number = 30000): Promise<T> {
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {

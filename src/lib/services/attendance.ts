@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Attendance } from '@/lib/types';
-import { fetchWithTimeout } from './utils';
+import { fetchWithTimeout, fetchAllRows } from './utils';
 
 export const mapDbToAttendance = (db: any): Attendance => ({
     id: db.id,
@@ -44,32 +44,30 @@ export const attendanceApi = {
 
         console.log(`📅 Fetching attendance for ${startDate} to ${endDate}`);
 
-        const { data, error } = await supabase
-            .from('attendance')
-            .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name), worker_courses(course_name)')
-            .gte('date', startDate)
-            .lte('date', endDate)
-            .order('date', { ascending: true });
-
-        if (error) {
-            console.error('❌ Attendance query error:', error);
-            console.error('❌ Error details:', JSON.stringify(error, null, 2));
-            throw error;
-        }
-        return (data || []).map(mapDbToAttendance);
+        const data = await fetchAllRows((from, to) =>
+            supabase
+                .from('attendance')
+                .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name), worker_courses(course_name)')
+                .gte('date', startDate)
+                .lte('date', endDate)
+                .order('date', { ascending: true })
+                .range(from, to)
+        );
+        return data.map(mapDbToAttendance);
     },
 
     // New: Fetch attendance for an arbitrary date range (e.g. a week)
     getByRange: async (startDate: string, endDate: string): Promise<Attendance[]> => {
-        const { data, error } = await supabase
-            .from('attendance')
-            .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name), worker_courses(course_name)')
-            .gte('date', startDate)
-            .lte('date', endDate)
-            .order('date', { ascending: true });
-
-        if (error) throw error;
-        return (data || []).map(mapDbToAttendance);
+        const data = await fetchAllRows((from, to) =>
+            supabase
+                .from('attendance')
+                .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name), worker_courses(course_name)')
+                .gte('date', startDate)
+                .lte('date', endDate)
+                .order('date', { ascending: true })
+                .range(from, to)
+        );
+        return data.map(mapDbToAttendance);
     },
 
     // New: Add a SINGLE entry (append)
@@ -116,14 +114,15 @@ export const attendanceApi = {
 
     // Get attendance records for a specific job
     getByJobId: async (jobId: string): Promise<Attendance[]> => {
-        const { data, error } = await supabase
-            .from('attendance')
-            .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name)')
-            .eq('job_id', jobId)
-            .order('date', { ascending: true });
-
-        if (error) throw error;
-        return (data || []).map(mapDbToAttendance);
+        const data = await fetchAllRows((from, to) =>
+            supabase
+                .from('attendance')
+                .select('*, workers(first_name, last_name), jobs(code, name, description), warehouses(name)')
+                .eq('job_id', jobId)
+                .order('date', { ascending: true })
+                .range(from, to)
+        );
+        return data.map(mapDbToAttendance);
     },
 
     // Get total hours for a specific job (sum of all attendance hours)
@@ -153,16 +152,17 @@ export const attendanceApi = {
 
     // Get attendance for a job within a date range (for SAL worker hours)
     getByJobIdAndDateRange: async (jobId: string, dateFrom: string, dateTo: string): Promise<Attendance[]> => {
-        const { data, error } = await supabase
-            .from('attendance')
-            .select('*, workers(first_name, last_name, hourly_rate, trasferta_rate)')
-            .eq('job_id', jobId)
-            .gte('date', dateFrom)
-            .lte('date', dateTo)
-            .order('date', { ascending: true });
-
-        if (error) throw error;
-        return (data || []).map(mapDbToAttendance);
+        const data = await fetchAllRows((from, to) =>
+            supabase
+                .from('attendance')
+                .select('*, workers(first_name, last_name, hourly_rate, trasferta_rate)')
+                .eq('job_id', jobId)
+                .gte('date', dateFrom)
+                .lte('date', dateTo)
+                .order('date', { ascending: true })
+                .range(from, to)
+        );
+        return data.map(mapDbToAttendance);
     },
 
     // Get aggregated statistics for the last N months (for dashboard chart)
