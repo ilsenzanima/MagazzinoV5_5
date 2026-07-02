@@ -19,6 +19,8 @@ import { costAnalysisApi, CostAnalysisRow } from "@/lib/services/cost-analysis"
 import { createClient } from "@/lib/supabase/client"
 import { notify } from "@/lib/notify"
 import * as XLSX from "xlsx-js-style"
+import { useBatchUpload } from "@/hooks/useBatchUpload"
+import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
 interface JobCostiSALProps {
     jobId: string
@@ -232,6 +234,8 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
     const [editingCostSal, setEditingCostSal] = useState<string | null>(null)
     const [editCostSalValue, setEditCostSalValue] = useState('')
     const [uploadingCostId, setUploadingCostId] = useState<string | null>(null)
+    const costDocBatchUpload = useBatchUpload()
+    const addCostBatchUpload = useBatchUpload()
 
     // ── Manage SAL dialog ─────────────────────────────────────────────────────
     const [isManageSalOpen, setIsManageSalOpen] = useState(false)
@@ -870,11 +874,16 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
             const salNameVal = newCostSal === '__none__' ? null : newCostSal
             const cost = await salCostsApi.add(jobId, desc, amount, salNameVal)
             if (newCostFiles.length > 0) {
-                const urls = await Promise.all(newCostFiles.map(f => salCostsApi.uploadDocument(f, jobLabel)))
+                const urls: string[] = []
+                const { failedCount } = await addCostBatchUpload.run(newCostFiles, async (f) => {
+                    urls.push(await salCostsApi.uploadDocument(f, jobLabel))
+                })
                 await salCostsApi.updateDocumentUrls(cost.id, urls)
+                if (failedCount > 0) notify.error(failedCount > 1 ? `${failedCount} allegati non caricati` : "Un allegato non è stato caricato")
             }
             setIsAddCostOpen(false)
             setNewCostDesc(''); setNewCostAmount(''); setNewCostSal('__none__'); setNewCostFiles([])
+            addCostBatchUpload.reset()
             await loadData()
             notify.success("Costo aggiunto")
         } catch (e) {
@@ -895,17 +904,15 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
         }
     }
     const handleUploadCostDoc = async (costId: string, existingUrls: string[], file: File) => {
-        try {
-            setUploadingCostId(costId)
-            const url = await salCostsApi.uploadDocument(file, jobLabel)
+        setUploadingCostId(costId)
+        const { failedCount } = await costDocBatchUpload.run([file], async (f) => {
+            const url = await salCostsApi.uploadDocument(f, jobLabel)
             await salCostsApi.updateDocumentUrls(costId, [...existingUrls, url])
-            await loadData()
-        } catch (e) {
-            console.error(e)
-            notify.error("Errore durante il caricamento del documento")
-        } finally {
-            setUploadingCostId(null)
-        }
+        })
+        if (failedCount > 0) notify.error("Errore durante il caricamento del documento")
+        await loadData()
+        setUploadingCostId(null)
+        costDocBatchUpload.reset()
     }
     const handleDeleteCostDoc = async (costId: string, existingUrls: string[], url: string) => {
         try {
@@ -1523,6 +1530,11 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                                     />
                                                 </label>
                                             </div>
+                                            {uploadingCostId === cost.id && (
+                                                <div className="w-20">
+                                                    <UploadStatusBar state={costDocBatchUpload.statuses[0]} />
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-2">
                                             <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-300 hover:text-red-500">
@@ -1733,14 +1745,18 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                     multiple
                                     className="hidden"
                                     accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                    disabled={costSaving}
                                     onChange={e => setNewCostFiles(Array.from(e.target.files || []))}
                                 />
                             </label>
                             {newCostFiles.length > 0 && (
-                                <ul className="text-xs text-slate-500 space-y-0.5 pl-1">
+                                <ul className="text-xs text-slate-500 space-y-1 pl-1">
                                     {newCostFiles.map((f, i) => (
-                                        <li key={i} className="flex items-center gap-1">
-                                            <Paperclip className="h-3 w-3" />{f.name}
+                                        <li key={i}>
+                                            <span className="flex items-center gap-1">
+                                                <Paperclip className="h-3 w-3" />{f.name}
+                                            </span>
+                                            {costSaving && <UploadStatusBar state={addCostBatchUpload.statuses[i]} />}
                                         </li>
                                     ))}
                                 </ul>

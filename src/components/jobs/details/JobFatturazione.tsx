@@ -14,6 +14,8 @@ import { notify } from "@/lib/notify"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { createClient } from "@/lib/supabase/client"
+import { useBatchUpload, UploadItemState } from "@/hooks/useBatchUpload"
+import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
 interface JobFatturazioneProps {
     jobId: string
@@ -44,6 +46,7 @@ function EntryDialog({
     onClose,
     onSave,
     uploading,
+    uploadState,
     onFileChange,
     fileRef,
     existingDocUrl,
@@ -54,6 +57,7 @@ function EntryDialog({
     onClose: () => void
     onSave: (data: EntryFormData) => Promise<void>
     uploading: boolean
+    uploadState?: UploadItemState
     onFileChange: (file: File) => void
     fileRef: React.RefObject<HTMLInputElement | null>
     existingDocUrl?: string
@@ -133,13 +137,14 @@ function EntryDialog({
                                 }
                                 {uploading ? "Caricamento..." : "Allega file"}
                             </Button>
-                            {existingDocUrl && (
+                            {existingDocUrl && !uploading && (
                                 <button onClick={() => openDocument(existingDocUrl)}
                                     className="text-xs text-blue-600 hover:underline truncate">
                                     Documento allegato
                                 </button>
                             )}
                         </div>
+                        {uploading && <UploadStatusBar state={uploadState} />}
                         <input
                             ref={fileRef}
                             type="file"
@@ -259,6 +264,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
     const [salDocUrl, setSalDocUrl] = useState<string | undefined>()
     const [uploadingSal, setUploadingSal] = useState(false)
     const salFileRef = useRef<HTMLInputElement>(null)
+    const salBatchUpload = useBatchUpload()
 
     // Fattura dialog
     const [fatturaDialogOpen, setFatturaDialogOpen] = useState(false)
@@ -266,6 +272,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
     const [fatturaForm, setFatturaForm] = useState<EntryFormData>(emptyForm())
     const [fatturaDocUrl, setFatturaDocUrl] = useState<string | undefined>()
     const [uploadingFattura, setUploadingFattura] = useState(false)
+    const fatturaBatchUpload = useBatchUpload()
     const fatturaFileRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => { load() }, [jobId])
@@ -313,9 +320,11 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
     const jobLabel = `${job.code ?? ''} ${job.name ?? ''}`.trim() || job.id
     const handleSalFile = async (file: File) => {
         setUploadingSal(true)
-        try { setSalDocUrl(await jobSalApprovatiApi.uploadDocument(file, jobLabel)) }
-        catch { notify.error("Errore upload") }
-        finally { setUploadingSal(false) }
+        const { failedCount } = await salBatchUpload.run([file], async (f) => {
+            setSalDocUrl(await jobSalApprovatiApi.uploadDocument(f, jobLabel))
+        })
+        if (failedCount > 0) notify.error("Errore upload")
+        setUploadingSal(false)
     }
     const saveSal = async (form: EntryFormData) => {
         const amount = parseFloat(form.amount.replace(",", ".")) || 0
@@ -345,9 +354,11 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
     }
     const handleFatturaFile = async (file: File) => {
         setUploadingFattura(true)
-        try { setFatturaDocUrl(await jobFattureCommittenteApi.uploadDocument(file, jobLabel)) }
-        catch { notify.error("Errore upload") }
-        finally { setUploadingFattura(false) }
+        const { failedCount } = await fatturaBatchUpload.run([file], async (f) => {
+            setFatturaDocUrl(await jobFattureCommittenteApi.uploadDocument(f, jobLabel))
+        })
+        if (failedCount > 0) notify.error("Errore upload")
+        setUploadingFattura(false)
     }
     const saveFattura = async (form: EntryFormData) => {
         const amount = parseFloat(form.amount.replace(",", ".")) || 0
@@ -538,6 +549,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 onClose={() => setSalDialogOpen(false)}
                 onSave={saveSal}
                 uploading={uploadingSal}
+                uploadState={salBatchUpload.statuses[0]}
                 onFileChange={handleSalFile}
                 fileRef={salFileRef}
                 existingDocUrl={salDocUrl}
@@ -549,6 +561,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 onClose={() => setFatturaDialogOpen(false)}
                 onSave={saveFattura}
                 uploading={uploadingFattura}
+                uploadState={fatturaBatchUpload.statuses[0]}
                 onFileChange={handleFatturaFile}
                 fileRef={fatturaFileRef}
                 existingDocUrl={fatturaDocUrl}

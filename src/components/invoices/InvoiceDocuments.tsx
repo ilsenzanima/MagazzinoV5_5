@@ -8,6 +8,8 @@ import { useState } from "react"
 import { notify } from "@/lib/notify"
 import { createClient } from "@/lib/supabase/client"
 import { deleteDriveFileIfApplicable } from "@/lib/services/utils"
+import { useBatchUpload } from "@/hooks/useBatchUpload"
+import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
 interface InvoiceDocumentsProps {
   invoiceId: string;
@@ -19,8 +21,10 @@ interface InvoiceDocumentsProps {
 export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, supplierName }: InvoiceDocumentsProps) {
   const supabase = createClient();
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const batchUpload = useBatchUpload();
 
   const openDocument = async (url: string) => {
     if (!url.includes('/')) {
@@ -40,17 +44,28 @@ export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, suppl
 
   const uploadFiles = async (files: File[]) => {
     if (!files.length) return;
+    setIsUploading(true);
+    setUploadingFiles(files);
+    const uploadedUrls: string[] = [];
+    const { failedCount } = await batchUpload.run(files, async (file) => {
+      uploadedUrls.push(await invoicesApi.uploadDocument(file, supplierName));
+    });
     try {
-      setIsUploading(true);
-      const uploadedUrls = await Promise.all(files.map(f => invoicesApi.uploadDocument(f, supplierName)));
-      const updated = [...documentUrls, ...uploadedUrls];
-      await supabase.from('invoices').update({ document_urls: updated }).eq('id', invoiceId);
-      onUpdate();
+      if (uploadedUrls.length) {
+        const updated = [...documentUrls, ...uploadedUrls];
+        await supabase.from('invoices').update({ document_urls: updated }).eq('id', invoiceId);
+        onUpdate();
+      }
+      if (failedCount > 0) {
+        notify.error(failedCount > 1 ? `${failedCount} documenti non caricati` : "Errore durante il caricamento del documento");
+      }
     } catch (error) {
-      console.error("Failed to upload document", error);
-      notify.error("Errore durante il caricamento del documento");
+      console.error("Failed to save uploaded documents", error);
+      notify.error("Errore durante il salvataggio dei documenti caricati");
     } finally {
       setIsUploading(false);
+      setUploadingFiles([]);
+      batchUpload.reset();
     }
   };
 
@@ -112,6 +127,16 @@ export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, suppl
         </div>
       </CardHeader>
       <CardContent>
+        {uploadingFiles.length > 0 && (
+          <div className="space-y-2 mb-3">
+            {uploadingFiles.map((file, index) => (
+              <div key={index} className="p-3 border dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-800">
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{file.name}</p>
+                <UploadStatusBar state={batchUpload.statuses[index]} />
+              </div>
+            ))}
+          </div>
+        )}
         {documentUrls.length > 0 ? (
           <div className="space-y-2">
             {documentUrls.map((url, index) => (

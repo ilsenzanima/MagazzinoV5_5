@@ -26,6 +26,8 @@ import {
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
+import { useBatchUpload } from "@/hooks/useBatchUpload";
+import { UploadStatusBar } from "@/components/ui/upload-status-row";
 
 interface PurchaseLine {
     tempId: string;
@@ -115,6 +117,7 @@ function NewPurchaseContent() {
 
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
+    const batchUpload = useBatchUpload();
 
     // Form State - Lines (inline table)
     const [lines, setLines] = useState<PurchaseLine[]>([emptyLine()]);
@@ -423,7 +426,12 @@ function NewPurchaseContent() {
             let documentUrls: string[] = [];
             if (selectedFiles.length > 0) {
                 const supplierName = suppliers.find(s => s.id === formData.supplierId)?.name;
-                documentUrls = await Promise.all(selectedFiles.map(f => purchasesApi.uploadDocument(f, supplierName)));
+                const urls: string[] = [];
+                const { failedCount } = await batchUpload.run(selectedFiles, async (f) => {
+                    urls.push(await purchasesApi.uploadDocument(f, supplierName));
+                });
+                if (failedCount > 0) throw new Error("Caricamento documento fallito, riprova");
+                documentUrls = urls;
             }
 
             const purchase = await purchasesApi.create({
@@ -589,19 +597,23 @@ function NewPurchaseContent() {
                                         type="file"
                                         accept=".pdf,.jpg,.jpeg,.png"
                                         multiple
+                                        disabled={loading}
                                         onChange={(e) => {
                                             const files = Array.from(e.target.files || []);
                                             if (files.length) setSelectedFiles(prev => [...prev, ...files]);
                                             e.target.value = "";
                                         }}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                                     />
                                     <div className="pointer-events-none flex flex-col items-center justify-center gap-1">
                                         <Upload className={`h-8 w-8 ${isDragging ? "text-blue-500" : "text-slate-400"}`} />
                                         {selectedFiles.length > 0 ? (
-                                            <div className="flex flex-col items-center gap-0.5">
+                                            <div className="flex flex-col items-stretch gap-1 w-full max-w-xs">
                                                 {selectedFiles.map((f, i) => (
-                                                    <p key={i} className="text-sm font-medium text-blue-600 dark:text-blue-400">{f.name}</p>
+                                                    <div key={i}>
+                                                        <p className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">{f.name}</p>
+                                                        {loading && <UploadStatusBar state={batchUpload.statuses[i]} />}
+                                                    </div>
                                                 ))}
                                             </div>
                                         ) : (

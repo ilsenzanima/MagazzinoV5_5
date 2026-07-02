@@ -38,6 +38,8 @@ import {
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
+import { useBatchUpload } from "@/hooks/useBatchUpload"
+import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
 interface PurchaseDDTConformitaProps {
     purchaseId: string
@@ -65,6 +67,7 @@ export function PurchaseDDTConformita({
     const [upName, setUpName] = useState("")
     const [uploading, setUploading] = useState(false)
     const upRef = useRef<HTMLInputElement>(null)
+    const batchUpload = useBatchUpload()
 
     // Disassociate
     const [disassocOpen, setDisassocOpen] = useState(false)
@@ -99,6 +102,7 @@ export function PurchaseDDTConformita({
         setUpDocTypeId("")
         setUpFile(null)
         setUpName("")
+        batchUpload.reset()
         setUploadOpen(true)
     }
 
@@ -112,9 +116,9 @@ export function PurchaseDDTConformita({
 
     const handleUpload = async () => {
         if (!upFile || !upDocTypeId) return
-        try {
-            setUploading(true)
-            const compressed = await compressImageIfNeeded(upFile)
+        setUploading(true)
+        const { failedCount } = await batchUpload.run([upFile], async (file) => {
+            const compressed = await compressImageIfNeeded(file)
             const formData = new FormData()
             formData.append("file", compressed)
             formData.append(
@@ -129,21 +133,22 @@ export function PurchaseDDTConformita({
                 supplierId,
                 brandId: null as any,
                 documentTypeId: upDocTypeId,
-                name: upName.trim() || upFile.name,
+                name: upName.trim() || file.name,
                 fileUrl: result.fileId,
                 fileSize: compressed.size,
                 purchaseId,
                 documentScope: "ddt_specific",
             })
-            toast.success("Documento caricato")
-            setUploadOpen(false)
-            load()
-            onUpdate?.()
-        } catch {
+        })
+        setUploading(false)
+        if (failedCount > 0) {
             toast.error("Errore durante il caricamento")
-        } finally {
-            setUploading(false)
+            return
         }
+        toast.success("Documento caricato")
+        setUploadOpen(false)
+        load()
+        onUpdate?.()
     }
 
     const confirmDisassoc = (assoc: PurchaseComplianceAssociation) => {
@@ -306,8 +311,8 @@ export function PurchaseDDTConformita({
                             <div className="space-y-1.5">
                                 <Label>File *</Label>
                                 <div
-                                    className="border-2 border-dashed rounded-md p-4 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                    onClick={() => upRef.current?.click()}
+                                    className={`border-2 border-dashed rounded-md p-4 text-center transition-colors ${uploading ? "opacity-60" : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                                    onClick={() => !uploading && upRef.current?.click()}
                                 >
                                     {upFile ? (
                                         <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{upFile.name}</p>
@@ -318,11 +323,13 @@ export function PurchaseDDTConformita({
                                         </>
                                     )}
                                 </div>
+                                {uploading && <UploadStatusBar state={batchUpload.statuses[0]} />}
                                 <input
                                     ref={upRef}
                                     type="file"
                                     className="hidden"
                                     accept=".pdf,.jpg,.jpeg,.png"
+                                    disabled={uploading}
                                     onChange={handleFileSelected}
                                 />
                             </div>
@@ -331,6 +338,7 @@ export function PurchaseDDTConformita({
                                     <Label>Nome documento</Label>
                                     <Input
                                         value={upName}
+                                        disabled={uploading}
                                         onChange={e => setUpName(e.target.value)}
                                         placeholder="Nome del documento"
                                     />
