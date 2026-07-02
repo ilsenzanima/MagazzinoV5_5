@@ -99,6 +99,7 @@ export function ProposalCostAnalysisVersions({ proposalId }: Props) {
                 proposalId={proposalId}
                 versionId={openVersionId}
                 versionName={v?.name ?? ""}
+                versionCreatedAt={v?.createdAt ?? ""}
                 onBack={() => setOpenVersionId(null)}
             />
         )
