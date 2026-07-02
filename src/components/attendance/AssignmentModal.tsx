@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Job, Worker, Attendance } from "@/lib/api";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 import { useState, useEffect } from "react";
 import { format, addDays } from "date-fns";
 import { it } from "date-fns/locale";
@@ -36,14 +38,19 @@ export default function AssignmentModal({
     const [status, setStatus] = useState<string>("presence");
     const [notes, setNotes] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
     // Recurring
     const [isRecurring, setIsRecurring] = useState(false);
     const [repeatUntil, setRepeatUntil] = useState<string>("");
 
     useEffect(() => {
+        warehousesApi.getAll().then(setWarehouses).catch(console.error);
+    }, []);
+
+    useEffect(() => {
         if (isOpen && currentAssignment) {
-            setJobId(currentAssignment.jobId || "");
+            setJobId(currentAssignment.jobId || currentAssignment.warehouseId || "");
             setHours(String(currentAssignment.hours || 8));
             setStatus(currentAssignment.status || "presence");
             setNotes(currentAssignment.notes || "");
@@ -66,11 +73,13 @@ export default function AssignmentModal({
     const handleSave = async () => {
         setIsLoading(true);
         try {
+            const isWarehouse = warehouses.some(w => w.id === jobId);
             const payload = {
                 id: currentAssignment?.id,
                 workerId: worker.id,
                 date: format(date, 'yyyy-MM-dd'),
-                jobId: jobId === 'none' ? undefined : jobId,
+                jobId: (jobId === 'none' || isWarehouse) ? undefined : jobId,
+                warehouseId: isWarehouse ? jobId : undefined,
                 hours: parseFloat(hours.replace(',', '.')) || 0,
                 status: status as any,
                 notes
@@ -135,7 +144,7 @@ export default function AssignmentModal({
                     {(status === 'presence' || status === 'permit' || status === 'transfer') && (
                         <>
                             <div className="space-y-2">
-                                <Label>Cantiere</Label>
+                                <Label>Cantiere / Magazzino</Label>
                                 <Select value={jobId} onValueChange={setJobId}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleziona cantiere..." />
@@ -147,6 +156,18 @@ export default function AssignmentModal({
                                                 {job.code} - {job.name}
                                             </SelectItem>
                                         ))}
+                                        {warehouses.length > 0 && (
+                                            <>
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1">
+                                                    MAGAZZINI
+                                                </div>
+                                                {warehouses.map(warehouse => (
+                                                    <SelectItem key={`warehouse-${warehouse.id}`} value={warehouse.id}>
+                                                        📦 {warehouse.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </>
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>
