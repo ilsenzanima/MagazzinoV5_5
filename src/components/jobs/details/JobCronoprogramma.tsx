@@ -67,7 +67,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
     }
 
     const presencePopupContent = (task: JobTask) => {
-        const inRange = attendance.filter(a => a.date >= task.startDate && a.date <= task.endDate && a.status === 'presence')
+        const inRange = attendance.filter(a => a.date >= task.startDate && a.date <= task.endDate && (a.status === 'presence' || a.status === 'transfer'))
         const totalHours = inRange.reduce((sum, a) => sum + a.hours, 0)
         const workers = new Set(inRange.map(a => a.workerId)).size
         if (inRange.length === 0) {
@@ -77,7 +77,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
     }
 
     const workersByDate = new Map<string, Set<string>>()
-    attendance.filter(a => a.status === 'presence').forEach(a => {
+    attendance.filter(a => a.status === 'presence' || a.status === 'transfer').forEach(a => {
         if (!workersByDate.has(a.date)) workersByDate.set(a.date, new Set())
         workersByDate.get(a.date)!.add(a.workerId)
     })
