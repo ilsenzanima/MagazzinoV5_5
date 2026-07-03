@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import type { CostAnalysisRow, CostAnalysisParams } from '@/lib/services/cost-analysis';
+import { effectiveUnitPrice, type CostAnalysisRow, type CostAnalysisParams } from '@/lib/services/cost-analysis';
 import type { Client } from '@/lib/types';
 
 const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -149,7 +149,7 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
 
     // --- 4. Materiali da Magazzino ---
     const fmtCell = (n: number | null) => n !== null ? `€ ${fmt(n)}` : '—';
-    const totMateriali = input.inventoryRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0);
+    const totMateriali = input.inventoryRows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0);
 
     if (input.inventoryRows.length > 0) {
         doc.setFontSize(10);
@@ -161,13 +161,16 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
         autoTable(doc, {
             startY: currentY,
             head: [['Articolo', 'Prezzo max acq.', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto']],
-            body: input.inventoryRows.map(r => [
-                r.itemModel ? `${r.itemName} (${r.itemModel})` : r.itemName,
-                r.maxPurchasePrice !== null ? `€ ${fmt(r.maxPurchasePrice)}` : 'N/D',
-                fmtCell(r.unitPrice),
-                fmt(r.qtyEstimated),
-                r.unitPrice !== null ? `€ ${fmt(r.unitPrice * r.qtyEstimated)}` : '—',
-            ]),
+            body: input.inventoryRows.map(r => {
+                const price = effectiveUnitPrice(r);
+                return [
+                    r.itemModel ? `${r.itemName} (${r.itemModel})` : r.itemName,
+                    r.maxPurchasePrice !== null ? `€ ${fmt(r.maxPurchasePrice)}` : 'N/D',
+                    fmtCell(r.unitPrice),
+                    fmt(r.qtyEstimated),
+                    price !== null ? `€ ${fmt(price * r.qtyEstimated)}` : '—',
+                ];
+            }),
             foot: [['Totale materiali', '', '', '', `€ ${fmt(totMateriali)}`]],
             theme: 'plain',
             styles: { fontSize: 8, cellPadding: 2.5, textColor: 50, lineColor: [230, 230, 230], lineWidth: 0.1 },

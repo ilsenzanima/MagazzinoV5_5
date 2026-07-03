@@ -31,6 +31,10 @@ export interface CostAnalysisRow {
     createdAt: string;
 }
 
+// Se il prezzo unitario non è impostato, usa in automatico il prezzo massimo di acquisto come stima
+export const effectiveUnitPrice = (row: Pick<CostAnalysisRow, 'unitPrice' | 'maxPurchasePrice'>): number | null =>
+    row.unitPrice ?? row.maxPurchasePrice;
+
 const mapRow = (db: any): CostAnalysisRow => ({
     id: db.id,
     jobId: db.job_id,

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info } from "lucide-react"
-import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams } from "@/lib/services/cost-analysis"
+import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, effectiveUnitPrice } from "@/lib/services/cost-analysis"
 import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { inventoryApi } from "@/lib/api"
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
@@ -82,7 +82,7 @@ function MaterialTable({ rows, onUpdate }: {
     rows: CostAnalysisRow[]
     onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void
 }) {
-    const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
+    const totalEst = rows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0)
 
     return (
         <div className="overflow-x-auto">
@@ -98,7 +98,9 @@ function MaterialTable({ rows, onUpdate }: {
                 </thead>
                 <tbody>
                     {rows.map((row, idx) => {
-                        const totEst = (row.unitPrice ?? 0) * row.qtyEstimated
+                        const price = effectiveUnitPrice(row)
+                        const usingMax = row.unitPrice === null && row.maxPurchasePrice !== null
+                        const totEst = (price ?? 0) * row.qtyEstimated
                         const unitPfx = row.itemUnit ? `€/${row.itemUnit}` : '€'
                         const label = row.itemModel ? `${row.itemName} (${row.itemModel})` : row.itemName
                         const stripe = idx % 2 === 1 ? 'bg-slate-50/80 dark:bg-slate-800/30' : ''
@@ -119,14 +121,16 @@ function MaterialTable({ rows, onUpdate }: {
                                 <td className="p-2 text-right">
                                     <div className="flex items-center justify-end gap-0.5">
                                         <span className="text-[10px] text-slate-400">{unitPfx}</span>
-                                        <EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} />
+                                        <EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })}
+                                            placeholder={row.maxPurchasePrice !== null ? fmt(row.maxPurchasePrice) : '—'} />
                                     </div>
                                 </td>
                                 <td className="p-2 text-right">
                                     <EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />
                                 </td>
-                                <td className="p-2 text-right font-mono text-xs text-slate-700 dark:text-slate-300 font-medium">
-                                    {row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}
+                                <td className={`p-2 text-right font-mono text-xs ${usingMax ? 'italic text-slate-500' : 'text-slate-700 dark:text-slate-300 font-medium'}`}
+                                    title={usingMax ? 'Prezzo non impostato: usato in automatico il prezzo massimo di acquisto' : undefined}>
+                                    {price !== null ? `€ ${fmt(totEst)}` : '—'}
                                 </td>
                             </tr>
                         )
@@ -354,7 +358,7 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
 
     // ── Calcoli riepilogo ─────────────────────────────────────────────────────
     const totBase = useMemo(() =>
-        [...inventoryRows, ...genericRows].reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0),
+        [...inventoryRows, ...genericRows].reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0),
         [inventoryRows, genericRows]
     )
     const sfrido_delta  = totBase * params.sfrido / 100
@@ -390,7 +394,7 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
                 <TabsContent value="prezzi" className="space-y-6 pt-4">
                     <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
                         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
-                        Qui sono raccolti i materiali e le voci di costo usati per determinare i prezzi di questa commessa: questi valori alimentano i calcoli dei SAL. Quando un materiale viene aggiunto (in automatico dai movimenti di magazzino, o manualmente), il prezzo unitario viene precompilato con quello impostato nelle analisi costi dell'offerta di origine, se presente. Le modifiche fatte qui restano locali alla commessa e non toccano l'analisi costi dell'offerta.
+                        Qui sono raccolti i materiali e le voci di costo usati per determinare i prezzi di questa commessa: questi valori alimentano i calcoli dei SAL. Quando un materiale viene aggiunto (in automatico dai movimenti di magazzino, o manualmente), il prezzo unitario viene precompilato con quello impostato nelle analisi costi dell'offerta di origine, se presente. Se il prezzo unitario di un materiale non è impostato, nei totali viene usato in automatico il prezzo massimo di acquisto (i totali che lo usano sono mostrati in corsivo). Le modifiche fatte qui restano locali alla commessa e non toccano l'analisi costi dell'offerta.
                     </p>
 
                     {/* ── Materiali da Magazzino ───────────────────────────────────── */}

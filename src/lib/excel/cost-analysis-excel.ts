@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { CostAnalysisPdfInput } from '@/lib/pdf/cost-analysis-pdf';
+import { effectiveUnitPrice } from '@/lib/services/cost-analysis';
 
 const EUR_FMT = '"€ "#,##0.00';
 const NUM_FMT = '#,##0.00';
@@ -129,19 +130,20 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
 
     // --- 5. Materiali da Magazzino ---
     // Colonne: Articolo | Prezzo max acq. | Prezzo unit. | Qtà presunta | Tot. presunto
-    const totMateriali = input.inventoryRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0);
+    const totMateriali = input.inventoryRows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0);
     if (input.inventoryRows.length > 0) {
         pushRow([titleCell('Materiali da Magazzino')]);
         pushRow(['Articolo', 'Prezzo max acq.', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto'].map(tableHdrCell));
         for (const r of input.inventoryRows) {
             const label = r.itemModel ? `${r.itemName} (${r.itemModel})` : r.itemName;
-            const totEst = (r.unitPrice ?? 0) * r.qtyEstimated;
+            const price = effectiveUnitPrice(r);
+            const totEst = (price ?? 0) * r.qtyEstimated;
             pushRow([
                 dataCell(label),
                 r.maxPurchasePrice !== null ? numDataCell(r.maxPurchasePrice) : dataCell('N/D', true),
                 r.unitPrice !== null ? numDataCell(r.unitPrice) : dataCell('—', true),
                 numDataCell(r.qtyEstimated, false),
-                r.unitPrice !== null ? numDataCell(totEst) : dataCell('—', true),
+                price !== null ? numDataCell(totEst) : dataCell('—', true),
             ], estimateLines(label, COL_WCH[0]));
         }
         pushRow([totalCell('Totale materiali'), totalCell(''), totalCell(''), totalCell(''), totalCell(totMateriali, true)]);

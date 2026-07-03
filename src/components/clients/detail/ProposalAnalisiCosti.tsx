@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, ArrowLeft } from "lucide-react"
 import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
-import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams } from "@/lib/services/cost-analysis"
+import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, effectiveUnitPrice } from "@/lib/services/cost-analysis"
 import { inventoryApi, clientsApi } from "@/lib/api"
 import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
@@ -51,7 +51,7 @@ function InlineTextEdit({ value, onSave, placeholder }: { value: string; onSave:
 }
 
 function MaterialTable({ rows, onUpdate }: { rows: CostAnalysisRow[]; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void }) {
-    const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
+    const totalEst = rows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0)
     return (
         <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -64,7 +64,9 @@ function MaterialTable({ rows, onUpdate }: { rows: CostAnalysisRow[]; onUpdate: 
                 </tr></thead>
                 <tbody>
                     {rows.map((row, idx) => {
-                        const totEst = (row.unitPrice ?? 0) * row.qtyEstimated
+                        const price = effectiveUnitPrice(row)
+                        const usingMax = row.unitPrice === null && row.maxPurchasePrice !== null
+                        const totEst = (price ?? 0) * row.qtyEstimated
                         const unitPfx = row.itemUnit ? `€/${row.itemUnit}` : '€'
                         const label = row.itemModel ? `${row.itemName} (${row.itemModel})` : row.itemName
                         const stripe = idx % 2 === 1 ? 'bg-slate-50/80 dark:bg-slate-800/30' : ''
@@ -74,9 +76,9 @@ function MaterialTable({ rows, onUpdate }: { rows: CostAnalysisRow[]; onUpdate: 
                                 <td className="p-2 text-right whitespace-nowrap">
                                     {row.maxPurchasePrice !== null ? <span className="text-xs font-mono text-slate-600"><span className="text-slate-400 text-[10px] mr-0.5">{unitPfx}</span>{fmt(row.maxPurchasePrice)}</span> : <Badge variant="outline" className="text-xs text-slate-400 border-slate-300">N/D</Badge>}
                                 </td>
-                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><span className="text-[10px] text-slate-400">{unitPfx}</span><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} /></div></td>
+                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><span className="text-[10px] text-slate-400">{unitPfx}</span><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} placeholder={row.maxPurchasePrice !== null ? fmt(row.maxPurchasePrice) : '—'} /></div></td>
                                 <td className="p-2 text-right"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} /></td>
-                                <td className="p-2 text-right font-mono text-xs text-slate-700 dark:text-slate-300 font-medium">{row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}</td>
+                                <td className={`p-2 text-right font-mono text-xs ${usingMax ? 'italic text-slate-500' : 'text-slate-700 dark:text-slate-300 font-medium'}`} title={usingMax ? 'Prezzo non impostato: usato in automatico il prezzo massimo di acquisto' : undefined}>{price !== null ? `€ ${fmt(totEst)}` : '—'}</td>
                             </tr>
                         )
                     })}
@@ -242,7 +244,7 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, versi
         catch { notify.error("Errore durante il salvataggio dei parametri") }
     }
 
-    const totBase = useMemo(() => [...inventoryRows, ...genericRows].reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0), [inventoryRows, genericRows])
+    const totBase = useMemo(() => [...inventoryRows, ...genericRows].reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0), [inventoryRows, genericRows])
     const sfrido_delta = totBase * params.sfrido / 100
     const totListino = totBase + sfrido_delta
     const sconto_delta = totListino * params.sconto / 100
