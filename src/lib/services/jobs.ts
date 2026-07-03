@@ -339,6 +339,16 @@ export const jobsApi = {
             .update({ deleted_at: null, deleted_by: null, deleted_by_name: null })
             .eq('id', id);
         if (error) throw error;
+
+        // L'eliminazione aveva riportato la proposta collegata "In attesa": al ripristino
+        // la riporta "Accettata", altrimenti la proposta mostrerebbe ancora "Converti in
+        // Commessa" e una riconversione sovrascriverebbe cronoprogramma/analisi costi
+        // della commessa appena ripristinata.
+        await supabase
+            .from('client_proposals')
+            .update({ status: 'accepted', updated_at: new Date().toISOString() })
+            .eq('converted_job_id', id)
+            .eq('status', 'pending');
     },
 
     getDeleted: async () => {

@@ -124,6 +124,27 @@ export async function POST(req: NextRequest) {
         await deleteStorageFiles(admin, extractStoragePaths(allUrls))
         await deleteDriveFiles(extractDriveFileIds(allUrls))
         await markFolderDeleted(['Proposte', id]).catch(() => {})
+    } else if (section === "clients") {
+        // Le proposte del cliente muoiono in cascata con lui: pulisce i loro file
+        // (solo quelli non ancora collegati a una commessa, che continua a usarli)
+        const { data: proposals } = await admin.from('client_proposals').select('id').eq('client_id', id)
+        const proposalIds = (proposals ?? []).map(p => p.id)
+        if (proposalIds.length > 0) {
+            const [sharedDocs, sharedSiteDocs, supplierOffers] = await Promise.all([
+                admin.from('shared_documents').select('file_url, job_id').in('proposal_id', proposalIds),
+                admin.from('shared_site_documents').select('file_url, job_id').in('proposal_id', proposalIds),
+                admin.from('shared_supplier_offers').select('file_url, job_id').in('proposal_id', proposalIds),
+            ])
+            const onlyProposalOwned = <T extends { job_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.job_id)
+            const allUrls = [
+                ...onlyProposalOwned(sharedDocs.data).map(r => r.file_url),
+                ...onlyProposalOwned(sharedSiteDocs.data).map(r => r.file_url),
+                ...onlyProposalOwned(supplierOffers.data).map(r => r.file_url),
+            ]
+            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+            await deleteDriveFiles(extractDriveFileIds(allUrls))
+            await Promise.allSettled(proposalIds.map(pid => markFolderDeleted(['Proposte', pid])))
+        }
     }
 
     let error: any
@@ -136,7 +157,20 @@ export async function POST(req: NextRequest) {
         const { error: delError } = await admin.from(table).delete().eq('id', id)
         error = delError
     }
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+        // FK RESTRICT: lo storico collegato impedisce l'eliminazione definitiva
+        if (error.code === '23503') {
+            const RESTRICT_MESSAGES: Record<string, string> = {
+                inventory: "Impossibile eliminare definitivamente: l'articolo ha storico movimenti o note di carico collegate, che deve essere preservato.",
+                workers: "Impossibile eliminare definitivamente: l'operaio ha presenze registrate, che alimentano i costi manodopera delle commesse.",
+                suppliers: "Impossibile eliminare definitivamente: il fornitore ha acquisti, fatture o documenti di conformità collegati.",
+                clients: "Impossibile eliminare definitivamente: il committente ha commesse collegate. Eliminare prima le commesse.",
+                jobs: "Impossibile eliminare definitivamente: la commessa ha movimenti o altri dati collegati che devono essere preservati.",
+            }
+            return NextResponse.json({ error: RESTRICT_MESSAGES[section] ?? "Impossibile eliminare definitivamente: esistono dati collegati che devono essere preservati." }, { status: 409 })
+        }
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     return NextResponse.json({ ok: true })
 }

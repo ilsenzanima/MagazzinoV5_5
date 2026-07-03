@@ -142,9 +142,39 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    // Committenti — le loro proposte muoiono in cascata: pulisce i file delle proposte
+    // (solo quelli non ancora collegati a una commessa, che continua a usarli)
+    {
+        const { data } = await admin.from('clients').select('id')
+            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
+        if (data?.length) {
+            const clientIds = data.map(r => r.id)
+            const { data: proposals } = await admin.from('client_proposals').select('id').in('client_id', clientIds)
+            const proposalIds = (proposals ?? []).map(p => p.id)
+            if (proposalIds.length > 0) {
+                const [sharedDocs, sharedSiteDocs, supplierOffers] = await Promise.all([
+                    admin.from('shared_documents').select('file_url, job_id').in('proposal_id', proposalIds),
+                    admin.from('shared_site_documents').select('file_url, job_id').in('proposal_id', proposalIds),
+                    admin.from('shared_supplier_offers').select('file_url, job_id').in('proposal_id', proposalIds),
+                ])
+                const onlyProposalOwned = <T extends { job_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.job_id)
+                const allUrls = [
+                    ...onlyProposalOwned(sharedDocs.data).map(r => r.file_url),
+                    ...onlyProposalOwned(sharedSiteDocs.data).map(r => r.file_url),
+                    ...onlyProposalOwned(supplierOffers.data).map(r => r.file_url),
+                ]
+                await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+                await deleteDriveFiles(extractDriveFileIds(allUrls))
+                await Promise.allSettled(proposalIds.map(pid => markFolderDeleted(['Proposte', pid])))
+            }
+            await admin.from('clients').delete().in('id', clientIds)
+            results.committenti = clientIds.length
+        }
+    }
+
     // Record senza file
     const tableLabels: Record<string, string> = {
-        clients: 'committenti', suppliers: 'fornitori', inventory: 'inventario',
+        suppliers: 'fornitori', inventory: 'inventario',
         workers: 'operai', load_notes: 'note_carico'
     }
     for (const [table, label] of Object.entries(tableLabels)) {
