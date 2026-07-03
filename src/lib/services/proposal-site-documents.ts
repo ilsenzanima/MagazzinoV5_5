@@ -8,6 +8,7 @@ const map = (db: any): SiteDocument => ({
     proposalId: db.proposal_id || null,
     documentTypeId: db.document_type_id || null,
     documentTypeName: db.job_site_document_types?.name || '',
+    folderId: db.folder_id || null,
     name: db.name,
     notes: db.notes || '',
     fileUrl: db.file_url,
@@ -49,6 +50,7 @@ export const proposalSiteDocumentsApi = {
                 proposal_id: doc.proposalId,
                 job_id: proposal?.converted_job_id || null,
                 document_type_id: doc.documentTypeId || null,
+                folder_id: doc.folderId || null,
                 name: doc.name,
                 notes: doc.notes || null,
                 file_url: doc.fileUrl,
@@ -65,7 +67,7 @@ export const proposalSiteDocumentsApi = {
         return map(data);
     },
 
-    update: async (id: string, patch: Partial<Pick<SiteDocument, 'name' | 'notes' | 'fileUrl' | 'fileType' | 'fileSize' | 'documentTypeId' | 'isOld' | 'isRev'>>): Promise<SiteDocument> => {
+    update: async (id: string, patch: Partial<Pick<SiteDocument, 'name' | 'notes' | 'fileUrl' | 'fileType' | 'fileSize' | 'documentTypeId' | 'folderId' | 'isOld' | 'isRev'>>): Promise<SiteDocument> => {
         const update: any = {};
         if (patch.name !== undefined) update.name = patch.name;
         if (patch.notes !== undefined) update.notes = patch.notes || null;
@@ -73,6 +75,7 @@ export const proposalSiteDocumentsApi = {
         if (patch.fileType !== undefined) update.file_type = patch.fileType;
         if (patch.fileSize !== undefined) update.file_size = patch.fileSize;
         if (patch.documentTypeId !== undefined) update.document_type_id = patch.documentTypeId || null;
+        if (patch.folderId !== undefined) update.folder_id = patch.folderId || null;
         if (patch.isOld !== undefined) update.is_old = patch.isOld;
         if (patch.isRev !== undefined) update.is_rev = patch.isRev;
         const { data, error } = await supabase.from('shared_site_documents').update(update).eq('id', id).select(SELECT_WITH_TYPE).single();

@@ -149,7 +149,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
                 </Button>
               </>
             )}
-            {userRole === 'admin' && (
+            {(userRole === 'admin' || userRole === 'operativo') && (
               <Button
                 variant="destructive"
                 size="sm"

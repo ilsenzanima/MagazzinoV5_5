@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { compressImageIfNeeded } from '@/lib/image-compress';
+import { uploadFileToDrive } from '@/lib/drive-upload';
 import { deleteDriveFileIfApplicable } from './utils';
 
 export interface SalCost {
@@ -284,12 +285,7 @@ export const salCostsApi = {
 
     uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {
         const compressed = await compressImageIfNeeded(file);
-        const formData = new FormData();
-        formData.append('file', compressed);
-        formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || 'Senza nome', 'Costi SAL']));
-        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
-        return result.fileId as string;
+        const result = await uploadFileToDrive(compressed, ['Cantieri', jobLabel || 'Senza nome', 'Costi SAL']);
+        return result.fileId;
     },
 };

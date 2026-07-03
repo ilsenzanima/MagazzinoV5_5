@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { getSoftDeletePayload, deleteDriveFileIfApplicable } from './utils';
 import { compressImageIfNeeded } from '@/lib/image-compress';
+import { uploadFileToDrive } from '@/lib/drive-upload';
 
 export type ComplianceDocumentType =
     | 'RDC_RDV_FT'
@@ -258,12 +259,7 @@ export const complianceApi = {
 
     uploadFile: async (file: File, supplierName: string): Promise<{ fileId: string; name: string }> => {
         const compressed = await compressImageIfNeeded(file);
-        const formData = new FormData();
-        formData.append('file', compressed);
-        formData.append('folderPath', JSON.stringify(['Fornitori', supplierName, 'Compliance']));
-        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
+        const result = await uploadFileToDrive(compressed, ['Fornitori', supplierName, 'Compliance']);
         return { fileId: result.fileId, name: result.name };
     },
 

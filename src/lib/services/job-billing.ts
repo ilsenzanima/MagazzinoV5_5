@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { JobSalApprovato, JobFatturaCommittente, JobSalFatturaLink } from '@/lib/types';
 import { compressImageIfNeeded } from '@/lib/image-compress';
+import { uploadFileToDrive } from '@/lib/drive-upload';
 import { deleteDriveFileIfApplicable } from './utils';
 
 const mapSal = (db: any): JobSalApprovato => ({
@@ -93,13 +94,8 @@ export const jobSalApprovatiApi = {
 
     uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {
         const compressed = await compressImageIfNeeded(file);
-        const formData = new FormData();
-        formData.append('file', compressed);
-        formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || 'Senza nome', 'SAL Approvati']));
-        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
-        return result.fileId as string;
+        const result = await uploadFileToDrive(compressed, ['Cantieri', jobLabel || 'Senza nome', 'SAL Approvati']);
+        return result.fileId;
     },
 };
 
@@ -163,13 +159,8 @@ export const jobFattureCommittenteApi = {
 
     uploadDocument: async (file: File, jobLabel?: string): Promise<string> => {
         const compressed = await compressImageIfNeeded(file);
-        const formData = new FormData();
-        formData.append('file', compressed);
-        formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || 'Senza nome', 'Fatture Committente']));
-        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
-        return result.fileId as string;
+        const result = await uploadFileToDrive(compressed, ['Cantieri', jobLabel || 'Senza nome', 'Fatture Committente']);
+        return result.fileId;
     },
 };
 

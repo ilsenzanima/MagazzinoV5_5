@@ -114,6 +114,43 @@ export async function uploadFile(
 }
 
 /**
+ * Avvia una sessione di upload "resumable" su Google Drive e ne ritorna l'URL.
+ * Il browser carica poi i byte direttamente su questo URL (tramite un proxy a chunk,
+ * vedi /api/drive/upload-chunk), aggirando il limite di ~4.5MB per richiesta imposto
+ * dalle funzioni serverless di Vercel sulle route che passano dal nostro server.
+ */
+export async function createResumableUploadSession(
+    folderId: string,
+    fileName: string,
+    mimeType: string
+): Promise<string> {
+    const oauth2Client = getOAuthClient();
+    const { token } = await oauth2Client.getAccessToken();
+    if (!token) throw new Error('Impossibile ottenere il token di accesso Google Drive');
+
+    const res = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,webViewLink',
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json; charset=UTF-8',
+            },
+            body: JSON.stringify({ name: fileName, parents: [folderId], mimeType }),
+        }
+    );
+
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Impossibile avviare l'upload su Google Drive (${res.status}): ${text}`);
+    }
+
+    const location = res.headers.get('location');
+    if (!location) throw new Error('Google Drive non ha fornito un URL di upload');
+    return location;
+}
+
+/**
  * Genera un link di download diretto per un file (richiede che il chiamante
  * sia autenticato sul sito; il file su Drive resta privato salvo questo link).
  */

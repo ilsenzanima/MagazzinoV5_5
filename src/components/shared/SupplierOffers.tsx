@@ -15,6 +15,7 @@ import { notify } from "@/lib/notify"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { getFileIcon } from "@/lib/file-icon"
 import { compressImageIfNeeded } from "@/lib/image-compress"
+import { uploadFileToDrive } from "@/lib/drive-upload"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
@@ -130,12 +131,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         const { okCount, failedCount } = await batchUpload.run(pendingFiles, async pending => {
             const compressed = await compressImageIfNeeded(pending.file)
             const fileExt = compressed.name.split('.').pop() || ''
-            const formData = new FormData()
-            formData.append('file', compressed)
-            formData.append('folderPath', JSON.stringify(folderPath))
-            const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
-            const uploaded = await res.json()
-            if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+            const uploaded = await uploadFileToDrive(compressed, folderPath)
 
             await supplierOffersApi.create({
                 jobId,

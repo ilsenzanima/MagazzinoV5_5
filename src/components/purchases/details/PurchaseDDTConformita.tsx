@@ -37,6 +37,7 @@ import {
 } from "@/lib/services/compliance"
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types"
 import { compressImageIfNeeded } from "@/lib/image-compress"
+import { uploadFileToDrive } from "@/lib/drive-upload"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { useBatchUpload } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
@@ -136,15 +137,7 @@ export function PurchaseDDTConformita({
         setUploading(true)
         const { failedCount } = await batchUpload.run([upFile], async (file) => {
             const compressed = await compressImageIfNeeded(file)
-            const formData = new FormData()
-            formData.append("file", compressed)
-            formData.append(
-                "folderPath",
-                JSON.stringify(["Fornitori", supplierName || supplierId, "Compliance", "DDT"])
-            )
-            const res = await fetch("/api/drive/upload", { method: "POST", body: formData })
-            const result = await res.json()
-            if (!res.ok) throw new Error(result.error || "Errore upload")
+            const result = await uploadFileToDrive(compressed, ["Fornitori", supplierName || supplierId, "Compliance", "DDT"])
 
             await complianceApi.create({
                 supplierId,

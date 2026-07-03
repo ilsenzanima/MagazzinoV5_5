@@ -59,6 +59,7 @@ import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
 import { compressImageIfNeeded } from "@/lib/image-compress"
+import { uploadFileToDrive } from "@/lib/drive-upload"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
@@ -292,12 +293,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         const { okCount, failedCount } = await batchUpload.run(pendingFiles, async pf => {
             const compressed = await compressImageIfNeeded(pf.file)
             const fileExt = compressed.name.split(".").pop() || ''
-            const formData = new FormData()
-            formData.append('file', compressed)
-            formData.append('folderPath', JSON.stringify(segments))
-            const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
-            const uploaded = await res.json()
-            if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+            const uploaded = await uploadFileToDrive(compressed, segments)
             await jobDocumentsApi.create({
                 jobId,
                 name: pf.name.trim() || pf.file.name,
@@ -343,12 +339,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
             if (editFile) {
                 const compressed = await compressImageIfNeeded(editFile)
                 const fileExt = compressed.name.split('.').pop() || ''
-                const formData = new FormData()
-                formData.append('file', compressed)
-                formData.append('folderPath', JSON.stringify(['Cantieri', jobLabel || jobId, 'Conformità']))
-                const res = await fetch('/api/drive/upload', { method: 'POST', body: formData })
-                const uploaded = await res.json()
-                if (!res.ok) throw new Error(uploaded.error || 'Errore upload su Google Drive')
+                const uploaded = await uploadFileToDrive(compressed, ['Cantieri', jobLabel || jobId, 'Conformità'])
                 fileUrl = uploaded.fileId
                 fileType = fileExt
                 fileSize = compressed.size

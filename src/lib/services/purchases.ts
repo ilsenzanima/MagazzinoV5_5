@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Purchase, PurchaseItem } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 import { compressImageIfNeeded } from '@/lib/image-compress';
+import { uploadFileToDrive } from '@/lib/drive-upload';
 
 export const mapDbToPurchase = (db: any): Purchase => ({
     id: db.id,
@@ -218,13 +219,8 @@ export const purchasesApi = {
 
     uploadDocument: async (file: File, supplierName?: string) => {
         const compressed = await compressImageIfNeeded(file);
-        const formData = new FormData();
-        formData.append('file', compressed);
-        formData.append('folderPath', JSON.stringify(['Fornitori', supplierName || 'Senza fornitore', 'Acquisti']));
-        const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Errore upload su Google Drive');
-        return result.fileId as string;
+        const result = await uploadFileToDrive(compressed, ['Fornitori', supplierName || 'Senza fornitore', 'Acquisti']);
+        return result.fileId;
     },
 
     update: async (id: string, purchase: Partial<Purchase>) => {
