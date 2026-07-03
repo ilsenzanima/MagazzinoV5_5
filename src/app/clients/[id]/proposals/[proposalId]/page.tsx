@@ -19,6 +19,8 @@ import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/servic
 import { clientsApi } from "@/lib/api"
 import { jobsApi, jobTasksApi } from "@/lib/api"
 import { proposalTasksApi } from "@/lib/services/proposal-tasks"
+import { costAnalysisApi } from "@/lib/services/cost-analysis"
+import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
 import { supplierOffersApi } from "@/lib/services/supplier-offers"
 import { SupplierOffers } from "@/components/shared/SupplierOffers"
@@ -91,6 +93,8 @@ export default function ProposalDetailPage() {
     const [converting, setConverting] = useState(false)
     const [convertHasTasks, setConvertHasTasks] = useState(false)
     const [convertStartDate, setConvertStartDate] = useState("")
+    const [costVersions, setCostVersions] = useState<ProposalCostAnalysisVersion[]>([])
+    const [convertVersionId, setConvertVersionId] = useState<string>("")
     const [convertReuseJobId, setConvertReuseJobId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [useClientAddr, setUseClientAddr] = useState(false)
@@ -290,6 +294,12 @@ export default function ProposalDetailPage() {
                 }
             }
 
+            // Copia l'analisi costi scelta dalla proposta nella tabella "Prezzi Materiali"
+            // della commessa (sostituendo eventuali righe esistenti)
+            if (convertVersionId) {
+                await costAnalysisApi.replaceFromProposalVersion(job.id, convertVersionId)
+            }
+
             // Collega alla commessa i documenti già caricati sulla proposta (stessi record, nessuna copia)
             await proposalDocumentsApi.linkToJob(proposalId, job.id)
             await proposalSiteDocumentsApi.linkToJob(proposalId, job.id)
@@ -299,7 +309,9 @@ export default function ProposalDetailPage() {
             // proposta (stesse righe, nessuna copia: restano sincronizzate tra le due pagine)
             await proposalComplianceApi.linkToJob(proposalId, job.id)
 
-            notify.success(convertReuseJobId ? "Commessa esistente aggiornata!" : "Commessa creata!")
+            notify.success(convertReuseJobId
+                ? "Commessa esistente aggiornata!"
+                : convertVersionId ? "Commessa creata con analisi costi copiata!" : "Commessa creata!")
             router.push(`/jobs/${job.id}`)
         } catch { notify.error("Errore durante la conversione") }
         finally { setConverting(false) }
@@ -345,6 +357,13 @@ export default function ProposalDetailPage() {
                             {(!proposal.convertedJobId || proposal.status === "pending") && (
                                 <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={async () => {
                                     setConvertStartDate("")
+                                    // Preseleziona l'analisi costi più recente: di default i materiali
+                                    // dell'offerta vengono copiati nei "Prezzi Materiali" della commessa
+                                    try {
+                                        const versions = await proposalCostAnalysisVersionsApi.getByProposalId(proposalId)
+                                        setCostVersions(versions)
+                                        setConvertVersionId(versions[0]?.id ?? "")
+                                    } catch { setCostVersions([]); setConvertVersionId("") }
                                     try {
                                         const proposalTasks = await proposalTasksApi.getByProposalId(proposalId)
                                         setConvertHasTasks(proposalTasks.length > 0)
@@ -669,11 +688,25 @@ export default function ProposalDetailPage() {
                     <DialogHeader><DialogTitle>Converti in Commessa</DialogTitle></DialogHeader>
                     <p className="text-sm text-slate-600 dark:text-slate-400 py-2">
                         {convertReuseJobId ? (
-                            <>La commessa precedentemente collegata a questa proposta esiste ancora (nel cestino): verrà <strong>ripristinata e aggiornata</strong> con i dati attuali della proposta (titolo, descrizione, indirizzo cantiere, valore stimato, cronoprogramma e conformità). I documenti restano collegati automaticamente.</>
+                            <>La commessa precedentemente collegata a questa proposta esiste ancora (nel cestino): verrà <strong>ripristinata e aggiornata</strong> con i dati attuali della proposta (titolo, descrizione, indirizzo cantiere, valore stimato, cronoprogramma, analisi costi e conformità). I documenti restano collegati automaticamente.</>
                         ) : (
                             <>Verrà creata una nuova commessa a partire da questa proposta con titolo, descrizione, indirizzo cantiere e valore stimato già compilati.</>
-                        )} La proposta verrà marcata come <strong>Accettata</strong>. I prezzi dei materiali verranno recuperati automaticamente dalle analisi costi della proposta man mano che vengono aggiunti alla commessa.
+                        )} La proposta verrà marcata come <strong>Accettata</strong>. I materiali e i parametri dell&apos;analisi costi scelta qui sotto verranno copiati nei &quot;Prezzi Materiali&quot; della commessa.
                     </p>
+                    {costVersions.length > 0 && (
+                        <div className="space-y-1 py-2">
+                            <label className="text-sm font-medium">Analisi costi da copiare in commessa</label>
+                            <Select value={convertVersionId || "none"} onValueChange={v => setConvertVersionId(v === "none" ? "" : v)}>
+                                <SelectTrigger><SelectValue placeholder="Seleziona analisi costi" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Nessuna (commessa senza materiali)</SelectItem>
+                                    {costVersions.map(v => (
+                                        <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     {convertHasTasks && (
                         <div className="space-y-1 py-2">
                             <label className="text-sm font-medium">Data inizio cantiere</label>
