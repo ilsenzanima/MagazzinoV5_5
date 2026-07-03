@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { proposalCostAnalysisApi } from './proposal-cost-analysis';
+import { proposalCostAnalysisApi, proposalCostAnalysisVersionsApi } from './proposal-cost-analysis';
 
 export interface CostAnalysisParams {
     jobId: string;
@@ -149,16 +149,34 @@ export const costAnalysisApi = {
         if (error) throw error;
     },
 
-    // Sostituisce righe e parametri della commessa con quelli di una versione di analisi costi della proposta
-    replaceFromProposalVersion: async (jobId: string, versionId: string): Promise<void> => {
-        const [rows, params] = await Promise.all([
-            proposalCostAnalysisApi.getByVersionId(versionId),
-            proposalCostAnalysisApi.getParams(versionId),
-        ]);
+    // Sostituisce righe e parametri della commessa con l'unione dei materiali di TUTTE le
+    // analisi costi della proposta: un materiale/voce presente in più versioni conta una
+    // sola volta, con i dati (prezzo, quantità...) della versione più recente che lo contiene.
+    // I parametri (sfrido, ricarico...) usati sono quelli della versione più recente.
+    // Restituisce false se la proposta non ha nessuna analisi costi da copiare.
+    replaceFromAllProposalVersions: async (jobId: string, proposalId: string): Promise<boolean> => {
+        const versions = await proposalCostAnalysisVersionsApi.getByProposalId(proposalId); // dal più recente al più vecchio
+        if (versions.length === 0) return false;
+
+        const rowsPerVersion = await Promise.all(versions.map(v => proposalCostAnalysisApi.getByVersionId(v.id)));
+
+        // Unisce le righe partendo dalla versione più vecchia, così quelle delle versioni
+        // più recenti sovrascrivono i duplicati (stesso articolo, o stesso nome per le voci generiche)
+        const merged = new Map<string, CostAnalysisRow>();
+        for (let i = versions.length - 1; i >= 0; i--) {
+            for (const r of rowsPerVersion[i]) {
+                const key = r.type === 'inventory' && r.itemId ? `inv:${r.itemId}` : `gen:${r.itemName.trim().toLowerCase()}`;
+                merged.set(key, r);
+            }
+        }
+        const mergedRows = [...merged.values()]
+            .sort((a, b) => a.type.localeCompare(b.type) || a.sortOrder - b.sortOrder)
+            .map((r, idx) => ({ ...r, sortOrder: idx }));
+
         const { error: delError } = await supabase.from('job_cost_analysis_rows').delete().eq('job_id', jobId);
         if (delError) throw delError;
-        if (rows.length > 0) {
-            const { error: insError } = await supabase.from('job_cost_analysis_rows').insert(rows.map(r => ({
+        if (mergedRows.length > 0) {
+            const { error: insError } = await supabase.from('job_cost_analysis_rows').insert(mergedRows.map(r => ({
                 job_id: jobId,
                 type: r.type,
                 item_id: r.itemId || null,
@@ -173,14 +191,17 @@ export const costAnalysisApi = {
             })));
             if (insError) throw insError;
         }
+
+        const latestParams = await proposalCostAnalysisApi.getParams(versions[0].id);
         await costAnalysisApi.upsertParams(jobId, {
-            sfrido: params.sfrido,
-            sconto: params.sconto,
-            trasporto: params.trasporto,
-            posa: params.posa,
-            ricarico: params.ricarico,
-            margineTrattativa: params.margineTrattativa,
-        }, versionId);
+            sfrido: latestParams.sfrido,
+            sconto: latestParams.sconto,
+            trasporto: latestParams.trasporto,
+            posa: latestParams.posa,
+            ricarico: latestParams.ricarico,
+            margineTrattativa: latestParams.margineTrattativa,
+        }, null);
+        return true;
     },
 
     // Prezzi massimi per più articoli in una sola query

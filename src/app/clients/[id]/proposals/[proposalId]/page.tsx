@@ -20,7 +20,6 @@ import { clientsApi } from "@/lib/api"
 import { jobsApi, jobTasksApi } from "@/lib/api"
 import { proposalTasksApi } from "@/lib/services/proposal-tasks"
 import { costAnalysisApi } from "@/lib/services/cost-analysis"
-import { proposalCostAnalysisVersionsApi } from "@/lib/services/proposal-cost-analysis"
 import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
 import { supplierOffersApi } from "@/lib/services/supplier-offers"
 import { SupplierOffers } from "@/components/shared/SupplierOffers"
@@ -307,17 +306,12 @@ export default function ProposalDetailPage() {
                 }
             }
 
-            // Copia in automatico l'analisi costi più recente della proposta nella tabella
-            // "Prezzi Materiali" della commessa (sostituendo eventuali righe esistenti),
-            // senza chiedere nulla all'utente
+            // Copia in automatico nella tabella "Prezzi Materiali" della commessa l'unione dei
+            // materiali di TUTTE le analisi costi della proposta (sostituendo eventuali righe
+            // esistenti), senza chiedere nulla all'utente
             let costAnalysisCopied = false
             try {
-                const versions = await proposalCostAnalysisVersionsApi.getByProposalId(proposalId)
-                const latestVersion = versions[0]
-                if (latestVersion) {
-                    await costAnalysisApi.replaceFromProposalVersion(job.id, latestVersion.id)
-                    costAnalysisCopied = true
-                }
+                costAnalysisCopied = await costAnalysisApi.replaceFromAllProposalVersions(job.id, proposalId)
             } catch { /* non bloccante: la commessa resta creata anche se la copia fallisce */ }
 
             // Collega alla commessa i documenti già caricati sulla proposta (stessi record, nessuna copia)
