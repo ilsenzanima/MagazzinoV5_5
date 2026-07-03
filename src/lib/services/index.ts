@@ -7,6 +7,7 @@ export * from './inventory';
 export * from './clients';
 export * from './jobs';
 export * from './job-tasks';
+export * from './job-task-assignments';
 export * from './movements';
 export * from './delivery-notes';
 export * from './workers';

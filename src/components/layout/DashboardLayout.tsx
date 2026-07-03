@@ -65,12 +65,6 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/purchases",
           active: pathname === "/purchases" || pathname.startsWith("/purchases/"),
         },
-        ...(userRole === "admin" || userRole === "operativo" ? [{
-          label: "Gestione conformità",
-          icon: ShieldCheck,
-          href: "/compliance",
-          active: pathname === "/compliance",
-        }] : []),
         {
           label: "Movimentazione",
           icon: Truck,
@@ -99,8 +93,24 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/attendance",
           active: pathname === "/attendance" || pathname.startsWith("/attendance/"),
         },
+        {
+          label: "Cronoprogramma",
+          icon: GanttChartSquare,
+          href: "/cronoprogramma",
+          active: pathname === "/cronoprogramma",
+        },
       ]
     },
+    ...(userRole === "admin" || userRole === "operativo" ? [{
+      items: [
+        {
+          label: "Gestione conformità",
+          icon: ShieldCheck,
+          href: "/compliance",
+          active: pathname === "/compliance",
+        },
+      ]
+    }] : []),
     {
       items: [
         {
@@ -114,12 +124,6 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           icon: Users,
           href: "/clients",
           active: pathname === "/clients" || pathname.startsWith("/clients/"),
-        },
-        {
-          label: "Cronoprogramma",
-          icon: GanttChartSquare,
-          href: "/cronoprogramma",
-          active: pathname === "/cronoprogramma",
         },
         ...(userRole === "admin" || userRole === "operativo" ? [{
           label: "Offerte generali",
