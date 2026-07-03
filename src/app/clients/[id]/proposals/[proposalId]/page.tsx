@@ -96,6 +96,9 @@ export default function ProposalDetailPage() {
     const [costVersions, setCostVersions] = useState<ProposalCostAnalysisVersion[]>([])
     const [convertVersionId, setConvertVersionId] = useState<string>("")
     const [convertReuseJobId, setConvertReuseJobId] = useState<string | null>(null)
+    // false = la commessa collegata è nel cestino o non esiste più: la proposta è riconvertibile
+    // (null = sconosciuto/in caricamento, trattato come "viva" per non far lampeggiare i pulsanti)
+    const [linkedJobAlive, setLinkedJobAlive] = useState<boolean | null>(null)
     const [saving, setSaving] = useState(false)
     const [useClientAddr, setUseClientAddr] = useState(false)
 
@@ -149,6 +152,18 @@ export default function ProposalDetailPage() {
         }).catch(() => router.push(`/clients/${clientId}`))
           .finally(() => setLoading(false))
     }, [proposalId, clientId])
+
+    // Verifica se la commessa collegata esiste ancora ed è fuori dal cestino:
+    // se non lo è, la proposta deve poter essere riconvertita qualunque sia il suo stato
+    useEffect(() => {
+        const jobId = proposal?.convertedJobId
+        if (!jobId) { setLinkedJobAlive(null); return }
+        let cancelled = false
+        jobsApi.getStatusById(jobId)
+            .then(s => { if (!cancelled) setLinkedJobAlive(s.exists && !s.deletedAt) })
+            .catch(() => { if (!cancelled) setLinkedJobAlive(null) })
+        return () => { cancelled = true }
+    }, [proposal?.convertedJobId])
 
     const openEdit = () => {
         if (!proposal) return
@@ -354,7 +369,7 @@ export default function ProposalDetailPage() {
                     </div>
                     {canEdit && (
                         <div className="flex gap-2 shrink-0 flex-wrap sm:justify-end">
-                            {(!proposal.convertedJobId || proposal.status === "pending") && (
+                            {(!proposal.convertedJobId || proposal.status === "pending" || linkedJobAlive === false) && (
                                 <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={async () => {
                                     setConvertStartDate("")
                                     // Preseleziona l'analisi costi più recente: di default i materiali
@@ -381,7 +396,7 @@ export default function ProposalDetailPage() {
                                     <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa
                                 </Button>
                             )}
-                            {proposal.convertedJobId && proposal.status !== "pending" && (
+                            {proposal.convertedJobId && proposal.status !== "pending" && linkedJobAlive !== false && (
                                 <Link href={`/jobs/${proposal.convertedJobId}`}>
                                     <Button size="sm" variant="outline" className="text-blue-600">Vai alla Commessa</Button>
                                 </Link>
@@ -552,8 +567,8 @@ export default function ProposalDetailPage() {
                                 </CardContent>
                             </Card>
 
-                            {/* Card collegamento commessa (solo se convertita) */}
-                            {proposal.convertedJobId && (
+                            {/* Card collegamento commessa (solo se convertita e la commessa esiste ancora) */}
+                            {proposal.convertedJobId && linkedJobAlive !== false && (
                                 <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-3 flex items-center justify-between gap-4">
                                     <div>
                                         <p className="text-xs uppercase tracking-wide text-green-600 mb-0.5">Convertita in commessa</p>
@@ -564,6 +579,14 @@ export default function ProposalDetailPage() {
                                             Vai alla Commessa
                                         </Button>
                                     </Link>
+                                </div>
+                            )}
+
+                            {/* Card commessa eliminata: la proposta può essere riconvertita */}
+                            {proposal.convertedJobId && linkedJobAlive === false && (
+                                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
+                                    <p className="text-xs uppercase tracking-wide text-amber-600 mb-0.5">Commessa eliminata</p>
+                                    <p className="text-xs text-slate-500">La commessa creata da questa proposta è stata eliminata. Puoi usare &quot;Converti in Commessa&quot; per riconvertirla: se la commessa è ancora nel cestino verrà ripristinata e aggiornata, altrimenti ne verrà creata una nuova.</p>
                                 </div>
                             )}
                         </div>
