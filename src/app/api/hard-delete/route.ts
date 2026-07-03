@@ -77,19 +77,27 @@ export async function POST(req: NextRequest) {
             await deleteDriveFiles(extractDriveFileIds(data.document_urls))
         }
     } else if (section === "jobs") {
-        const [job, jobDocs, sharedDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
+        // shared_documents/shared_site_documents/shared_supplier_offers condividono la
+        // stessa riga tra commessa e offerta di origine (job_id impostato sulla riga della
+        // proposta alla conversione, senza copiarla): se una riga ha ANCHE proposal_id
+        // valorizzato, il file resta visibile/necessario sull'offerta e non va cancellato,
+        // la riga sopravvive con job_id azzerato (FK ON DELETE SET NULL).
+        const [job, jobDocs, sharedDocs, sharedSiteDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
             admin.from('jobs').select('code, name').eq('id', id).single(),
             admin.from('job_documents').select('file_url').eq('job_id', id),
-            admin.from('shared_documents').select('file_url').eq('job_id', id),
-            admin.from('shared_supplier_offers').select('file_url').eq('job_id', id),
+            admin.from('shared_documents').select('file_url, proposal_id').eq('job_id', id),
+            admin.from('shared_site_documents').select('file_url, proposal_id').eq('job_id', id),
+            admin.from('shared_supplier_offers').select('file_url, proposal_id').eq('job_id', id),
             admin.from('job_sal_costs').select('document_urls').eq('job_id', id),
             admin.from('job_sal_approvati').select('document_url').eq('job_id', id),
             admin.from('job_fatture_committente').select('document_url').eq('job_id', id),
         ])
+        const onlyJobOwned = <T extends { proposal_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.proposal_id)
         const allUrls = [
             ...(jobDocs.data ?? []).map(r => r.file_url),
-            ...(sharedDocs.data ?? []).map(r => r.file_url),
-            ...(supplierOffers.data ?? []).map(r => r.file_url),
+            ...onlyJobOwned(sharedDocs.data).map(r => r.file_url),
+            ...onlyJobOwned(sharedSiteDocs.data).map(r => r.file_url),
+            ...onlyJobOwned(supplierOffers.data).map(r => r.file_url),
             ...(salCosts.data ?? []).flatMap(r => r.document_urls ?? []),
             ...(salApprovati.data ?? []).map(r => r.document_url),
             ...(fattureCommittente.data ?? []).map(r => r.document_url),
@@ -100,13 +108,18 @@ export async function POST(req: NextRequest) {
             await markFolderDeleted(['Cantieri', `${job.data.code} ${job.data.name}`]).catch(() => {})
         }
     } else if (section === "proposals") {
-        const [sharedDocs, supplierOffers] = await Promise.all([
-            admin.from('shared_documents').select('file_url').eq('proposal_id', id),
-            admin.from('shared_supplier_offers').select('file_url').eq('proposal_id', id),
+        // Stesso ragionamento, speculare: non cancella il file se la riga è ancora
+        // collegata a una commessa (job_id valorizzato), che continua a usarlo.
+        const [sharedDocs, sharedSiteDocs, supplierOffers] = await Promise.all([
+            admin.from('shared_documents').select('file_url, job_id').eq('proposal_id', id),
+            admin.from('shared_site_documents').select('file_url, job_id').eq('proposal_id', id),
+            admin.from('shared_supplier_offers').select('file_url, job_id').eq('proposal_id', id),
         ])
+        const onlyProposalOwned = <T extends { job_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.job_id)
         const allUrls = [
-            ...(sharedDocs.data ?? []).map(r => r.file_url),
-            ...(supplierOffers.data ?? []).map(r => r.file_url),
+            ...onlyProposalOwned(sharedDocs.data).map(r => r.file_url),
+            ...onlyProposalOwned(sharedSiteDocs.data).map(r => r.file_url),
+            ...onlyProposalOwned(supplierOffers.data).map(r => r.file_url),
         ]
         await deleteStorageFiles(admin, extractStoragePaths(allUrls))
         await deleteDriveFiles(extractDriveFileIds(allUrls))

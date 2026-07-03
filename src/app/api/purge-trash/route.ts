@@ -79,24 +79,30 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    // Jobs — elimina anche i file collegati (documenti cantiere, condivisi, SAL, fatture committente)
+    // Jobs — elimina anche i file collegati (documenti cantiere, condivisi, SAL, fatture committente).
+    // shared_documents/shared_site_documents/shared_supplier_offers condividono la stessa riga tra
+    // commessa e offerta di origine: se una riga ha ANCHE proposal_id valorizzato, il file resta
+    // necessario sull'offerta e non va cancellato (la riga sopravvive con job_id azzerato via FK).
     {
         const { data } = await admin.from('jobs').select('id, code, name')
             .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
         if (data?.length) {
             const jobIds = data.map(r => r.id)
-            const [jobDocs, sharedDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
+            const [jobDocs, sharedDocs, sharedSiteDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
                 admin.from('job_documents').select('file_url').in('job_id', jobIds),
-                admin.from('shared_documents').select('file_url').in('job_id', jobIds),
-                admin.from('shared_supplier_offers').select('file_url').in('job_id', jobIds),
+                admin.from('shared_documents').select('file_url, proposal_id').in('job_id', jobIds),
+                admin.from('shared_site_documents').select('file_url, proposal_id').in('job_id', jobIds),
+                admin.from('shared_supplier_offers').select('file_url, proposal_id').in('job_id', jobIds),
                 admin.from('job_sal_costs').select('document_urls').in('job_id', jobIds),
                 admin.from('job_sal_approvati').select('document_url').in('job_id', jobIds),
                 admin.from('job_fatture_committente').select('document_url').in('job_id', jobIds),
             ])
+            const onlyJobOwned = <T extends { proposal_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.proposal_id)
             const allUrls = [
                 ...(jobDocs.data ?? []).map(r => r.file_url),
-                ...(sharedDocs.data ?? []).map(r => r.file_url),
-                ...(supplierOffers.data ?? []).map(r => r.file_url),
+                ...onlyJobOwned(sharedDocs.data).map(r => r.file_url),
+                ...onlyJobOwned(sharedSiteDocs.data).map(r => r.file_url),
+                ...onlyJobOwned(supplierOffers.data).map(r => r.file_url),
                 ...(salCosts.data ?? []).flatMap(r => r.document_urls ?? []),
                 ...(salApprovati.data ?? []).map(r => r.document_url),
                 ...(fattureCommittente.data ?? []).map(r => r.document_url),
@@ -109,19 +115,24 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    // Proposte — elimina anche i file collegati (documenti condivisi, offerte fornitori)
+    // Proposte — elimina anche i file collegati (documenti condivisi, offerte fornitori).
+    // Stesso ragionamento, speculare: non cancella il file se la riga è ancora collegata
+    // a una commessa (job_id valorizzato), che continua a usarlo.
     {
         const { data } = await admin.from('client_proposals').select('id')
             .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
         if (data?.length) {
             const proposalIds = data.map(r => r.id)
-            const [sharedDocs, supplierOffers] = await Promise.all([
-                admin.from('shared_documents').select('file_url').in('proposal_id', proposalIds),
-                admin.from('shared_supplier_offers').select('file_url').in('proposal_id', proposalIds),
+            const [sharedDocs, sharedSiteDocs, supplierOffers] = await Promise.all([
+                admin.from('shared_documents').select('file_url, job_id').in('proposal_id', proposalIds),
+                admin.from('shared_site_documents').select('file_url, job_id').in('proposal_id', proposalIds),
+                admin.from('shared_supplier_offers').select('file_url, job_id').in('proposal_id', proposalIds),
             ])
+            const onlyProposalOwned = <T extends { job_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.job_id)
             const allUrls = [
-                ...(sharedDocs.data ?? []).map(r => r.file_url),
-                ...(supplierOffers.data ?? []).map(r => r.file_url),
+                ...onlyProposalOwned(sharedDocs.data).map(r => r.file_url),
+                ...onlyProposalOwned(sharedSiteDocs.data).map(r => r.file_url),
+                ...onlyProposalOwned(supplierOffers.data).map(r => r.file_url),
             ]
             await deleteStorageFiles(admin, extractStoragePaths(allUrls))
             await deleteDriveFiles(extractDriveFileIds(allUrls))
