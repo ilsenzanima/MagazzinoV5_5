@@ -151,7 +151,8 @@ export const costAnalysisApi = {
 
     // Sostituisce righe e parametri della commessa con l'unione dei materiali di TUTTE le
     // analisi costi della proposta: un materiale/voce presente in più versioni conta una
-    // sola volta, con i dati (prezzo, quantità...) della versione più recente che lo contiene.
+    // sola volta, con i dati della versione che gli assegna il prezzo unitario più alto
+    // (a parità/assenza di prezzo, vince la versione più recente che lo contiene).
     // I parametri (sfrido, ricarico...) usati sono quelli della versione più recente.
     // Restituisce false se la proposta non ha nessuna analisi costi da copiare.
     replaceFromAllProposalVersions: async (jobId: string, proposalId: string): Promise<boolean> => {
@@ -160,13 +161,17 @@ export const costAnalysisApi = {
 
         const rowsPerVersion = await Promise.all(versions.map(v => proposalCostAnalysisApi.getByVersionId(v.id)));
 
-        // Unisce le righe partendo dalla versione più vecchia, così quelle delle versioni
-        // più recenti sovrascrivono i duplicati (stesso articolo, o stesso nome per le voci generiche)
+        // Unisce le righe partendo dalla versione più vecchia: tra duplicati (stesso articolo,
+        // o stesso nome per le voci generiche) vince quello con prezzo unitario più alto; a
+        // parità/assenza di prezzo vince la versione più recente (>= mantiene l'ultima vista)
         const merged = new Map<string, CostAnalysisRow>();
         for (let i = versions.length - 1; i >= 0; i--) {
             for (const r of rowsPerVersion[i]) {
                 const key = r.type === 'inventory' && r.itemId ? `inv:${r.itemId}` : `gen:${r.itemName.trim().toLowerCase()}`;
-                merged.set(key, r);
+                const current = merged.get(key);
+                if (!current || (r.unitPrice ?? -Infinity) >= (current.unitPrice ?? -Infinity)) {
+                    merged.set(key, r);
+                }
             }
         }
         const mergedRows = [...merged.values()]
