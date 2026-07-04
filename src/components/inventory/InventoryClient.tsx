@@ -404,7 +404,10 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                   <Link href={`/inventory/${item.id}`} key={item.id}>
                     <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
                       <span className="font-mono text-xs text-slate-400 dark:text-slate-500 w-20 shrink-0 truncate hidden sm:block">{item.code}</span>
-                      <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 break-words">
+                      <span
+                        className="font-semibold text-slate-900 dark:text-white text-sm flex-1 min-w-0 truncate"
+                        title={item.model ? `${item.name} (${item.model})` : item.name}
+                      >
                         {item.name}
                         {item.model && <span className="text-slate-500 font-normal ml-1">({item.model})</span>}
                       </span>

@@ -173,7 +173,7 @@ export default function ClientsPage() {
                         <span className="font-semibold text-slate-900 dark:text-white text-sm w-48 shrink-0 truncate">
                           {client.name}
                         </span>
-                        <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden sm:block">
+                        <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 min-w-0 truncate hidden sm:block">
                           {addressLine || '—'}
                         </span>
                       </div>

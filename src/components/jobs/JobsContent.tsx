@@ -221,7 +221,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <span className="font-mono text-xs text-slate-500 dark:text-slate-400 w-24 shrink-0 truncate">
                       {job.code}
                     </span>
-                    <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 truncate">
+                    <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 min-w-0 truncate">
                       {job.name}
                     </span>
                     <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>

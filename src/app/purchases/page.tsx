@@ -265,7 +265,10 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                           <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0">
                             {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}
                           </span>
-                          <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 break-words hidden md:block">
+                          <span
+                            className="text-slate-400 dark:text-slate-500 text-xs flex-1 min-w-0 truncate hidden md:block"
+                            title={articleNames}
+                          >
                             {articleNames || '—'}
                           </span>
                           <div className="flex items-center gap-2 shrink-0 ml-auto">

@@ -239,7 +239,10 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                       <span className="text-blue-600 dark:text-blue-400 text-xs w-36 shrink-0 break-words hidden md:block">
                         {jobLabel || '—'}
                       </span>
-                      <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 break-words hidden lg:block">
+                      <span
+                        className="text-slate-400 dark:text-slate-500 text-xs flex-1 min-w-0 truncate hidden lg:block"
+                        title={movement.itemNames?.join(', ')}
+                      >
                         {movement.itemNames?.join(', ') || '—'}
                       </span>
                       <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 ml-auto pt-0.5">

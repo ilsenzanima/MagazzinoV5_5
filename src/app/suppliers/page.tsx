@@ -165,7 +165,7 @@ export default function SuppliersPage() {
                     <span className="text-slate-500 dark:text-slate-400 text-xs w-32 shrink-0 truncate hidden md:block">
                       {supplier.phone || '—'}
                     </span>
-                    <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden lg:block">
+                    <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 min-w-0 truncate hidden lg:block">
                       {supplier.email || '—'}
                     </span>
                     <span className="text-slate-400 dark:text-slate-500 text-xs w-48 shrink-0 truncate hidden xl:block">
