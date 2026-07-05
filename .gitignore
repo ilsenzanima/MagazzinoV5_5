@@ -73,3 +73,7 @@ build_err.log
 compile_errors.txt
 debug_lotti.sql
 *.log
+
+# AI agent sample folder (for local reference documents)
+/_sample_data/
+
