@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent and worktree folders to avoid duplicate analysis
+    ".claude/**",
+    ".agent/**",
+    ".claire/**",
+    "_sample_data/**",
   ]),
 ]);
 
