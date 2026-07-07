@@ -220,7 +220,9 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
               ) : movements.map((movement) => {
                 const typeConfig = getTypeConfig(movement);
                 const Icon = typeConfig.icon;
-                const jobLabel = movement.jobName || movement.jobDescription || movement.jobCode;
+                const jobLabel = movement.type === 'sale' && movement.clientName
+                  ? `VENDITA: ${movement.clientName}`
+                  : (movement.jobName || movement.jobDescription || movement.jobCode);
                 return (
                   <Link href={`/movements/${movement.id}`} key={movement.id}>
                     <div className="flex items-start gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
@@ -326,7 +328,15 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                             <span className="text-slate-500 dark:text-slate-400 shrink-0">Causale</span>
                             <span className="font-medium text-right break-words">{movement.causal}</span>
                           </div>
-                          {(movement.jobCode || movement.jobName || movement.jobDescription) && (
+                           {movement.type === 'sale' && movement.clientName && (
+                            <div className="flex justify-between gap-3 py-1 border-b border-slate-50 dark:border-slate-700">
+                              <span className="text-slate-500 dark:text-slate-400 shrink-0">Committente</span>
+                              <span className="font-medium text-blue-600 dark:text-blue-400 text-right break-words">
+                                {movement.clientName}
+                              </span>
+                            </div>
+                          )}
+                          {movement.type !== 'sale' && (movement.jobCode || movement.jobName || movement.jobDescription) && (
                             <div className="flex justify-between gap-3 py-1 border-b border-slate-50 dark:border-slate-700">
                               <span className="text-slate-500 dark:text-slate-400 shrink-0">Commessa</span>
                               {(() => {

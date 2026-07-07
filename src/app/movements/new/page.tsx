@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { mapDbItemToInventoryItem, mapDbToJob } from '@/lib/api';
+import { mapDbItemToInventoryItem, mapDbToJob, mapDbToClient } from '@/lib/api';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import NewMovementContent from '@/components/movements/NewMovementContent';
 import { Suspense } from 'react';
@@ -36,12 +36,22 @@ export default async function NewMovementPage() {
 
     const initialJobs = jobsData ? jobsData.map(mapDbToJob) : [];
 
+    // Fetch initial clients (limit 100)
+    const { data: clientsData } = await supabase
+        .from('clients')
+        .select('*')
+        .order('name', { ascending: true })
+        .limit(100);
+
+    const initialClients = clientsData ? clientsData.map(mapDbToClient) : [];
+
     return (
         <DashboardLayout>
             <Suspense fallback={<NewMovementSkeleton />}>
                 <NewMovementContent 
                     initialInventory={initialInventory} 
                     initialJobs={initialJobs} 
+                    initialClients={initialClients}
                 />
             </Suspense>
         </DashboardLayout>

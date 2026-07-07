@@ -10,14 +10,53 @@ export interface DriveUploadResult {
     webViewLink: string
 }
 
-export async function uploadFileToDrive(file: File, folderPath: string[]): Promise<DriveUploadResult> {
+const folderPromiseCache: Record<string, Promise<string> | undefined> = {}
+
+/**
+ * Assicura che il percorso di cartelle esista su Google Drive.
+ * Ritorna una promessa con l'id della cartella finale.
+ * Utilizza una cache locale per evitare race conditions ed evitare di creare cartelle duplicate
+ * quando più file dello stesso cantiere/commessa vengono caricati simultaneamente.
+ */
+export function ensureFolderOnDrive(folderPath: string[]): Promise<string> {
+    const key = folderPath.join('/')
+    if (folderPromiseCache[key]) {
+        return folderPromiseCache[key]
+    }
+
+    const promise = (async () => {
+        const res = await fetch('/api/drive/upload-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderPath }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+            delete folderPromiseCache[key]
+            throw new Error(data.error || 'Errore nella creazione della cartella su Google Drive')
+        }
+        return data.folderId
+    })()
+
+    folderPromiseCache[key] = promise
+    return promise
+}
+
+export async function uploadFileToDrive(file: File, folderPath: string[] | string): Promise<DriveUploadResult> {
+    let folderId: string
+    if (typeof folderPath === 'string') {
+        folderId = folderPath
+    } else {
+        folderId = await ensureFolderOnDrive(folderPath)
+    }
+
     const sessionRes = await fetch('/api/drive/upload-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             fileName: file.name,
             mimeType: file.type || 'application/octet-stream',
-            folderPath,
+            folderId,
         }),
     })
     const session = await sessionRes.json()

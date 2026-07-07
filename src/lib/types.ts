@@ -390,6 +390,8 @@ export interface DeliveryNote {
     jobClientName?: string;
     jobDescription?: string;
     jobAddress?: string;
+    clientId?: string;
+    clientName?: string;
     causal: string;
     pickupLocation: string;
     deliveryLocation: string;

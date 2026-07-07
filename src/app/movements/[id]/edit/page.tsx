@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { mapDbToDeliveryNote, mapDbItemToInventoryItem, mapDbToJob } from '@/lib/api';
+import { mapDbToDeliveryNote, mapDbItemToInventoryItem, mapDbToJob, mapDbToClient } from '@/lib/api';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import NewMovementContent from '@/components/movements/NewMovementContent';
 import { Suspense } from 'react';
@@ -24,6 +24,7 @@ export default async function EditMovementPage({ params }: { params: Promise<{ i
         .from('delivery_notes')
         .select(`
             *,
+            clients(id, name),
             jobs(code, description, site_address),
             delivery_note_items(
               *,
@@ -72,6 +73,28 @@ export default async function EditMovementPage({ params }: { params: Promise<{ i
         }
     }
 
+    // Fetch initial clients (limit 100)
+    const { data: clientsData } = await supabase
+        .from('clients')
+        .select('*')
+        .order('name', { ascending: true })
+        .limit(100);
+
+    const initialClients = clientsData ? clientsData.map(mapDbToClient) : [];
+
+    // Ensure the client linked to the note is in the list, if not, fetch it
+    if (initialNote.clientId && !initialClients.find(c => c.id === initialNote.clientId)) {
+        const { data: linkedClient } = await supabase
+            .from('clients')
+            .select('*')
+            .eq('id', initialNote.clientId)
+            .single();
+
+        if (linkedClient) {
+            initialClients.push(mapDbToClient(linkedClient));
+        }
+    }
+
     return (
         <DashboardLayout>
             <Suspense fallback={<EditMovementSkeleton />}>
@@ -79,6 +102,7 @@ export default async function EditMovementPage({ params }: { params: Promise<{ i
                     initialNote={initialNote}
                     initialInventory={initialInventory}
                     initialJobs={initialJobs}
+                    initialClients={initialClients}
                 />
             </Suspense>
         </DashboardLayout>

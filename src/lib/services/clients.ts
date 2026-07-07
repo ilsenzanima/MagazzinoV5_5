@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Client } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 
-const mapDbToClient = (db: any): Client => {
+export const mapDbToClient = (db: any): Client => {
     return {
         id: db.id,
         name: db.name,

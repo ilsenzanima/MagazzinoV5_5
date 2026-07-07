@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { inventoryApi } from "@/lib/services/inventory";
 import { jobsApi } from "@/lib/services/jobs";
 import { warehousesApi } from "@/lib/services/warehouses";
-import { InventoryItem, Job, Warehouse, DeliveryNote } from "@/lib/types";
+import { InventoryItem, Job, Warehouse, DeliveryNote, Client } from "@/lib/types";
 import { createMovement, updateMovement } from "@/app/movements/actions";
 import { notify } from "@/lib/notify";
 
@@ -67,10 +67,11 @@ const ensureTrailingEmpty = (lines: MovementLine[]): MovementLine[] => {
 interface UseMovementFormProps {
     initialInventory: InventoryItem[];
     initialJobs: Job[];
+    initialClients: Client[];
     initialNote?: DeliveryNote;
 }
 
-export function useMovementForm({ initialInventory, initialJobs, initialNote }: UseMovementFormProps) {
+export function useMovementForm({ initialInventory, initialJobs, initialClients, initialNote }: UseMovementFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
@@ -79,6 +80,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
 
     const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
     const [jobs, setJobs] = useState<Job[]>(initialJobs);
+    const [clients, setClients] = useState<Client[]>(initialClients);
     const [primaryWarehouse, setPrimaryWarehouse] = useState<Warehouse | null>(null);
 
     const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
@@ -94,6 +96,9 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     );
     const [selectedJob, setSelectedJob] = useState<Job | null>(
         initialNote?.jobId ? initialJobs.find((j) => j.id === initialNote.jobId) || null : null
+    );
+    const [selectedClient, setSelectedClient] = useState<Client | null>(
+        initialNote?.clientId ? initialClients.find((c) => c.id === initialNote.clientId) || null : null
     );
     const [causal, setCausal] = useState(initialNote?.causal || "");
     const [pickupLocation, setPickupLocation] = useState(initialNote?.pickupLocation || "");
@@ -148,15 +153,33 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     }, []);
 
     // In modifica, i campi causale/luoghi/note salvati non vanno sovrascritti
-    // con i default finché l'utente non cambia tab o cantiere
+    // con i default finché l'utente non cambia tab o cantiere o committente
     const editingDefaultsSuppressed = useRef(isEditing);
-    const initialTabJob = useRef({ tab: activeTab, jobId: selectedJob?.id ?? null });
+    const initialTabJob = useRef({ 
+        tab: activeTab, 
+        jobId: selectedJob?.id ?? null,
+        clientId: initialNote?.clientId ?? null
+    });
+
+    const isFirstTabChange = useRef(true);
+    useEffect(() => {
+        if (isFirstTabChange.current) {
+            isFirstTabChange.current = false;
+            return;
+        }
+        if (activeTab === "sale") {
+            setSelectedJob(null);
+        } else {
+            setSelectedClient(null);
+        }
+    }, [activeTab]);
 
     useEffect(() => {
         if (editingDefaultsSuppressed.current) {
             if (
                 activeTab === initialTabJob.current.tab &&
-                (selectedJob?.id ?? null) === initialTabJob.current.jobId
+                (selectedJob?.id ?? null) === initialTabJob.current.jobId &&
+                (selectedClient?.id ?? null) === initialTabJob.current.clientId
             ) {
                 return;
             }
@@ -180,6 +203,13 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             jobAddress += `DESTINAZIONE: ${destinationText}`;
         }
 
+        let clientAddress = "";
+        if (selectedClient) {
+            clientAddress += `CLIENTE: ${selectedClient.name}\n`;
+            const fullAddr = selectedClient.address || `${selectedClient.street || ''} ${selectedClient.streetNumber || ''}, ${selectedClient.postalCode || ''} ${selectedClient.city || ''} ${selectedClient.province ? '(' + selectedClient.province + ')' : ''}`.trim().replace(/^,/, '').trim();
+            clientAddress += `DESTINAZIONE: ${fullAddr || 'Sede cliente'}`;
+        }
+
         const warehouseAddress = primaryWarehouse?.address
             ? `${primaryWarehouse.name}\n${primaryWarehouse.address}`
             : "OPI FIRESAFE S.R.L. MAGAZZINO\nVia A. Malignani, 9 - 33010 - REANA DEL ROJALE (UD)";
@@ -197,7 +227,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         } else if (activeTab === "sale") {
             setCausal("Vendita");
             setPickupLocation(warehouseAddress);
-            setDeliveryLocation("Cliente");
+            setDeliveryLocation(clientAddress || "Cliente");
             setTransportTime("08:00");
         } else if (activeTab === "waste") {
             setCausal("Trasporto eccedenze cantiere");
@@ -216,7 +246,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         } else {
             setNotes("");
         }
-    }, [activeTab, selectedJob, primaryWarehouse]);
+    }, [activeTab, selectedJob, selectedClient, primaryWarehouse]);
 
     useEffect(() => {
         if (activeTab === "entry" && selectedJob) {
@@ -771,6 +801,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             number: fullNumber,
             date,
             jobId: selectedJob?.id,
+            clientId: selectedClient?.id,
             causal,
             pickupLocation,
             deliveryLocation,
@@ -817,6 +848,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         isEditing,
         inventory,
         jobs,
+        clients,
         isJobSelectorOpen,
         setIsJobSelectorOpen,
         jobsLoading,
@@ -829,6 +861,8 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         setDate,
         selectedJob,
         setSelectedJob,
+        selectedClient,
+        setSelectedClient,
         causal,
         setCausal,
         pickupLocation,
