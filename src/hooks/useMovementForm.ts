@@ -197,7 +197,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         } else if (activeTab === "sale") {
             setCausal("Vendita");
             setPickupLocation(warehouseAddress);
-            setDeliveryLocation("Cliente");
+            setDeliveryLocation(jobAddress || "Cliente");
             setTransportTime("08:00");
         } else if (activeTab === "waste") {
             setCausal("Trasporto eccedenze cantiere");

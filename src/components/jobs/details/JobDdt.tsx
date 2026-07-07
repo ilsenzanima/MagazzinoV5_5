@@ -36,11 +36,18 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const load = async () => {
     try {
       setLoading(true)
-      const [notes, purchases] = await Promise.all([
+      const [exitNotes, saleNotes, purchases] = await Promise.all([
         deliveryNotesApi.getByJobId(jobId, "exit"),
+        deliveryNotesApi.getByJobId(jobId, "sale"),
         purchasesApi.getByJobId(jobId),
       ])
-      setOpiNotes(notes)
+      const combinedNotes = [...exitNotes, ...saleNotes].sort((a, b) => {
+        const dateA = new Date(a.date).getTime()
+        const dateB = new Date(b.date).getTime()
+        if (dateB !== dateA) return dateB - dateA
+        return b.number.localeCompare(a.number)
+      })
+      setOpiNotes(combinedNotes)
       const docs: SupplierDoc[] = []
       purchases.filter(p => p.orderType !== 'order').forEach(p => {
         (p.documentUrls || []).forEach((url, index) => docs.push({ purchase: p, url, index }))
