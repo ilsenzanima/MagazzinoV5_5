@@ -12,31 +12,28 @@ import {
     Recycle,
 } from "lucide-react";
 import Link from "next/link";
-import { InventoryItem, Job, DeliveryNote, Client } from "@/lib/types";
+import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { useMovementForm } from "@/hooks/useMovementForm";
 
 import { MovementHeader } from "./form/MovementHeader";
 import { MovementJobSelector } from "./form/MovementJobSelector";
-import { MovementClientSelector } from "./form/MovementClientSelector";
 import { MovementFooter } from "./form/MovementFooter";
 import { MovementInlineTable } from "./form/MovementInlineTable";
 
 interface NewMovementContentProps {
     initialInventory: InventoryItem[];
     initialJobs: Job[];
-    initialClients: Client[];
     initialNote?: DeliveryNote;
 }
 
 export default function NewMovementContent({
     initialInventory,
     initialJobs,
-    initialClients,
     initialNote,
 }: NewMovementContentProps) {
     const { userRole } = useAuth();
-    const form = useMovementForm({ initialInventory, initialJobs, initialClients, initialNote });
+    const form = useMovementForm({ initialInventory, initialJobs, initialNote });
 
     if (userRole === "user") {
         return (
@@ -139,24 +136,16 @@ export default function NewMovementContent({
                         deliveryLocation={form.deliveryLocation}
                         setDeliveryLocation={form.setDeliveryLocation}
                     >
-                        {form.activeTab === "sale" ? (
-                            <MovementClientSelector
-                                selectedClient={form.selectedClient}
-                                onSelect={form.setSelectedClient}
-                                clients={form.clients}
-                            />
-                        ) : (
-                            <MovementJobSelector
-                                selectedJob={form.selectedJob}
-                                onSelect={form.handleJobSelect}
-                                onClear={() => form.setSelectedJob(null)}
-                                isOpen={form.isJobSelectorOpen}
-                                setIsOpen={form.setIsJobSelectorOpen}
-                                jobs={form.jobs}
-                                onSearch={form.handleJobSearch}
-                                loading={form.jobsLoading}
-                            />
-                        )}
+                        <MovementJobSelector
+                            selectedJob={form.selectedJob}
+                            onSelect={form.handleJobSelect}
+                            onClear={() => form.setSelectedJob(null)}
+                            isOpen={form.isJobSelectorOpen}
+                            setIsOpen={form.setIsJobSelectorOpen}
+                            jobs={form.jobs}
+                            onSearch={form.handleJobSearch}
+                            loading={form.jobsLoading}
+                        />
                     </MovementHeader>
 
                     <MovementInlineTable

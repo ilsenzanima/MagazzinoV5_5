@@ -21,7 +21,6 @@ interface MovementData {
   number: string
   date: string
   jobId?: string
-  clientId?: string
   causal: string
   pickupLocation: string
   deliveryLocation: string
@@ -72,7 +71,6 @@ export async function createMovement(data: MovementData, lines: MovementLine[]):
       number: data.number,
       date: data.date,
       job_id: data.jobId || null,
-      client_id: data.clientId || null,
       causal: data.causal,
       pickup_location: data.pickupLocation,
       delivery_location: data.deliveryLocation,
@@ -235,7 +233,6 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
       number: data.number,
       date: data.date,
       job_id: data.jobId || null,
-      client_id: data.clientId || null,
       causal: data.causal,
       pickup_location: data.pickupLocation,
       delivery_location: data.deliveryLocation,

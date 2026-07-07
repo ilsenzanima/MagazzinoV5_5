@@ -13,8 +13,6 @@ export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
     jobClientName: db.jobs?.clients?.name,
     jobDescription: db.jobs?.description,
     jobAddress: db.jobs?.site_address,
-    clientId: db.client_id,
-    clientName: db.clients?.name || db.jobs?.clients?.name,
     causal: db.causal,
     pickupLocation: db.pickup_location,
     deliveryLocation: db.delivery_location,
@@ -65,9 +63,6 @@ const mapDeliveryNoteToDb = (note: Partial<DeliveryNote>) => {
     if ('jobId' in note) {
         dbNote.job_id = note.jobId || null;
     }
-    if ('clientId' in note) {
-        dbNote.client_id = note.clientId || null;
-    }
 
     return dbNote;
 };
@@ -106,7 +101,7 @@ export const deliveryNotesApi = {
 
         let query = supabase
             .from('delivery_notes')
-            .select('*, clients(id, name), jobs(code, description, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))', { count: 'estimated' });
+            .select('*, jobs(code, description, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))', { count: 'estimated' });
 
         if (dateFrom) {
             query = query.gte('date', dateFrom);
@@ -122,7 +117,6 @@ export const deliveryNotesApi = {
             const resolveIds = async (term: string) => {
                 const hasSlash = term.includes('/');
                 let jIds: string[] = [];
-                let cIds: string[] = [];
                 if (!hasSlash) {
                     const { data: jobs } = await supabase
                         .from('jobs')
@@ -131,11 +125,11 @@ export const deliveryNotesApi = {
                     // Also search by client name
                     const { data: clients } = await supabase.from('clients').select('id').ilike('name', `%${term}%`);
                     if (clients && clients.length > 0) {
-                        cIds = clients.map((c: any) => c.id);
-                        const { data: jobsByClient } = await supabase.from('jobs').select('id').in('client_id', cIds);
+                        const clientIds = clients.map((c: any) => c.id);
+                        const { data: jobsByClient } = await supabase.from('jobs').select('id').in('client_id', clientIds);
                         if (jobsByClient) jIds = [...new Set([...jIds, ...jobsByClient.map((j: any) => j.id)])];
                     }
-                    jIds = [...new Set([...jIds, ...(jobs || []).map((j: any) => j.id)])];
+                    jIds = (jobs || []).map((j: any) => j.id);
                 }
 
                 // Search by inventory item names
@@ -150,18 +144,17 @@ export const deliveryNotesApi = {
                         dnIds = [...new Set((dni || []).map((d: any) => d.delivery_note_id))];
                     }
                 }
-                return { jIds, cIds, dnIds, hasSlash };
+                return { jIds, dnIds, hasSlash };
             };
 
             if (commaTerms.length > 1) {
                 // Comma = OR: any term can match any field
                 const allOrConditions: string[] = [];
-                let allJIds: string[] = [], allCIds: string[] = [], allDnIds: string[] = [];
+                let allJIds: string[] = [], allDnIds: string[] = [];
 
                 for (const term of commaTerms) {
-                    const { jIds, cIds, dnIds, hasSlash } = await resolveIds(term);
+                    const { jIds, dnIds, hasSlash } = await resolveIds(term);
                     allJIds = [...new Set([...allJIds, ...jIds])];
-                    allCIds = [...new Set([...allCIds, ...cIds])];
                     allDnIds = [...new Set([...allDnIds, ...dnIds])];
                     allOrConditions.push(
                         `number.ilike.%${term}%`,
@@ -172,7 +165,6 @@ export const deliveryNotesApi = {
                     );
                 }
                 if (allJIds.length > 0) allOrConditions.push(`job_id.in.(${allJIds.join(',')})`);
-                if (allCIds.length > 0) allOrConditions.push(`client_id.in.(${allCIds.join(',')})`);
                 if (allDnIds.length > 0) allOrConditions.push(`id.in.(${allDnIds.join(',')})`);
                 query = query.or(allOrConditions.join(','));
             } else {
@@ -183,7 +175,7 @@ export const deliveryNotesApi = {
                         query = query.ilike('number', `%${word}%`);
                         continue;
                     }
-                    const { jIds, cIds, dnIds } = await resolveIds(word);
+                    const { jIds, dnIds } = await resolveIds(word);
                     const orConditions: string[] = [
                         `number.ilike.%${word}%`,
                         `causal.ilike.%${word}%`,
@@ -192,7 +184,6 @@ export const deliveryNotesApi = {
                         `delivery_location.ilike.%${word}%`,
                     ];
                     if (jIds.length > 0) orConditions.push(`job_id.in.(${jIds.join(',')})`);
-                    if (cIds.length > 0) orConditions.push(`client_id.in.(${cIds.join(',')})`);
                     if (dnIds.length > 0) orConditions.push(`id.in.(${dnIds.join(',')})`);
                     query = query.or(orConditions.join(','));
                 }
@@ -224,7 +215,6 @@ export const deliveryNotesApi = {
             .from('delivery_notes')
             .select(`
         *,
-        clients(id, name),
         jobs(code, description, site_address, job_name:name, client_id, clients(id, name)),
         delivery_note_items(
           *,
