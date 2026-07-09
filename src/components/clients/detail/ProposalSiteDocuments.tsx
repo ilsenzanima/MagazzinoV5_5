@@ -255,6 +255,10 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     }
 
     const goToStep2 = () => {
+        if (!upDocTypeId) {
+            notify.error("Selezionare il tipo di documento.")
+            return
+        }
         if (pendingFiles.length === 0) return
         setUpStep(2)
     }
@@ -311,6 +315,10 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
 
     const handleSaveEdit = async () => {
         if (!activeDoc) return
+        if (!editDocTypeId) {
+            notify.error("Selezionare il tipo di documento.")
+            return
+        }
         try {
             setSaving(true)
             let fileUrl = activeDoc.fileUrl
@@ -645,7 +653,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                         <div className="space-y-1">
                             <Label>Tipo documento</Label>
                             <Select value={editDocTypeId} onValueChange={setEditDocTypeId}>
-                                <SelectTrigger><SelectValue placeholder="Nessun tipo" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Seleziona tipo documento" /></SelectTrigger>
                                 <SelectContent>
                                     {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                                 </SelectContent>

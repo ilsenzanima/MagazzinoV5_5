@@ -237,6 +237,10 @@ function DocumentFormDialog({
             setError("Marca e nome sono obbligatori.");
             return;
         }
+        if (!form.documentTypeId) {
+            setError("Il tipo di documento è obbligatorio.");
+            return;
+        }
         setSaving(true);
         setError("");
         try {
@@ -443,6 +447,10 @@ function MultiUploadDialog({
     };
 
     const goToStep2 = () => {
+        if (!documentTypeId) {
+            toast.error("Selezionare il tipo di documento.");
+            return;
+        }
         if (!effectiveSupplierId || !brandId || pendingFiles.length === 0) return;
         setStep(2);
     };

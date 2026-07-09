@@ -256,7 +256,11 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
     }
 
     const goToStep2 = () => {
-        if (!upDocTypeId || pendingFiles.length === 0) return
+        if (!upDocTypeId) {
+            notify.error("Selezionare il tipo di documento.")
+            return
+        }
+        if (pendingFiles.length === 0) return
         setUpStep(2)
     }
 
@@ -313,6 +317,10 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
 
     const handleSaveEdit = async () => {
         if (!activeDoc) return
+        if (!editDocTypeId) {
+            notify.error("Selezionare il tipo di documento.")
+            return
+        }
         try {
             setSaving(true)
             let fileUrl = activeDoc.fileUrl
@@ -627,7 +635,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
                         {upStep === 1 ? (
                             <>
                                 <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
-                                <Button onClick={goToStep2} disabled={!upDocTypeId || pendingFiles.length === 0}>Continua</Button>
+                                <Button onClick={goToStep2} disabled={pendingFiles.length === 0}>Continua</Button>
                             </>
                         ) : (
                             <>
@@ -649,7 +657,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: Props) {
                         <div className="space-y-1">
                             <Label>Tipo documento</Label>
                             <Select value={editDocTypeId} onValueChange={setEditDocTypeId}>
-                                <SelectTrigger><SelectValue placeholder="Nessun tipo" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Seleziona tipo documento" /></SelectTrigger>
                                 <SelectContent>
                                     {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                                 </SelectContent>

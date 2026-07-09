@@ -50,7 +50,8 @@ function InlineTextEdit({ value, onSave, placeholder }: { value: string; onSave:
     return <button className="text-left w-full hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-1 py-0.5 text-sm" onClick={start}>{value || <span className="text-slate-400 italic text-xs">{placeholder}</span>}</button>
 }
 
-function MaterialTable({ rows, onUpdate }: { rows: CostAnalysisRow[]; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void }) {
+function MaterialTable({ rows, onUpdate, onDelete }: { rows: CostAnalysisRow[]; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void; onDelete: (id: string) => void }) {
+    const [pendingDelete, setPendingDelete] = useState<string | null>(null)
     const totalEst = rows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0)
     return (
         <div className="overflow-x-auto">
@@ -61,6 +62,7 @@ function MaterialTable({ rows, onUpdate }: { rows: CostAnalysisRow[]; onUpdate: 
                     <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo unit.</th>
                     <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà presunta</th>
                     <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. presunto</th>
+                    <th className="w-6 p-2"></th>
                 </tr></thead>
                 <tbody>
                     {rows.map((row, idx) => {
@@ -79,11 +81,22 @@ function MaterialTable({ rows, onUpdate }: { rows: CostAnalysisRow[]; onUpdate: 
                                 <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><span className="text-[10px] text-slate-400">{unitPfx}</span><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} placeholder={row.maxPurchasePrice !== null ? fmt(row.maxPurchasePrice) : '—'} /></div></td>
                                 <td className="p-2 text-right"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} /></td>
                                 <td className={`p-2 text-right font-mono text-xs ${usingMax ? 'italic text-slate-500' : 'text-slate-700 dark:text-slate-300 font-medium'}`} title={usingMax ? 'Prezzo non impostato: usato in automatico il prezzo massimo di acquisto' : undefined}>{price !== null ? `€ ${fmt(totEst)}` : '—'}</td>
+                                <td className="p-2 text-right whitespace-nowrap">
+                                    {pendingDelete === row.id ? (
+                                        <span className="flex items-center gap-1 justify-end">
+                                            <span className="text-xs text-slate-500">Eliminare?</span>
+                                            <button onClick={() => { onDelete(row.id); setPendingDelete(null) }} className="text-xs font-medium text-red-600 hover:text-red-700 px-1">Sì</button>
+                                            <button onClick={() => setPendingDelete(null)} className="text-xs text-slate-400 hover:text-slate-600 px-1">No</button>
+                                        </span>
+                                    ) : (
+                                        <button onClick={() => setPendingDelete(row.id)} className="text-slate-300 hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
+                                    )}
+                                </td>
                             </tr>
                         )
                     })}
                 </tbody>
-                {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm"><td colSpan={4} className="p-2 text-slate-600 dark:text-slate-400">Totale materiali</td><td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td></tr></tfoot>}
+                {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm"><td colSpan={4} className="p-2 text-slate-600 dark:text-slate-400">Totale materiali</td><td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td><td></td></tr></tfoot>}
             </table>
         </div>
     )
@@ -302,7 +315,7 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, versi
                     <Button size="sm" onClick={() => setSelectorOpen(true)} className="bg-blue-600 hover:bg-blue-700 h-8 text-xs"><PlusCircle className="h-3.5 w-3.5 mr-1" />Aggiungi articolo</Button>
                 </div>
                 <CardContent className="pt-0 pb-4 px-4">
-                    {inventoryRows.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">Nessun materiale. Usa "Aggiungi articolo" per aggiungerne uno manualmente.</p> : <MaterialTable rows={inventoryRows} onUpdate={handleUpdate} />}
+                    {inventoryRows.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">Nessun materiale. Usa "Aggiungi articolo" per aggiungerne uno manualmente.</p> : <MaterialTable rows={inventoryRows} onUpdate={handleUpdate} onDelete={handleDelete} />}
                 </CardContent>
             </Card>
 

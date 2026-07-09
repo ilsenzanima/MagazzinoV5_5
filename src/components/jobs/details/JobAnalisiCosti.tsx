@@ -78,10 +78,12 @@ function InlineTextEdit({ value, onSave, placeholder }: { value: string; onSave:
 }
 
 // ── Tabella materiali ─────────────────────────────────────────────────────────
-function MaterialTable({ rows, onUpdate }: {
+function MaterialTable({ rows, onUpdate, onDelete }: {
     rows: CostAnalysisRow[]
     onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void
+    onDelete: (id: string) => void
 }) {
+    const [pendingDelete, setPendingDelete] = useState<string | null>(null)
     const totalEst = rows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0)
 
     return (
@@ -94,6 +96,7 @@ function MaterialTable({ rows, onUpdate }: {
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo unit.</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà presunta</th>
                         <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. presunto</th>
+                        <th className="w-6 p-2"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -132,6 +135,19 @@ function MaterialTable({ rows, onUpdate }: {
                                     title={usingMax ? 'Prezzo non impostato: usato in automatico il prezzo massimo di acquisto' : undefined}>
                                     {price !== null ? `€ ${fmt(totEst)}` : '—'}
                                 </td>
+                                <td className="p-2 text-right whitespace-nowrap">
+                                    {pendingDelete === row.id ? (
+                                        <span className="flex items-center gap-1 justify-end">
+                                            <span className="text-xs text-slate-500">Eliminare?</span>
+                                            <button onClick={() => { onDelete(row.id); setPendingDelete(null) }} className="text-xs font-medium text-red-600 hover:text-red-700 px-1">Sì</button>
+                                            <button onClick={() => setPendingDelete(null)} className="text-xs text-slate-400 hover:text-slate-600 px-1">No</button>
+                                        </span>
+                                    ) : (
+                                        <button onClick={() => setPendingDelete(row.id)} className="text-slate-300 hover:text-red-500">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </td>
                             </tr>
                         )
                     })}
@@ -141,6 +157,7 @@ function MaterialTable({ rows, onUpdate }: {
                         <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm">
                             <td colSpan={4} className="p-2 text-slate-600 dark:text-slate-400">Totale materiali</td>
                             <td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td>
+                            <td></td>
                         </tr>
                     </tfoot>
                 )}
@@ -413,7 +430,7 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
                             Nessun materiale. Usa "Aggiungi articolo" per aggiungerne uno manualmente.
                         </p>
                     ) : (
-                        <MaterialTable rows={inventoryRows} onUpdate={handleUpdate} />
+                        <MaterialTable rows={inventoryRows} onUpdate={handleUpdate} onDelete={handleDelete} />
                     )}
                 </CardContent>
             </Card>

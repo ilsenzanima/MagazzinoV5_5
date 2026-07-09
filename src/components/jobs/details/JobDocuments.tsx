@@ -243,6 +243,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   }
 
   const goToStep2 = () => {
+    if (!upDocTypeId) {
+      toast.error("Selezionare il tipo di documento.")
+      return
+    }
     if (pendingFiles.length === 0) return
     setUpStep(2)
   }
@@ -312,6 +316,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
 
   const handleSaveEdit = async () => {
     if (!activeDoc) return
+    if (!editDocTypeId) {
+      toast.error("Selezionare il tipo di documento.")
+      return
+    }
     try {
       setSaving(true)
       let fileUrl = activeDoc.fileUrl
@@ -676,7 +684,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
             <div className="space-y-1">
               <Label>Tipo documento</Label>
               <Select value={editDocTypeId} onValueChange={setEditDocTypeId}>
-                <SelectTrigger><SelectValue placeholder="Nessun tipo" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Seleziona tipo documento" /></SelectTrigger>
                 <SelectContent>
                   {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                 </SelectContent>

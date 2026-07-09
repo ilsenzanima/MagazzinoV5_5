@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { FileText, Loader2, Truck, Building2 } from "lucide-react"
 import { deliveryNotesApi, purchasesApi } from "@/lib/api"
 import { DeliveryNote, DeliveryNoteItem, Purchase } from "@/lib/types"
@@ -13,6 +13,7 @@ import { it } from "date-fns/locale"
 import { toast } from "sonner"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
+import { mapDbToPurchase } from "@/lib/services/purchases"
 
 interface JobDdtProps {
   jobId: string
@@ -26,6 +27,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const [loading, setLoading] = useState(true)
   const [opiNotes, setOpiNotes] = useState<DeliveryNote[]>([])
   const [supplierDocs, setSupplierDocs] = useState<SupplierDoc[]>([])
+  const [allPurchases, setAllPurchases] = useState<Purchase[]>([])
   const supabase = createClient()
   const [viewMode, setViewMode] = useViewMode('job-ddt', 'grid')
 
@@ -48,6 +50,33 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
         return b.number.localeCompare(a.number)
       })
       setOpiNotes(combinedNotes)
+
+      // Raccogli tutti i purchaseId legati ai materiali movimentati nelle bolle interne
+      const purchaseIds = new Set<string>()
+      combinedNotes.forEach(note => {
+        (note.items || []).forEach(item => {
+          if (item.purchaseId) {
+            purchaseIds.add(item.purchaseId)
+          }
+        })
+      })
+
+      // Carica gli acquisti associati alle movimentazioni che non sono direttamente legati a questa commessa
+      let finalPurchases = [...purchases]
+      const missingIds = Array.from(purchaseIds).filter(id => !purchases.some(p => p.id === id))
+      if (missingIds.length > 0) {
+        const { data: extraPurchases, error: extraError } = await supabase
+          .from('purchases')
+          .select('*, suppliers(name), purchase_items(price, quantity), profiles(full_name)')
+          .in('id', missingIds)
+          .is('deleted_at', null)
+        if (extraError) throw extraError
+        if (extraPurchases) {
+          finalPurchases = [...finalPurchases, ...extraPurchases.map(mapDbToPurchase)]
+        }
+      }
+      setAllPurchases(finalPurchases)
+
       const docs: SupplierDoc[] = []
       purchases.filter(p => p.orderType !== 'order').forEach(p => {
         (p.documentUrls || []).forEach((url, index) => docs.push({ purchase: p, url, index }))
@@ -100,7 +129,6 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       window.open(url, '_blank')
     }
   }
-
 
   return (
     <div className="space-y-4">
@@ -164,18 +192,87 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
             ))}
           </div>
         )
-      ) : supplierDocs.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-slate-500">
-            <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Nessun DDT fornitore</h3>
-            <p className="text-slate-500 dark:text-slate-400">Nessun documento allegato agli acquisti di questa commessa.</p>
+      ) : (
+        <SupplierTabs
+          supplierDocs={supplierDocs}
+          opiNotes={opiNotes}
+          allPurchases={allPurchases}
+          viewMode={viewMode}
+          openSupplierDoc={openSupplierDoc}
+        />
+      )}
+    </div>
+  )
+}
+
+function SupplierTabs({
+  supplierDocs,
+  opiNotes,
+  allPurchases,
+  viewMode,
+  openSupplierDoc
+}: {
+  supplierDocs: SupplierDoc[]
+  opiNotes: DeliveryNote[]
+  allPurchases: Purchase[]
+  viewMode: 'grid' | 'list'
+  openSupplierDoc: (url: string) => void
+}) {
+  const getNoteSupplierDocs = (note: DeliveryNote) => {
+    const docs: SupplierDoc[] = []
+    const seenUrls = new Set<string>()
+    ;(note.items || []).forEach(item => {
+      if (item.purchaseId) {
+        const purchase = allPurchases.find(p => p.id === item.purchaseId)
+        if (purchase) {
+          (purchase.documentUrls || []).forEach((url, index) => {
+            if (!seenUrls.has(url)) {
+              seenUrls.add(url)
+              docs.push({ purchase, url, index })
+            }
+          })
+        }
+      }
+    })
+    return docs
+  }
+
+  const notesDocsMap = new Map<string, SupplierDoc[]>()
+  let totalDocsCount = supplierDocs.length
+  opiNotes.forEach(note => {
+    const docs = getNoteSupplierDocs(note)
+    notesDocsMap.set(note.id, docs)
+    totalDocsCount += docs.length
+  })
+
+  if (totalDocsCount === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="py-12 text-center text-slate-500">
+          <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Nessun DDT fornitore</h3>
+          <p className="text-slate-500 dark:text-slate-400">Nessun documento allegato agli acquisti di questa commessa.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const renderDocsList = (docs: SupplierDoc[]) => {
+    if (docs.length === 0) {
+      return (
+        <Card className="border-dashed bg-slate-50/50 dark:bg-slate-800/10 border-slate-200">
+          <CardContent className="py-8 text-center text-slate-400 dark:text-slate-500">
+            <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">Nessun documento associato a questo DDT interno.</p>
           </CardContent>
         </Card>
-      ) : viewMode === 'list' ? (
+      )
+    }
+    if (viewMode === 'list') {
+      return (
         <div className="space-y-1.5">
-          {supplierDocs.map((doc) => (
-            <div key={`${doc.purchase.id}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+          {docs.map((doc) => (
+            <div key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
               <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
                 <FileText className="h-5 w-5 text-red-500" />
               </div>
@@ -185,30 +282,57 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
                 </p>
                 <p className="text-xs text-slate-500 truncate">Allegato {doc.index + 1}</p>
               </div>
-              <p className="text-xs text-slate-400 shrink-0">{format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it })}</p>
+              <p className="text-xs text-slate-400 shrink-0">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
             </div>
           ))}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {supplierDocs.map((doc) => (
-            <Card key={`${doc.purchase.id}_${doc.index}`} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-              <CardContent className="p-4 flex items-start gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-                  <FileText className="h-8 w-8 text-red-500" />
-                </div>
-                <div className="flex-1 overflow-hidden min-w-0">
-                  <p className="font-medium truncate text-sm">
-                    {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">Allegato {doc.index + 1}</p>
-                  <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it })}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
+      )
+    }
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {docs.map((doc) => (
+          <Card key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+            <CardContent className="p-4 flex items-start gap-3">
+              <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
+                <FileText className="h-8 w-8 text-red-500" />
+              </div>
+              <div className="flex-1 overflow-hidden min-w-0">
+                <p className="font-medium truncate text-sm">
+                  {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5 truncate">Allegato {doc.index + 1}</p>
+                <p className="text-xs text-slate-400 mt-1">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  const notesWithItems = opiNotes.filter(note => note.items && note.items.length > 0)
+
+  return (
+    <Tabs defaultValue="cantiere" className="space-y-4">
+      <TabsList className="flex-wrap h-auto gap-1">
+        <TabsTrigger value="cantiere">DDT presso cantiere</TabsTrigger>
+        {notesWithItems.map(note => (
+          <TabsTrigger key={note.id} value={note.id}>
+            DDT {note.number}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      
+      <TabsContent value="cantiere" className="pt-2">
+        {renderDocsList(supplierDocs)}
+      </TabsContent>
+      
+      {notesWithItems.map(note => (
+        <TabsContent key={note.id} value={note.id} className="pt-2">
+          {renderDocsList(notesDocsMap.get(note.id) || [])}
+        </TabsContent>
+      ))}
+    </Tabs>
   )
 }
+
