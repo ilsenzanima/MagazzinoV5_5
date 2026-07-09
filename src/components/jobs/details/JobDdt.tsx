@@ -36,6 +36,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const [loading, setLoading] = useState(true)
   const [opiNotes, setOpiNotes] = useState<DeliveryNote[]>([])
   const [supplierDocs, setSupplierDocs] = useState<SupplierDoc[]>([])
+  const [associatedDocs, setAssociatedDocs] = useState<SupplierDoc[]>([])
   const [openAssociateModal, setOpenAssociateModal] = useState(false)
   const supabase = createClient()
   const [viewMode, setViewMode] = useViewMode('job-ddt', 'grid')
@@ -60,11 +61,45 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       })
       setOpiNotes(combinedNotes)
 
+      // Raccogli tutti i purchaseId legati ai materiali movimentati nelle bolle interne
+      const purchaseIds = new Set<string>()
+      combinedNotes.forEach(note => {
+        (note.items || []).forEach(item => {
+          if (item.purchaseId) {
+            purchaseIds.add(item.purchaseId)
+          }
+        })
+      })
+      const associatedIds = Array.from(purchaseIds)
+
+      // Carica gli acquisti associati alle movimentazioni che non sono direttamente legati a questa commessa
+      let extraPurchases: Purchase[] = []
+      const missingIds = associatedIds.filter(id => !purchases.some(p => p.id === id))
+      if (missingIds.length > 0) {
+        const { data: extraDb, error: extraError } = await supabase
+          .from('purchases')
+          .select('*, suppliers(name), purchase_items(price, quantity), profiles(full_name)')
+          .in('id', missingIds)
+          .is('deleted_at', null)
+        if (!extraError && extraDb) {
+          extraPurchases = extraDb.map(mapDbToPurchase)
+        }
+      }
+
+      // Documenti caricati direttamente in cantiere (purchases linked directly to job)
       const docs: SupplierDoc[] = []
       purchases.filter(p => p.orderType !== 'order').forEach(p => {
         (p.documentUrls || []).forEach((url, index) => docs.push({ purchase: p, url, index }))
       })
       setSupplierDocs(docs)
+
+      // Documenti dei DDT associati manualmente alle bolle interne
+      const assocDocs: SupplierDoc[] = []
+      const allAvailablePurchases = [...purchases, ...extraPurchases]
+      allAvailablePurchases.filter(p => p.orderType !== 'order' && associatedIds.includes(p.id)).forEach(p => {
+        (p.documentUrls || []).forEach((url, index) => assocDocs.push({ purchase: p, url, index }))
+      })
+      setAssociatedDocs(assocDocs)
     } catch (error) {
       console.error("Failed to load DDT", error)
       toast.error("Errore nel caricamento dei DDT")
@@ -115,14 +150,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
 
   const handleAssociatePurchase = async (purchaseId: string): Promise<number> => {
     try {
-      // 1. Collega l'acquisto alla commessa (imposta job_id)
-      const { error: pError } = await supabase
-        .from('purchases')
-        .update({ job_id: jobId })
-        .eq('id', purchaseId)
-      if (pError) throw pError
-
-      // 2. Carica gli articoli dell'acquisto selezionato
+      // 1. Carica gli articoli dell'acquisto selezionato
       const { data: purchaseItems, error: piError } = await supabase
         .from('purchase_items')
         .select('id, inventory_id')
@@ -133,14 +161,14 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
         return 0
       }
 
-      // 3. Raccogli gli ID di tutte le bolle interne della commessa
+      // 2. Raccogli gli ID di tutte le bolle interne della commessa
       const noteIds = opiNotes.map(n => n.id)
       if (noteIds.length === 0) {
         await load()
         return 0
       }
 
-      // 4. Carica tutte le righe delle bolle interne della commessa
+      // 3. Carica tutte le righe delle bolle interne della commessa
       const { data: noteItems, error: niError } = await supabase
         .from('delivery_note_items')
         .select('id, inventory_id')
@@ -151,7 +179,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
         return 0
       }
 
-      // 5. Esegui il matching e aggiorna i record delle bolle interne
+      // 4. Esegui il matching e aggiorna i record delle bolle interne
       let updatedCount = 0
       const updates = noteItems.map(async (ni) => {
         const matchingPi = purchaseItems.find(pi => pi.inventory_id === ni.inventory_id)
@@ -177,14 +205,58 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
     }
   }
 
-  const renderDocsList = (docs: SupplierDoc[]) => {
+  const handleDisassociatePurchase = async (purchaseId: string): Promise<void> => {
+    try {
+      setLoading(true)
+      // 1. Carica gli articoli dell'acquisto da disassociare
+      const { data: purchaseItems, error: piError } = await supabase
+        .from('purchase_items')
+        .select('id')
+        .eq('purchase_id', purchaseId)
+      if (piError) throw piError
+      if (!purchaseItems || purchaseItems.length === 0) {
+        toast.error("Nessun articolo trovato per questo acquisto")
+        return
+      }
+
+      const piIds = purchaseItems.map(pi => pi.id)
+
+      // 2. Raccogli gli ID di tutte le bolle interne della commessa
+      const noteIds = opiNotes.map(n => n.id)
+      if (noteIds.length === 0) return
+
+      // 3. Scollega gli articoli nelle bolle interne
+      const { error: updateError } = await supabase
+        .from('delivery_note_items')
+        .update({ purchase_item_id: null })
+        .in('delivery_note_id', noteIds)
+        .in('purchase_item_id', piIds)
+      if (updateError) throw updateError
+
+      toast.success("DDT disassociato con successo")
+      await load()
+    } catch (error) {
+      console.error("Errore durante la disassociazione", error)
+      toast.error("Errore durante la disassociazione")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const renderDocsList = (docs: SupplierDoc[], isAssociatedTab = false) => {
     if (docs.length === 0) {
       return (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center text-slate-500">
             <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Nessun DDT fornitore</h3>
-            <p className="text-slate-500 dark:text-slate-400">Nessun documento allegato agli acquisti di questa commessa.</p>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">
+              {isAssociatedTab ? "Nessun DDT associato" : "Nessun DDT fornitore"}
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400">
+              {isAssociatedTab 
+                ? "Nessun DDT associato alle bolle interne." 
+                : "Nessun documento allegato direttamente in cantiere."}
+            </p>
           </CardContent>
         </Card>
       )
@@ -193,17 +265,29 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       return (
         <div className="space-y-1.5">
           {docs.map((doc) => (
-            <div key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-              <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
+            <div key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
+              <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
                 <FileText className="h-5 w-5 text-red-500" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
                 <p className="font-medium truncate text-sm">
                   {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
                 </p>
                 <p className="text-xs text-slate-500 truncate">Allegato {doc.index + 1}</p>
               </div>
-              <p className="text-xs text-slate-400 shrink-0">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
+              <div className="flex items-center gap-2 shrink-0">
+                <p className="text-xs text-slate-400 mr-2">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
+                {isAssociatedTab && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleDisassociatePurchase(doc.purchase.id)}
+                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    Disassocia
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -212,18 +296,28 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {docs.map((doc) => (
-          <Card key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+          <Card key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="hover:shadow-md transition-shadow relative">
             <CardContent className="p-4 flex items-start gap-3">
-              <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
+              <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
                 <FileText className="h-8 w-8 text-red-500" />
               </div>
-              <div className="flex-1 overflow-hidden min-w-0">
+              <div className="flex-1 overflow-hidden min-w-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
                 <p className="font-medium truncate text-sm">
                   {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5 truncate">Allegato {doc.index + 1}</p>
                 <p className="text-xs text-slate-400 mt-1">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
               </div>
+              {isAssociatedTab && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleDisassociatePurchase(doc.purchase.id)}
+                  className="absolute top-2 right-2 h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                >
+                  Disassocia
+                </Button>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -251,11 +345,11 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
             </TabsTrigger>
             <TabsTrigger value="fornitori">
               DDT Fornitori
-              <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{supplierDocs.length}</span>
+              <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{supplierDocs.length + associatedDocs.length}</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        {((subTab === "opi" && opiNotes.length > 0) || (subTab === "fornitori" && supplierDocs.length > 0)) && (
+        {((subTab === "opi" && opiNotes.length > 0) || (subTab === "fornitori" && (supplierDocs.length > 0 || associatedDocs.length > 0))) && (
           <ViewToggle mode={viewMode} onChange={setViewMode} />
         )}
       </div>
@@ -304,16 +398,30 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
         )
       ) : (
         <div className="space-y-4">
-          <div className="flex justify-between items-center gap-2 flex-wrap mb-4">
-            <div className="flex items-baseline gap-2">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">DDT presso cantiere</h3>
+          <Tabs defaultValue="cantiere" className="w-full">
+            <div className="flex justify-between items-center gap-2 flex-wrap mb-2">
+              <TabsList>
+                <TabsTrigger value="cantiere">
+                  DDT presso cantiere
+                  <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{supplierDocs.length}</span>
+                </TabsTrigger>
+                <TabsTrigger value="associati">
+                  DDT associati
+                  <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{associatedDocs.length}</span>
+                </TabsTrigger>
+              </TabsList>
+              <Button onClick={() => setOpenAssociateModal(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 flex items-center gap-1.5">
+                <ArrowRightLeft className="h-4 w-4" />
+                Associa DDT da Acquisti
+              </Button>
             </div>
-            <Button onClick={() => setOpenAssociateModal(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 flex items-center gap-1.5">
-              <ArrowRightLeft className="h-4 w-4" />
-              Associa DDT da Acquisti
-            </Button>
-          </div>
-          {renderDocsList(supplierDocs)}
+            <TabsContent value="cantiere" className="pt-2">
+              {renderDocsList(supplierDocs, false)}
+            </TabsContent>
+            <TabsContent value="associati" className="pt-2">
+              {renderDocsList(associatedDocs, true)}
+            </TabsContent>
+          </Tabs>
         </div>
       )}
 

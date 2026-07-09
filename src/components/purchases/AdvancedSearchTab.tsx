@@ -167,25 +167,19 @@ export function AdvancedSearchTab({
         suppliersApi.getAll().then(setSuppliers).catch(console.error);
     }, []);
 
-    useEffect(() => {
-        if (isModal && jobOpiNotes && supplierId) {
-            const uniqueMaterials = new Set<string>();
-            jobOpiNotes.forEach(note => {
-                (note.items || []).forEach((item: any) => {
-                    const name = item.inventoryName || item.name;
-                    if (name) {
-                        uniqueMaterials.add(name);
-                    }
-                });
+    const getUniqueOpiMaterials = (): string[] => {
+        if (!jobOpiNotes) return [];
+        const unique = new Set<string>();
+        jobOpiNotes.forEach(note => {
+            (note.items || []).forEach((item: any) => {
+                const name = item.inventoryName || item.name;
+                if (name) {
+                    unique.add(name);
+                }
             });
-            const materialList = Array.from(uniqueMaterials);
-            if (materialList.length > 0) {
-                setTerms(materialList);
-            } else {
-                setTerms([""]);
-            }
-        }
-    }, [supplierId, isModal, jobOpiNotes]);
+        });
+        return Array.from(unique).sort();
+    };
 
     useEffect(() => {
         if (!supplierId) { setPurchases([]); return; }
@@ -259,6 +253,32 @@ export function AdvancedSearchTab({
                         </SelectContent>
                     </Select>
                 </div>
+
+                {isModal && jobOpiNotes && supplierId && (
+                    <div className="space-y-1">
+                        <span className="text-xs font-semibold text-slate-500 block">Articoli della commessa:</span>
+                        <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-900/50 rounded border dark:border-slate-800">
+                            {getUniqueOpiMaterials().map((mat, i) => (
+                                <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => {
+                                        if (!terms.includes(mat)) {
+                                            if (terms.length === 1 && terms[0] === "") {
+                                                setTerms([mat]);
+                                            } else {
+                                                setTerms(prev => [...prev, mat]);
+                                            }
+                                        }
+                                    }}
+                                    className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                                >
+                                    + {mat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div>
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
