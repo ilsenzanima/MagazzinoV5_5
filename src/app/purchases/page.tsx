@@ -495,9 +495,8 @@ function PurchasesPageContent() {
   const { userRole } = useAuth();
   const canSeeFatture = userRole === 'admin' || userRole === 'operativo';
 
-  const rawTab = (searchParams?.get("tab") ?? "acquisti") as "acquisti" | "ordini" | "fatture" | "ricerca";
-  // Redirect user role away from fatture tab
-  const tab = rawTab === "fatture" && !canSeeFatture ? "acquisti" : rawTab;
+  const rawTab = searchParams?.get("tab") ?? "acquisti";
+  const tab = (rawTab === "fatture" && !canSeeFatture) || !["acquisti", "ordini", "fatture"].includes(rawTab) ? "acquisti" : rawTab;
 
   const handleTabChange = (value: string) => {
     const params = new URLSearchParams(searchParams?.toString() ?? "");
@@ -511,9 +510,9 @@ function PurchasesPageContent() {
       <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 rounded-lg mb-6 border dark:border-border">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-            {tab === "acquisti" ? "Gestione Acquisti" : tab === "ordini" ? "Gestione Ordini" : tab === "fatture" ? "Gestione Fatture" : "Ricerca Avanzata"}
+            {tab === "acquisti" ? "Gestione Acquisti" : tab === "ordini" ? "Gestione Ordini" : "Gestione Fatture"}
           </h1>
-          {canSeeFatture && tab !== "ricerca" && (
+          {canSeeFatture && (
             <Link href={tab === "fatture" ? "/invoices/new" : tab === "ordini" ? "/purchases/new?type=order" : "/purchases/new"}>
               <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="mr-1.5 h-4 w-4" />
@@ -538,11 +537,6 @@ function PurchasesPageContent() {
                 Fatture
               </TabsTrigger>
             )}
-            <TabsTrigger value="ricerca" className="flex items-center gap-1.5 flex-1 sm:flex-none basis-[calc(50%-0.125rem)] sm:basis-auto">
-              <Search className="h-4 w-4" />
-              <span className="sm:hidden">Ricerca</span>
-              <span className="hidden sm:inline">Ricerca Avanzata</span>
-            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -550,7 +544,6 @@ function PurchasesPageContent() {
       {tab === "acquisti" && <PurchasesTab orderType="purchase" />}
       {tab === "ordini" && <PurchasesTab orderType="order" />}
       {canSeeFatture && tab === "fatture" && <InvoicesTab />}
-      {tab === "ricerca" && <AdvancedSearchTab />}
     </>
   );
 }

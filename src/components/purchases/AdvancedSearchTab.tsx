@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Loader2, ExternalLink, Search, Package } from "lucide-react";
+import { Plus, X, Loader2, ExternalLink, Search, Package, ArrowRightLeft } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "sonner";
 
 interface PurchaseWithItems {
     id: string;
@@ -141,19 +142,50 @@ function AutocompleteInput({ value, onChange, onRemove, showRemove, suggestions,
     );
 }
 
-// ── Main component ──────────────────────────────────────────────────────────
+interface AdvancedSearchTabProps {
+    isModal?: boolean;
+    onAssociate?: (purchaseId: string) => Promise<number>;
+    associatedPurchaseIds?: Set<string>;
+    jobOpiNotes?: any[];
+}
 
-export function AdvancedSearchTab() {
+export function AdvancedSearchTab({
+    isModal = false,
+    onAssociate,
+    associatedPurchaseIds,
+    jobOpiNotes
+}: AdvancedSearchTabProps) {
     const { isMobile } = useIsMobile();
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [supplierId, setSupplierId] = useState("");
     const [terms, setTerms] = useState<string[]>([""]);
     const [purchases, setPurchases] = useState<PurchaseWithItems[]>([]);
     const [loading, setLoading] = useState(false);
+    const [associatingId, setAssociatingId] = useState<string | null>(null);
 
     useEffect(() => {
         suppliersApi.getAll().then(setSuppliers).catch(console.error);
     }, []);
+
+    useEffect(() => {
+        if (isModal && jobOpiNotes && supplierId) {
+            const uniqueMaterials = new Set<string>();
+            jobOpiNotes.forEach(note => {
+                (note.items || []).forEach((item: any) => {
+                    const name = item.inventoryName || item.name;
+                    if (name) {
+                        uniqueMaterials.add(name);
+                    }
+                });
+            });
+            const materialList = Array.from(uniqueMaterials);
+            if (materialList.length > 0) {
+                setTerms(materialList);
+            } else {
+                setTerms([""]);
+            }
+        }
+    }, [supplierId, isModal, jobOpiNotes]);
 
     useEffect(() => {
         if (!supplierId) { setPurchases([]); return; }
@@ -332,10 +364,40 @@ export function AdvancedSearchTab() {
                                             href={`/purchases/${p.id}`}
                                             target={isMobile ? undefined : "_blank"}
                                             rel={isMobile ? undefined : "noopener noreferrer"}
-                                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 mr-2"
                                         >
                                             Apri {!isMobile && <ExternalLink className="h-3 w-3" />}
                                         </Link>
+                                        {isModal && onAssociate && (
+                                            <Button
+                                                size="sm"
+                                                onClick={async () => {
+                                                    setAssociatingId(p.id);
+                                                    try {
+                                                        const count = await onAssociate(p.id);
+                                                        if (count > 0) {
+                                                            toast.success(`Associazione completata per ${count} articoli!`);
+                                                        } else {
+                                                            toast.info("Nessun articolo corrispondente trovato nelle bolle di questa commessa.");
+                                                        }
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                        toast.error("Errore durante l'associazione");
+                                                    } finally {
+                                                        setAssociatingId(null);
+                                                    }
+                                                }}
+                                                disabled={associatingId === p.id}
+                                                className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+                                            >
+                                                {associatingId === p.id ? (
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                    <ArrowRightLeft className="h-3 w-3" />
+                                                )}
+                                                {associatedPurchaseIds?.has(p.id) ? "Riascocia" : "Associa"}
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
 
