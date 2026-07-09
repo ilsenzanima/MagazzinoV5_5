@@ -471,11 +471,15 @@ export const jobDocumentsApi = {
     },
     delete: async (id: string) => {
         const { data: existing } = await supabase.from('job_documents').select('file_url').eq('id', id).maybeSingle();
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('job_documents')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .select();
         if (error) throw error;
+        if (!data || data.length === 0) {
+            throw new Error("Eliminazione non consentita o documento non trovato");
+        }
         await deleteDriveFileIfApplicable(existing?.file_url);
     }
 };

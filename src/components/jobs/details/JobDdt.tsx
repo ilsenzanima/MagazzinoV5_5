@@ -130,6 +130,39 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
     }
   }
 
+  // Calcolo dei documenti per ciascuna bolla interna (con raggruppamento dei materiali per lo stesso file)
+  const getNoteSupplierDocs = (note: DeliveryNote): (SupplierDoc & { materials: string[] })[] => {
+    const docsMap = new Map<string, { purchase: Purchase; url: string; index: number; materials: string[] }>()
+    ;(note.items || []).forEach(item => {
+      if (item.purchaseId) {
+        const purchase = allPurchases.find(p => p.id === item.purchaseId)
+        if (purchase) {
+          (purchase.documentUrls || []).forEach((url, index) => {
+            const matName = item.inventoryName || "Materiale"
+            if (docsMap.has(url)) {
+              const existing = docsMap.get(url)!
+              if (!existing.materials.includes(matName)) {
+                existing.materials.push(matName)
+              }
+            } else {
+              docsMap.set(url, { purchase, url, index, materials: [matName] })
+            }
+          })
+        }
+      }
+    })
+    return Array.from(docsMap.values())
+  }
+
+  const notesWithItems = opiNotes.filter(note => note.items && note.items.length > 0)
+  const notesDocsMap = new Map<string, (SupplierDoc & { materials: string[] })[]>()
+  let totalSupplierDocsCount = supplierDocs.length
+  notesWithItems.forEach(note => {
+    const docs = getNoteSupplierDocs(note)
+    notesDocsMap.set(note.id, docs)
+    totalSupplierDocsCount += docs.length
+  })
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center gap-2 flex-wrap">
@@ -141,11 +174,10 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
             </TabsTrigger>
             <TabsTrigger value="fornitori">
               DDT Fornitori
-              <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{supplierDocs.length}</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        {((subTab === "opi" && opiNotes.length > 0) || (subTab === "fornitori" && supplierDocs.length > 0)) && (
+        {((subTab === "opi" && opiNotes.length > 0) || (subTab === "fornitori" && totalSupplierDocsCount > 0)) && (
           <ViewToggle mode={viewMode} onChange={setViewMode} />
         )}
       </div>
@@ -195,8 +227,9 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       ) : (
         <SupplierTabs
           supplierDocs={supplierDocs}
-          opiNotes={opiNotes}
-          allPurchases={allPurchases}
+          notesDocsMap={notesDocsMap}
+          totalDocsCount={totalSupplierDocsCount}
+          notesWithItems={notesWithItems}
           viewMode={viewMode}
           openSupplierDoc={openSupplierDoc}
         />
@@ -207,44 +240,19 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
 
 function SupplierTabs({
   supplierDocs,
-  opiNotes,
-  allPurchases,
+  notesDocsMap,
+  totalDocsCount,
+  notesWithItems,
   viewMode,
   openSupplierDoc
 }: {
   supplierDocs: SupplierDoc[]
-  opiNotes: DeliveryNote[]
-  allPurchases: Purchase[]
+  notesDocsMap: Map<string, (SupplierDoc & { materials: string[] })[]>
+  totalDocsCount: number
+  notesWithItems: DeliveryNote[]
   viewMode: 'grid' | 'list'
   openSupplierDoc: (url: string) => void
 }) {
-  const getNoteSupplierDocs = (note: DeliveryNote) => {
-    const docs: SupplierDoc[] = []
-    const seenUrls = new Set<string>()
-    ;(note.items || []).forEach(item => {
-      if (item.purchaseId) {
-        const purchase = allPurchases.find(p => p.id === item.purchaseId)
-        if (purchase) {
-          (purchase.documentUrls || []).forEach((url, index) => {
-            if (!seenUrls.has(url)) {
-              seenUrls.add(url)
-              docs.push({ purchase, url, index })
-            }
-          })
-        }
-      }
-    })
-    return docs
-  }
-
-  const notesDocsMap = new Map<string, SupplierDoc[]>()
-  let totalDocsCount = supplierDocs.length
-  opiNotes.forEach(note => {
-    const docs = getNoteSupplierDocs(note)
-    notesDocsMap.set(note.id, docs)
-    totalDocsCount += docs.length
-  })
-
   if (totalDocsCount === 0) {
     return (
       <Card className="border-dashed">
@@ -271,56 +279,73 @@ function SupplierTabs({
     if (viewMode === 'list') {
       return (
         <div className="space-y-1.5">
-          {docs.map((doc) => (
-            <div key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-              <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
-                <FileText className="h-5 w-5 text-red-500" />
+          {docs.map((doc) => {
+            const hasMaterials = 'materials' in doc && Array.isArray((doc as any).materials)
+            const label = hasMaterials 
+              ? (doc as any).materials.join(', ') 
+              : `Allegato ${doc.index + 1}`
+            return (
+              <div key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+                <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
+                  <FileText className="h-5 w-5 text-red-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate text-sm">
+                    {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate" title={label}>{label}</p>
+                </div>
+                <p className="text-xs text-slate-400 shrink-0">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate text-sm">
-                  {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
-                </p>
-                <p className="text-xs text-slate-500 truncate">Allegato {doc.index + 1}</p>
-              </div>
-              <p className="text-xs text-slate-400 shrink-0">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )
     }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {docs.map((doc) => (
-          <Card key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-            <CardContent className="p-4 flex items-start gap-3">
-              <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-                <FileText className="h-8 w-8 text-red-500" />
-              </div>
-              <div className="flex-1 overflow-hidden min-w-0">
-                <p className="font-medium truncate text-sm">
-                  {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5 truncate">Allegato {doc.index + 1}</p>
-                <p className="text-xs text-slate-400 mt-1">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {docs.map((doc) => {
+          const hasMaterials = 'materials' in doc && Array.isArray((doc as any).materials)
+          const label = hasMaterials 
+            ? (doc as any).materials.join(', ') 
+            : `Allegato ${doc.index + 1}`
+          return (
+            <Card key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+              <CardContent className="p-4 flex items-start gap-3">
+                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
+                  <FileText className="h-8 w-8 text-red-500" />
+                </div>
+                <div className="flex-1 overflow-hidden min-w-0">
+                  <p className="font-medium truncate text-sm">
+                    {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 truncate" title={label}>{label}</p>
+                  <p className="text-xs text-slate-400 mt-1">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     )
   }
 
-  const notesWithItems = opiNotes.filter(note => note.items && note.items.length > 0)
-
   return (
     <Tabs defaultValue="cantiere" className="space-y-4">
       <TabsList className="flex-wrap h-auto gap-1">
-        <TabsTrigger value="cantiere">DDT presso cantiere</TabsTrigger>
-        {notesWithItems.map(note => (
-          <TabsTrigger key={note.id} value={note.id}>
-            DDT {note.number}
-          </TabsTrigger>
-        ))}
+        <TabsTrigger value="cantiere">
+          DDT presso cantiere
+          <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{supplierDocs.length}</span>
+        </TabsTrigger>
+        {notesWithItems.map(note => {
+          const docsCount = (notesDocsMap.get(note.id) || []).length
+          return (
+            <TabsTrigger key={note.id} value={note.id}>
+              DDT {note.number}
+              <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{docsCount}</span>
+            </TabsTrigger>
+          )
+        })}
       </TabsList>
       
       <TabsContent value="cantiere" className="pt-2">

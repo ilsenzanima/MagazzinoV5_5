@@ -85,8 +85,11 @@ export const proposalSiteDocumentsApi = {
 
     delete: async (id: string): Promise<void> => {
         const { data: existing } = await supabase.from('shared_site_documents').select('file_url').eq('id', id).maybeSingle();
-        const { error } = await supabase.from('shared_site_documents').delete().eq('id', id);
+        const { data, error } = await supabase.from('shared_site_documents').delete().eq('id', id).select();
         if (error) throw error;
+        if (!data || data.length === 0) {
+            throw new Error("Eliminazione non consentita o documento non trovato");
+        }
         await deleteDriveFileIfApplicable(existing?.file_url);
     },
 
