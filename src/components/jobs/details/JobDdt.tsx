@@ -165,7 +165,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       // 3. Carica gli articoli dell'acquisto selezionato
       const { data: purchaseItems, error: piError } = await supabase
         .from('purchase_items')
-        .select('id, inventory_id')
+        .select('id, item_id')
         .eq('purchase_id', purchaseId)
       if (piError) throw piError
       if (!purchaseItems || purchaseItems.length === 0) {
@@ -194,7 +194,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       // 6. Esegui il matching e aggiorna i record delle bolle interne
       let updatedCount = 0
       const updates = noteItems.map(async (ni) => {
-        const matchingPi = purchaseItems.find(pi => pi.inventory_id === ni.inventory_id)
+        const matchingPi = purchaseItems.find(pi => pi.item_id === ni.inventory_id)
         if (matchingPi) {
           const { error: updateError } = await supabase
             .from('delivery_note_items')
