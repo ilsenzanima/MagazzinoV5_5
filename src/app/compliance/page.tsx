@@ -51,7 +51,7 @@ import { suppliersApi } from "@/lib/services/suppliers";
 import { brandsApi } from "@/lib/services/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
 import { PageSizeSelector } from "@/components/ui/page-size-selector";
@@ -870,6 +870,17 @@ export default function CompliancePage() {
     const [viewMode, setViewMode] = useViewMode('compliance');
     const [pageSize, setPageSize] = usePageSize('compliance');
 
+    const searchParams = useSearchParams();
+    const queryTab = searchParams.get("tab") === "guests" ? "guests" : "suppliers";
+    const [activeTab, setActiveTab] = useState(queryTab);
+
+    useEffect(() => {
+        const tab = searchParams.get("tab");
+        if (tab === "guests" || tab === "suppliers") {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
+
     useEffect(() => {
         if (userRole && userRole !== "admin" && userRole !== "operativo") {
             router.replace("/dashboard");
@@ -959,7 +970,7 @@ export default function CompliancePage() {
                     </div>
                 </div>
 
-                <Tabs defaultValue="suppliers" className="space-y-6">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                     <TabsList>
                         <TabsTrigger value="suppliers">Conformità Fornitori</TabsTrigger>
                         <TabsTrigger value="guests">Cantieri Ospiti</TabsTrigger>
