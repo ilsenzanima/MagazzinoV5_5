@@ -305,19 +305,25 @@ export default function GuestPortalPage({ params }: Props) {
                                                 ) : (
                                                     <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
                                                         {job.documents.custom.map((doc: any) => (
-                                                            <div key={doc.id} className="p-2 border.rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group">
+                                                            <a
+                                                                key={doc.id}
+                                                                href={doc.fileUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
+                                                            >
                                                                 <div className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</div>
                                                                 <div className="min-w-0 flex-1">
-                                                                    <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-800 dark:text-slate-200 hover:text-primary dark:hover:text-primary break-all line-clamp-2">
+                                                                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
                                                                         {doc.name}
-                                                                    </a>
+                                                                    </span>
                                                                     <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{doc.typeName}</span>
                                                                     {doc.notes && <span className="text-[10px] text-slate-400 block italic mt-0.5 line-clamp-1">{doc.notes}</span>}
                                                                 </div>
-                                                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 p-1 hover:bg-slate-100 rounded text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                    <Download className="h-3.5 w-3.5" />
-                                                                </a>
-                                                            </div>
+                                                                <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                </div>
+                                                            </a>
                                                         ))}
                                                     </div>
                                                 )}
@@ -334,19 +340,25 @@ export default function GuestPortalPage({ params }: Props) {
                                                 ) : (
                                                     <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
                                                         {job.documents.associated.map((doc: any) => (
-                                                            <div key={doc.id} className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group">
+                                                            <a
+                                                                key={doc.id}
+                                                                href={doc.fileUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
+                                                            >
                                                                 <div className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</div>
                                                                 <div className="min-w-0 flex-1">
-                                                                    <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-800 dark:text-slate-200 hover:text-primary dark:hover:text-primary break-all line-clamp-2">
+                                                                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
                                                                         {doc.name}
-                                                                    </a>
+                                                                    </span>
                                                                     <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{doc.supplierName} · {doc.typeName}</span>
                                                                     {doc.notes && <span className="text-[10px] text-slate-400 block italic mt-0.5 line-clamp-1">{doc.notes}</span>}
                                                                 </div>
-                                                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 p-1 hover:bg-slate-100 rounded text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                    <Download className="h-3.5 w-3.5" />
-                                                                </a>
-                                                            </div>
+                                                                <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                </div>
+                                                            </a>
                                                         ))}
                                                     </div>
                                                 )}
@@ -364,32 +376,39 @@ export default function GuestPortalPage({ params }: Props) {
                                                     <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
                                                         {/* Documenti DDT allegati da acquisti fornitori */}
                                                         {job.documents.ddt.map((doc: any) => (
-                                                            <div key={doc.id} className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group">
+                                                            <a
+                                                                key={doc.id}
+                                                                href={doc.fileUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
+                                                            >
                                                                 <div className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</div>
                                                                 <div className="min-w-0 flex-1">
-                                                                    <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-800 dark:text-slate-200 hover:text-primary dark:hover:text-primary break-all line-clamp-2">
+                                                                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
                                                                         {doc.name}
-                                                                    </a>
+                                                                    </span>
                                                                     <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{doc.supplierName} · {doc.typeName}</span>
                                                                     {doc.notes && <span className="text-[10px] text-slate-400 block italic mt-0.5 line-clamp-1">{doc.notes}</span>}
                                                                 </div>
-                                                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 p-1 hover:bg-slate-100 rounded text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                    <Download className="h-3.5 w-3.5" />
-                                                                </a>
-                                                            </div>
+                                                                <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                </div>
+                                                            </a>
                                                         ))}
 
                                                         {/* Bolle interne OPI */}
                                                         {job.documents.internalNotes.map((note: any) => (
-                                                            <div key={note.id} className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group">
+                                                            <div
+                                                                key={note.id}
+                                                                onClick={() => handleDownloadInternalNote(note)}
+                                                                className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
+                                                            >
                                                                 <div className="mt-0.5 shrink-0 text-primary"><FileText className="h-5 w-5" /></div>
                                                                 <div className="min-w-0 flex-1">
-                                                                    <button
-                                                                        onClick={() => handleDownloadInternalNote(note)}
-                                                                        className="text-left font-semibold text-slate-800 dark:text-slate-200 hover:text-primary dark:hover:text-primary break-all line-clamp-2"
-                                                                    >
+                                                                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
                                                                         DDT OPI {note.number}
-                                                                    </button>
+                                                                    </span>
                                                                     <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
                                                                         Data: {format(new Date(note.date), "dd/MM/yyyy")} · Causale: {note.causal}
                                                                     </span>
@@ -397,13 +416,9 @@ export default function GuestPortalPage({ params }: Props) {
                                                                         Articoli inclusi: {note.items.length} voci
                                                                     </span>
                                                                 </div>
-                                                                <button
-                                                                    onClick={() => handleDownloadInternalNote(note)}
-                                                                    className="shrink-0 p-1 hover:bg-slate-100 rounded text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    title="Scarica PDF Bolla"
-                                                                >
-                                                                    <Download className="h-3.5 w-3.5" />
-                                                                </button>
+                                                                <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>

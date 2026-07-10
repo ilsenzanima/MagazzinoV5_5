@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
             // --- CATEGORIA 3: Documenti DDT/Bolle ---
             
             // A. Trova i purchase_id collegati alla commessa per tracciare i DDT
-            const [directPurchases, itemPurchases, deliveryItems] = await Promise.all([
+            const [directPurchases, itemPurchases, deliveryItems, manuallyAssociatedPurchases] = await Promise.all([
                 admin.from("purchases").select("id, delivery_note_number, document_urls").eq("job_id", jobId).is("deleted_at", null),
                 admin.from("purchase_items").select("purchase_id").eq("job_id", jobId),
                 admin
@@ -170,16 +170,22 @@ export async function POST(req: NextRequest) {
                     .select("purchase_item_id, delivery_notes!inner(job_id)")
                     .eq("delivery_notes.job_id", jobId)
                     .not("purchase_item_id", "is", null),
+                admin.from("purchases").select("id, delivery_note_number, document_urls").like("notes", `%[associated_job:${jobId}]%`).is("deleted_at", null),
             ]);
 
             if (directPurchases.error) throw directPurchases.error;
             if (itemPurchases.error) throw itemPurchases.error;
             if (deliveryItems.error) throw deliveryItems.error;
+            if (manuallyAssociatedPurchases.error) throw manuallyAssociatedPurchases.error;
 
             const purchaseIds = new Set<string>();
             const purchaseMap = new Map<string, any>(); // Per mappare id acquisto a numero DDT
 
             (directPurchases.data || []).forEach((p: any) => {
+                purchaseIds.add(p.id);
+                purchaseMap.set(p.id, p);
+            });
+            (manuallyAssociatedPurchases.data || []).forEach((p: any) => {
                 purchaseIds.add(p.id);
                 purchaseMap.set(p.id, p);
             });

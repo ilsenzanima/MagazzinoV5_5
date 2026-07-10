@@ -109,13 +109,13 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           label: "Gestione conformità",
           icon: ShieldCheck,
           href: "/compliance",
-          active: pathname === "/compliance" && currentTab !== "guests",
+          active: pathname === "/compliance",
         },
         {
           label: "Cantieri Ospiti",
           icon: Building2,
-          href: "/compliance?tab=guests",
-          active: pathname === "/compliance" && currentTab === "guests",
+          href: "/guest-sites",
+          active: pathname === "/guest-sites" || pathname.startsWith("/guest-sites/"),
         },
       ]
     }] : []),

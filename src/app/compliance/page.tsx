@@ -1,7 +1,6 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import GuestSitesTab from "@/components/compliance/GuestSitesTab";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -51,7 +50,7 @@ import { suppliersApi } from "@/lib/services/suppliers";
 import { brandsApi } from "@/lib/services/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
 import { PageSizeSelector } from "@/components/ui/page-size-selector";
@@ -870,16 +869,7 @@ function ComplianceContent() {
     const [viewMode, setViewMode] = useViewMode('compliance');
     const [pageSize, setPageSize] = usePageSize('compliance');
 
-    const searchParams = useSearchParams();
-    const queryTab = searchParams.get("tab") === "guests" ? "guests" : "suppliers";
-    const [activeTab, setActiveTab] = useState(queryTab);
 
-    useEffect(() => {
-        const tab = searchParams.get("tab");
-        if (tab === "guests" || tab === "suppliers") {
-            setActiveTab(tab);
-        }
-    }, [searchParams]);
 
     useEffect(() => {
         if (userRole && userRole !== "admin" && userRole !== "operativo") {
@@ -966,18 +956,12 @@ function ComplianceContent() {
                     <ShieldCheck className="h-6 w-6 text-primary" />
                     <div>
                         <h1 className="text-2xl font-bold">Gestione conformità</h1>
-                        <p className="text-sm text-muted-foreground">Documenti per fornitori e accessi ospiti per cantiere</p>
+                        <p className="text-sm text-muted-foreground">Carica e gestisci i documenti di conformità per singolo fornitore.</p>
                     </div>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList>
-                        <TabsTrigger value="suppliers">Conformità Fornitori</TabsTrigger>
-                        <TabsTrigger value="guests">Cantieri Ospiti</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="suppliers" className="space-y-6">
-                        <div className="flex justify-between items-center">
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
                             <p className="text-sm text-muted-foreground">Carica e gestisci i documenti di conformità per singolo fornitore.</p>
                             <Button onClick={() => setUploadOpen(true)}>
                                 <Plus className="mr-2 h-4 w-4" />
@@ -1059,12 +1043,7 @@ function ComplianceContent() {
                                 )}
                             </>
                         )}
-                    </TabsContent>
-
-                    <TabsContent value="guests">
-                        <GuestSitesTab />
-                    </TabsContent>
-                </Tabs>
+                </div>
             </div>
 
 
