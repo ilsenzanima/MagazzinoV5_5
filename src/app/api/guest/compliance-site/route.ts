@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
                 .select(`
                     id, custom_name, custom_notes, created_at,
                     supplier_compliance_documents (
-                        id, name, file_url, file_type, file_size, notes, created_at,
+                        id, name, file_url, file_size, notes, created_at,
                         suppliers (name),
                         compliance_document_types (name)
                     )
@@ -145,12 +145,13 @@ export async function POST(req: NextRequest) {
                 const doc = assocDoc.supplier_compliance_documents as any;
                 if (!doc) continue;
                 const signedUrl = await createSignedUrl(admin, doc.file_url);
+                const fileExt = doc.file_url.split(".").pop()?.toLowerCase() || "pdf";
                 associatedDocuments.push({
                     id: assocDoc.id,
                     name: assocDoc.custom_name || doc.name,
                     notes: assocDoc.custom_notes || doc.notes,
                     fileUrl: signedUrl,
-                    fileType: doc.file_type,
+                    fileType: fileExt,
                     fileSize: doc.file_size,
                     supplierName: getRelationName(doc.suppliers) || "Sconosciuto",
                     typeName: getRelationName(doc.compliance_document_types) || "Generico",
@@ -207,7 +208,7 @@ export async function POST(req: NextRequest) {
                 const { data: supplierDocs, error: supplierDocsError } = await admin
                     .from("supplier_compliance_documents")
                     .select(`
-                        id, name, file_url, file_type, file_size, notes, created_at, purchase_id,
+                        id, name, file_url, file_size, notes, created_at, purchase_id,
                         suppliers (name),
                         compliance_document_types (name)
                     `)
@@ -240,12 +241,13 @@ export async function POST(req: NextRequest) {
                         if (pDetail) ddtNumber = pDetail.delivery_note_number;
                     }
 
+                    const fileExt = doc.file_url.split(".").pop()?.toLowerCase() || "pdf";
                     ddtDocuments.push({
                         id: doc.id,
                         name: doc.name,
                         notes: doc.notes ? `DDT Fornitore: ${ddtNumber}. Note: ${doc.notes}` : `DDT Fornitore: ${ddtNumber}`,
                         fileUrl: signedUrl,
-                        fileType: doc.file_type,
+                        fileType: fileExt,
                         fileSize: doc.file_size,
                         supplierName: getRelationName(doc.suppliers) || "Sconosciuto",
                         typeName: getRelationName(doc.compliance_document_types) || "Conformità DDT",
