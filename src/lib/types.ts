@@ -517,3 +517,31 @@ export interface LoadNote {
     createdByName?: string; // Display name of creator
     createdAt?: string;
 }
+
+export interface GuestSite {
+    id: string;
+    name: string;
+    address: string;
+    passcode: string;
+    createdBy?: string;
+    createdAt: string;
+    updatedAt: string;
+    deletedAt?: string | null;
+}
+
+export interface GuestSiteJob {
+    id: string;
+    guestSiteId: string;
+    jobId: string;
+    customNotes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    deletedAt?: string | null;
+    
+    // Campi opzionali caricati in join
+    jobCode?: string;
+    jobDescription?: string;
+    jobStartDate?: string;
+    jobEndDate?: string;
+}
+

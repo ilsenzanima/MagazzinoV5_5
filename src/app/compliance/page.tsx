@@ -1,8 +1,10 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import GuestSitesTab from "@/components/compliance/GuestSitesTab";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -949,95 +951,111 @@ export default function CompliancePage() {
         <DashboardLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <ShieldCheck className="h-6 w-6 text-primary" />
-                        <div>
-                            <h1 className="text-2xl font-bold">Gestione conformità</h1>
-                            <p className="text-sm text-muted-foreground">Documenti di conformità per fornitore</p>
-                        </div>
+                <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-6 w-6 text-primary" />
+                    <div>
+                        <h1 className="text-2xl font-bold">Gestione conformità</h1>
+                        <p className="text-sm text-muted-foreground">Documenti per fornitori e accessi ospiti per cantiere</p>
                     </div>
-                    <Button onClick={() => setUploadOpen(true)}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Carica documento
-                    </Button>
                 </div>
 
-                {/* Supplier selector */}
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex flex-wrap gap-4">
-                            <div className="max-w-sm flex-1 space-y-1.5">
-                                <Label className="text-sm font-medium">Seleziona fornitore</Label>
-                                <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Scegli un fornitore..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {suppliers.map((s) => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {selectedSupplierId && (
-                                <div className="max-w-sm flex-1 space-y-1.5">
-                                    <Label className="text-sm font-medium">Cerca documento</Label>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                        <Input
-                                            className="pl-9"
-                                            placeholder="Cerca per nome..."
-                                            value={search}
-                                            onChange={(e) => setSearch(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                <Tabs defaultValue="suppliers" className="space-y-6">
+                    <TabsList>
+                        <TabsTrigger value="suppliers">Conformità Fornitori</TabsTrigger>
+                        <TabsTrigger value="guests">Cantieri Ospiti</TabsTrigger>
+                    </TabsList>
 
-                {/* Documents area */}
-                {selectedSupplierId && (
-                    <>
-                        {loadingDocs ? (
-                            <div className="flex justify-center py-16">
-                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : documents.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
-                                <FileText className="h-10 w-10 opacity-30" />
-                                <p className="text-sm">Nessun documento caricato per questo fornitore.</p>
-                                <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Carica il primo documento
-                                </Button>
-                            </div>
-                        ) : filteredDocuments.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
-                                <Search className="h-10 w-10 opacity-30" />
-                                <p className="text-sm">Nessun documento trovato per &quot;{search}&quot;.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-end gap-2">
-                                    <PageSizeSelector value={pageSize} onChange={setPageSize} />
-                                    <ViewToggle mode={viewMode} onChange={setViewMode} />
+                    <TabsContent value="suppliers" className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <p className="text-sm text-muted-foreground">Carica e gestisci i documenti di conformità per singolo fornitore.</p>
+                            <Button onClick={() => setUploadOpen(true)}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Carica documento
+                            </Button>
+                        </div>
+
+                        {/* Supplier selector */}
+                        <Card>
+                            <CardContent className="p-4">
+                                <div className="flex flex-wrap gap-4">
+                                    <div className="max-w-sm flex-1 space-y-1.5">
+                                        <Label className="text-sm font-medium">Seleziona fornitore</Label>
+                                        <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Scegli un fornitore..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {suppliers.map((s) => (
+                                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {selectedSupplierId && (
+                                        <div className="max-w-sm flex-1 space-y-1.5">
+                                            <Label className="text-sm font-medium">Cerca documento</Label>
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                                <Input
+                                                    className="pl-9"
+                                                    placeholder="Cerca per nome..."
+                                                    value={search}
+                                                    onChange={(e) => setSearch(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                                <DocumentTypeTabs
-                                    docs={filteredDocuments}
-                                    docTypes={docTypes}
-                                    viewMode={viewMode}
-                                    pageSize={pageSize}
-                                    onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
-                                    onDelete={setDeletingDoc}
-                                />
+                            </CardContent>
+                        </Card>
+
+                        {/* Documents area */}
+                        {selectedSupplierId && (
+                            <>
+                                {loadingDocs ? (
+                                    <div className="flex justify-center py-16">
+                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                    </div>
+                                ) : documents.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
+                                        <FileText className="h-10 w-10 opacity-30" />
+                                        <p className="text-sm">Nessun documento caricato per questo fornitore.</p>
+                                        <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Carica il primo documento
+                                        </Button>
+                                    </div>
+                                ) : filteredDocuments.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
+                                        <Search className="h-10 w-10 opacity-30" />
+                                        <p className="text-sm">Nessun documento trovato per &quot;{search}&quot;.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <PageSizeSelector value={pageSize} onChange={setPageSize} />
+                                            <ViewToggle mode={viewMode} onChange={setViewMode} />
+                                        </div>
+                                        <DocumentTypeTabs
+                                            docs={filteredDocuments}
+                                            docTypes={docTypes}
+                                            viewMode={viewMode}
+                                            pageSize={pageSize}
+                                            onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
+                                            onDelete={setDeletingDoc}
+                                        />
+                                    </>
+                                )}
                             </>
                         )}
-                    </>
-                )}
+                    </TabsContent>
+
+                    <TabsContent value="guests">
+                        <GuestSitesTab />
+                    </TabsContent>
+                </Tabs>
             </div>
+
 
             {/* Multi upload dialog */}
             <MultiUploadDialog
