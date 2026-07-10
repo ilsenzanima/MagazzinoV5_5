@@ -175,8 +175,10 @@ export async function POST(req: NextRequest) {
             }));
 
             // --- CATEGORIA 2: Documenti Associati (conformità fornitori) ---
+            // Nota: la tabella storica "job_compliance_associations" è stata sostituita da
+            // "shared_compliance_associations" (condivisa tra proposte e commesse) e non contiene più dati.
             const { data: rawAssocDocs, error: assocDocsError } = await admin
-                .from("job_compliance_associations")
+                .from("shared_compliance_associations")
                 .select(`
                     id, custom_name, custom_notes, created_at,
                     supplier_compliance_documents (
