@@ -101,8 +101,7 @@ export async function POST(req: NextRequest) {
                     job_site_document_types (name)
                 `)
                 .eq("job_id", jobId)
-                .eq("category", "conformita")
-                .is("deleted_at", null);
+                .eq("category", "conformita");
 
             if (jobDocsError) throw jobDocsError;
 
