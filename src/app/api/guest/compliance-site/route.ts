@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
                 .select(`
                     id, name, notes, file_url, file_type, file_size, category, created_at,
                     job_conformita_document_types (name),
-                    job_site_document_folders (name)
+                    job_site_document_types (name)
                 `)
                 .eq("job_id", jobId)
                 .eq("category", "conformita")
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
             for (const doc of (rawJobDocs || [])) {
                 const signedUrl = await createSignedUrl(admin, doc.file_url);
                 const typeName = getRelationName(doc.job_conformita_document_types) || 
-                                 getRelationName(doc.job_site_document_folders) || 
+                                 getRelationName(doc.job_site_document_types) || 
                                  "Generico";
 
                 customDocuments.push({
