@@ -48,11 +48,18 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const load = async () => {
     try {
       setLoading(true)
-      const [exitNotes, saleNotes, purchases] = await Promise.all([
+      // Carica bolle interne, acquisti diretti del cantiere, e acquisti associati manualmente tramite il tag notes
+      const [exitNotes, saleNotes, directPurchases, manuallyAssociatedDb] = await Promise.all([
         deliveryNotesApi.getByJobId(jobId, "exit"),
         deliveryNotesApi.getByJobId(jobId, "sale"),
         purchasesApi.getByJobId(jobId),
+        supabase
+          .from('purchases')
+          .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model)), profiles(full_name)')
+          .like('notes', `%[associated_job:${jobId}]%`)
+          .is('deleted_at', null)
       ])
+
       const combinedNotes = [...exitNotes, ...saleNotes].sort((a, b) => {
         const dateA = new Date(a.date).getTime()
         const dateB = new Date(b.date).getTime()
@@ -61,42 +68,27 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       })
       setOpiNotes(combinedNotes)
 
-      // Raccogli tutti i purchaseId legati ai materiali movimentati nelle bolle interne
-      const purchaseIds = new Set<string>()
-      combinedNotes.forEach(note => {
-        (note.items || []).forEach(item => {
-          if (item.purchaseId) {
-            purchaseIds.add(item.purchaseId)
-          }
-        })
-      })
-      const associatedIds = Array.from(purchaseIds)
-
-      // Carica gli acquisti associati alle movimentazioni che non sono direttamente legati a questa commessa
-      let extraPurchases: Purchase[] = []
-      const missingIds = associatedIds.filter(id => !purchases.some(p => p.id === id))
-      if (missingIds.length > 0) {
-        const { data: extraDb, error: extraError } = await supabase
-          .from('purchases')
-          .select('*, suppliers(name), purchase_items(price, quantity), profiles(full_name)')
-          .in('id', missingIds)
-          .is('deleted_at', null)
-        if (!extraError && extraDb) {
-          extraPurchases = extraDb.map(mapDbToPurchase)
-        }
-      }
-
-      // Documenti caricati direttamente in cantiere (purchases linked directly to job)
+      // DDT presso cantiere: acquisti legati direttamente alla commessa che NON contengono il tag di associazione manuale
+      const cantierePurchases = directPurchases.filter(p => !p.notes?.includes(`[associated_job:${jobId}]`))
       const docs: SupplierDoc[] = []
-      purchases.filter(p => p.orderType !== 'order').forEach(p => {
+      cantierePurchases.filter(p => p.orderType !== 'order').forEach(p => {
         (p.documentUrls || []).forEach((url, index) => docs.push({ purchase: p, url, index }))
       })
       setSupplierDocs(docs)
 
-      // Documenti dei DDT associati manualmente alle bolle interne
+      // DDT associati: acquisti associati manualmente
+      const manuallyAssociatedPurchases = (manuallyAssociatedDb.data || []).map((p: any) => ({
+        ...mapDbToPurchase(p),
+        items: (p.purchase_items ?? []).map((i: any) => ({
+          price: i.price,
+          quantity: i.quantity,
+          itemName: i.inventory?.name,
+          itemModel: i.inventory?.model,
+        }))
+      }))
+
       const assocDocs: SupplierDoc[] = []
-      const allAvailablePurchases = [...purchases, ...extraPurchases]
-      allAvailablePurchases.filter(p => p.orderType !== 'order' && associatedIds.includes(p.id)).forEach(p => {
+      manuallyAssociatedPurchases.filter(p => p.orderType !== 'order').forEach(p => {
         (p.documentUrls || []).forEach((url, index) => assocDocs.push({ purchase: p, url, index }))
       })
       setAssociatedDocs(assocDocs)
@@ -150,7 +142,27 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
 
   const handleAssociatePurchase = async (purchaseId: string): Promise<number> => {
     try {
-      // 1. Carica gli articoli dell'acquisto selezionato
+      // 1. Carica l'acquisto per leggerne le note attuali
+      const { data: purchaseData, error: pLoadError } = await supabase
+        .from('purchases')
+        .select('notes')
+        .eq('id', purchaseId)
+        .single()
+      if (pLoadError) throw pLoadError
+
+      // 2. Aggiorna le note inserendo il tag di associazione
+      const currentNotes = purchaseData.notes || ""
+      const assocTag = `[associated_job:${jobId}]`
+      if (!currentNotes.includes(assocTag)) {
+        const newNotes = currentNotes ? `${currentNotes} ${assocTag}` : assocTag
+        const { error: pUpdateError } = await supabase
+          .from('purchases')
+          .update({ notes: newNotes })
+          .eq('id', purchaseId)
+        if (pUpdateError) throw pUpdateError
+      }
+
+      // 3. Carica gli articoli dell'acquisto selezionato
       const { data: purchaseItems, error: piError } = await supabase
         .from('purchase_items')
         .select('id, inventory_id')
@@ -161,14 +173,14 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
         return 0
       }
 
-      // 2. Raccogli gli ID di tutte le bolle interne della commessa
+      // 4. Raccogli gli ID di tutte le bolle interne della commessa
       const noteIds = opiNotes.map(n => n.id)
       if (noteIds.length === 0) {
         await load()
         return 0
       }
 
-      // 3. Carica tutte le righe delle bolle interne della commessa
+      // 5. Carica tutte le righe delle bolle interne della commessa
       const { data: noteItems, error: niError } = await supabase
         .from('delivery_note_items')
         .select('id, inventory_id')
@@ -179,7 +191,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
         return 0
       }
 
-      // 4. Esegui il matching e aggiorna i record delle bolle interne
+      // 6. Esegui il matching e aggiorna i record delle bolle interne
       let updatedCount = 0
       const updates = noteItems.map(async (ni) => {
         const matchingPi = purchaseItems.find(pi => pi.inventory_id === ni.inventory_id)
@@ -208,30 +220,51 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const handleDisassociatePurchase = async (purchaseId: string): Promise<void> => {
     try {
       setLoading(true)
-      // 1. Carica gli articoli dell'acquisto da disassociare
+
+      // 1. Rimuovi il tag [associated_job:jobId] dalle note dell'acquisto
+      const { data: purchaseData, error: pLoadError } = await supabase
+        .from('purchases')
+        .select('notes')
+        .eq('id', purchaseId)
+        .single()
+      if (pLoadError) throw pLoadError
+
+      const currentNotes = purchaseData.notes || ""
+      const assocTag = `[associated_job:${jobId}]`
+      if (currentNotes.includes(assocTag)) {
+        const newNotes = currentNotes
+          .replace(assocTag, "")
+          .replace(/\s+/g, ' ')
+          .trim()
+        const { error: pUpdateError } = await supabase
+          .from('purchases')
+          .update({ notes: newNotes })
+          .eq('id', purchaseId)
+        if (pUpdateError) throw pUpdateError
+      }
+
+      // 2. Carica gli articoli dell'acquisto da disassociare
       const { data: purchaseItems, error: piError } = await supabase
         .from('purchase_items')
         .select('id')
         .eq('purchase_id', purchaseId)
       if (piError) throw piError
-      if (!purchaseItems || purchaseItems.length === 0) {
-        toast.error("Nessun articolo trovato per questo acquisto")
-        return
+
+      if (purchaseItems && purchaseItems.length > 0) {
+        const piIds = purchaseItems.map(pi => pi.id)
+
+        // 3. Raccogli gli ID di tutte le bolle interne della commessa
+        const noteIds = opiNotes.map(n => n.id)
+        if (noteIds.length > 0) {
+          // Scollega gli articoli nelle bolle interne
+          const { error: updateError } = await supabase
+            .from('delivery_note_items')
+            .update({ purchase_item_id: null })
+            .in('delivery_note_id', noteIds)
+            .in('purchase_item_id', piIds)
+          if (updateError) throw updateError
+        }
       }
-
-      const piIds = purchaseItems.map(pi => pi.id)
-
-      // 2. Raccogli gli ID di tutte le bolle interne della commessa
-      const noteIds = opiNotes.map(n => n.id)
-      if (noteIds.length === 0) return
-
-      // 3. Scollega gli articoli nelle bolle interne
-      const { error: updateError } = await supabase
-        .from('delivery_note_items')
-        .update({ purchase_item_id: null })
-        .in('delivery_note_id', noteIds)
-        .in('purchase_item_id', piIds)
-      if (updateError) throw updateError
 
       toast.success("DDT disassociato con successo")
       await load()
@@ -241,6 +274,39 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const getMatchedMaterialsLabel = (purchase: Purchase, index: number) => {
+    // 1. Raccogli tutti i nomi unici dei materiali nelle bolle interne (OPI) della commessa
+    const opiMaterialNames = new Set<string>()
+    opiNotes.forEach(note => {
+      (note.items || []).forEach(item => {
+        const name = item.inventoryName
+        if (name) opiMaterialNames.add(name.toLowerCase().trim())
+      })
+    })
+
+    // 2. Trova gli articoli dell'acquisto che hanno un nome presente in opiMaterialNames
+    const matchedNames: string[] = []
+    ;(purchase.items || []).forEach(item => {
+      if (item.itemName) {
+        const nameClean = item.itemName.toLowerCase().trim()
+        if (opiMaterialNames.has(nameClean)) {
+          const fullName = item.itemModel 
+            ? `${item.itemName} (${item.itemModel})`
+            : item.itemName
+          if (!matchedNames.includes(fullName)) {
+            matchedNames.push(fullName)
+          }
+        }
+      }
+    })
+
+    // 3. Se non c'è corrispondenza o non ci sono articoli nell'acquisto, mostra "Allegato X"
+    if (matchedNames.length === 0) {
+      return `Allegato ${index + 1}`
+    }
+    return matchedNames.join(', ')
   }
 
   const renderDocsList = (docs: SupplierDoc[], isAssociatedTab = false) => {
@@ -264,75 +330,76 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
     if (viewMode === 'list') {
       return (
         <div className="space-y-1.5">
-          {docs.map((doc) => (
-            <div key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
-              <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-                <FileText className="h-5 w-5 text-red-500" />
+          {docs.map((doc) => {
+            const label = getMatchedMaterialsLabel(doc.purchase, doc.index)
+            return (
+              <div key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
+                <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+                  <FileText className="h-5 w-5 text-red-500" />
+                </div>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+                  <p className="font-medium truncate text-sm">
+                    {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate">{label}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <p className="text-xs text-slate-400 mr-2">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
+                  {isAssociatedTab && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleDisassociatePurchase(doc.purchase.id)}
+                      className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      Disassocia
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-                <p className="font-medium truncate text-sm">
-                  {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
-                </p>
-                <p className="text-xs text-slate-500 truncate">Allegato {doc.index + 1}</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <p className="text-xs text-slate-400 mr-2">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
-                {isAssociatedTab && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleDisassociatePurchase(doc.purchase.id)}
-                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
-                  >
-                    Disassocia
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )
     }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {docs.map((doc) => (
-          <Card key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="hover:shadow-md transition-shadow relative">
-            <CardContent className="p-4 flex items-start gap-3">
-              <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-                <FileText className="h-8 w-8 text-red-500" />
-              </div>
-              <div className="flex-1 overflow-hidden min-w-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-                <p className="font-medium truncate text-sm">
-                  {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5 truncate">Allegato {doc.index + 1}</p>
-                <p className="text-xs text-slate-400 mt-1">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
-              </div>
-              {isAssociatedTab && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleDisassociatePurchase(doc.purchase.id)}
-                  className="absolute top-2 right-2 h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
-                >
-                  Disassocia
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+        {docs.map((doc) => {
+          const label = getMatchedMaterialsLabel(doc.purchase, doc.index)
+          return (
+            <Card key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="hover:shadow-md transition-shadow relative">
+              <CardContent className="p-4 flex items-start gap-3">
+                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+                  <FileText className="h-8 w-8 text-red-500" />
+                </div>
+                <div className="flex-1 overflow-hidden min-w-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
+                  <p className="font-medium truncate text-sm">
+                    {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 truncate">{label}</p>
+                  <p className="text-xs text-slate-400 mt-1">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
+                </div>
+                {isAssociatedTab && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleDisassociatePurchase(doc.purchase.id)}
+                    className="absolute top-2 right-2 h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    Disassocia
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     )
   }
 
-  const associatedPurchaseIds = new Set<string>()
-  opiNotes.forEach(note => {
-    (note.items || []).forEach(item => {
-      if (item.purchaseId) {
-        associatedPurchaseIds.add(item.purchaseId)
-      }
-    })
-  })
+  const associatedPurchaseIds = new Set<string>(
+    associatedDocs.map(doc => doc.purchase.id)
+  )
 
   return (
     <div className="space-y-4">
