@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { getFileIcon, formatFileSize } from "@/lib/file-icon";
+import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/ui/photo-gallery";
 
 interface Props {
     params: Promise<{ id: string }>;
@@ -40,6 +41,21 @@ function GuestPortalContent({ params }: Props) {
     const [siteData, setSiteData] = useState<any>(null);
     const [jobs, setJobs] = useState<any[]>([]);
     const [activeJobId, setActiveJobId] = useState<string>("");
+
+    // Galleria foto: elenco immagini della cartella corrente + indice attivo
+    const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([]);
+    const [galleryIndex, setGalleryIndex] = useState(0);
+    const [galleryOpen, setGalleryOpen] = useState(false);
+
+    const openGallery = (images: PhotoGalleryImage[], startIndex: number) => {
+        setGalleryImages(images);
+        setGalleryIndex(startIndex);
+        setGalleryOpen(true);
+    };
+
+    const scrollToSection = (id: string) => {
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
 
     useEffect(() => {
         // Priorità 1: codice passato via QR/link diretto (?code=...)
@@ -208,178 +224,214 @@ function GuestPortalContent({ params }: Props) {
         );
     }
 
-    const renderJobDocuments = (job: any) => (
-        <Card className="overflow-hidden border-slate-200/80 dark:border-slate-800 shadow-sm">
-            {/* Intestazione commessa */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-black font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            {job.code}
-                        </span>
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                            {job.name || job.description}
-                        </h4>
+    const renderDocLink = (doc: any, subtitle: string, images?: PhotoGalleryImage[], imageIndex?: number) => {
+        const asImage = images && imageIndex !== undefined;
+        const content = (
+            <>
+                <div className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</div>
+                <div className="min-w-0 flex-1">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
+                        {doc.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{subtitle}</span>
+                    {doc.notes && <span className="text-[10px] text-slate-400 block italic mt-0.5 line-clamp-1">{doc.notes}</span>}
+                </div>
+                <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                </div>
+            </>
+        );
+        const className = "p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer w-full text-left";
+        if (asImage) {
+            return (
+                <button key={doc.id} onClick={() => openGallery(images!, imageIndex!)} className={className}>
+                    {content}
+                </button>
+            );
+        }
+        return (
+            <a key={doc.id} href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className={className}>
+                {content}
+            </a>
+        );
+    };
+
+    const renderJobDocuments = (job: any) => {
+        const customGroups: any[] = job.documents.custom || [];
+        const sections = [
+            ...customGroups.map((g: any) => ({
+                id: `custom-${job.jobId}-${g.typeId || "untyped"}`,
+                label: g.typeName,
+                count: g.folders.reduce((sum: number, f: any) => sum + f.documents.length, 0),
+            })),
+            {
+                id: `associated-${job.jobId}`,
+                label: "Certificati Conformità",
+                count: job.documents.associated.length,
+            },
+            {
+                id: `ddt-${job.jobId}`,
+                label: "DDT e Bolle Consegna",
+                count: job.documents.ddt.length + job.documents.internalNotes.length,
+            },
+        ];
+
+        return (
+            <Card className="overflow-hidden border-slate-200/80 dark:border-slate-800 shadow-sm">
+                {/* Intestazione commessa */}
+                <div className="bg-slate-50 dark:bg-slate-900/60 p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-black font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                {job.code}
+                            </span>
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                                {job.name || job.description}
+                            </h4>
+                        </div>
+                        {job.description && job.name && job.description !== job.name && (
+                            <p className="text-xs text-slate-500 mt-1">{job.description}</p>
+                        )}
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
+                            <Calendar className="h-3.5 w-3.5" />
+                            <span>
+                                Periodo: {job.startDate ? format(new Date(job.startDate), "dd/MM/yyyy") : "N/D"} - {job.endDate ? format(new Date(job.endDate), "dd/MM/yyyy") : "N/D"}
+                            </span>
+                        </div>
                     </div>
-                    {job.description && job.name && job.description !== job.name && (
-                        <p className="text-xs text-slate-500 mt-1">{job.description}</p>
+                </div>
+
+                <CardContent className="p-5 space-y-4">
+                    {/* Note ad-hoc */}
+                    {job.customNotes && (
+                        <div className="bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 p-3.5 rounded-lg">
+                            <span className="text-[9px] text-blue-500 dark:text-blue-400 font-extrabold uppercase tracking-wide">Commento informativo della direzione cantiere</span>
+                            <p className="text-sm text-blue-900 dark:text-blue-300 mt-1 whitespace-pre-wrap font-medium leading-relaxed italic">
+                                &ldquo;{job.customNotes}&rdquo;
+                            </p>
+                        </div>
                     )}
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>
-                            Periodo: {job.startDate ? format(new Date(job.startDate), "dd/MM/yyyy") : "N/D"} - {job.endDate ? format(new Date(job.endDate), "dd/MM/yyyy") : "N/D"}
-                        </span>
-                    </div>
-                </div>
-            </div>
 
-            <CardContent className="p-5 space-y-4">
-                {/* Note ad-hoc */}
-                {job.customNotes && (
-                    <div className="bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 p-3.5 rounded-lg">
-                        <span className="text-[9px] text-blue-500 dark:text-blue-400 font-extrabold uppercase tracking-wide">Commento informativo della direzione cantiere</span>
-                        <p className="text-sm text-blue-900 dark:text-blue-300 mt-1 whitespace-pre-wrap font-medium leading-relaxed italic">
-                            &ldquo;{job.customNotes}&rdquo;
-                        </p>
-                    </div>
-                )}
+                    {/* Layout a due colonne: indice a sinistra (sempre visibile), contenuto a capitoli a destra */}
+                    <div className="grid gap-6 md:grid-cols-[200px_1fr] items-start">
+                        {/* Indice */}
+                        <nav className="hidden md:block sticky top-4 space-y-0.5 self-start">
+                            {sections.map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => scrollToSection(s.id)}
+                                    className="w-full text-left px-2 py-1.5 rounded text-xs font-medium text-slate-500 hover:text-primary hover:bg-primary/5 transition-colors flex items-center justify-between gap-2"
+                                >
+                                    <span className="truncate">{s.label}</span>
+                                    <span className="text-[10px] text-slate-400 shrink-0">{s.count}</span>
+                                </button>
+                            ))}
+                        </nav>
 
-                {/* Griglia delle Categorie Documenti */}
-                <div className="grid gap-6 md:grid-cols-3">
-                    {/* Categoria 1: Documenti Personalizzati */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1.5 border-b">
-                            <FileText className="h-4 w-4 text-primary shrink-0" />
-                            <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">Documenti Cantiere</h5>
-                        </div>
-                        {job.documents.custom.length === 0 ? (
-                            <p className="text-xs text-slate-400 italic py-2">Nessun documento inserito.</p>
-                        ) : (
-                            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
-                                {job.documents.custom.map((doc: any) => (
-                                    <a
-                                        key={doc.id}
-                                        href={doc.fileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
-                                    >
-                                        <div className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</div>
-                                        <div className="min-w-0 flex-1">
-                                            <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
-                                                {doc.name}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{doc.typeName}</span>
-                                            {doc.notes && <span className="text-[10px] text-slate-400 block italic mt-0.5 line-clamp-1">{doc.notes}</span>}
-                                        </div>
-                                        <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <ExternalLink className="h-3.5 w-3.5" />
-                                        </div>
-                                    </a>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Categoria 2: Documenti Associati */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1.5 border-b">
-                            <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                            <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">Certificati Conformità</h5>
-                        </div>
-                        {job.documents.associated.length === 0 ? (
-                            <p className="text-xs text-slate-400 italic py-2">Nessun certificato associato.</p>
-                        ) : (
-                            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
-                                {job.documents.associated.map((doc: any) => (
-                                    <a
-                                        key={doc.id}
-                                        href={doc.fileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
-                                    >
-                                        <div className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</div>
-                                        <div className="min-w-0 flex-1">
-                                            <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
-                                                {doc.name}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{doc.supplierName} · {doc.typeName}</span>
-                                            {doc.notes && <span className="text-[10px] text-slate-400 block italic mt-0.5 line-clamp-1">{doc.notes}</span>}
-                                        </div>
-                                        <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <ExternalLink className="h-3.5 w-3.5" />
-                                        </div>
-                                    </a>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Categoria 3: Documenti DDT/Bolle */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 pb-1.5 border-b">
-                            <Truck className="h-4 w-4 text-amber-600 shrink-0" />
-                            <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">DDT e Bolle Consegna</h5>
-                        </div>
-                        {(job.documents.ddt.length === 0 && job.documents.internalNotes.length === 0) ? (
-                            <p className="text-xs text-slate-400 italic py-2">Nessun DDT presente.</p>
-                        ) : (
-                            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
-                                {/* Documenti DDT allegati da acquisti fornitori */}
-                                {job.documents.ddt.map((doc: any) => (
-                                    <a
-                                        key={doc.id}
-                                        href={doc.fileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
-                                    >
-                                        <div className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</div>
-                                        <div className="min-w-0 flex-1">
-                                            <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
-                                                {doc.name}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{doc.supplierName} · {doc.typeName}</span>
-                                            {doc.notes && <span className="text-[10px] text-slate-400 block italic mt-0.5 line-clamp-1">{doc.notes}</span>}
-                                        </div>
-                                        <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <ExternalLink className="h-3.5 w-3.5" />
-                                        </div>
-                                    </a>
-                                ))}
-
-                                {/* Bolle interne OPI */}
-                                {job.documents.internalNotes.map((note: any) => (
-                                    <div
-                                        key={note.id}
-                                        onClick={() => handleDownloadInternalNote(note)}
-                                        className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
-                                    >
-                                        <div className="mt-0.5 shrink-0 text-primary"><FileText className="h-5 w-5" /></div>
-                                        <div className="min-w-0 flex-1">
-                                            <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
-                                                DDT OPI {note.number}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
-                                                Data: {format(new Date(note.date), "dd/MM/yyyy")} · Causale: {note.causal}
-                                            </span>
-                                            <span className="text-[10px] text-slate-450 block italic mt-0.5 line-clamp-1">
-                                                Articoli inclusi: {note.items.length} voci
-                                            </span>
-                                        </div>
-                                        <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <ExternalLink className="h-3.5 w-3.5" />
-                                        </div>
+                        {/* Contenuto a capitoli, in un unico elenco continuo */}
+                        <div className="space-y-8 min-w-0">
+                            {/* Capitoli: Documenti Cantiere, un capitolo per tipo documento */}
+                            {customGroups.map((g: any) => (
+                                <div key={g.typeId || "untyped"} id={`custom-${job.jobId}-${g.typeId || "untyped"}`} className="space-y-3 scroll-mt-4">
+                                    <div className="flex items-center gap-2 pb-1.5 border-b">
+                                        <FileText className="h-4 w-4 text-primary shrink-0" />
+                                        <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">{g.typeName}</h5>
                                     </div>
-                                ))}
+                                    <div className="space-y-4">
+                                        {g.folders.map((f: any) => {
+                                            const imagesInFolder: PhotoGalleryImage[] = f.documents
+                                                .filter((d: any) => isImageFileType(d.fileType))
+                                                .map((d: any) => ({ url: d.fileUrl, name: d.name }));
+                                            return (
+                                                <div key={f.folderId || "root"} className="space-y-2">
+                                                    {f.folderName && (
+                                                        <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                                                            📁 {f.folderName}
+                                                        </p>
+                                                    )}
+                                                    <div className="grid gap-2 sm:grid-cols-2">
+                                                        {f.documents.map((doc: any) => {
+                                                            const isImg = isImageFileType(doc.fileType);
+                                                            const imgIndex = isImg ? imagesInFolder.findIndex(im => im.url === doc.fileUrl) : undefined;
+                                                            return renderDocLink(doc, g.typeName, isImg ? imagesInFolder : undefined, imgIndex);
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                            {customGroups.length === 0 && (
+                                <div id={`custom-${job.jobId}-untyped`} className="space-y-3 scroll-mt-4">
+                                    <div className="flex items-center gap-2 pb-1.5 border-b">
+                                        <FileText className="h-4 w-4 text-primary shrink-0" />
+                                        <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">Documenti Cantiere</h5>
+                                    </div>
+                                    <p className="text-xs text-slate-400 italic py-2">Nessun documento inserito.</p>
+                                </div>
+                            )}
+
+                            {/* Capitolo: Certificati Conformità */}
+                            <div id={`associated-${job.jobId}`} className="space-y-3 scroll-mt-4">
+                                <div className="flex items-center gap-2 pb-1.5 border-b">
+                                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                                    <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">Certificati Conformità</h5>
+                                </div>
+                                {job.documents.associated.length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic py-2">Nessun certificato associato.</p>
+                                ) : (
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {job.documents.associated.map((doc: any) => renderDocLink(doc, `${doc.supplierName} · ${doc.typeName}`))}
+                                    </div>
+                                )}
                             </div>
-                        )}
+
+                            {/* Capitolo: DDT e Bolle Consegna */}
+                            <div id={`ddt-${job.jobId}`} className="space-y-3 scroll-mt-4">
+                                <div className="flex items-center gap-2 pb-1.5 border-b">
+                                    <Truck className="h-4 w-4 text-amber-600 shrink-0" />
+                                    <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">DDT e Bolle Consegna</h5>
+                                </div>
+                                {(job.documents.ddt.length === 0 && job.documents.internalNotes.length === 0) ? (
+                                    <p className="text-xs text-slate-400 italic py-2">Nessun DDT presente.</p>
+                                ) : (
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {job.documents.ddt.map((doc: any) => renderDocLink(doc, `${doc.supplierName} · ${doc.typeName}`))}
+
+                                        {/* Bolle interne OPI */}
+                                        {job.documents.internalNotes.map((note: any) => (
+                                            <div
+                                                key={note.id}
+                                                onClick={() => handleDownloadInternalNote(note)}
+                                                className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
+                                            >
+                                                <div className="mt-0.5 shrink-0 text-primary"><FileText className="h-5 w-5" /></div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
+                                                        DDT OPI {note.number}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
+                                                        Data: {format(new Date(note.date), "dd/MM/yyyy")} · Causale: {note.causal}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-450 block italic mt-0.5 line-clamp-1">
+                                                        Articoli inclusi: {note.items.length} voci
+                                                    </span>
+                                                </div>
+                                                <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
+                </CardContent>
+            </Card>
+        );
+    };
 
     // Portale Cantiere Ospite (Autenticato)
     return (
@@ -467,6 +519,15 @@ function GuestPortalContent({ params }: Props) {
                     )}
                 </div>
             </main>
+
+            {galleryOpen && (
+                <PhotoGallery
+                    images={galleryImages}
+                    index={galleryIndex}
+                    onIndexChange={setGalleryIndex}
+                    onClose={() => setGalleryOpen(false)}
+                />
+            )}
         </div>
     );
 }

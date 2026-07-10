@@ -152,20 +152,34 @@ export async function POST(req: NextRequest) {
 
             const jobId = job.id;
 
-            // --- CATEGORIA 1: Documenti Personalizzati (propri della commessa) ---
-            const { data: rawJobDocs, error: jobDocsError } = await admin
-                .from("job_documents")
-                .select(`
-                    id, name, notes, file_url, file_type, file_size, category, created_at,
-                    job_conformita_document_types (name),
-                    job_site_document_types (name)
-                `)
-                .eq("job_id", jobId)
-                .eq("category", "conformita");
+            // --- CATEGORIA 1: Documenti Personalizzati (conformità propria della commessa) ---
+            const [rawJobDocsResult, jobFoldersResult] = await Promise.all([
+                admin
+                    .from("job_documents")
+                    .select(`
+                        id, name, notes, file_url, file_type, file_size, category, created_at,
+                        conformita_document_type_id, folder_id,
+                        job_conformita_document_types (name),
+                        job_site_document_types (name)
+                    `)
+                    .eq("job_id", jobId)
+                    .eq("category", "conformita"),
+                admin
+                    .from("job_document_folders")
+                    .select("id, document_type_id, name")
+                    .eq("job_id", jobId)
+                    .is("deleted_at", null),
+            ]);
 
-            if (jobDocsError) throw jobDocsError;
+            if (rawJobDocsResult.error) throw rawJobDocsResult.error;
+            if (jobFoldersResult.error) throw jobFoldersResult.error;
 
-            const customDocuments = await Promise.all((rawJobDocs || []).map(async (doc: any) => {
+            const rawJobDocs = rawJobDocsResult.data;
+            const folderNameById = new Map<string, string>(
+                (jobFoldersResult.data || []).map((f: any) => [f.id, f.name])
+            );
+
+            const customDocEntries = await Promise.all((rawJobDocs || []).map(async (doc: any) => {
                 const signedUrl = await createSignedUrl(admin, doc.file_url);
                 const typeName = getRelationName(doc.job_conformita_document_types) ||
                                  getRelationName(doc.job_site_document_types) ||
@@ -179,9 +193,44 @@ export async function POST(req: NextRequest) {
                     fileType: doc.file_type,
                     fileSize: doc.file_size,
                     typeName,
+                    typeId: doc.conformita_document_type_id as string | null,
+                    folderId: doc.folder_id as string | null,
                     createdAt: doc.created_at,
                 };
             }));
+
+            // Raggruppa: Tipo documento -> Cartella (o "senza cartella") -> documenti,
+            // rispecchiando la stessa struttura usata nella gestione conformità della commessa.
+            const typeOrder: string[] = [];
+            const typeGroups = new Map<string, { typeId: string | null; typeName: string; folderOrder: string[]; folders: Map<string, { folderId: string | null; folderName: string | null; documents: typeof customDocEntries }> }>();
+
+            for (const doc of customDocEntries) {
+                const typeKey = doc.typeId || "__untyped__";
+                if (!typeGroups.has(typeKey)) {
+                    typeGroups.set(typeKey, { typeId: doc.typeId, typeName: doc.typeName, folderOrder: [], folders: new Map() });
+                    typeOrder.push(typeKey);
+                }
+                const typeGroup = typeGroups.get(typeKey)!;
+                const folderKey = doc.folderId || "__root__";
+                if (!typeGroup.folders.has(folderKey)) {
+                    typeGroup.folders.set(folderKey, {
+                        folderId: doc.folderId,
+                        folderName: doc.folderId ? (folderNameById.get(doc.folderId) || "Cartella") : null,
+                        documents: [],
+                    });
+                    typeGroup.folderOrder.push(folderKey);
+                }
+                typeGroup.folders.get(folderKey)!.documents.push(doc);
+            }
+
+            const customDocuments = typeOrder.map(typeKey => {
+                const g = typeGroups.get(typeKey)!;
+                return {
+                    typeId: g.typeId,
+                    typeName: g.typeName,
+                    folders: g.folderOrder.map(folderKey => g.folders.get(folderKey)!),
+                };
+            });
 
             // --- CATEGORIA 2: Documenti Associati (conformità fornitori) ---
             // Nota: la tabella storica "job_compliance_associations" è stata sostituita da
