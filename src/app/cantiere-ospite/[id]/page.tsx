@@ -185,7 +185,7 @@ export default function GuestPortalPage({ params }: Props) {
                     </Card>
 
                     <p className="text-center text-[10px] text-slate-400">
-                        In caso di problemi di accesso, contatta l'amministrazione all'indirizzo email <a href="mailto:amministrazione@opifiresafe.com" className="underline font-semibold">amministrazione@opifiresafe.com</a>.
+                        In caso di problemi di accesso, contatta il referente del cantiere OPI Firesafe S.r.l.
                     </p>
                 </div>
             </div>
