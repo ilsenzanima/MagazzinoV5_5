@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -165,9 +166,11 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
     <div className={cn("pb-12 h-full bg-sidebar text-sidebar-foreground flex flex-col", className)}>
       <div className="space-y-4 py-4 flex-1 overflow-y-auto">
         <div className="px-3 py-2">
-          <h2 className="mb-6 px-4 text-lg font-semibold tracking-tight text-sidebar-primary">
-            Magazzino V5.5
-          </h2>
+          <div className="mb-6 px-4">
+            <div className="inline-flex bg-white rounded-lg px-3 py-2 shadow-sm">
+              <Image src="/logo_header.png" alt="OPI Firesafe" width={160} height={35} className="h-7 w-auto" priority />
+            </div>
+          </div>
 
           <div className="space-y-4">
             {routeGroups.map((group, groupIndex) => (
