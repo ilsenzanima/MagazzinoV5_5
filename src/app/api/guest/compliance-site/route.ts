@@ -304,7 +304,6 @@ export async function POST(req: NextRequest) {
                 `)
                 .eq("job_id", jobId)
                 .in("type", ["exit", "sale"])
-                .is("deleted_at", null)
                 .order("date", { ascending: false });
 
             if (opiError) throw opiError;
