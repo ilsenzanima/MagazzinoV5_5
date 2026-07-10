@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Loader2, ExternalLink, Search, Package, ArrowRightLeft } from "lucide-react";
+import { Plus, X, Loader2, ExternalLink, Search, Package, ArrowRightLeft, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
@@ -396,9 +396,9 @@ export function AdvancedSearchTab({
                                                     try {
                                                         const count = await onAssociate(p.id);
                                                         if (count > 0) {
-                                                            toast.success(`Associazione completata per ${count} articoli!`);
+                                                            toast.success(`DDT associato e collegato a ${count} articoli!`);
                                                         } else {
-                                                            toast.info("Nessun articolo corrispondente trovato nelle bolle di questa commessa.");
+                                                            toast.success("DDT associato alla commessa!");
                                                         }
                                                     } catch (err) {
                                                         console.error(err);
@@ -408,14 +408,20 @@ export function AdvancedSearchTab({
                                                     }
                                                 }}
                                                 disabled={associatingId === p.id}
-                                                className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+                                                className={`h-7 text-xs flex items-center gap-1 transition-all ${
+                                                    associatedPurchaseIds?.has(p.id)
+                                                        ? "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                                                        : "bg-green-600 hover:bg-green-700 text-white"
+                                                }`}
                                             >
                                                 {associatingId === p.id ? (
                                                     <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : associatedPurchaseIds?.has(p.id) ? (
+                                                    <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                                                 ) : (
                                                     <ArrowRightLeft className="h-3 w-3" />
                                                 )}
-                                                {associatedPurchaseIds?.has(p.id) ? "Riascocia" : "Associa"}
+                                                {associatedPurchaseIds?.has(p.id) ? "Associato" : "Associa"}
                                             </Button>
                                         )}
                                     </div>
