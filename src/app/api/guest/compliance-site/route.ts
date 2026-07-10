@@ -28,6 +28,44 @@ function getRelationName(rel: any): string {
     return rel.name || "";
 }
 
+// Rate limiting anti brute-force: nessuna infrastruttura Redis/KV disponibile,
+// quindi i tentativi vengono tracciati su tabella Supabase (persistente tra invocazioni serverless)
+const RATE_LIMIT_WINDOW_MINUTES = 15;
+const MAX_ATTEMPTS_PER_SITE_IP = 8;
+const MAX_ATTEMPTS_PER_IP = 30;
+
+function getClientIp(req: NextRequest): string {
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    if (forwardedFor) return forwardedFor.split(",")[0].trim();
+    return req.headers.get("x-real-ip") || "unknown";
+}
+
+async function isRateLimited(admin: any, siteId: string, ip: string): Promise<boolean> {
+    const since = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000).toISOString();
+
+    const [{ count: siteIpCount }, { count: ipCount }] = await Promise.all([
+        admin
+            .from("guest_login_attempts")
+            .select("id", { count: "exact", head: true })
+            .eq("guest_site_id", siteId)
+            .eq("ip_address", ip)
+            .eq("success", false)
+            .gte("created_at", since),
+        admin
+            .from("guest_login_attempts")
+            .select("id", { count: "exact", head: true })
+            .eq("ip_address", ip)
+            .eq("success", false)
+            .gte("created_at", since),
+    ]);
+
+    return (siteIpCount ?? 0) >= MAX_ATTEMPTS_PER_SITE_IP || (ipCount ?? 0) >= MAX_ATTEMPTS_PER_IP;
+}
+
+async function recordAttempt(admin: any, siteId: string | null, ip: string, success: boolean): Promise<void> {
+    await admin.from("guest_login_attempts").insert({ guest_site_id: siteId, ip_address: ip, success });
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { siteId, passcode } = await req.json();
@@ -46,6 +84,15 @@ export async function POST(req: NextRequest) {
             auth: { persistSession: false },
         });
 
+        const clientIp = getClientIp(req);
+
+        if (await isRateLimited(admin, siteId, clientIp)) {
+            return NextResponse.json(
+                { error: "Troppi tentativi falliti. Riprova tra qualche minuto." },
+                { status: 429 }
+            );
+        }
+
         // 1. Valida il cantiere ospite e il passcode
         const { data: site, error: siteError } = await admin
             .from("guest_sites")
@@ -57,8 +104,11 @@ export async function POST(req: NextRequest) {
 
         if (siteError) throw siteError;
         if (!site) {
+            await recordAttempt(admin, siteId, clientIp, false);
             return NextResponse.json({ error: "Credenziali non valide" }, { status: 401 });
         }
+
+        await recordAttempt(admin, siteId, clientIp, true);
 
         // 2. Recupera le commesse associate al cantiere (storico)
         const { data: associations, error: assocError } = await admin
@@ -105,14 +155,13 @@ export async function POST(req: NextRequest) {
 
             if (jobDocsError) throw jobDocsError;
 
-            const customDocuments = [];
-            for (const doc of (rawJobDocs || [])) {
+            const customDocuments = await Promise.all((rawJobDocs || []).map(async (doc: any) => {
                 const signedUrl = await createSignedUrl(admin, doc.file_url);
-                const typeName = getRelationName(doc.job_conformita_document_types) || 
-                                 getRelationName(doc.job_site_document_types) || 
+                const typeName = getRelationName(doc.job_conformita_document_types) ||
+                                 getRelationName(doc.job_site_document_types) ||
                                  "Generico";
 
-                customDocuments.push({
+                return {
                     id: doc.id,
                     name: doc.name,
                     notes: doc.notes,
@@ -121,8 +170,8 @@ export async function POST(req: NextRequest) {
                     fileSize: doc.file_size,
                     typeName,
                     createdAt: doc.created_at,
-                });
-            }
+                };
+            }));
 
             // --- CATEGORIA 2: Documenti Associati (conformità fornitori) ---
             const { data: rawAssocDocs, error: assocDocsError } = await admin
@@ -140,13 +189,12 @@ export async function POST(req: NextRequest) {
 
             if (assocDocsError) throw assocDocsError;
 
-            const associatedDocuments = [];
-            for (const assocDoc of (rawAssocDocs || [])) {
+            const associatedDocuments = (await Promise.all((rawAssocDocs || []).map(async (assocDoc: any) => {
                 const doc = assocDoc.supplier_compliance_documents as any;
-                if (!doc) continue;
+                if (!doc) return null;
                 const signedUrl = await createSignedUrl(admin, doc.file_url);
-                const fileExt = doc.file_url.split(".").pop()?.toLowerCase() || "pdf";
-                associatedDocuments.push({
+                const fileExt = (doc.file_url || "").split(".").pop()?.toLowerCase() || "pdf";
+                return {
                     id: assocDoc.id,
                     name: assocDoc.custom_name || doc.name,
                     notes: assocDoc.custom_notes || doc.notes,
@@ -156,8 +204,8 @@ export async function POST(req: NextRequest) {
                     supplierName: getRelationName(doc.suppliers) || "Sconosciuto",
                     typeName: getRelationName(doc.compliance_document_types) || "Generico",
                     createdAt: assocDoc.created_at,
-                });
-            }
+                };
+            }))).filter(Boolean);
 
             // --- CATEGORIA 3: Documenti DDT/Bolle ---
             
@@ -234,7 +282,7 @@ export async function POST(req: NextRequest) {
 
                 const filteredSupplierDocs = (supplierDocs || []).filter(d => !excludedSet.has(d.id));
 
-                for (const doc of filteredSupplierDocs) {
+                const supplierComplianceDocs = await Promise.all(filteredSupplierDocs.map(async (doc: any) => {
                     const signedUrl = await createSignedUrl(admin, doc.file_url);
                     // Cerca il numero DDT dell'acquisto
                     let ddtNumber = "";
@@ -247,8 +295,8 @@ export async function POST(req: NextRequest) {
                         if (pDetail) ddtNumber = pDetail.delivery_note_number;
                     }
 
-                    const fileExt = doc.file_url.split(".").pop()?.toLowerCase() || "pdf";
-                    ddtDocuments.push({
+                    const fileExt = (doc.file_url || "").split(".").pop()?.toLowerCase() || "pdf";
+                    return {
                         id: doc.id,
                         name: doc.name,
                         notes: doc.notes ? `DDT Fornitore: ${ddtNumber}. Note: ${doc.notes}` : `DDT Fornitore: ${ddtNumber}`,
@@ -259,8 +307,9 @@ export async function POST(req: NextRequest) {
                         typeName: getRelationName(doc.compliance_document_types) || "Conformità DDT",
                         createdAt: doc.created_at,
                         kind: "ddt_supplier_compliance",
-                    });
-                }
+                    };
+                }));
+                ddtDocuments.push(...supplierComplianceDocs);
 
                 // 2. I file fisici dei DDT fornitore (i file pdf/immagini caricati all'acquisto)
                 // Carichiamo tutti gli acquisti per ricavare i document_urls
@@ -272,30 +321,32 @@ export async function POST(req: NextRequest) {
 
                 if (purchDetailsError) throw purchDetailsError;
 
+                const purchaseFileEntries: { purchase: any; url: string; docIndex: number }[] = [];
                 for (const p of (allPurchasesDetails || [])) {
-                    if (p.document_urls && p.document_urls.length > 0) {
-                        let docIndex = 1;
-                        for (const url of p.document_urls) {
-                            const signedUrl = await createSignedUrl(admin, url);
-                            // Estrae l'estensione o tipo
-                            const ext = url.split(".").pop()?.toLowerCase() || "pdf";
-                            const suppName = getRelationName(p.suppliers) || "Sconosciuto";
-                            ddtDocuments.push({
-                                id: `${p.id}-doc-${docIndex}`,
-                                name: `DDT Fornitore ${p.delivery_note_number}`,
-                                notes: `File DDT allegato all'acquisto del ${new Date(p.delivery_note_date).toLocaleDateString("it-IT")} - Fornitore: ${suppName}`,
-                                fileUrl: signedUrl,
-                                fileType: ext,
-                                fileSize: null,
-                                supplierName: suppName,
-                                typeName: "DDT Fornitore (Bolla)",
-                                createdAt: p.delivery_note_date,
-                                kind: "ddt_supplier_file",
-                            });
-                            docIndex++;
-                        }
-                    }
+                    (p.document_urls || []).forEach((url: string, i: number) => {
+                        purchaseFileEntries.push({ purchase: p, url, docIndex: i + 1 });
+                    });
                 }
+
+                const purchaseFileDocuments = await Promise.all(purchaseFileEntries.map(async ({ purchase: p, url, docIndex }) => {
+                    const signedUrl = await createSignedUrl(admin, url);
+                    // Estrae l'estensione o tipo
+                    const ext = (url || "").split(".").pop()?.toLowerCase() || "pdf";
+                    const suppName = getRelationName(p.suppliers) || "Sconosciuto";
+                    return {
+                        id: `${p.id}-doc-${docIndex}`,
+                        name: `DDT Fornitore ${p.delivery_note_number}`,
+                        notes: `File DDT allegato all'acquisto del ${new Date(p.delivery_note_date).toLocaleDateString("it-IT")} - Fornitore: ${suppName}`,
+                        fileUrl: signedUrl,
+                        fileType: ext,
+                        fileSize: null,
+                        supplierName: suppName,
+                        typeName: "DDT Fornitore (Bolla)",
+                        createdAt: p.delivery_note_date,
+                        kind: "ddt_supplier_file",
+                    };
+                }));
+                ddtDocuments.push(...purchaseFileDocuments);
             }
 
             // 3. Le bolle interne OPI (DDT OPI di tipo 'exit' e 'sale')
