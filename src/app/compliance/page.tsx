@@ -2,7 +2,7 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import GuestSitesTab from "@/components/compliance/GuestSitesTab";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -864,7 +864,7 @@ function DocumentTypeTabs({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function CompliancePage() {
+function ComplianceContent() {
     const { userRole } = useAuth();
     const router = useRouter();
     const [viewMode, setViewMode] = useViewMode('compliance');
@@ -1118,5 +1118,20 @@ export default function CompliancePage() {
                 </AlertDialogContent>
             </AlertDialog>
         </DashboardLayout>
+    );
+}
+
+export default function CompliancePage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+                <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <span className="text-sm text-slate-500 font-medium">Caricamento conformità...</span>
+                </div>
+            </div>
+        }>
+            <ComplianceContent />
+        </Suspense>
     );
 }
