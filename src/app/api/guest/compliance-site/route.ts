@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { ensureFileLinkShareable, getFileDownloadUrl } from "@/lib/google-drive";
+import { ensureFileLinkShareable } from "@/lib/google-drive";
 
 // Helper per generare Signed URL per i file salvati su Supabase Storage o link a Google Drive
 async function createSignedUrl(admin: any, fileUrl: string): Promise<string> {
     if (!fileUrl) return "";
     // Se è un ID di Drive (es. non contiene '/'): l'endpoint /api/drive/download richiede una
     // sessione Supabase, che un ospite anonimo non ha mai. Rendiamo il file leggibile da chiunque
-    // abbia il link e restituiamo il link diretto di Drive, senza passare dal nostro endpoint.
+    // abbia il link e restituiamo il link diretto al viewer di Drive (apre in anteprima nel
+    // browser invece di forzare il download, come uc?export=download).
     if (!fileUrl.includes("/")) {
         try {
             await ensureFileLinkShareable(fileUrl);
-            return await getFileDownloadUrl(fileUrl);
+            return `https://drive.google.com/file/d/${encodeURIComponent(fileUrl)}/view`;
         } catch {
             return "";
         }
