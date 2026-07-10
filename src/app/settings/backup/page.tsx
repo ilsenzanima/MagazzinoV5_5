@@ -60,7 +60,6 @@ const TABLES = [
     'job_conformita_document_types',
     'job_site_document_types',
     'job_inventory',
-    'job_ddt_document_exclusions',
     'job_sal_names',
     'job_sal_items',
     'job_sal_costs',

@@ -33,7 +33,6 @@ import { createClient } from "@/lib/supabase/client"
 import { jobDocumentsApi, JobDocument } from "@/lib/api"
 import { jobConformitaDocumentTypesApi, JobConformitaDocumentType } from "@/lib/services/job-conformita-document-types"
 import { jobDocumentFoldersApi, JobDocumentFolder } from "@/lib/services/job-document-folders"
-import { jobDdtDocumentExclusionsApi } from "@/lib/services/job-ddt-document-exclusions"
 import { jobArticlesApi, JobArticle } from "@/lib/services/job-articles"
 import { itemComplianceApi } from "@/lib/services/item-compliance"
 import { JobDdt } from "./JobDdt"
@@ -782,24 +781,20 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     const [toDisassociate, setToDisassociate] = useState<JobComplianceAssociation | null>(null)
     const [viewMode, setViewMode] = useViewMode('job-conformita-associated', 'list')
 
-    // Conf. Ass. DDT: documenti di conformità tracciati automaticamente dai DDT
+    // Conf. Ass. DDT: documenti di conformità tracciati automaticamente dai DDT associati manualmente
     const [ddtDocs, setDdtDocs] = useState<ComplianceDocument[]>([])
-    const [ddtExcludedIds, setDdtExcludedIds] = useState<Set<string>>(new Set())
-    const [ddtTogglingId, setDdtTogglingId] = useState<string | null>(null)
 
     useEffect(() => { load() }, [jobId])
 
     const load = async () => {
         try {
             setLoading(true)
-            const [assocs, ddt, excluded] = await Promise.all([
+            const [assocs, ddt] = await Promise.all([
                 jobComplianceApi.getByJobId(jobId),
                 complianceApi.getByJobIdFromDDT(jobId),
-                jobDdtDocumentExclusionsApi.getExcludedIds(jobId),
             ])
             setAssociations(assocs)
             setDdtDocs(ddt)
-            setDdtExcludedIds(excluded)
         } catch {
             toast.error("Errore nel caricamento delle associazioni")
         } finally {
@@ -807,46 +802,9 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
         }
     }
 
-    const handleSetDdtIncluded = async (docId: string, included: boolean) => {
-        try {
-            setDdtTogglingId(docId)
-            if (included) {
-                await jobDdtDocumentExclusionsApi.include(jobId, docId)
-                setDdtExcludedIds(prev => { const next = new Set(prev); next.delete(docId); return next })
-            } else {
-                await jobDdtDocumentExclusionsApi.exclude(jobId, docId)
-                setDdtExcludedIds(prev => new Set(prev).add(docId))
-            }
-        } catch {
-            toast.error("Errore durante l'aggiornamento dello stato")
-        } finally {
-            setDdtTogglingId(null)
-        }
-    }
-
-    const renderDdtInclusionToggle = (doc: ComplianceDocument, isExcluded: boolean) => (
-        <div className="inline-flex rounded-full overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0">
-            <button
-                disabled={ddtTogglingId === doc.id}
-                onClick={() => handleSetDdtIncluded(doc.id, true)}
-                className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${!isExcluded ? 'bg-emerald-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-            >
-                Incluso
-            </button>
-            <button
-                disabled={ddtTogglingId === doc.id}
-                onClick={() => handleSetDdtIncluded(doc.id, false)}
-                className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${isExcluded ? 'bg-slate-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-            >
-                Escluso
-            </button>
-        </div>
-    )
-
     const renderDdtCard = (doc: ComplianceDocument) => {
-        const isExcluded = ddtExcludedIds.has(doc.id)
         return (
-            <Card key={doc.id} className={`hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
+            <Card key={doc.id} className="hover:shadow-sm transition-shadow">
                 <CardContent className="p-3 flex items-start gap-3">
                     <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
                         <ShieldCheck className="h-6 w-6 text-green-600" />
@@ -864,7 +822,6 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                                     DDT {doc.purchaseNumber}
                                 </span>
                             )}
-                            <div className="ml-auto">{renderDdtInclusionToggle(doc, isExcluded)}</div>
                         </div>
                     </div>
                     {doc.fileUrl && (
@@ -878,9 +835,8 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     }
 
     const renderDdtRow = (doc: ComplianceDocument) => {
-        const isExcluded = ddtExcludedIds.has(doc.id)
         return (
-            <div key={doc.id} className={`group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow ${isExcluded ? 'opacity-60' : ''}`}>
+            <div key={doc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
                 <div className="bg-green-50 dark:bg-green-950/30 p-1 rounded shrink-0">
                     <ShieldCheck className="h-5 w-5 text-green-600" />
                 </div>
@@ -898,7 +854,6 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                             DDT {doc.purchaseNumber}
                         </span>
                     )}
-                    {renderDdtInclusionToggle(doc, isExcluded)}
                 </div>
                 {doc.fileUrl && (
                     <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => openDoc(doc.fileUrl)} title="Apri documento">

@@ -240,6 +240,9 @@ export async function POST(req: NextRequest) {
 
             const purchaseIds = new Set<string>();
             const purchaseMap = new Map<string, any>(); // Per mappare id acquisto a numero DDT
+            // Solo gli acquisti associati manualmente dalla sezione DDT/Bolle alimentano
+            // i certificati di conformità automatici (categoria "Conf. Ass. DDT").
+            const purchaseIdsForCompliance = new Set<string>();
 
             (directPurchases.data || []).forEach((p: any) => {
                 purchaseIds.add(p.id);
@@ -248,6 +251,7 @@ export async function POST(req: NextRequest) {
             (manuallyAssociatedPurchases.data || []).forEach((p: any) => {
                 purchaseIds.add(p.id);
                 purchaseMap.set(p.id, p);
+                purchaseIdsForCompliance.add(p.id);
             });
             (itemPurchases.data || []).forEach((pi: any) => {
                 if (pi.purchase_id) purchaseIds.add(pi.purchase_id);
@@ -267,10 +271,8 @@ export async function POST(req: NextRequest) {
 
             const ddtDocuments = [];
 
-            if (purchaseIds.size > 0) {
-                const purchaseIdList = Array.from(purchaseIds);
-
-                // 1. Documenti di conformità legati a questi acquisti (da DDT fornitori)
+            if (purchaseIdsForCompliance.size > 0) {
+                // Documenti di conformità legati agli acquisti associati manualmente (da DDT/Bolle)
                 const { data: supplierDocs, error: supplierDocsError } = await admin
                     .from("supplier_compliance_documents")
                     .select(`
@@ -278,23 +280,12 @@ export async function POST(req: NextRequest) {
                         suppliers (name),
                         compliance_document_types (name)
                     `)
-                    .in("purchase_id", purchaseIdList)
+                    .in("purchase_id", Array.from(purchaseIdsForCompliance))
                     .is("deleted_at", null);
 
                 if (supplierDocsError) throw supplierDocsError;
 
-                // Esclusioni DDT impostate in commessa
-                const { data: exclusions, error: exclError } = await admin
-                    .from("job_ddt_document_exclusions")
-                    .select("compliance_document_id")
-                    .eq("job_id", jobId);
-
-                if (exclError) throw exclError;
-                const excludedSet = new Set((exclusions || []).map(e => e.compliance_document_id));
-
-                const filteredSupplierDocs = (supplierDocs || []).filter(d => !excludedSet.has(d.id));
-
-                const supplierComplianceDocs = await Promise.all(filteredSupplierDocs.map(async (doc: any) => {
+                const supplierComplianceDocs = await Promise.all((supplierDocs || []).map(async (doc: any) => {
                     const signedUrl = await createSignedUrl(admin, doc.file_url);
                     // Cerca il numero DDT dell'acquisto
                     let ddtNumber = "";
@@ -322,8 +313,12 @@ export async function POST(req: NextRequest) {
                     };
                 }));
                 ddtDocuments.push(...supplierComplianceDocs);
+            }
 
-                // 2. I file fisici dei DDT fornitore (i file pdf/immagini caricati all'acquisto)
+            if (purchaseIds.size > 0) {
+                const purchaseIdList = Array.from(purchaseIds);
+
+                // I file fisici dei DDT fornitore (i file pdf/immagini caricati all'acquisto)
                 // Carichiamo tutti gli acquisti per ricavare i document_urls
                 const { data: allPurchasesDetails, error: purchDetailsError } = await admin
                     .from("purchases")

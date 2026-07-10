@@ -112,39 +112,21 @@ export const complianceApi = {
     },
 
     getByJobIdFromDDT: async (jobId: string): Promise<ComplianceDocument[]> => {
-        // Raccoglie gli id degli acquisti collegati a questa commessa, per tre vie:
-        // - l'intero acquisto è assegnato alla commessa (purchases.job_id)
-        // - singole righe dell'acquisto sono assegnate alla commessa (purchase_items.job_id)
-        // - il materiale è stato mandato/reso in cantiere tramite un DDT di
-        //   movimentazione (delivery_notes.job_id) che referenzia quel lotto
-        //   (delivery_note_items.purchase_item_id), incluso il caso "fittizio"
-        //   in cui viene comunque scelto un lotto di riferimento per il prezzo.
-        const [directPurchases, itemPurchases, deliveryItems] = await Promise.all([
-            supabase.from('purchases').select('id').eq('job_id', jobId).is('deleted_at', null),
-            supabase.from('purchase_items').select('purchase_id').eq('job_id', jobId),
-            supabase
-                .from('delivery_note_items')
-                .select('purchase_item_id, delivery_notes!inner(job_id)')
-                .eq('delivery_notes.job_id', jobId)
-                .not('purchase_item_id', 'is', null),
-        ]);
-        if (directPurchases.error) throw directPurchases.error;
-        if (itemPurchases.error) throw itemPurchases.error;
-        if (deliveryItems.error) throw deliveryItems.error;
+        // Raccoglie gli id degli acquisti associati manualmente a questa commessa
+        // dalla sezione DDT/Bolle (tag "[associated_job:jobId]" nelle note
+        // dell'acquisto, impostato dal pulsante "Associa" in JobDdt). Non si
+        // considerano più i materiali collegati solo tramite acquisto diretto o
+        // bolla interna di movimentazione: la selezione ora è manuale, così da
+        // mostrare solo i DDT scelti esplicitamente.
+        const { data: associatedPurchases, error } = await supabase
+            .from('purchases')
+            .select('id')
+            .like('notes', `%[associated_job:${jobId}]%`)
+            .is('deleted_at', null);
+        if (error) throw error;
 
         const purchaseIds = new Set<string>();
-        (directPurchases.data || []).forEach((p: any) => purchaseIds.add(p.id));
-        (itemPurchases.data || []).forEach((pi: any) => { if (pi.purchase_id) purchaseIds.add(pi.purchase_id); });
-
-        const purchaseItemIds = (deliveryItems.data || []).map((d: any) => d.purchase_item_id).filter(Boolean);
-        if (purchaseItemIds.length > 0) {
-            const { data: piRows, error: piError } = await supabase
-                .from('purchase_items')
-                .select('id, purchase_id')
-                .in('id', purchaseItemIds);
-            if (piError) throw piError;
-            (piRows || []).forEach((pi: any) => { if (pi.purchase_id) purchaseIds.add(pi.purchase_id); });
-        }
+        (associatedPurchases || []).forEach((p: any) => purchaseIds.add(p.id));
 
         if (purchaseIds.size === 0) return [];
         const purchaseIdList = Array.from(purchaseIds);
