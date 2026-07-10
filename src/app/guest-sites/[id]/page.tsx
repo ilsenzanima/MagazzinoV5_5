@@ -1,7 +1,7 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ import {
     MapPin,
     Key,
     Save,
+    Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "react-qr-code";
@@ -45,6 +46,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { downloadSvgAsPng } from "@/lib/qr-download";
 
 function GuestSiteDetailContent() {
     const router = useRouter();
@@ -89,6 +91,10 @@ function GuestSiteDetailContent() {
     // Copy states
     const [copiedInvite, setCopiedInvite] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
+
+    // QR code refs (per il download come immagine PNG)
+    const qrNoPasscodeRef = useRef<HTMLDivElement>(null);
+    const qrWithPasscodeRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (userRole && userRole !== "admin" && userRole !== "operativo") {
@@ -264,6 +270,20 @@ function GuestSiteDetailContent() {
         return `${window.location.origin}/cantiere-ospite/${siteId}`;
     };
 
+    const getPortalUrlWithPasscode = (siteId: string, passcode: string) => {
+        const base = getPortalUrl(siteId);
+        return base ? `${base}?code=${encodeURIComponent(passcode)}` : "";
+    };
+
+    const handleDownloadQr = (containerRef: React.RefObject<HTMLDivElement | null>, withPasscode: boolean) => {
+        if (!site) return;
+        const svg = containerRef.current?.querySelector("svg") as SVGSVGElement | null;
+        if (!svg) return;
+        const slug = site.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "cantiere";
+        const filename = `qr-${slug}-${withPasscode ? "con-password" : "senza-password"}.png`;
+        downloadSvgAsPng(svg, filename);
+    };
+
     const handleCopyLink = () => {
         if (!site) return;
         navigator.clipboard.writeText(getPortalUrl(site.id));
@@ -379,7 +399,7 @@ Note: Questo link consente di visualizzare in sola lettura i certificati di conf
                                                         {assoc.jobCode}
                                                     </span>
                                                     <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                                                        {assoc.jobDescription || "Senza descrizione"}
+                                                        {assoc.jobName || assoc.jobDescription || "Senza nome"}
                                                     </h4>
                                                 </div>
                                                 {assoc.customNotes && (
@@ -417,9 +437,36 @@ Note: Questo link consente di visualizzare in sola lettura i certificati di conf
                         </CardHeader>
                         <CardContent className="p-5 space-y-5">
                             {/* QR Code */}
-                            <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-950 rounded-lg border shadow-inner">
+                            <div ref={qrNoPasscodeRef} className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-950 rounded-lg border shadow-inner">
                                 <QRCode value={inviteUrl} size={150} />
                                 <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-3">Scansiona per accedere</span>
+                            </div>
+
+                            {/* QR "con password" incorporata: generato ma non mostrato, solo per il download */}
+                            <div ref={qrWithPasscodeRef} className="hidden">
+                                <QRCode value={getPortalUrlWithPasscode(site.id, site.passcode)} size={512} />
+                            </div>
+
+                            {/* Download QR Code */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => handleDownloadQr(qrNoPasscodeRef, false)}
+                                    title="Il visitatore dovrà digitare manualmente il passcode"
+                                >
+                                    <Download className="mr-1.5 h-3.5 w-3.5" /> QR senza password
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => handleDownloadQr(qrWithPasscodeRef, true)}
+                                    title="Il QR contiene già il passcode: accesso immediato senza digitarlo"
+                                >
+                                    <Download className="mr-1.5 h-3.5 w-3.5" /> QR con password
+                                </Button>
                             </div>
 
                             {/* Passcode info */}
@@ -567,7 +614,7 @@ Note: Questo link consente di visualizzare in sola lettura i certificati di conf
                                                 onClick={() => setSelectedJobId(j.id)}
                                             >
                                                 <span className="font-bold">{j.code}</span>
-                                                <span className="truncate max-w-[200px] text-slate-500">{j.description || j.name}</span>
+                                                <span className="truncate max-w-[200px] text-slate-500">{j.name || j.description}</span>
                                             </div>
                                         ))
                                     )}

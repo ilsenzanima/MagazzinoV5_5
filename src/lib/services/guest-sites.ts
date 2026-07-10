@@ -34,6 +34,7 @@ const mapAssociation = (db: any): GuestSiteJob => ({
     deletedAt: db.deleted_at,
     // Dati in join se presenti
     jobCode: db.jobs?.code,
+    jobName: db.jobs?.name,
     jobDescription: db.jobs?.description,
     jobStartDate: db.jobs?.start_date,
     jobEndDate: db.jobs?.end_date,
@@ -113,7 +114,7 @@ export const guestSitesApi = {
     getJobsForSite: async (guestSiteId: string): Promise<GuestSiteJob[]> => {
         const { data, error } = await supabase
             .from('guest_site_jobs')
-            .select('*, jobs(code, description, start_date, end_date)')
+            .select('*, jobs(code, name, description, start_date, end_date)')
             .eq('guest_site_id', guestSiteId)
             .is('deleted_at', null)
             .order('created_at', { ascending: true });
@@ -142,7 +143,7 @@ export const guestSitesApi = {
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', existing.id)
-                .select('*, jobs(code, description, start_date, end_date)')
+                .select('*, jobs(code, name, description, start_date, end_date)')
                 .single();
             if (error) throw error;
             return mapAssociation(data);
@@ -155,7 +156,7 @@ export const guestSitesApi = {
                     job_id: jobId,
                     custom_notes: customNotes || null,
                 })
-                .select('*, jobs(code, description, start_date, end_date)')
+                .select('*, jobs(code, name, description, start_date, end_date)')
                 .single();
             if (error) throw error;
             return mapAssociation(data);
@@ -170,7 +171,7 @@ export const guestSitesApi = {
                 updated_at: new Date().toISOString(),
             })
             .eq('id', associationId)
-            .select('*, jobs(code, description, start_date, end_date)')
+            .select('*, jobs(code, name, description, start_date, end_date)')
             .single();
         if (error) throw error;
         return mapAssociation(data);

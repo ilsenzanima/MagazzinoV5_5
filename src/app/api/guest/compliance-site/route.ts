@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
                 jobs (
                     id,
                     code,
+                    name,
                     description,
                     start_date,
                     end_date,
@@ -389,6 +390,7 @@ export async function POST(req: NextRequest) {
             jobsData.push({
                 jobId,
                 code: job.code,
+                name: job.name,
                 description: job.description,
                 startDate: job.start_date,
                 endDate: job.end_date,

@@ -540,6 +540,7 @@ export interface GuestSiteJob {
     
     // Campi opzionali caricati in join
     jobCode?: string;
+    jobName?: string;
     jobDescription?: string;
     jobStartDate?: string;
     jobEndDate?: string;
