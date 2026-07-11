@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ensureFileLinkShareable } from "@/lib/google-drive";
+import { isImageFileType } from "@/lib/image-file-types";
 
 // Helper per generare Signed URL per i file salvati su Supabase Storage o link a Google Drive
-async function createSignedUrl(admin: any, fileUrl: string): Promise<string> {
+async function createSignedUrl(admin: any, fileUrl: string, fileType?: string | null): Promise<string> {
     if (!fileUrl) return "";
     // Se è un ID di Drive (es. non contiene '/'): l'endpoint /api/drive/download richiede una
     // sessione Supabase, che un ospite anonimo non ha mai. Rendiamo il file leggibile da chiunque
-    // abbia il link e restituiamo il link diretto al viewer di Drive (apre in anteprima nel
-    // browser invece di forzare il download, come uc?export=download).
+    // abbia il link. Le immagini passano dal nostro proxy (serve i byte da 'self', rispettando la
+    // CSP img-src e permettendo l'uso in <img> per la galleria); gli altri file aprono il viewer
+    // di Drive in anteprima nel browser invece di forzare il download (come uc?export=download).
     if (!fileUrl.includes("/")) {
         try {
             await ensureFileLinkShareable(fileUrl);
+            if (isImageFileType(fileType)) {
+                return `/api/guest/drive-image?fileId=${encodeURIComponent(fileUrl)}`;
+            }
             return `https://drive.google.com/file/d/${encodeURIComponent(fileUrl)}/view`;
         } catch {
             return "";
@@ -180,7 +185,7 @@ export async function POST(req: NextRequest) {
             );
 
             const customDocEntries = await Promise.all((rawJobDocs || []).map(async (doc: any) => {
-                const signedUrl = await createSignedUrl(admin, doc.file_url);
+                const signedUrl = await createSignedUrl(admin, doc.file_url, doc.file_type);
                 const typeName = getRelationName(doc.job_conformita_document_types) ||
                                  getRelationName(doc.job_site_document_types) ||
                                  "Generico";

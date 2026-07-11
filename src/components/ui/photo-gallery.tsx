@@ -3,6 +3,9 @@
 import { useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { isImageFileType } from "@/lib/image-file-types";
+
+export { isImageFileType };
 
 export interface PhotoGalleryImage {
     url: string;
@@ -96,13 +99,4 @@ export function PhotoGallery({ images, index, onIndexChange, onClose }: PhotoGal
         </div>,
         document.body
     );
-}
-
-// Helper per riconoscere se un file è un'immagine dal tipo/estensione, per decidere
-// se aprirlo nella galleria invece che in una nuova scheda.
-const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif", "svg"]);
-
-export function isImageFileType(fileType?: string | null): boolean {
-    if (!fileType) return false;
-    return IMAGE_EXTENSIONS.has(fileType.toLowerCase().replace(".", ""));
 }
