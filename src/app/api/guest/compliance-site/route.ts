@@ -394,10 +394,11 @@ export async function POST(req: NextRequest) {
                     // Estrae l'estensione o tipo
                     const ext = (url || "").split(".").pop()?.toLowerCase() || "pdf";
                     const suppName = getRelationName(p.suppliers) || "Sconosciuto";
+                    const formattedDate = p.delivery_note_date ? new Date(p.delivery_note_date).toLocaleDateString("it-IT") : "";
                     return {
                         id: `${p.id}-doc-${docIndex}`,
-                        name: `DDT Fornitore ${p.delivery_note_number}`,
-                        notes: `File DDT allegato all'acquisto del ${new Date(p.delivery_note_date).toLocaleDateString("it-IT")} - Fornitore: ${suppName}`,
+                        name: `DDT ${p.delivery_note_number}${formattedDate ? ` DEL ${formattedDate}` : ""}`,
+                        notes: `Fornitore: ${suppName}`,
                         fileUrl: signedUrl,
                         fileType: ext,
                         fileSize: null,

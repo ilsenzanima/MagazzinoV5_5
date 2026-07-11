@@ -258,28 +258,72 @@ function GuestPortalContent({ params }: Props) {
 
     const renderJobDocuments = (job: any) => {
         const customGroups: any[] = job.documents.custom || [];
-        const sections = [
-            ...customGroups.map((g: any) => ({
-                id: `custom-${job.jobId}-${g.typeId || "untyped"}`,
-                label: g.typeName,
-                count: g.folders.reduce((sum: number, f: any) => sum + f.documents.length, 0),
-            })),
+
+        // Certificati Conformità: raggruppati per tipo di conformità, e come sottocartella per fornitore
+        const conformitaByType = new Map<string, { typeName: string; bySupplier: Map<string, any[]> }>();
+        for (const doc of job.documents.associated) {
+            const typeKey = doc.typeName || "Generico";
+            if (!conformitaByType.has(typeKey)) conformitaByType.set(typeKey, { typeName: typeKey, bySupplier: new Map() });
+            const typeGroup = conformitaByType.get(typeKey)!;
+            const supplierKey = doc.supplierName || "Sconosciuto";
+            if (!typeGroup.bySupplier.has(supplierKey)) typeGroup.bySupplier.set(supplierKey, []);
+            typeGroup.bySupplier.get(supplierKey)!.push(doc);
+        }
+        const conformitaGroups = Array.from(conformitaByType.values());
+
+        // DDT e Bolle Consegna: raggruppati per fornitore (le bolle interne sotto "OPI")
+        const ddtBySupplier = new Map<string, { kind: "doc" | "note"; item: any }[]>();
+        for (const doc of job.documents.ddt) {
+            const key = doc.supplierName || "Sconosciuto";
+            if (!ddtBySupplier.has(key)) ddtBySupplier.set(key, []);
+            ddtBySupplier.get(key)!.push({ kind: "doc", item: doc });
+        }
+        for (const note of job.documents.internalNotes) {
+            if (!ddtBySupplier.has("OPI")) ddtBySupplier.set("OPI", []);
+            ddtBySupplier.get("OPI")!.push({ kind: "note", item: note });
+        }
+        const ddtGroups = Array.from(ddtBySupplier.entries()).map(([supplierName, items]) => ({ supplierName, items }));
+
+        const macroSections = [
             {
-                id: `associated-${job.jobId}`,
-                label: "Certificati Conformità",
-                count: job.documents.associated.length,
+                id: `macro-custom-${job.jobId}`,
+                label: "Documenti Cantiere",
+                icon: FileText,
+                iconColor: "text-primary",
+                items: customGroups.map((g: any) => ({
+                    id: `custom-${job.jobId}-${g.typeId || "untyped"}`,
+                    label: g.typeName,
+                    count: g.folders.reduce((sum: number, f: any) => sum + f.documents.length, 0),
+                })),
             },
             {
-                id: `ddt-${job.jobId}`,
+                id: `macro-associated-${job.jobId}`,
+                label: "Certificati Conformità",
+                icon: ShieldCheck,
+                iconColor: "text-emerald-600",
+                items: conformitaGroups.map((g) => ({
+                    id: `associated-${job.jobId}-${g.typeName}`,
+                    label: g.typeName,
+                    count: Array.from(g.bySupplier.values()).reduce((sum, arr) => sum + arr.length, 0),
+                })),
+            },
+            {
+                id: `macro-ddt-${job.jobId}`,
                 label: "DDT e Bolle Consegna",
-                count: job.documents.ddt.length + job.documents.internalNotes.length,
+                icon: Truck,
+                iconColor: "text-amber-600",
+                items: ddtGroups.map((g) => ({
+                    id: `ddt-${job.jobId}-${g.supplierName}`,
+                    label: g.supplierName,
+                    count: g.items.length,
+                })),
             },
         ];
 
         return (
-            <Card className="overflow-hidden border-slate-200/80 dark:border-slate-800 shadow-sm">
+            <Card className="border-slate-200/80 dark:border-slate-800 shadow-sm">
                 {/* Intestazione commessa */}
-                <div className="bg-slate-50 dark:bg-slate-900/60 p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div className="bg-slate-50 dark:bg-slate-900/60 rounded-t-xl p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-black font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full">
@@ -313,118 +357,149 @@ function GuestPortalContent({ params }: Props) {
                     )}
 
                     {/* Layout a due colonne: indice a sinistra (sempre visibile), contenuto a capitoli a destra */}
-                    <div className="grid gap-6 md:grid-cols-[200px_1fr] items-start">
-                        {/* Indice */}
-                        <nav className="hidden md:block sticky top-4 space-y-0.5 self-start">
-                            {sections.map((s) => (
-                                <button
-                                    key={s.id}
-                                    onClick={() => scrollToSection(s.id)}
-                                    className="w-full text-left px-2 py-1.5 rounded text-xs font-medium text-slate-500 hover:text-primary hover:bg-primary/5 transition-colors flex items-center justify-between gap-2"
-                                >
-                                    <span className="truncate">{s.label}</span>
-                                    <span className="text-[10px] text-slate-400 shrink-0">{s.count}</span>
-                                </button>
+                    <div className="grid gap-6 md:grid-cols-[220px_1fr] items-start">
+                        {/* Indice a macro-categorie */}
+                        <nav className="hidden md:block sticky top-4 space-y-3 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
+                            {macroSections.map((macro) => (
+                                <div key={macro.id}>
+                                    <button
+                                        onClick={() => scrollToSection(macro.id)}
+                                        className="w-full text-left px-2 py-1 rounded text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:text-primary transition-colors flex items-center gap-1.5"
+                                    >
+                                        <macro.icon className={`h-3.5 w-3.5 shrink-0 ${macro.iconColor}`} />
+                                        <span className="truncate">{macro.label}</span>
+                                    </button>
+                                    <div className="mt-0.5 space-y-0.5">
+                                        {macro.items.map((s) => (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => scrollToSection(s.id)}
+                                                className="w-full text-left pl-6 pr-2 py-1 rounded text-xs font-medium text-slate-500 hover:text-primary hover:bg-primary/5 transition-colors flex items-center justify-between gap-2"
+                                            >
+                                                <span className="truncate">{s.label}</span>
+                                                <span className="text-[10px] text-slate-400 shrink-0">{s.count}</span>
+                                            </button>
+                                        ))}
+                                        {macro.items.length === 0 && (
+                                            <p className="pl-6 pr-2 py-1 text-[11px] text-slate-300 italic">Vuoto</p>
+                                        )}
+                                    </div>
+                                </div>
                             ))}
                         </nav>
 
-                        {/* Contenuto a capitoli, in un unico elenco continuo */}
-                        <div className="space-y-8 min-w-0">
-                            {/* Capitoli: Documenti Cantiere, un capitolo per tipo documento */}
-                            {customGroups.map((g: any) => (
-                                <div key={g.typeId || "untyped"} id={`custom-${job.jobId}-${g.typeId || "untyped"}`} className="space-y-3 scroll-mt-4">
-                                    <div className="flex items-center gap-2 pb-1.5 border-b">
-                                        <FileText className="h-4 w-4 text-primary shrink-0" />
-                                        <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">{g.typeName}</h5>
-                                    </div>
-                                    <div className="space-y-4">
-                                        {g.folders.map((f: any) => {
-                                            const imagesInFolder: PhotoGalleryImage[] = f.documents
-                                                .filter((d: any) => isImageFileType(d.fileType))
-                                                .map((d: any) => ({ url: d.fileUrl, name: d.name }));
-                                            return (
-                                                <div key={f.folderId || "root"} className="space-y-2">
-                                                    {f.folderName && (
-                                                        <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
-                                                            📁 {f.folderName}
-                                                        </p>
-                                                    )}
-                                                    <div className="grid gap-2 sm:grid-cols-2">
-                                                        {f.documents.map((doc: any) => {
-                                                            const isImg = isImageFileType(doc.fileType);
-                                                            const imgIndex = isImg ? imagesInFolder.findIndex(im => im.url === doc.fileUrl) : undefined;
-                                                            return renderDocLink(doc, g.typeName, isImg ? imagesInFolder : undefined, imgIndex);
-                                                        })}
+                        {/* Contenuto a capitoli, in un unico elenco continuo, raggruppato per macro-categoria */}
+                        <div className="space-y-10 min-w-0">
+                            {/* Macro-categoria: Documenti Cantiere */}
+                            <div id={`macro-custom-${job.jobId}`} className="space-y-6 scroll-mt-4">
+                                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-primary" /> Documenti Cantiere
+                                </h3>
+                                {customGroups.length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic py-2 pl-1">Nessun documento inserito.</p>
+                                ) : customGroups.map((g: any) => (
+                                    <div key={g.typeId || "untyped"} id={`custom-${job.jobId}-${g.typeId || "untyped"}`} className="space-y-3 scroll-mt-4 pl-1">
+                                        <div className="flex items-center gap-2 pb-1.5 border-b">
+                                            <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">{g.typeName}</h5>
+                                        </div>
+                                        <div className="space-y-4">
+                                            {g.folders.map((f: any) => {
+                                                const imagesInFolder: PhotoGalleryImage[] = f.documents
+                                                    .filter((d: any) => isImageFileType(d.fileType))
+                                                    .map((d: any) => ({ url: d.fileUrl, name: d.name }));
+                                                return (
+                                                    <div key={f.folderId || "root"} className="space-y-2">
+                                                        {f.folderName && (
+                                                            <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                                                                📁 {f.folderName}
+                                                            </p>
+                                                        )}
+                                                        <div className="grid gap-2 sm:grid-cols-2">
+                                                            {f.documents.map((doc: any) => {
+                                                                const isImg = isImageFileType(doc.fileType);
+                                                                const imgIndex = isImg ? imagesInFolder.findIndex(im => im.url === doc.fileUrl) : undefined;
+                                                                return renderDocLink(doc, g.typeName, isImg ? imagesInFolder : undefined, imgIndex);
+                                                            })}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                            {customGroups.length === 0 && (
-                                <div id={`custom-${job.jobId}-untyped`} className="space-y-3 scroll-mt-4">
-                                    <div className="flex items-center gap-2 pb-1.5 border-b">
-                                        <FileText className="h-4 w-4 text-primary shrink-0" />
-                                        <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">Documenti Cantiere</h5>
-                                    </div>
-                                    <p className="text-xs text-slate-400 italic py-2">Nessun documento inserito.</p>
-                                </div>
-                            )}
-
-                            {/* Capitolo: Certificati Conformità */}
-                            <div id={`associated-${job.jobId}`} className="space-y-3 scroll-mt-4">
-                                <div className="flex items-center gap-2 pb-1.5 border-b">
-                                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                                    <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">Certificati Conformità</h5>
-                                </div>
-                                {job.documents.associated.length === 0 ? (
-                                    <p className="text-xs text-slate-400 italic py-2">Nessun certificato associato.</p>
-                                ) : (
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        {job.documents.associated.map((doc: any) => renderDocLink(doc, `${doc.supplierName} · ${doc.typeName}`))}
-                                    </div>
-                                )}
+                                ))}
                             </div>
 
-                            {/* Capitolo: DDT e Bolle Consegna */}
-                            <div id={`ddt-${job.jobId}`} className="space-y-3 scroll-mt-4">
-                                <div className="flex items-center gap-2 pb-1.5 border-b">
-                                    <Truck className="h-4 w-4 text-amber-600 shrink-0" />
-                                    <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">DDT e Bolle Consegna</h5>
-                                </div>
-                                {(job.documents.ddt.length === 0 && job.documents.internalNotes.length === 0) ? (
-                                    <p className="text-xs text-slate-400 italic py-2">Nessun DDT presente.</p>
-                                ) : (
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        {job.documents.ddt.map((doc: any) => renderDocLink(doc, `${doc.supplierName} · ${doc.typeName}`))}
-
-                                        {/* Bolle interne OPI */}
-                                        {job.documents.internalNotes.map((note: any) => (
-                                            <div
-                                                key={note.id}
-                                                onClick={() => handleDownloadInternalNote(note)}
-                                                className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
-                                            >
-                                                <div className="mt-0.5 shrink-0 text-primary"><FileText className="h-5 w-5" /></div>
-                                                <div className="min-w-0 flex-1">
-                                                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
-                                                        DDT OPI {note.number}
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
-                                                        Data: {format(new Date(note.date), "dd/MM/yyyy")} · Causale: {note.causal}
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-450 block italic mt-0.5 line-clamp-1">
-                                                        Articoli inclusi: {note.items.length} voci
-                                                    </span>
+                            {/* Macro-categoria: Certificati Conformità (tipo -> fornitore) */}
+                            <div id={`macro-associated-${job.jobId}`} className="space-y-6 scroll-mt-4">
+                                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide flex items-center gap-2">
+                                    <ShieldCheck className="h-4 w-4 text-emerald-600" /> Certificati Conformità
+                                </h3>
+                                {conformitaGroups.length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic py-2 pl-1">Nessun certificato associato.</p>
+                                ) : conformitaGroups.map((g) => (
+                                    <div key={g.typeName} id={`associated-${job.jobId}-${g.typeName}`} className="space-y-3 scroll-mt-4 pl-1">
+                                        <div className="flex items-center gap-2 pb-1.5 border-b">
+                                            <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">{g.typeName}</h5>
+                                        </div>
+                                        <div className="space-y-4">
+                                            {Array.from(g.bySupplier.entries()).map(([supplierName, docs]: [string, any[]]) => (
+                                                <div key={supplierName} className="space-y-2">
+                                                    <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                                                        📁 {supplierName}
+                                                    </p>
+                                                    <div className="grid gap-2 sm:grid-cols-2">
+                                                        {docs.map((doc: any) => renderDocLink(doc, g.typeName))}
+                                                    </div>
                                                 </div>
-                                                <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <ExternalLink className="h-3.5 w-3.5" />
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
-                                )}
+                                ))}
+                            </div>
+
+                            {/* Macro-categoria: DDT e Bolle Consegna (per fornitore, OPI per le bolle interne) */}
+                            <div id={`macro-ddt-${job.jobId}`} className="space-y-6 scroll-mt-4">
+                                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide flex items-center gap-2">
+                                    <Truck className="h-4 w-4 text-amber-600" /> DDT e Bolle Consegna
+                                </h3>
+                                {ddtGroups.length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic py-2 pl-1">Nessun DDT presente.</p>
+                                ) : ddtGroups.map((g) => (
+                                    <div key={g.supplierName} id={`ddt-${job.jobId}-${g.supplierName}`} className="space-y-3 scroll-mt-4 pl-1">
+                                        <div className="flex items-center gap-2 pb-1.5 border-b">
+                                            <h5 className="font-bold text-xs uppercase text-slate-400 tracking-wider">{g.supplierName}</h5>
+                                        </div>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            {g.items.map(({ kind, item }) =>
+                                                kind === "doc" ? (
+                                                    renderDocLink(item, item.typeName)
+                                                ) : (
+                                                    <div
+                                                        key={item.id}
+                                                        onClick={() => handleDownloadInternalNote(item)}
+                                                        className="p-2 border rounded-md hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-2 border text-xs group cursor-pointer"
+                                                    >
+                                                        <div className="mt-0.5 shrink-0 text-primary"><FileText className="h-5 w-5" /></div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
+                                                                DDT {item.number} DEL {format(new Date(item.date), "dd/MM/yyyy")}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
+                                                                Causale: {item.causal}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-450 block italic mt-0.5 line-clamp-1">
+                                                                Articoli inclusi: {item.items.length} voci
+                                                            </span>
+                                                        </div>
+                                                        <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                        </div>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>

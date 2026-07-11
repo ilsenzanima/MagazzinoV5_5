@@ -613,8 +613,8 @@ Note: Questo link consente di visualizzare in sola lettura i certificati di conf
                                                 className={`p-2.5 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 ${selectedJobId === j.id ? "bg-slate-50 dark:bg-slate-900 border-l-2 border-primary" : ""}`}
                                                 onClick={() => setSelectedJobId(j.id)}
                                             >
-                                                <span className="font-bold">{j.code}</span>
-                                                <span className="truncate max-w-[200px] text-slate-500">{j.name || j.description}</span>
+                                                <span className="font-bold truncate flex-1">{j.name || j.description || "Senza nome"}</span>
+                                                <span className="text-slate-400 font-mono text-[10px] shrink-0 ml-2">{j.code}</span>
                                             </div>
                                         ))
                                     )}
