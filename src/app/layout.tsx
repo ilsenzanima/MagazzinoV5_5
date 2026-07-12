@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { ConnectionManager } from "@/components/ConnectionManager";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "sonner";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
@@ -76,6 +77,7 @@ export default function RootLayout({
             <ServiceWorkerRegistration />
             {children}
             <Toaster />
+            <SonnerToaster richColors position="top-center" />
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -128,15 +128,14 @@ export async function buildCoverPdfBlob(job: CoverPdfJobInfo, sections: CoverPdf
             doc.setTextColor(60);
             doc.text(group.label, margin + 2, y + 3.5);
 
-            // Link "Apri cartella" — punta al percorso relativo della cartella dentro lo zip
-            const folderLabel = "[Apri cartella]";
-            doc.setFontSize(8);
+            // Percorso della cartella come testo (non link): l'apertura diretta della cartella
+            // non è affidabile in tutti i lettori PDF (funziona in Acrobat/browser ma non in
+            // tutti, es. PDFgear), quindi mostriamo il percorso per trovare il file a mano.
+            doc.setFontSize(7.5);
             doc.setFont("helvetica", "normal");
-            doc.setTextColor(...primaryColor);
-            const folderLabelWidth = doc.getTextWidth(folderLabel);
-            const folderLabelX = margin + contentWidth - 2 - folderLabelWidth;
-            doc.text(folderLabel, folderLabelX, y + 3.5);
-            doc.link(folderLabelX, y - 2, folderLabelWidth, 5, { url: `${group.folderRelativePath}/` });
+            doc.setTextColor(140);
+            const folderPathLabel = `${group.folderRelativePath}/`;
+            doc.text(folderPathLabel, margin + contentWidth - 2, y + 3.5, { align: "right", maxWidth: contentWidth / 2 });
 
             y += 6;
             doc.setDrawColor(220, 220, 220);
