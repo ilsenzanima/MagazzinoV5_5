@@ -28,7 +28,7 @@ async function fetchBlob(url: string): Promise<Blob> {
     return res.blob();
 }
 
-export function buildInternalJobZipPlan(job: { documents: any }, supabase: SupabaseClient): ZipPlan {
+export function buildInternalJobZipPlan(job: { documents: any }, supabase: SupabaseClient): Promise<ZipPlan> {
     return buildJobZipPlan(job, async (doc) => {
         const url = await resolveInternalDownloadUrl(supabase, doc.fileUrl);
         return fetchBlob(url);

@@ -61,6 +61,42 @@ export function buildFileName(name: string, fileType?: string | null): string {
     return `${base}.${ext}`;
 }
 
+// Un'estensione plausibile è corta e alfanumerica (pdf, jpg, docx...). Per i documenti
+// caricati su Google Drive senza una colonna file_type dedicata (es. certificati fornitore,
+// DDT fisici), il codice altrove deriva "l'estensione" spezzando l'URL sul punto: se l'URL è
+// un bare Drive fileId (nessun punto), il risultato è l'intero fileId (30+ caratteri opachi),
+// non un'estensione vera. Usare questo controllo per capire quando NON fidarsi del valore e
+// derivare l'estensione reale dal Content-Type del file scaricato.
+export function isPlausibleExtension(ext?: string | null): boolean {
+    return !!ext && /^[a-z0-9]{1,5}$/i.test(ext);
+}
+
+const MIME_TO_EXTENSION: Record<string, string> = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/heic": "heic",
+    "image/heif": "heif",
+    "image/bmp": "bmp",
+    "image/svg+xml": "svg",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.ms-powerpoint": "ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "text/plain": "txt",
+};
+
+// Ricava un'estensione plausibile dal Content-Type reale del file scaricato. Fallback "pdf"
+// perché la maggior parte dei documenti non tipizzati (certificati, DDT) sono PDF nella pratica.
+export function extensionFromMimeType(mimeType?: string | null): string {
+    if (!mimeType) return "pdf";
+    return MIME_TO_EXTENSION[mimeType.split(";")[0].trim().toLowerCase()] || "pdf";
+}
+
 // Deduplica i nomi file all'interno della stessa cartella (JSZip sovrascriverebbe silenziosamente altrimenti)
 export function dedupeFileName(fileName: string, usedNames: Set<string>): string {
     if (!usedNames.has(fileName)) {

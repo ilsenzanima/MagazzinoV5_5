@@ -170,7 +170,7 @@ function GuestPortalContent({ params }: Props) {
     const handleDownloadFullZip = async (job: any) => {
         setZipDownloadingJobId(job.jobId);
         try {
-            const plan = buildGuestJobZipPlan(job);
+            const plan = await buildGuestJobZipPlan(job);
             if (plan.entries.length === 0) {
                 toast.error("Nessun documento da scaricare per questa commessa");
                 return;

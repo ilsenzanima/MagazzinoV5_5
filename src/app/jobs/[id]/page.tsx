@@ -74,7 +74,7 @@ export default function JobDetailsPage() {
         try {
             const supabase = createClient();
             const tree = await fetchInternalJobDocumentTree(job.id, supabase);
-            const plan = buildInternalJobZipPlan(tree, supabase);
+            const plan = await buildInternalJobZipPlan(tree, supabase);
             if (plan.entries.length === 0) {
                 notify.error("Nessun documento da scaricare per questa commessa");
                 return;

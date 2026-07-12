@@ -3,11 +3,12 @@ import { it } from "date-fns/locale";
 import type { CoverPdfJobInfo, CoverPdfSection } from "@/lib/zip/documentation-zip-types";
 
 // Genera il PDF di copertina/indice dello zip "documentazione completa": intestazione in
-// stile bolle interne OPI, dati della commessa, e un indice dei capitoli (pagina 1, con
-// link che saltano alla sezione corrispondente) seguito dall'elenco dei documenti per
-// capitolo, ciascuno con un link relativo che apre direttamente il file dentro lo zip
-// (funziona nei lettori PDF che risolvono i link relativi al percorso del file, es. Adobe
-// Acrobat/Reader; negli altri lettori resta comunque leggibile il nome/percorso del file).
+// stile bolle interne OPI, dati della commessa, e il contenuto diviso in capitoli (un
+// capitolo per macro-categoria, una sottovoce per gruppo/cartella) navigabile come un manuale
+// tramite i segnalibri nativi del PDF (pannello indice del lettore, es. Adobe Acrobat/Reader).
+// Ogni documento ha inoltre un link relativo che apre direttamente il file dentro lo zip una
+// volta estratto (funziona nei lettori che risolvono i link relativi; negli altri resta
+// comunque leggibile il nome/percorso del file).
 export async function buildCoverPdfBlob(job: CoverPdfJobInfo, sections: CoverPdfSection[]): Promise<Blob> {
     const { default: jsPDF } = await import("jspdf");
 
@@ -86,50 +87,20 @@ export async function buildCoverPdfBlob(job: CoverPdfJobInfo, sections: CoverPdf
         infoY += periodText && job.description ? 2 : 5;
         doc.text(periodText, margin + 2, infoY);
     }
-    y += infoBoxHeight + 6;
+    y += infoBoxHeight + 8;
 
-    // --- Indice (pagina 1): un capitolo per sezione, con link interno alla pagina di inizio ---
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...primaryColor);
-    doc.text("INDICE", margin, y);
-    y += 5;
-    doc.setDrawColor(...borderColor);
-    doc.line(margin, y, margin + contentWidth, y);
-    y += 6;
-
-    const indexRowRefs: { section: CoverPdfSection; y: number }[] = [];
-    for (const section of sections) {
-        indexRowRefs.push({ section, y });
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(20);
-        const count = section.groups.reduce((sum, g) => sum + g.entries.length, 0);
-        doc.text(`${section.title}`, margin + 2, y + 4);
-        doc.setTextColor(140);
-        doc.setFontSize(8);
-        doc.text(`${count} document${count === 1 ? "o" : "i"}`, margin + contentWidth - 2, y + 4, { align: "right" });
-        y += 8;
-    }
-
-    // --- Contenuto: da pagina 2, un capitolo alla volta ---
-    doc.addPage();
-    let currentPage = (doc.internal as any).getCurrentPageInfo().pageNumber;
-    y = margin;
-
+    // --- Contenuto: un capitolo per sezione, sottovoci per gruppo, con segnalibri PDF ---
     const ensureSpace = (needed: number) => {
         if (y + needed > bottomLimit) {
             doc.addPage();
-            currentPage = (doc.internal as any).getCurrentPageInfo().pageNumber;
             y = margin;
         }
     };
 
-    const sectionStartPage: number[] = [];
-
-    sections.forEach((section, sIdx) => {
+    for (const section of sections) {
         ensureSpace(14);
-        sectionStartPage[sIdx] = currentPage;
+        const sectionPage = (doc.internal as any).getCurrentPageInfo().pageNumber;
+        const sectionBookmark = doc.outline.add(null, section.title, { pageNumber: sectionPage });
 
         doc.setFillColor(...primaryColor);
         doc.rect(margin, y, contentWidth, 8, "F");
@@ -149,6 +120,9 @@ export async function buildCoverPdfBlob(job: CoverPdfJobInfo, sections: CoverPdf
 
         for (const group of section.groups) {
             ensureSpace(11);
+            const groupPage = (doc.internal as any).getCurrentPageInfo().pageNumber;
+            doc.outline.add(sectionBookmark, group.label, { pageNumber: groupPage });
+
             doc.setFontSize(9.5);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(60);
@@ -187,13 +161,7 @@ export async function buildCoverPdfBlob(job: CoverPdfJobInfo, sections: CoverPdf
             y += 3;
         }
         y += 2;
-    });
-
-    // --- Torna a pagina 1 e disegna i link dell'indice ora che conosciamo le pagine ---
-    doc.setPage(1);
-    indexRowRefs.forEach((ref, i) => {
-        doc.link(margin, ref.y - 2, contentWidth, 8, { pageNumber: sectionStartPage[i] || 2 });
-    });
+    }
 
     // --- Numerazione pagine ---
     const pageCount = (doc.internal as any).getNumberOfPages();
