@@ -197,8 +197,11 @@ function GuestPortalContent({ params }: Props) {
                                             className="pl-9 font-mono text-center tracking-widest text-lg font-bold uppercase"
                                             placeholder="OPI-XXXXXX"
                                             value={passcode}
-                                            onChange={(e) => setPasscode(e.target.value)}
+                                            onChange={(e) => setPasscode(e.target.value.toUpperCase())}
                                             autoComplete="off"
+                                            autoCapitalize="characters"
+                                            autoCorrect="off"
+                                            spellCheck={false}
                                             required
                                         />
                                     </div>

@@ -107,16 +107,19 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 1. Valida il cantiere ospite e il passcode
-        const { data: site, error: siteError } = await admin
+        // 1. Valida il cantiere ospite e il passcode (confronto case-insensitive: il campo passcode
+        // mostra il testo in maiuscolo solo via CSS, ma su mobile l'utente può digitarlo in minuscolo)
+        const { data: siteById, error: siteError } = await admin
             .from("guest_sites")
             .select("*")
             .eq("id", siteId)
-            .eq("passcode", passcode)
             .is("deleted_at", null)
             .maybeSingle();
 
         if (siteError) throw siteError;
+        const site = siteById && siteById.passcode?.trim().toUpperCase() === String(passcode).trim().toUpperCase()
+            ? siteById
+            : null;
         if (!site) {
             await recordAttempt(admin, siteId, clientIp, false);
             return NextResponse.json({ error: "Credenziali non valide" }, { status: 401 });
