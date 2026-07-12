@@ -224,7 +224,7 @@ function GuestPortalContent({ params }: Props) {
         );
     }
 
-    const renderDocLink = (doc: any, subtitle: string, images?: PhotoGalleryImage[], imageIndex?: number) => {
+    const renderDocLink = (doc: any, images?: PhotoGalleryImage[], imageIndex?: number) => {
         const asImage = images && imageIndex !== undefined;
         const content = (
             <>
@@ -233,7 +233,6 @@ function GuestPortalContent({ params }: Props) {
                     <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary break-all line-clamp-2">
                         {doc.name}
                     </span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{subtitle}</span>
                     {doc.notes && <span className="text-[10px] text-slate-400 block italic mt-0.5 line-clamp-1">{doc.notes}</span>}
                 </div>
                 <div className="shrink-0 p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -418,7 +417,7 @@ function GuestPortalContent({ params }: Props) {
                                                             {f.documents.map((doc: any) => {
                                                                 const isImg = isImageFileType(doc.fileType);
                                                                 const imgIndex = isImg ? imagesInFolder.findIndex(im => im.url === doc.fileUrl) : undefined;
-                                                                return renderDocLink(doc, g.typeName, isImg ? imagesInFolder : undefined, imgIndex);
+                                                                return renderDocLink(doc, isImg ? imagesInFolder : undefined, imgIndex);
                                                             })}
                                                         </div>
                                                     </div>
@@ -448,7 +447,7 @@ function GuestPortalContent({ params }: Props) {
                                                         📁 {supplierName}
                                                     </p>
                                                     <div className="grid gap-2 sm:grid-cols-2">
-                                                        {docs.map((doc: any) => renderDocLink(doc, g.typeName))}
+                                                        {docs.map((doc: any) => renderDocLink(doc))}
                                                     </div>
                                                 </div>
                                             ))}
@@ -472,7 +471,7 @@ function GuestPortalContent({ params }: Props) {
                                         <div className="grid gap-2 sm:grid-cols-2">
                                             {g.items.map(({ kind, item }) =>
                                                 kind === "doc" ? (
-                                                    renderDocLink(item, item.typeName)
+                                                    renderDocLink(item)
                                                 ) : (
                                                     <div
                                                         key={item.id}
