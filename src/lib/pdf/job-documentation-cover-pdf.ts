@@ -87,7 +87,22 @@ export async function buildCoverPdfBlob(job: CoverPdfJobInfo, sections: CoverPdf
         infoY += periodText && job.description ? 2 : 5;
         doc.text(periodText, margin + 2, infoY);
     }
-    y += infoBoxHeight + 8;
+    y += infoBoxHeight + 6;
+
+    // --- Nota d'uso: spiega i link e il disclaimer sulla compatibilità dei lettori PDF ---
+    const noteLines = doc.splitTextToSize(
+        "Il nome di ogni documento elencato qui sotto è un collegamento che apre direttamente il file corrispondente all'interno di questa cartella zip. A seconda del programma usato per aprire questo PDF, i collegamenti potrebbero non funzionare: in quel caso è comunque possibile leggere il percorso indicato accanto a ciascun gruppo di documenti per trovare manualmente il file desiderato.",
+        contentWidth - 6
+    );
+    const noteBoxHeight = noteLines.length * 3.8 + 5;
+    doc.setDrawColor(...borderColor);
+    doc.setFillColor(250, 247, 240);
+    doc.roundedRect(margin, y, contentWidth, noteBoxHeight, 1, 1, "FD");
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(90);
+    doc.text(noteLines, margin + 3, y + 4.5);
+    y += noteBoxHeight + 8;
 
     // --- Contenuto: un capitolo per sezione, sottovoci per gruppo, con segnalibri PDF ---
     const ensureSpace = (needed: number) => {
