@@ -401,7 +401,7 @@ export async function POST(req: NextRequest) {
                     return {
                         id: `${p.id}-doc-${docIndex}`,
                         name: `DDT ${p.delivery_note_number}${formattedDate ? ` DEL ${formattedDate}` : ""}`,
-                        notes: `Fornitore: ${suppName}`,
+                        notes: null,
                         fileUrl: signedUrl,
                         fileType: ext,
                         fileSize: null,
