@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { downloadFile, getFileMetadata, isOfficeMimeType, ensureFileLinkShareable } from "@/lib/google-drive"
+import { downloadFile, getFileMetadata, isOfficeMimeType, ensureFileLinkShareable, officeNativePreviewUrl } from "@/lib/google-drive"
 
 export async function GET(req: NextRequest) {
     const cookieStore = await cookies()
@@ -19,13 +19,16 @@ export async function GET(req: NextRequest) {
     if (!fileId) return NextResponse.json({ error: 'fileId mancante' }, { status: 400 })
 
     try {
-        // I documenti Office vengono aperti nel viewer di Google Drive in sola
-        // lettura, a meno che non sia richiesto il download diretto (download=1).
+        // I documenti Office vengono aperti nell'anteprima nativa di Google Docs/Sheets/Slides
+        // in sola lettura, a meno che non sia richiesto il download diretto (download=1). Il
+        // viewer generico di Drive (file/d/{id}/view) a volte fallisce con "Impossibile
+        // visualizzare l'anteprima del file" su questi formati, specie se caricati di recente.
         if (!forceDownload) {
             const { mimeType: previewMimeType } = await getFileMetadata(fileId)
             if (isOfficeMimeType(previewMimeType)) {
                 await ensureFileLinkShareable(fileId)
-                return NextResponse.redirect(`https://drive.google.com/file/d/${fileId}/view`)
+                const nativeUrl = officeNativePreviewUrl(fileId, previewMimeType)
+                return NextResponse.redirect(nativeUrl || `https://drive.google.com/file/d/${fileId}/view`)
             }
         }
 

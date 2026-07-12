@@ -202,6 +202,39 @@ export function isOfficeMimeType(mimeType: string): boolean {
     return OFFICE_MIME_TYPES.has(mimeType);
 }
 
+const OFFICE_APP_BY_MIME_TYPE: Record<string, string> = {
+    'application/msword': 'document',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+    'application/vnd.ms-excel': 'spreadsheet',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'spreadsheet',
+    'application/vnd.ms-powerpoint': 'presentation',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'presentation',
+};
+
+// Anteprima nativa di Google Docs/Sheets/Slides per un file Office su Drive: più affidabile
+// del viewer generico di Drive (file/d/{id}/view), che a volte mostra "Impossibile
+// visualizzare l'anteprima del file" per documenti Office, specialmente se caricati di
+// recente e non ancora completamente elaborati dalla pipeline di anteprima di Drive.
+export function officeNativePreviewUrl(fileId: string, mimeType: string): string | null {
+    const app = OFFICE_APP_BY_MIME_TYPE[mimeType];
+    if (!app) return null;
+    return `https://docs.google.com/${app}/d/${encodeURIComponent(fileId)}/preview`;
+}
+
+const OFFICE_APP_BY_EXTENSION: Record<string, string> = {
+    doc: 'document', docx: 'document',
+    xls: 'spreadsheet', xlsx: 'spreadsheet',
+    ppt: 'presentation', pptx: 'presentation',
+};
+
+// Come officeNativePreviewUrl, ma a partire dall'estensione del file invece del mimeType
+// (utile dove il mimeType non è già disponibile senza una chiamata aggiuntiva a Drive).
+export function officeNativePreviewUrlByExtension(fileId: string, extension?: string | null): string | null {
+    const app = extension ? OFFICE_APP_BY_EXTENSION[extension.toLowerCase().replace('.', '')] : undefined;
+    if (!app) return null;
+    return `https://docs.google.com/${app}/d/${encodeURIComponent(fileId)}/preview`;
+}
+
 export async function getFileMetadata(fileId: string): Promise<{ mimeType: string; name: string }> {
     const drive = getDriveClient();
     const { data } = await drive.files.get({ fileId, fields: 'mimeType, name' });
