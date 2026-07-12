@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare } from "lucide-react";
+import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -15,6 +15,11 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
+import { createClient } from "@/lib/supabase/client";
+import { fetchInternalJobDocumentTree } from "@/lib/zip/internal-job-zip-data";
+import { buildInternalJobZipPlan } from "@/lib/zip/internal-job-zip-plan";
+import { buildCoverPdfBlob } from "@/lib/pdf/job-documentation-cover-pdf";
+import { buildAndDownloadDocumentationZip } from "@/lib/zip/build-documentation-zip";
 import { HelpTip } from "@/components/ui/help-tip";
 import { jobConformitaDocumentTypesApi } from "@/lib/services/job-conformita-document-types";
 import { jobSiteDocumentTypesApi } from "@/lib/services/job-site-document-types";
@@ -58,9 +63,39 @@ export default function JobDetailsPage() {
     const [totalHours, setTotalHours] = useState(0);
     const [loading, setLoading] = useState(true);
     const [linkedProposal, setLinkedProposal] = useState<ClientProposal | null>(null);
+    const [downloadingZip, setDownloadingZip] = useState(false);
 
     // Ref for printing
     const printRef = useRef<HTMLDivElement>(null);
+
+    const handleDownloadFullZip = async () => {
+        if (!job) return;
+        setDownloadingZip(true);
+        try {
+            const supabase = createClient();
+            const tree = await fetchInternalJobDocumentTree(job.id, supabase);
+            const plan = buildInternalJobZipPlan(tree, supabase);
+            if (plan.entries.length === 0) {
+                notify.error("Nessun documento da scaricare per questa commessa");
+                return;
+            }
+            const coverPdfBlob = await buildCoverPdfBlob(
+                { code: job.code, name: job.name, description: job.description, startDate: job.startDate, endDate: job.endDate },
+                plan.sections
+            );
+            await buildAndDownloadDocumentationZip({
+                entries: plan.entries,
+                coverPdfBlob,
+                coverPdfFileName: "00 - Indice Documentazione.pdf",
+                zipFileName: `${job.code}_documentazione_completa.zip`,
+            });
+        } catch (error) {
+            console.error("Failed to build documentation zip", error);
+            notify.error("Errore durante la generazione dello zip");
+        } finally {
+            setDownloadingZip(false);
+        }
+    };
 
     const handlePrint = async () => {
         if (!job) return;
@@ -481,10 +516,26 @@ export default function JobDetailsPage() {
                         {job?.name}
                     </h1>
                     {(userRole === 'admin' || userRole === 'operativo') && (
-                        <Button variant="outline" size="sm" onClick={handlePrint} className="px-2 md:px-4">
-                            <Printer className="h-4 w-4 md:mr-2" />
-                            <span className="hidden sm:inline">Stampa</span>
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleDownloadFullZip}
+                                disabled={downloadingZip}
+                                className="px-2 md:px-4"
+                            >
+                                {downloadingZip ? (
+                                    <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+                                ) : (
+                                    <Archive className="h-4 w-4 md:mr-2" />
+                                )}
+                                <span className="hidden sm:inline">Scarica documentazione</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={handlePrint} className="px-2 md:px-4">
+                                <Printer className="h-4 w-4 md:mr-2" />
+                                <span className="hidden sm:inline">Stampa</span>
+                            </Button>
+                        </div>
                     )}
                 </div>
 

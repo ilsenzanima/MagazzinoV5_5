@@ -25,19 +25,21 @@ async function fetchBlob(url: string): Promise<Blob> {
     return res.blob();
 }
 
-// Aggiunge un documento standard (con fileUrl/rawFileId) al gruppo di zip/PDF corrente,
-// gestendo dedup dei nomi file e restituendo la entry per l'indice del PDF.
+// Aggiunge un documento standard al gruppo di zip/PDF corrente, gestendo dedup dei nomi
+// file e restituendo la entry per l'indice del PDF. `fetchDocBlob` astrae come recuperare
+// i byte del documento (diverso tra portale ospiti e scheda commessa interna).
 function addDocEntry(
     doc: any,
     pathSegments: string[],
     usedNames: Set<string>,
-    entries: PlannedZipEntry[]
+    entries: PlannedZipEntry[],
+    fetchDocBlob: (doc: any) => Promise<Blob>
 ): CoverPdfEntry {
     const fileName = dedupeFileName(buildFileName(doc.name, doc.fileType), usedNames);
     entries.push({
         pathSegments,
         fileName,
-        getBlob: () => fetchBlob(guestDocDownloadUrl(doc)),
+        getBlob: () => fetchDocBlob(doc),
     });
     return {
         name: doc.name,
@@ -46,7 +48,11 @@ function addDocEntry(
     };
 }
 
-export function buildGuestJobZipPlan(job: any): ZipPlan {
+// Costruisce il piano di zip (documenti + sezioni per il PDF di copertina) a partire dalla
+// stessa struttura dati usata per renderizzare la commessa (job.documents.custom/associated/
+// ddt/internalNotes). `fetchDocBlob` recupera i byte reali di un documento: diverso tra
+// portale ospiti (proxy pubblico) e scheda commessa interna (sessione Supabase autenticata).
+export function buildJobZipPlan(job: any, fetchDocBlob: (doc: any) => Promise<Blob>): ZipPlan {
     const entries: PlannedZipEntry[] = [];
     const sections: CoverPdfSection[] = [];
 
@@ -59,7 +65,7 @@ export function buildGuestJobZipPlan(job: any): ZipPlan {
                 ? ["Documenti Cantiere", sanitizePathSegment(typeGroup.typeName), sanitizePathSegment(folder.folderName)]
                 : ["Documenti Cantiere", sanitizePathSegment(typeGroup.typeName)];
             const usedNames = new Set<string>();
-            const coverEntries = folder.documents.map((doc: any) => addDocEntry(doc, pathSegments, usedNames, entries));
+            const coverEntries = folder.documents.map((doc: any) => addDocEntry(doc, pathSegments, usedNames, entries, fetchDocBlob));
             if (coverEntries.length > 0) {
                 customCoverGroups.push({
                     label: folder.folderName ? `${typeGroup.typeName} / ${folder.folderName}` : typeGroup.typeName,
@@ -78,7 +84,7 @@ export function buildGuestJobZipPlan(job: any): ZipPlan {
         for (const [supplierName, docs] of Array.from(typeGroup.bySupplier.entries())) {
             const pathSegments = ["Certificati Conformità", sanitizePathSegment(typeGroup.typeName), sanitizePathSegment(supplierName)];
             const usedNames = new Set<string>();
-            const coverEntries = docs.map((doc: any) => addDocEntry(doc, pathSegments, usedNames, entries));
+            const coverEntries = docs.map((doc: any) => addDocEntry(doc, pathSegments, usedNames, entries, fetchDocBlob));
             if (coverEntries.length > 0) {
                 conformitaCoverGroups.push({
                     label: `${typeGroup.typeName} / ${supplierName}`,
@@ -99,7 +105,7 @@ export function buildGuestJobZipPlan(job: any): ZipPlan {
         const coverEntries: CoverPdfEntry[] = [];
         for (const { kind, item } of group.items) {
             if (kind === "doc") {
-                coverEntries.push(addDocEntry(item, pathSegments, usedNames, entries));
+                coverEntries.push(addDocEntry(item, pathSegments, usedNames, entries, fetchDocBlob));
             } else {
                 // Bolla interna OPI: nessun file caricato, il PDF viene generato al volo
                 // con lo stesso layout istituzionale usato per il download singolo.
@@ -150,4 +156,10 @@ export function buildGuestJobZipPlan(job: any): ZipPlan {
     sections.push({ title: "DDT e Bolle Consegna", groups: ddtCoverGroups });
 
     return { entries, sections };
+}
+
+// Wrapper specifico per il portale ospiti: recupera i byte via il proxy pubblico
+// /api/guest/drive-image (Drive) o la signed URL già presente in fileUrl (Storage).
+export function buildGuestJobZipPlan(job: any): ZipPlan {
+    return buildJobZipPlan(job, (doc) => fetchBlob(guestDocDownloadUrl(doc)));
 }
