@@ -25,6 +25,8 @@ import { uploadFileToDrive } from "@/lib/drive-upload"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
 import { OldRevCheckboxes, OldRevBadges } from "@/components/documents/OldRevControls"
+import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/ui/photo-gallery"
+import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
 
 interface Props {
     proposalId: string
@@ -53,6 +55,21 @@ export function ProposalDocuments({ proposalId }: Props) {
     const [saving, setSaving] = useState(false)
     const [viewMode, setViewMode] = useViewMode('proposal-documents')
     const [activeFolderByType, setActiveFolderByType] = useState<Record<string, string>>({})
+    const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([])
+    const [galleryIndex, setGalleryIndex] = useState(0)
+    const [galleryOpen, setGalleryOpen] = useState(false)
+
+    const openGalleryForDoc = async (doc: ProposalDocument, siblingDocs: ProposalDocument[]) => {
+        const imageDocs = siblingDocs.filter(d => isImageFileType(d.fileType))
+        const startIndex = Math.max(0, imageDocs.findIndex(d => d.id === doc.id))
+        const resolved = await Promise.all(imageDocs.map(async d => ({
+            url: await resolveDocumentDisplayUrl(supabase, d.fileUrl),
+            name: d.name,
+        })))
+        setGalleryImages(resolved)
+        setGalleryIndex(startIndex)
+        setGalleryOpen(true)
+    }
 
     // Upload wizard state
     const [upStep, setUpStep] = useState<1 | 2>(1)
@@ -363,11 +380,11 @@ export function ProposalDocuments({ proposalId }: Props) {
         } catch { notify.error("Errore eliminazione") }
     }
 
-    const renderDocCard = (doc: ProposalDocument) => (
+    const renderDocCard = (doc: ProposalDocument, siblingDocs: ProposalDocument[]) => (
         <Card
             key={doc.id}
             className="group hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => openDoc(doc.fileUrl)}
+            onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : openDoc(doc.fileUrl)}
         >
             <CardContent className="p-4 flex items-start gap-3">
                 <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
@@ -403,11 +420,11 @@ export function ProposalDocuments({ proposalId }: Props) {
         </Card>
     )
 
-    const renderDocRow = (doc: ProposalDocument) => (
+    const renderDocRow = (doc: ProposalDocument, siblingDocs: ProposalDocument[]) => (
         <div
             key={doc.id}
             className="group flex items-center gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors cursor-pointer"
-            onClick={() => openDoc(doc.fileUrl)}
+            onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : openDoc(doc.fileUrl)}
         >
             <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
             <div className="flex-1 min-w-0">
@@ -468,11 +485,11 @@ export function ProposalDocuments({ proposalId }: Props) {
                     {docTypes.length === 0 ? (
                         viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {documents.map(renderDocCard)}
+                                {documents.map(d => renderDocCard(d, documents))}
                             </div>
                         ) : (
                             <div className="space-y-1">
-                                {documents.map(renderDocRow)}
+                                {documents.map(d => renderDocRow(d, documents))}
                             </div>
                         )
                     ) : (
@@ -525,11 +542,11 @@ export function ProposalDocuments({ proposalId }: Props) {
                                             </p>
                                         ) : viewMode === 'grid' ? (
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                {shownDocs.map(renderDocCard)}
+                                                {shownDocs.map(d => renderDocCard(d, shownDocs))}
                                             </div>
                                         ) : (
                                             <div className="space-y-1">
-                                                {shownDocs.map(renderDocRow)}
+                                                {shownDocs.map(d => renderDocRow(d, shownDocs))}
                                             </div>
                                         )}
                                     </TabsContent>
@@ -756,6 +773,15 @@ export function ProposalDocuments({ proposalId }: Props) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {galleryOpen && (
+                <PhotoGallery
+                    images={galleryImages}
+                    index={galleryIndex}
+                    onIndexChange={setGalleryIndex}
+                    onClose={() => setGalleryOpen(false)}
+                />
+            )}
         </div>
     )
 }

@@ -61,6 +61,8 @@ import { compressImageIfNeeded } from "@/lib/image-compress"
 import { uploadFileToDrive } from "@/lib/drive-upload"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
+import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/ui/photo-gallery"
+import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
 
 interface JobConformitaProps {
     jobId: string
@@ -93,6 +95,23 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const [activeDoc, setActiveDoc] = useState<JobDocument | null>(null)
     const [viewMode, setViewMode] = useViewMode('job-conformita-own-documents', 'grid')
     const [activeFolderByType, setActiveFolderByType] = useState<Record<string, string>>({})
+
+    // Galleria foto
+    const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([])
+    const [galleryIndex, setGalleryIndex] = useState(0)
+    const [galleryOpen, setGalleryOpen] = useState(false)
+
+    const openGalleryForDoc = async (doc: JobDocument, siblingDocs: JobDocument[]) => {
+        const imageDocs = siblingDocs.filter(d => isImageFileType(d.fileType))
+        const startIndex = Math.max(0, imageDocs.findIndex(d => d.id === doc.id))
+        const resolved = await Promise.all(imageDocs.map(async d => ({
+            url: await resolveDocumentDisplayUrl(supabase, d.fileUrl),
+            name: d.name,
+        })))
+        setGalleryImages(resolved)
+        setGalleryIndex(startIndex)
+        setGalleryOpen(true)
+    }
 
     // Upload wizard state
     const [upStep, setUpStep] = useState<1 | 2>(1)
@@ -399,8 +418,8 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         } catch { window.open(url, "_blank") }
     }
 
-    const renderDocCard = (doc: JobDocument) => (
-        <Card key={doc.id} className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => openDoc(doc.fileUrl)}>
+    const renderDocCard = (doc: JobDocument, siblingDocs: JobDocument[]) => (
+        <Card key={doc.id} className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : openDoc(doc.fileUrl)}>
             <CardContent className="p-3 flex items-start gap-3">
                 <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">
                     {getFileIcon(doc.fileType, "h-7 w-7")}
@@ -432,8 +451,8 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         </Card>
     )
 
-    const renderDocRow = (doc: JobDocument) => (
-        <div key={doc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openDoc(doc.fileUrl)}>
+    const renderDocRow = (doc: JobDocument, siblingDocs: JobDocument[]) => (
+        <div key={doc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : openDoc(doc.fileUrl)}>
             <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
                 {getFileIcon(doc.fileType, "h-5 w-5")}
             </div>
@@ -489,11 +508,11 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
             ) : docTypes.length === 0 ? (
                 viewMode === 'list' ? (
                     <div className="space-y-1.5">
-                        {docs.map(renderDocRow)}
+                        {docs.map(d => renderDocRow(d, docs))}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {docs.map(renderDocCard)}
+                        {docs.map(d => renderDocCard(d, docs))}
                     </div>
                 )
             ) : (
@@ -546,11 +565,11 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                                     </p>
                                 ) : viewMode === 'list' ? (
                                     <div className="space-y-1.5">
-                                        {shownDocs.map(renderDocRow)}
+                                        {shownDocs.map(d => renderDocRow(d, shownDocs))}
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {shownDocs.map(renderDocCard)}
+                                        {shownDocs.map(d => renderDocCard(d, shownDocs))}
                                     </div>
                                 )}
                             </TabsContent>
@@ -761,6 +780,15 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {galleryOpen && (
+                <PhotoGallery
+                    images={galleryImages}
+                    index={galleryIndex}
+                    onIndexChange={setGalleryIndex}
+                    onClose={() => setGalleryOpen(false)}
+                />
+            )}
         </div>
     )
 }

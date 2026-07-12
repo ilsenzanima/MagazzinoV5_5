@@ -31,6 +31,8 @@ import { uploadFileToDrive } from "@/lib/drive-upload"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
 import { OldRevCheckboxes, OldRevBadges } from "@/components/documents/OldRevControls"
+import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/ui/photo-gallery"
+import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
 
 interface JobDocumentsProps {
   jobId: string
@@ -62,6 +64,23 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const supabase = createClient()
   const [viewMode, setViewMode] = useViewMode('job-documents', 'grid')
   const [activeFolderByType, setActiveFolderByType] = useState<Record<string, string>>({})
+
+  // Galleria foto
+  const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([])
+  const [galleryIndex, setGalleryIndex] = useState(0)
+  const [galleryOpen, setGalleryOpen] = useState(false)
+
+  const openGalleryForDoc = async (doc: SiteDocument, siblingDocs: SiteDocument[]) => {
+    const imageDocs = siblingDocs.filter(d => isImageFileType(d.fileType))
+    const startIndex = Math.max(0, imageDocs.findIndex(d => d.id === doc.id))
+    const resolved = await Promise.all(imageDocs.map(async d => ({
+      url: await resolveDocumentDisplayUrl(supabase, d.fileUrl),
+      name: d.name,
+    })))
+    setGalleryImages(resolved)
+    setGalleryIndex(startIndex)
+    setGalleryOpen(true)
+  }
 
   // Upload wizard state
   const [upStep, setUpStep] = useState<1 | 2>(1)
@@ -389,11 +408,11 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     }
   }
 
-  const renderDocCard = (doc: SiteDocument) => (
+  const renderDocCard = (doc: SiteDocument, siblingDocs: SiteDocument[]) => (
     <Card
       key={doc.id}
       className="group hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => handleOpenDocument(doc.fileUrl)}
+      onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : handleOpenDocument(doc.fileUrl)}
     >
       <CardContent className="p-4 flex items-start gap-3">
         <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
@@ -431,11 +450,11 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     </Card>
   )
 
-  const renderDocRow = (doc: SiteDocument) => (
+  const renderDocRow = (doc: SiteDocument, siblingDocs: SiteDocument[]) => (
     <div
       key={doc.id}
       className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer"
-      onClick={() => handleOpenDocument(doc.fileUrl)}
+      onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : handleOpenDocument(doc.fileUrl)}
     >
       <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
         {getFileIcon(doc.fileType, "h-5 w-5")}
@@ -502,11 +521,11 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
       ) : docTypes.length === 0 ? (
         viewMode === 'list' ? (
           <div className="space-y-1.5">
-            {documents.map(renderDocRow)}
+            {documents.map(d => renderDocRow(d, documents))}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {documents.map(renderDocCard)}
+            {documents.map(d => renderDocCard(d, documents))}
           </div>
         )
       ) : (
@@ -559,11 +578,11 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                   </p>
                 ) : viewMode === 'list' ? (
                   <div className="space-y-1.5">
-                    {shownDocs.map(renderDocRow)}
+                    {shownDocs.map(d => renderDocRow(d, shownDocs))}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {shownDocs.map(renderDocCard)}
+                    {shownDocs.map(d => renderDocCard(d, shownDocs))}
                   </div>
                 )}
               </TabsContent>
@@ -788,6 +807,15 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {galleryOpen && (
+        <PhotoGallery
+          images={galleryImages}
+          index={galleryIndex}
+          onIndexChange={setGalleryIndex}
+          onClose={() => setGalleryOpen(false)}
+        />
+      )}
     </div>
   )
 }
