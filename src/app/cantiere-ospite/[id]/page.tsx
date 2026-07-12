@@ -19,12 +19,17 @@ import {
     AlertCircle,
     Truck,
     ShieldCheck,
+    Archive,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { getFileIcon, formatFileSize } from "@/lib/file-icon";
 import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/ui/photo-gallery";
+import { buildConformitaGroups, buildDdtGroups } from "@/lib/guest-portal-grouping";
+import { buildGuestJobZipPlan } from "@/lib/zip/guest-job-zip-plan";
+import { buildCoverPdfBlob } from "@/lib/pdf/job-documentation-cover-pdf";
+import { buildAndDownloadDocumentationZip } from "@/lib/zip/build-documentation-zip";
 
 interface Props {
     params: Promise<{ id: string }>;
@@ -46,6 +51,9 @@ function GuestPortalContent({ params }: Props) {
     const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([]);
     const [galleryIndex, setGalleryIndex] = useState(0);
     const [galleryOpen, setGalleryOpen] = useState(false);
+
+    // Download zip "documentazione completa": id della commessa in corso di preparazione
+    const [zipDownloadingJobId, setZipDownloadingJobId] = useState<string | null>(null);
 
     const openGallery = (images: PhotoGalleryImage[], startIndex: number) => {
         setGalleryImages(images);
@@ -157,6 +165,34 @@ function GuestPortalContent({ params }: Props) {
         }
     };
 
+    // Scarica un unico zip con tutti i documenti della commessa, organizzati nelle stesse
+    // cartelle mostrate nel portale, più un PDF di copertina/indice con link ai singoli file.
+    const handleDownloadFullZip = async (job: any) => {
+        setZipDownloadingJobId(job.jobId);
+        try {
+            const plan = buildGuestJobZipPlan(job);
+            if (plan.entries.length === 0) {
+                toast.error("Nessun documento da scaricare per questa commessa");
+                return;
+            }
+            const coverPdfBlob = await buildCoverPdfBlob(
+                { code: job.code, name: job.name, description: job.description, startDate: job.startDate, endDate: job.endDate },
+                plan.sections
+            );
+            await buildAndDownloadDocumentationZip({
+                entries: plan.entries,
+                coverPdfBlob,
+                coverPdfFileName: "00 - Indice Documentazione.pdf",
+                zipFileName: `${job.code}_documentazione_completa.zip`,
+            });
+        } catch (error) {
+            console.error("Failed to build documentation zip", error);
+            toast.error("Errore durante la generazione dello zip");
+        } finally {
+            setZipDownloadingJobId(null);
+        }
+    };
+
     if (checkingAuth) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -260,31 +296,8 @@ function GuestPortalContent({ params }: Props) {
 
     const renderJobDocuments = (job: any) => {
         const customGroups: any[] = job.documents.custom || [];
-
-        // Certificati Conformità: raggruppati per tipo di conformità, e come sottocartella per fornitore
-        const conformitaByType = new Map<string, { typeName: string; bySupplier: Map<string, any[]> }>();
-        for (const doc of job.documents.associated) {
-            const typeKey = doc.typeName || "Generico";
-            if (!conformitaByType.has(typeKey)) conformitaByType.set(typeKey, { typeName: typeKey, bySupplier: new Map() });
-            const typeGroup = conformitaByType.get(typeKey)!;
-            const supplierKey = doc.supplierName || "Sconosciuto";
-            if (!typeGroup.bySupplier.has(supplierKey)) typeGroup.bySupplier.set(supplierKey, []);
-            typeGroup.bySupplier.get(supplierKey)!.push(doc);
-        }
-        const conformitaGroups = Array.from(conformitaByType.values());
-
-        // DDT e Bolle Consegna: raggruppati per fornitore (le bolle interne sotto "OPI")
-        const ddtBySupplier = new Map<string, { kind: "doc" | "note"; item: any }[]>();
-        for (const doc of job.documents.ddt) {
-            const key = doc.supplierName || "Sconosciuto";
-            if (!ddtBySupplier.has(key)) ddtBySupplier.set(key, []);
-            ddtBySupplier.get(key)!.push({ kind: "doc", item: doc });
-        }
-        for (const note of job.documents.internalNotes) {
-            if (!ddtBySupplier.has("OPI")) ddtBySupplier.set("OPI", []);
-            ddtBySupplier.get("OPI")!.push({ kind: "note", item: note });
-        }
-        const ddtGroups = Array.from(ddtBySupplier.entries()).map(([supplierName, items]) => ({ supplierName, items }));
+        const conformitaGroups = buildConformitaGroups(job);
+        const ddtGroups = buildDdtGroups(job);
 
         const macroSections = [
             {
@@ -345,6 +358,20 @@ function GuestPortalContent({ params }: Props) {
                             </span>
                         </div>
                     </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 bg-white dark:bg-slate-900"
+                        disabled={zipDownloadingJobId === job.jobId}
+                        onClick={() => handleDownloadFullZip(job)}
+                    >
+                        {zipDownloadingJobId === job.jobId ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                            <Archive className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Scarica documentazione completa
+                    </Button>
                 </div>
 
                 <CardContent className="p-5 space-y-4">
