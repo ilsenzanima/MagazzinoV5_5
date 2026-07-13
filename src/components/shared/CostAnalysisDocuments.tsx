@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Upload, Loader2, FileText, Pencil, Trash2 } from "lucide-react"
+import { Upload, Loader2, FileText, Pencil, Trash2, X } from "lucide-react"
 import { costAnalysisDocumentsApi, CostAnalysisDocument } from "@/lib/services/cost-analysis-documents"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -300,52 +300,52 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
 
             {/* Upload dialog */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-                <DialogContent>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle>Carica Analisi Costi di Terzi</DialogTitle></DialogHeader>
                     {upStep === 1 ? (
                         <div className="space-y-4 py-2">
-                            <div
-                                className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragOver ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                onClick={() => fileInputRef.current?.click()}
-                                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-                                onDragLeave={() => setDragOver(false)}
-                                onDrop={handleDrop}
-                            >
-                                <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFilesSelected} />
-                                <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                                <p className="text-sm text-slate-600 font-medium">
-                                    {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca o trascina qui i file"}
-                                </p>
-                            </div>
-                            {pendingFiles.length > 0 && (
-                                <div className="space-y-1 max-h-40 overflow-y-auto">
-                                    {pendingFiles.map((p, i) => (
-                                        <div key={i} className="flex items-center justify-between text-sm bg-slate-50 dark:bg-slate-800 rounded px-2 py-1">
-                                            <span className="truncate">{p.file.name}</span>
-                                            <button onClick={() => removePending(i)} className="text-slate-400 hover:text-red-600 ml-2">
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </div>
-                                    ))}
+                            <div className="space-y-1">
+                                <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
+                                <div
+                                    className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragOver ? 'bg-blue-50 border-blue-400 dark:bg-blue-950' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                                    onDragLeave={() => setDragOver(false)}
+                                    onDrop={handleDrop}
+                                >
+                                    <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFilesSelected} />
+                                    <Upload className="h-8 w-8 text-slate-400 mb-2" />
+                                    <p className="text-sm text-slate-600 font-medium">
+                                        {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca o trascina qui i file"}
+                                    </p>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     ) : (
-                        <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+                        <div className="space-y-4 py-2">
+                            <p className="text-xs text-slate-500">Per ogni file inserisci nome e nota (opzionale).</p>
                             {pendingFiles.map((p, i) => (
-                                <div key={i} className="space-y-2 border rounded-lg p-3">
-                                    <p className="text-xs text-slate-400 truncate">{p.file.name}</p>
+                                <div key={i} className="border rounded-lg p-3 space-y-2 relative">
+                                    {!uploading && (
+                                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600" onClick={() => removePending(i)}>
+                                            <X className="h-3.5 w-3.5" />
+                                        </Button>
+                                    )}
+                                    <p className="text-xs text-slate-400 truncate pr-6">{p.file.name}</p>
                                     <div className="space-y-1">
-                                        <Label>Nome documento</Label>
+                                        <Label className="text-xs">Nome documento</Label>
                                         <Input value={p.name} disabled={batchUpload.statuses[i]?.status === 'uploading'} onChange={e => updatePending(i, { name: e.target.value })} />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label>Nota (opzionale)</Label>
-                                        <Input value={p.notes} disabled={batchUpload.statuses[i]?.status === 'uploading'} onChange={e => updatePending(i, { notes: e.target.value })} />
+                                        <Label className="text-xs">Nota (opzionale)</Label>
+                                        <Input value={p.notes} disabled={batchUpload.statuses[i]?.status === 'uploading'} onChange={e => updatePending(i, { notes: e.target.value })} placeholder="Breve descrizione" />
                                     </div>
                                     <UploadStatusBar state={batchUpload.statuses[i]} />
                                 </div>
                             ))}
+                            {pendingFiles.length === 0 && (
+                                <p className="text-sm text-slate-400 italic text-center py-4">Nessun file selezionato.</p>
+                            )}
                         </div>
                     )}
                     <DialogFooter>
