@@ -1,11 +1,10 @@
 import { supabase } from '@/lib/supabase';
 import { deleteDriveFileIfApplicable } from './utils';
 
-export interface SupplierOffer {
+export interface CostAnalysisDocument {
     id: string;
     proposalId: string | null;
     jobId: string | null;
-    supplierId: string | null;
     name: string;
     notes: string;
     fileUrl: string;
@@ -16,11 +15,10 @@ export interface SupplierOffer {
     createdAt: string;
 }
 
-const map = (db: any): SupplierOffer => ({
+const map = (db: any): CostAnalysisDocument => ({
     id: db.id,
     proposalId: db.proposal_id || null,
     jobId: db.job_id || null,
-    supplierId: db.supplier_id || null,
     name: db.name,
     notes: db.notes || '',
     fileUrl: db.file_url,
@@ -31,10 +29,10 @@ const map = (db: any): SupplierOffer => ({
     createdAt: db.created_at,
 });
 
-export const supplierOffersApi = {
-    getByJobId: async (jobId: string): Promise<SupplierOffer[]> => {
+export const costAnalysisDocumentsApi = {
+    getByJobId: async (jobId: string): Promise<CostAnalysisDocument[]> => {
         const { data, error } = await supabase
-            .from('shared_supplier_offers')
+            .from('shared_cost_analysis_documents')
             .select('*')
             .eq('job_id', jobId)
             .order('created_at', { ascending: false });
@@ -42,9 +40,9 @@ export const supplierOffersApi = {
         return (data || []).map(map);
     },
 
-    getByProposalId: async (proposalId: string): Promise<SupplierOffer[]> => {
+    getByProposalId: async (proposalId: string): Promise<CostAnalysisDocument[]> => {
         const { data, error } = await supabase
-            .from('shared_supplier_offers')
+            .from('shared_cost_analysis_documents')
             .select('*')
             .eq('proposal_id', proposalId)
             .order('created_at', { ascending: false });
@@ -52,9 +50,9 @@ export const supplierOffersApi = {
         return (data || []).map(map);
     },
 
-    create: async (doc: { proposalId?: string; jobId?: string; supplierId?: string | null; name: string; notes?: string; fileUrl: string; fileType?: string; fileSize?: number | null }): Promise<SupplierOffer> => {
+    create: async (doc: { proposalId?: string; jobId?: string; name: string; notes?: string; fileUrl: string; fileType?: string; fileSize?: number | null }): Promise<CostAnalysisDocument> => {
         const { data: { user } } = await supabase.auth.getUser();
-        // Se l'offerta viene caricata sulla proposta ed è già stata convertita in commessa,
+        // Se il documento viene caricato sulla proposta ed è già stata convertita in commessa,
         // è subito visibile anche lì (stesso record, nessuna copia).
         let jobId = doc.jobId || null;
         let proposalId = doc.proposalId || null;
@@ -66,7 +64,7 @@ export const supplierOffersApi = {
                 .single();
             jobId = proposal?.converted_job_id || null;
         } else if (doc.jobId && !proposalId) {
-            // Se l'offerta viene caricata sulla commessa e questa proviene da una
+            // Se il documento viene caricato sulla commessa e questa proviene da una
             // proposta, è subito visibile anche lì (stesso record, nessuna copia).
             const { data: proposal } = await supabase
                 .from('client_proposals')
@@ -76,11 +74,10 @@ export const supplierOffersApi = {
             proposalId = proposal?.id || null;
         }
         const { data, error } = await supabase
-            .from('shared_supplier_offers')
+            .from('shared_cost_analysis_documents')
             .insert({
                 proposal_id: proposalId,
                 job_id: jobId,
-                supplier_id: doc.supplierId || null,
                 name: doc.name,
                 notes: doc.notes || null,
                 file_url: doc.fileUrl,
@@ -95,28 +92,27 @@ export const supplierOffersApi = {
         return map(data);
     },
 
-    update: async (id: string, patch: { name?: string; notes?: string; supplierId?: string | null }): Promise<SupplierOffer> => {
+    update: async (id: string, patch: { name?: string; notes?: string }): Promise<CostAnalysisDocument> => {
         const update: any = {};
         if (patch.name !== undefined) update.name = patch.name;
         if (patch.notes !== undefined) update.notes = patch.notes || null;
-        if (patch.supplierId !== undefined) update.supplier_id = patch.supplierId || null;
-        const { data, error } = await supabase.from('shared_supplier_offers').update(update).eq('id', id).select('*').single();
+        const { data, error } = await supabase.from('shared_cost_analysis_documents').update(update).eq('id', id).select('*').single();
         if (error) throw error;
         return map(data);
     },
 
     delete: async (id: string): Promise<void> => {
-        const { data: existing } = await supabase.from('shared_supplier_offers').select('file_url').eq('id', id).maybeSingle();
-        const { error } = await supabase.from('shared_supplier_offers').delete().eq('id', id);
+        const { data: existing } = await supabase.from('shared_cost_analysis_documents').select('file_url').eq('id', id).maybeSingle();
+        const { error } = await supabase.from('shared_cost_analysis_documents').delete().eq('id', id);
         if (error) throw error;
         await deleteDriveFileIfApplicable(existing?.file_url);
     },
 
-    // Collega alla commessa appena creata tutte le offerte già caricate sulla proposta,
+    // Collega alla commessa appena creata tutte le analisi già caricate sulla proposta,
     // così restano gli stessi record (nessuna copia) e sono visibili da entrambe le pagine.
     linkToJob: async (proposalId: string, jobId: string): Promise<void> => {
         const { error } = await supabase
-            .from('shared_supplier_offers')
+            .from('shared_cost_analysis_documents')
             .update({ job_id: jobId })
             .eq('proposal_id', proposalId);
         if (error) throw error;
