@@ -54,6 +54,7 @@ function GuestPortalContent({ params }: Props) {
 
     // Download zip "documentazione completa": id della commessa in corso di preparazione
     const [zipDownloadingJobId, setZipDownloadingJobId] = useState<string | null>(null);
+    const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null);
 
     const openGallery = (images: PhotoGalleryImage[], startIndex: number) => {
         setGalleryImages(images);
@@ -169,6 +170,7 @@ function GuestPortalContent({ params }: Props) {
     // cartelle mostrate nel portale, più un PDF di copertina/indice con link ai singoli file.
     const handleDownloadFullZip = async (job: any) => {
         setZipDownloadingJobId(job.jobId);
+        setZipProgress(null);
         try {
             const plan = await buildGuestJobZipPlan(job);
             if (plan.entries.length === 0) {
@@ -184,12 +186,14 @@ function GuestPortalContent({ params }: Props) {
                 coverPdfBlob,
                 coverPdfFileName: "00 - Indice Documentazione.pdf",
                 zipFileName: `${job.code}_documentazione_completa.zip`,
+                onProgress: (done, total) => setZipProgress({ done, total }),
             });
         } catch (error) {
             console.error("Failed to build documentation zip", error);
             toast.error("Errore durante la generazione dello zip");
         } finally {
             setZipDownloadingJobId(null);
+            setZipProgress(null);
         }
     };
 
@@ -366,11 +370,20 @@ function GuestPortalContent({ params }: Props) {
                         onClick={() => handleDownloadFullZip(job)}
                     >
                         {zipDownloadingJobId === job.jobId ? (
-                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            <>
+                                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                {zipProgress
+                                    ? zipProgress.done >= zipProgress.total
+                                        ? "Comprimo lo zip..."
+                                        : `Preparazione file ${zipProgress.done}/${zipProgress.total}...`
+                                    : "Preparazione..."}
+                            </>
                         ) : (
-                            <Archive className="h-3.5 w-3.5 mr-1.5" />
+                            <>
+                                <Archive className="h-3.5 w-3.5 mr-1.5" />
+                                Scarica documentazione completa
+                            </>
                         )}
-                        Scarica documentazione completa
                     </Button>
                 </div>
 

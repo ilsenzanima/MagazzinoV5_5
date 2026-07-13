@@ -64,6 +64,7 @@ export default function JobDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [linkedProposal, setLinkedProposal] = useState<ClientProposal | null>(null);
     const [downloadingZip, setDownloadingZip] = useState(false);
+    const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null);
 
     // Ref for printing
     const printRef = useRef<HTMLDivElement>(null);
@@ -71,6 +72,7 @@ export default function JobDetailsPage() {
     const handleDownloadFullZip = async () => {
         if (!job) return;
         setDownloadingZip(true);
+        setZipProgress(null);
         try {
             const supabase = createClient();
             const tree = await fetchInternalJobDocumentTree(job.id, supabase);
@@ -88,12 +90,14 @@ export default function JobDetailsPage() {
                 coverPdfBlob,
                 coverPdfFileName: "00 - Indice Documentazione.pdf",
                 zipFileName: `${job.code}_documentazione_completa.zip`,
+                onProgress: (done, total) => setZipProgress({ done, total }),
             });
         } catch (error) {
             console.error("Failed to build documentation zip", error);
             notify.error("Errore durante la generazione dello zip");
         } finally {
             setDownloadingZip(false);
+            setZipProgress(null);
         }
     };
 
@@ -525,11 +529,22 @@ export default function JobDetailsPage() {
                                 className="px-2 md:px-4"
                             >
                                 {downloadingZip ? (
-                                    <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+                                    <>
+                                        <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+                                        <span className="hidden sm:inline">
+                                            {zipProgress
+                                                ? zipProgress.done >= zipProgress.total
+                                                    ? "Comprimo lo zip..."
+                                                    : `File ${zipProgress.done}/${zipProgress.total}...`
+                                                : "Preparazione..."}
+                                        </span>
+                                    </>
                                 ) : (
-                                    <Archive className="h-4 w-4 md:mr-2" />
+                                    <>
+                                        <Archive className="h-4 w-4 md:mr-2" />
+                                        <span className="hidden sm:inline">Scarica documentazione</span>
+                                    </>
                                 )}
-                                <span className="hidden sm:inline">Scarica documentazione</span>
                             </Button>
                             <Button variant="outline" size="sm" onClick={handlePrint} className="px-2 md:px-4">
                                 <Printer className="h-4 w-4 md:mr-2" />
