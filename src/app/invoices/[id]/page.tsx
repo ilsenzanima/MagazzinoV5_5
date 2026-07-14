@@ -261,6 +261,31 @@ export default function InvoiceDetailPage() {
         }
     };
 
+    const handleResetTransport = async (purchaseId: string) => {
+        const purchase = invoice?.purchases?.find(p => p.id === purchaseId);
+        if (!purchase?.items) return;
+        if (!confirm("Rimuovere il trasporto applicato dalle righe per poter inserire un nuovo importo?")) return;
+        try {
+            setApplyingTransport(prev => ({ ...prev, [purchaseId]: true }));
+            const items = purchase.items.map(i => ({
+                id: i.id,
+                purchaseId,
+                itemId: '',
+                quantity: i.quantity ?? 1,
+                price: i.price ?? 0,
+                createdAt: '',
+                transportApplied: i.transportApplied ?? false,
+                transportUnitCost: i.transportUnitCost ?? 0,
+            }));
+            await purchasesApi.reverseTransportOnItems(items);
+            load();
+        } catch (e: any) {
+            notify.error(`Errore: ${e.message}`);
+        } finally {
+            setApplyingTransport(prev => ({ ...prev, [purchaseId]: false }));
+        }
+    };
+
     useEffect(() => { load(); }, [id]);
 
     // Load suppliers + available purchases when entering edit mode
@@ -612,10 +637,23 @@ export default function InvoiceDetailPage() {
                                                                         <Truck className="h-4 w-4 text-amber-500 shrink-0" />
                                                                         <span className="text-xs font-medium text-slate-600 dark:text-slate-300 shrink-0">Costo Trasporto:</span>
                                                                         {allApplied ? (
-                                                                            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                                                                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                                Applicato (€ {(p.transportCost ?? 0).toFixed(2)})
-                                                                            </span>
+                                                                            <>
+                                                                                <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                                                                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                                    Applicato (€ {(p.transportCost ?? 0).toFixed(2)})
+                                                                                </span>
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    variant="ghost"
+                                                                                    className="h-7 text-xs text-slate-500 hover:text-slate-700"
+                                                                                    disabled={isApplying}
+                                                                                    onClick={() => handleResetTransport(p.id)}
+                                                                                >
+                                                                                    {isApplying
+                                                                                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                                                        : "Modifica"}
+                                                                                </Button>
+                                                                            </>
                                                                         ) : (
                                                                             <>
                                                                                 <div className="flex items-center gap-1">

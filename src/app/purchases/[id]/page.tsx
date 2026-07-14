@@ -20,6 +20,7 @@ import {
     inventoryApi,
     jobsApi,
     purchasesApi,
+    supplierGroupsApi,
     Supplier,
     InventoryItem,
     Job,
@@ -107,7 +108,7 @@ export default function PurchaseDetailPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData, sourceOrdersData] = await Promise.all([
+            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData, sourceOrdersData, hiddenSupplierIds] = await Promise.all([
                 purchasesApi.getById(id),
                 purchasesApi.getItems(id),
                 inventoryApi.getAll(),
@@ -115,7 +116,8 @@ export default function PurchaseDetailPage() {
                 purchasesApi.getPurchaseBatchAvailability(id),
                 suppliersApi.getAll(),
                 purchasesApi.getPurchaseItemJobMovements(id),
-                purchasesApi.getSourceOrders(id)
+                purchasesApi.getSourceOrders(id),
+                supplierGroupsApi.getHiddenFromPurchasesIds()
             ]);
 
             setPurchase(purchaseData);
@@ -134,7 +136,7 @@ export default function PurchaseDetailPage() {
             setInventory(inventoryData);
             setJobs(jobsData.filter(j => j.status === 'active'));
             setBatchAvailability(availabilityData);
-            setSuppliers(suppliersData);
+            setSuppliers(suppliersData.filter(s => s.id === purchaseData.supplierId || !hiddenSupplierIds.includes(s.id)));
             setItemJobMovements(jobMovementsData);
 
             if (purchaseData.jobId) {
@@ -544,6 +546,20 @@ export default function PurchaseDetailPage() {
         }
     };
 
+    const handleResetTransport = async () => {
+        if (!confirm("Rimuovere il trasporto applicato dalle righe per poter inserire un nuovo importo?")) return;
+        try {
+            setApplyingTransport(true);
+            await purchasesApi.reverseTransportOnItems(items);
+            await loadData();
+        } catch (e) {
+            console.error(e);
+            alert("Errore durante la rimozione del trasporto");
+        } finally {
+            setApplyingTransport(false);
+        }
+    };
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -912,10 +928,24 @@ export default function PurchaseDetailPage() {
                                                     Applica trasporto a tutte le righe
                                                 </Button>
                                             ) : (
-                                                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                                    Trasporto applicato
-                                                </span>
+                                                <>
+                                                    <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        Trasporto applicato
+                                                    </span>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-8 text-xs text-slate-500 hover:text-slate-700"
+                                                        onClick={handleResetTransport}
+                                                        disabled={applyingTransport}
+                                                    >
+                                                        {applyingTransport
+                                                            ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                                                            : null}
+                                                        Modifica
+                                                    </Button>
+                                                </>
                                             )}
                                         </div>
                                     )}

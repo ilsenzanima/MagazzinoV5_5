@@ -43,6 +43,7 @@ import {
     ComplianceDocument,
 } from "@/lib/services/compliance"
 import { suppliersApi } from "@/lib/services/suppliers"
+import { supplierGroupsApi } from "@/lib/services/supplier-groups"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
@@ -1255,7 +1256,9 @@ function AssociateDialog({
     const [loadingArticleDocs, setLoadingArticleDocs] = useState(false)
 
     useEffect(() => {
-        suppliersApi.getAll().then(s => setSuppliers(s)).catch(() => {})
+        Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromPurchasesIds()])
+            .then(([s, hiddenIds]) => setSuppliers(s.filter(sup => !hiddenIds.includes(sup.id))))
+            .catch(() => {})
     }, [])
 
     useEffect(() => {

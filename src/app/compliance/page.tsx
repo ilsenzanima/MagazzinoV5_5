@@ -47,6 +47,7 @@ import {
     X,
 } from "lucide-react";
 import { suppliersApi } from "@/lib/services/suppliers";
+import { supplierGroupsApi } from "@/lib/services/supplier-groups";
 import { brandsApi } from "@/lib/services/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
@@ -891,7 +892,9 @@ function ComplianceContent() {
     const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
-        suppliersApi.getAll().then(setSuppliers).catch(console.error);
+        Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromPurchasesIds()])
+            .then(([allSuppliers, hiddenIds]) => setSuppliers(allSuppliers.filter(s => !hiddenIds.includes(s.id))))
+            .catch(console.error);
         brandsApi.getAll().then(setBrands).catch(console.error);
         complianceDocumentTypesApi.getAll().then(setDocTypes).catch(console.error);
     }, []);

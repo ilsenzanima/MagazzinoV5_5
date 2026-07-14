@@ -1,19 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 import { Upload, Loader2, FileText, Pencil, Trash2, X } from "lucide-react"
-import { supplierOffersApi, SupplierOffer } from "@/lib/services/supplier-offers"
-import { suppliersApi } from "@/lib/services/suppliers"
-import { supplierGroupsApi } from "@/lib/services/supplier-groups"
-import type { Supplier } from "@/lib/types"
+import { costAnalysisDocumentsApi, CostAnalysisDocument } from "@/lib/services/cost-analysis-documents"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
@@ -27,8 +21,6 @@ import { useViewMode } from "@/hooks/useViewMode"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
-const NO_SUPPLIER = "_nessuno"
-
 interface PendingFile {
     file: File
     name: string
@@ -41,19 +33,16 @@ interface Props {
     jobLabel?: string
 }
 
-export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
-    const [documents, setDocuments] = useState<SupplierOffer[]>([])
-    const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([])
-    const [suppliers, setSuppliers] = useState<Supplier[]>([])
+export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
+    const [documents, setDocuments] = useState<CostAnalysisDocument[]>([])
     const [loading, setLoading] = useState(true)
     const [uploadOpen, setUploadOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
-    const [activeDoc, setActiveDoc] = useState<SupplierOffer | null>(null)
+    const [activeDoc, setActiveDoc] = useState<CostAnalysisDocument | null>(null)
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
-    const [viewMode, setViewMode] = useViewMode('supplier-offers', 'grid')
-    const [supplierTab, setSupplierTab] = useState("tutti")
+    const [viewMode, setViewMode] = useViewMode('cost-analysis-documents', 'grid')
     const supabase = createClient()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -61,57 +50,26 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     const [upStep, setUpStep] = useState<1 | 2>(1)
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
     const [dragOver, setDragOver] = useState(false)
-    const [uploadSupplierId, setUploadSupplierId] = useState("")
 
     // Edit form
     const [editName, setEditName] = useState("")
     const [editNotes, setEditNotes] = useState("")
-    const [editSupplierId, setEditSupplierId] = useState("")
 
     const ownerId = jobId || proposalId
-    const folderPath = jobId ? ['Cantieri', jobLabel || jobId, 'Offerte Fornitori'] : ['Proposte', proposalId || '', 'Offerte Fornitori']
-
-    const supplierName = useMemo(() => {
-        const map = new Map(allSuppliers.map(s => [s.id, s.name]))
-        return (id: string | null) => (id && map.get(id)) || null
-    }, [allSuppliers])
-
-    // Sotto-tab per fornitore: solo i fornitori con almeno un documento, in ordine alfabetico
-    const supplierGroups = useMemo(() => {
-        const present = new Map<string, string>()
-        let hasUnassigned = false
-        for (const doc of documents) {
-            if (doc.supplierId) present.set(doc.supplierId, supplierName(doc.supplierId) || "Fornitore")
-            else hasUnassigned = true
-        }
-        const groups = [...present.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
-        return { groups, hasUnassigned }
-    }, [documents, supplierName])
-
-    const filteredDocuments = useMemo(() => {
-        if (supplierTab === "tutti") return documents
-        if (supplierTab === NO_SUPPLIER) return documents.filter(d => !d.supplierId)
-        return documents.filter(d => d.supplierId === supplierTab)
-    }, [documents, supplierTab])
+    const folderPath = jobId ? ['Cantieri', jobLabel || jobId, 'Analisi Costi di Terzi'] : ['Proposte', proposalId || '', 'Analisi Costi di Terzi']
 
     useEffect(() => {
         if (ownerId) load()
-        Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromPurchasesIds()])
-            .then(([s, hiddenIds]) => {
-                setAllSuppliers(s)
-                setSuppliers(s.filter(sup => !hiddenIds.includes(sup.id)))
-            })
-            .catch(() => {})
     }, [ownerId])
 
     const load = async () => {
         try {
             setLoading(true)
-            const all = jobId ? await supplierOffersApi.getByJobId(jobId) : await supplierOffersApi.getByProposalId(proposalId!)
+            const all = jobId ? await costAnalysisDocumentsApi.getByJobId(jobId) : await costAnalysisDocumentsApi.getByProposalId(proposalId!)
             setDocuments(all)
         } catch (error) {
-            console.error("Failed to load offerte fornitori", error)
-            notify.error("Errore nel caricamento delle offerte fornitori")
+            console.error("Failed to load analisi costi di terzi", error)
+            notify.error("Errore nel caricamento delle analisi costi di terzi")
         } finally {
             setLoading(false)
         }
@@ -120,7 +78,6 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     const openUpload = () => {
         setUpStep(1)
         setPendingFiles([])
-        setUploadSupplierId("")
         batchUpload.reset()
         setUploadOpen(true)
     }
@@ -154,7 +111,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     }
 
     const goToStep2 = () => {
-        if (pendingFiles.length === 0 || !uploadSupplierId) return
+        if (pendingFiles.length === 0) return
         setUpStep(2)
     }
 
@@ -176,10 +133,9 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
             const fileExt = compressed.name.split('.').pop() || ''
             const uploaded = await uploadFileToDrive(compressed, folderPath)
 
-            await supplierOffersApi.create({
+            await costAnalysisDocumentsApi.create({
                 jobId,
                 proposalId,
-                supplierId: uploadSupplierId,
                 name: pending.name.trim() || pending.file.name,
                 notes: pending.notes.trim(),
                 fileUrl: uploaded.fileId,
@@ -199,11 +155,10 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         load()
     }
 
-    const openEdit = (doc: SupplierOffer) => {
+    const openEdit = (doc: CostAnalysisDocument) => {
         setActiveDoc(doc)
         setEditName(doc.name)
         setEditNotes(doc.notes || "")
-        setEditSupplierId(doc.supplierId || "")
         setEditOpen(true)
     }
 
@@ -211,10 +166,9 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         if (!activeDoc) return
         try {
             setSaving(true)
-            await supplierOffersApi.update(activeDoc.id, {
+            await costAnalysisDocumentsApi.update(activeDoc.id, {
                 name: editName.trim() || activeDoc.name,
                 notes: editNotes.trim(),
-                supplierId: editSupplierId || null,
             })
             notify.success("Documento aggiornato")
             setEditOpen(false)
@@ -247,7 +201,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         try {
             const path = activeDoc.fileUrl?.split('/public/documents/')[1]
             if (path) await supabase.storage.from('documents').remove([path])
-            await supplierOffersApi.delete(activeDoc.id)
+            await costAnalysisDocumentsApi.delete(activeDoc.id)
             setDeleteOpen(false)
             setEditOpen(false)
             notify.success("Documento eliminato")
@@ -259,7 +213,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         }
     }
 
-    const renderDocCard = (doc: SupplierOffer) => (
+    const renderDocCard = (doc: CostAnalysisDocument) => (
         <Card key={doc.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenDocument(doc.fileUrl)}>
             <CardContent className="p-4 flex items-start gap-3">
                 <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
@@ -277,9 +231,6 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                             <Pencil className="h-3 w-3" />
                         </Button>
                     </div>
-                    {supplierName(doc.supplierId) && (
-                        <Badge variant="outline" className="mt-1 text-[10px] font-normal">{supplierName(doc.supplierId)}</Badge>
-                    )}
                     {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
                     <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
                 </div>
@@ -287,7 +238,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         </Card>
     )
 
-    const renderDocRow = (doc: SupplierOffer) => (
+    const renderDocRow = (doc: CostAnalysisDocument) => (
         <div
             key={doc.id}
             className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-slate-800 hover:shadow-sm transition-shadow cursor-pointer"
@@ -297,12 +248,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                 {getFileIcon(doc.fileType)}
             </div>
             <div className="flex-1 overflow-hidden min-w-0">
-                <div className="flex items-center gap-2">
-                    <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
-                    {supplierName(doc.supplierId) && (
-                        <Badge variant="outline" className="text-[10px] font-normal shrink-0">{supplierName(doc.supplierId)}</Badge>
-                    )}
-                </div>
+                <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
                 {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
             </div>
             <p className="text-xs text-slate-400 shrink-0">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
@@ -320,29 +266,15 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Offerte Fornitori</h2>
+                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Analisi Costi di Terzi</h2>
                 <div className="flex items-center gap-2">
                     <ViewToggle mode={viewMode} onChange={setViewMode} />
                     <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
                         <Upload className="mr-2 h-4 w-4" />
-                        Carica Documenti
+                        Carica Analisi Costi
                     </Button>
                 </div>
             </div>
-
-            {documents.length > 0 && (supplierGroups.groups.length > 0) && (
-                <Tabs value={supplierTab} onValueChange={setSupplierTab}>
-                    <TabsList className="flex-wrap h-auto">
-                        <TabsTrigger value="tutti">Tutti</TabsTrigger>
-                        {supplierGroups.groups.map(g => (
-                            <TabsTrigger key={g.id} value={g.id}>{g.name}</TabsTrigger>
-                        ))}
-                        {supplierGroups.hasUnassigned && (
-                            <TabsTrigger value={NO_SUPPLIER}>Senza fornitore</TabsTrigger>
-                        )}
-                    </TabsList>
-                </Tabs>
-            )}
 
             {loading ? (
                 <div className="flex justify-center py-12">
@@ -352,39 +284,26 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                 <Card className="border-dashed">
                     <CardContent className="py-12 text-center text-slate-500">
                         <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                        <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Nessuna offerta fornitore</h3>
-                        <p className="text-slate-500 dark:text-slate-400">Carica le offerte ricevute dai fornitori.</p>
+                        <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">Nessuna analisi costi caricata</h3>
+                        <p className="text-slate-500 dark:text-slate-400">Carica qui le analisi costi fornite da terzi (es. dal cliente o da un consulente).</p>
                     </CardContent>
                 </Card>
-            ) : filteredDocuments.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-12">Nessun documento per questo fornitore.</p>
             ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredDocuments.map(renderDocCard)}
+                    {documents.map(renderDocCard)}
                 </div>
             ) : (
                 <div className="space-y-2">
-                    {filteredDocuments.map(renderDocRow)}
+                    {documents.map(renderDocRow)}
                 </div>
             )}
 
             {/* Upload dialog */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                 <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>Carica Offerte Fornitori</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>Carica Analisi Costi di Terzi</DialogTitle></DialogHeader>
                     {upStep === 1 ? (
                         <div className="space-y-4 py-2">
-                            <div className="space-y-1">
-                                <Label>Fornitore *</Label>
-                                <Select value={uploadSupplierId} onValueChange={setUploadSupplierId}>
-                                    <SelectTrigger><SelectValue placeholder="Seleziona il fornitore" /></SelectTrigger>
-                                    <SelectContent>
-                                        {suppliers.map(s => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
                             <div className="space-y-1">
                                 <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
                                 <div
@@ -433,7 +352,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                         {upStep === 1 ? (
                             <>
                                 <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
-                                <Button onClick={goToStep2} disabled={pendingFiles.length === 0 || !uploadSupplierId}>Continua</Button>
+                                <Button onClick={goToStep2} disabled={pendingFiles.length === 0}>Continua</Button>
                             </>
                         ) : (
                             <>
@@ -460,21 +379,6 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                         <div className="space-y-1">
                             <Label>Nota</Label>
                             <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Fornitore</Label>
-                            <Select value={editSupplierId} onValueChange={setEditSupplierId}>
-                                <SelectTrigger><SelectValue placeholder="Seleziona il fornitore" /></SelectTrigger>
-                                <SelectContent>
-                                    {suppliers.some(s => s.id === editSupplierId)
-                                        ? suppliers.map(s => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))
-                                        : allSuppliers.map(s => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                </SelectContent>
-                            </Select>
                         </div>
                     </div>
                     <DialogFooter className="flex-col sm:flex-row gap-2">

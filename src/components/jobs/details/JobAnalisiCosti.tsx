@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info } from "lucide-react"
+import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info, Upload } from "lucide-react"
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, effectiveUnitPrice } from "@/lib/services/cost-analysis"
 import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { inventoryApi } from "@/lib/api"
@@ -14,9 +14,11 @@ import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
 import { notify } from "@/lib/notify"
 import type { InventoryItem, Movement } from "@/lib/types"
 import { ProposalCostAnalysisVersions } from "@/components/clients/detail/ProposalCostAnalysisVersions"
+import { CostAnalysisDocuments } from "@/components/shared/CostAnalysisDocuments"
 
 interface JobAnalisiCostiProps {
     jobId: string
+    jobLabel?: string
     movements: Movement[]
 }
 
@@ -241,7 +243,7 @@ const DEFAULT_PARAMS: Omit<CostAnalysisParams, 'jobId'> = {
     sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10,
 }
 
-export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
+export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiProps) {
     const [rows, setRows] = useState<CostAnalysisRow[]>([])
     const [params, setParams] = useState<CostAnalysisParams>({ jobId, ...DEFAULT_PARAMS })
     const [loading, setLoading] = useState(true)
@@ -254,7 +256,7 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
     const proposalPriceMapRef = useRef<Map<string, number>>(new Map())
 
     const [proposalId, setProposalId] = useState<string | null>(null)
-    const [subTab, setSubTab] = useState<'prezzi' | 'offerta'>('prezzi')
+    const [subTab, setSubTab] = useState<'prezzi' | 'offerta' | 'terzi'>('prezzi')
 
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
@@ -398,13 +400,16 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
 
     return (
         <div className="space-y-4">
-            <Tabs value={subTab} onValueChange={v => setSubTab(v as 'prezzi' | 'offerta')}>
+            <Tabs value={subTab} onValueChange={v => setSubTab(v as 'prezzi' | 'offerta' | 'terzi')}>
                 <TabsList>
                     <TabsTrigger value="prezzi">
                         <Package className="h-4 w-4 mr-1" />Prezzi Materiali
                     </TabsTrigger>
                     <TabsTrigger value="offerta">
                         <Calculator className="h-4 w-4 mr-1" />Analisi Costi Offerta
+                    </TabsTrigger>
+                    <TabsTrigger value="terzi">
+                        <Upload className="h-4 w-4 mr-1" />Caricate da Terzi
                     </TabsTrigger>
                 </TabsList>
 
@@ -541,6 +546,14 @@ export function JobAnalisiCosti({ jobId, movements }: JobAnalisiCostiProps) {
                             Questa commessa non è collegata a nessuna offerta: non ci sono analisi costi da mostrare.
                         </p>
                     )}
+                </TabsContent>
+
+                <TabsContent value="terzi" className="space-y-4 pt-4">
+                    <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
+                        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
+                        Qui puoi caricare analisi costi fornite da terzi (cliente, consulente, fornitore) come documento, in alternativa a quelle create direttamente in questa pagina.
+                    </p>
+                    <CostAnalysisDocuments jobId={jobId} jobLabel={jobLabel} />
                 </TabsContent>
             </Tabs>
 

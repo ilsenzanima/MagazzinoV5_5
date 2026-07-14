@@ -30,6 +30,7 @@ import {
     ComplianceDocument,
 } from "@/lib/services/compliance"
 import { suppliersApi } from "@/lib/services/suppliers"
+import { supplierGroupsApi } from "@/lib/services/supplier-groups"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { notify } from "@/lib/notify"
 import {
@@ -271,7 +272,9 @@ function AssociateDialog({
     const [associating, setAssociating] = useState<string | null>(null)
 
     useEffect(() => {
-        suppliersApi.getAll().then(s => setSuppliers(s)).catch(() => {})
+        Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromPurchasesIds()])
+            .then(([s, hiddenIds]) => setSuppliers(s.filter(sup => !hiddenIds.includes(sup.id))))
+            .catch(() => {})
     }, [])
 
     useEffect(() => {

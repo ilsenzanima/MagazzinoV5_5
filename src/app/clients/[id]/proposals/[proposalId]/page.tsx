@@ -23,6 +23,8 @@ import { costAnalysisApi } from "@/lib/services/cost-analysis"
 import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
 import { supplierOffersApi } from "@/lib/services/supplier-offers"
 import { SupplierOffers } from "@/components/shared/SupplierOffers"
+import { costAnalysisDocumentsApi } from "@/lib/services/cost-analysis-documents"
+import { CostAnalysisDocuments } from "@/components/shared/CostAnalysisDocuments"
 import { proposalDocumentTypesApi } from "@/lib/services/proposal-document-types"
 import { HelpTip } from "@/components/ui/help-tip"
 import { proposalComplianceApi, jobComplianceApi } from "@/lib/services/compliance"
@@ -318,6 +320,7 @@ export default function ProposalDetailPage() {
             await proposalDocumentsApi.linkToJob(proposalId, job.id)
             await proposalSiteDocumentsApi.linkToJob(proposalId, job.id)
             await supplierOffersApi.linkToJob(proposalId, job.id)
+            await costAnalysisDocumentsApi.linkToJob(proposalId, job.id)
 
             // Collega alla commessa le associazioni di conformità già presenti sulla
             // proposta (stesse righe, nessuna copia: restano sincronizzate tra le due pagine)
@@ -592,7 +595,18 @@ export default function ProposalDetailPage() {
 
                 {/* ── ANALISI COSTI ─────────────────────────────────── */}
                 <TabsContent value="costi">
-                    <ProposalCostAnalysisVersions proposalId={proposalId} />
+                    <Tabs defaultValue="create">
+                        <TabsList>
+                            <TabsTrigger value="create">Create</TabsTrigger>
+                            <TabsTrigger value="terzi">Caricate da Terzi</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="create" className="pt-4">
+                            <ProposalCostAnalysisVersions proposalId={proposalId} />
+                        </TabsContent>
+                        <TabsContent value="terzi" className="pt-4">
+                            <CostAnalysisDocuments proposalId={proposalId} />
+                        </TabsContent>
+                    </Tabs>
                 </TabsContent>
 
                 {/* ── DOCUMENTI ─────────────────────────────────────── */}
