@@ -21,6 +21,7 @@ import {
   unitsApi,
   inventorySupplierCodesApi,
   suppliersApi,
+  supplierGroupsApi,
   Movement,
   Job,
   Brand,
@@ -227,13 +228,14 @@ export default function InventoryDetailPage() {
         }).catch(console.error);
 
         // Load auxiliary data for forms in background
-        const [jobsData, brandsData, typesData, unitsData, supplierCodesData, suppliersData] = await Promise.all([
+        const [jobsData, brandsData, typesData, unitsData, supplierCodesData, suppliersData, hiddenSupplierIds] = await Promise.all([
           jobsApi.getAll(),
           brandsApi.getAll(),
           itemTypesApi.getAll(),
           unitsApi.getAll(),
           inventorySupplierCodesApi.getByItemId(id),
-          suppliersApi.getAll()
+          suppliersApi.getAll(),
+          supplierGroupsApi.getHiddenFromPurchasesIds()
         ]);
 
         setActiveJobs(jobsData.filter(j => j.status === 'active'));
@@ -241,7 +243,7 @@ export default function InventoryDetailPage() {
         setTypes(typesData);
         setUnits(unitsData);
         setSupplierCodes(supplierCodesData);
-        setSuppliers(suppliersData);
+        setSuppliers(suppliersData.filter(s => !hiddenSupplierIds.includes(s.id)));
       } catch (err) {
         console.warn("Error loading auxiliary data:", err);
         // Don't block the page if history fails

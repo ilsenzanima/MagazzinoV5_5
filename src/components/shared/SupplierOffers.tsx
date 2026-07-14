@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Upload, Loader2, FileText, Pencil, Trash2, X } from "lucide-react"
 import { supplierOffersApi, SupplierOffer } from "@/lib/services/supplier-offers"
 import { suppliersApi } from "@/lib/services/suppliers"
+import { supplierGroupsApi } from "@/lib/services/supplier-groups"
 import type { Supplier } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -42,6 +43,7 @@ interface Props {
 
 export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     const [documents, setDocuments] = useState<SupplierOffer[]>([])
+    const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([])
     const [suppliers, setSuppliers] = useState<Supplier[]>([])
     const [loading, setLoading] = useState(true)
     const [uploadOpen, setUploadOpen] = useState(false)
@@ -70,9 +72,9 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     const folderPath = jobId ? ['Cantieri', jobLabel || jobId, 'Offerte Fornitori'] : ['Proposte', proposalId || '', 'Offerte Fornitori']
 
     const supplierName = useMemo(() => {
-        const map = new Map(suppliers.map(s => [s.id, s.name]))
+        const map = new Map(allSuppliers.map(s => [s.id, s.name]))
         return (id: string | null) => (id && map.get(id)) || null
-    }, [suppliers])
+    }, [allSuppliers])
 
     // Sotto-tab per fornitore: solo i fornitori con almeno un documento, in ordine alfabetico
     const supplierGroups = useMemo(() => {
@@ -94,7 +96,12 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
 
     useEffect(() => {
         if (ownerId) load()
-        suppliersApi.getAll().then(setSuppliers).catch(() => {})
+        Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromPurchasesIds()])
+            .then(([s, hiddenIds]) => {
+                setAllSuppliers(s)
+                setSuppliers(s.filter(sup => !hiddenIds.includes(sup.id)))
+            })
+            .catch(() => {})
     }, [ownerId])
 
     const load = async () => {
@@ -459,9 +466,13 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                             <Select value={editSupplierId} onValueChange={setEditSupplierId}>
                                 <SelectTrigger><SelectValue placeholder="Seleziona il fornitore" /></SelectTrigger>
                                 <SelectContent>
-                                    {suppliers.map(s => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                    ))}
+                                    {suppliers.some(s => s.id === editSupplierId)
+                                        ? suppliers.map(s => (
+                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))
+                                        : allSuppliers.map(s => (
+                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
