@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { suppliersApi, Supplier } from "@/lib/api";
+import { suppliersApi, supplierGroupsApi, Supplier } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -164,7 +164,9 @@ export function AdvancedSearchTab({
     const [associatingId, setAssociatingId] = useState<string | null>(null);
 
     useEffect(() => {
-        suppliersApi.getAll().then(setSuppliers).catch(console.error);
+        Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromPurchasesIds()])
+            .then(([allSuppliers, hiddenIds]) => setSuppliers(allSuppliers.filter(s => !hiddenIds.includes(s.id))))
+            .catch(console.error);
     }, []);
 
     const getUniqueOpiMaterials = (): string[] => {

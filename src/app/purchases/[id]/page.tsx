@@ -20,6 +20,7 @@ import {
     inventoryApi,
     jobsApi,
     purchasesApi,
+    supplierGroupsApi,
     Supplier,
     InventoryItem,
     Job,
@@ -107,7 +108,7 @@ export default function PurchaseDetailPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData, sourceOrdersData] = await Promise.all([
+            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData, sourceOrdersData, hiddenSupplierIds] = await Promise.all([
                 purchasesApi.getById(id),
                 purchasesApi.getItems(id),
                 inventoryApi.getAll(),
@@ -115,7 +116,8 @@ export default function PurchaseDetailPage() {
                 purchasesApi.getPurchaseBatchAvailability(id),
                 suppliersApi.getAll(),
                 purchasesApi.getPurchaseItemJobMovements(id),
-                purchasesApi.getSourceOrders(id)
+                purchasesApi.getSourceOrders(id),
+                supplierGroupsApi.getHiddenFromPurchasesIds()
             ]);
 
             setPurchase(purchaseData);
@@ -134,7 +136,7 @@ export default function PurchaseDetailPage() {
             setInventory(inventoryData);
             setJobs(jobsData.filter(j => j.status === 'active'));
             setBatchAvailability(availabilityData);
-            setSuppliers(suppliersData);
+            setSuppliers(suppliersData.filter(s => s.id === purchaseData.supplierId || !hiddenSupplierIds.includes(s.id)));
             setItemJobMovements(jobMovementsData);
 
             if (purchaseData.jobId) {
