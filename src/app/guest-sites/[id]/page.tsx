@@ -183,7 +183,6 @@ function GuestSiteDetailContent() {
         try {
             setLoadingJobs(true);
             const data = await jobsApi.getAll();
-            // Filtra solo commesse attive per facilitare la ricerca
             setAllJobs(data || []);
         } catch (e) {
             console.error(e);

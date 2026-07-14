@@ -37,6 +37,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const [opiNotes, setOpiNotes] = useState<DeliveryNote[]>([])
   const [supplierDocs, setSupplierDocs] = useState<SupplierDoc[]>([])
   const [associatedDocs, setAssociatedDocs] = useState<SupplierDoc[]>([])
+  const [sitePurchases, setSitePurchases] = useState<Purchase[]>([])
   const [openAssociateModal, setOpenAssociateModal] = useState(false)
   const supabase = createClient()
   const [viewMode, setViewMode] = useViewMode('job-ddt', 'grid')
@@ -69,12 +70,13 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
       setOpiNotes(combinedNotes)
 
       // DDT presso cantiere: acquisti legati direttamente alla commessa che NON contengono il tag di associazione manuale
-      const cantierePurchases = directPurchases.filter(p => !p.notes?.includes(`[associated_job:${jobId}]`))
+      const cantierePurchases = directPurchases.filter(p => !p.notes?.includes(`[associated_job:${jobId}]`)).filter(p => p.orderType !== 'order')
       const docs: SupplierDoc[] = []
-      cantierePurchases.filter(p => p.orderType !== 'order').forEach(p => {
+      cantierePurchases.forEach(p => {
         (p.documentUrls || []).forEach((url, index) => docs.push({ purchase: p, url, index }))
       })
       setSupplierDocs(docs)
+      setSitePurchases(cantierePurchases)
 
       // DDT associati: acquisti associati manualmente
       const manuallyAssociatedPurchases = (manuallyAssociatedDb.data || []).map((p: any) => ({
@@ -508,6 +510,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
               onAssociate={handleAssociatePurchase}
               associatedPurchaseIds={associatedPurchaseIds}
               jobOpiNotes={opiNotes}
+              sitePurchases={sitePurchases}
             />
           </div>
 

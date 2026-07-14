@@ -4,11 +4,12 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { suppliersApi, Supplier } from "@/lib/api";
+import { Purchase } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Loader2, ExternalLink, Search, Package, ArrowRightLeft, Check } from "lucide-react";
+import { Plus, X, Loader2, ExternalLink, Search, Package, ArrowRightLeft, Check, Truck } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
@@ -147,13 +148,17 @@ interface AdvancedSearchTabProps {
     onAssociate?: (purchaseId: string) => Promise<number>;
     associatedPurchaseIds?: Set<string>;
     jobOpiNotes?: any[];
+    // Acquisti già legati direttamente alla commessa (arrivati in cantiere), mostrati come
+    // promemoria sempre visibile mentre si cerca un DDT da associare manualmente.
+    sitePurchases?: Purchase[];
 }
 
 export function AdvancedSearchTab({
     isModal = false,
     onAssociate,
     associatedPurchaseIds,
-    jobOpiNotes
+    jobOpiNotes,
+    sitePurchases
 }: AdvancedSearchTabProps) {
     const { isMobile } = useIsMobile();
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -235,7 +240,37 @@ export function AdvancedSearchTab({
     const activeTerms = terms.filter(t => t.trim().length > 0);
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 items-start">
+        <div className="space-y-4">
+            {isModal && sitePurchases && sitePurchases.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                        <Truck className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                            Acquisti già presenti in cantiere (arrivati direttamente, {sitePurchases.length})
+                        </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                        {sitePurchases.map(p => (
+                            <span
+                                key={p.id}
+                                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200"
+                                title={p.supplierName || "Fornitore sconosciuto"}
+                            >
+                                <span className="font-semibold">{p.supplierName || "Fornitore sconosciuto"}</span>
+                                <span className="text-amber-500 dark:text-amber-500">·</span>
+                                Bolla {p.deliveryNoteNumber}
+                                {p.deliveryNoteDate && (
+                                    <span className="text-amber-500 dark:text-amber-500">
+                                        {" "}({new Date(p.deliveryNoteDate).toLocaleDateString("it-IT")})
+                                    </span>
+                                )}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 items-start">
             {/* ── Filtri ── */}
             <div className="space-y-5 bg-white dark:bg-card border dark:border-border rounded-lg p-5 shadow-sm sticky top-28">
                 <div>
@@ -449,6 +484,7 @@ export function AdvancedSearchTab({
                         ))}
                     </div>
                 )}
+            </div>
             </div>
         </div>
     );
