@@ -1,7 +1,8 @@
 "use client"
 
 import { notify } from "@/lib/notify";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,12 +20,14 @@ import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
 import { PageSizeSelector } from "@/components/ui/page-size-selector";
 import { usePageSize } from "@/hooks/usePageSize";
-export default function SuppliersPage() {
+function SuppliersPageContent() {
   const { userRole } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useViewMode('fornitori');
   const [pageSize, setPageSize] = usePageSize('fornitori');
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,21 +35,38 @@ export default function SuppliersPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page")) || 1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Initial load
+  // Initial load (restores whatever page/search were in the URL)
   useEffect(() => {
-    loadSuppliers(1, "");
+    loadSuppliers(currentPage, searchTerm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageSize]);
 
-  // Debounced Search
+  // Debounced Search — skip on the very first render so it doesn't
+  // immediately override the page restored from the URL with page 1.
+  const isFirstSearch = useRef(true);
   useEffect(() => {
+    if (isFirstSearch.current) {
+      isFirstSearch.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
       loadSuppliers(1, searchTerm);
     }, 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Keep the URL in sync with search/page so browser back/forward restores
+  // the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.set("q", searchTerm);
+    if (currentPage !== 1) params.set("page", String(currentPage));
+    const query = params.toString();
+    router.replace(query ? `/suppliers?${query}` : "/suppliers", { scroll: false });
+  }, [searchTerm, currentPage, router]);
 
   const loadSuppliers = async (page: number, search: string) => {
     try {
@@ -239,5 +259,20 @@ export default function SuppliersPage() {
         onConfirm={handleDeleteSupplier}
       />
     </DashboardLayout>
+  );
+}
+
+export default function SuppliersPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento fornitori...</span>
+        </div>
+      </DashboardLayout>
+    }>
+      <SuppliersPageContent />
+    </Suspense>
   );
 }

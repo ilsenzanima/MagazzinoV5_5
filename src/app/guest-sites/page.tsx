@@ -34,18 +34,28 @@ import { GuestSite } from "@/lib/types";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
 import { useAuth } from "@/components/auth-provider";
 
 function GuestSitesContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { userRole } = useAuth();
     const [sites, setSites] = useState<GuestSite[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState(searchParams.get("q") || "");
     const [viewMode, setViewMode] = useViewMode("guest-sites", "grid");
+
+    // Keep the URL in sync with the search term so browser back/forward
+    // restores the exact view instead of resetting it.
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (search) params.set("q", search);
+        const query = params.toString();
+        router.replace(query ? `/guest-sites?${query}` : "/guest-sites", { scroll: false });
+    }, [search, router]);
 
     // Site creation dialog
     const [formOpen, setFormOpen] = useState(false);

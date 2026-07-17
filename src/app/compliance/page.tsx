@@ -51,7 +51,7 @@ import { supplierGroupsApi } from "@/lib/services/supplier-groups";
 import { brandsApi } from "@/lib/services/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
 import { PageSizeSelector } from "@/components/ui/page-size-selector";
@@ -795,6 +795,8 @@ function DocumentTypeTabs({
     docTypes,
     viewMode,
     pageSize,
+    activeTab,
+    onTabChange,
     onEdit,
     onDelete,
 }: {
@@ -802,6 +804,8 @@ function DocumentTypeTabs({
     docTypes: ComplianceDocumentTypeConfig[];
     viewMode: 'grid' | 'list';
     pageSize: number;
+    activeTab: string;
+    onTabChange: (key: string) => void;
     onEdit: (doc: ComplianceDocument) => void;
     onDelete: (doc: ComplianceDocument) => void;
 }) {
@@ -814,8 +818,10 @@ function DocumentTypeTabs({
     const getPage = (key: string) => pages[key] ?? 1;
     const setPage = (key: string, p: number) => setPages(prev => ({ ...prev, [key]: p }));
 
+    const effectiveTab = groups.some(g => g.key === activeTab) ? activeTab : groups[0]?.key;
+
     return (
-        <Tabs defaultValue={groups[0]?.key} onValueChange={() => {}}>
+        <Tabs value={effectiveTab} onValueChange={onTabChange}>
             <TabsList className="flex-wrap h-auto gap-1">
                 {groups.map(({ key, label, docs: groupDocs }) => (
                     <TabsTrigger key={key} value={key}>
@@ -867,6 +873,7 @@ function DocumentTypeTabs({
 function ComplianceContent() {
     const { userRole } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [viewMode, setViewMode] = useViewMode('compliance');
     const [pageSize, setPageSize] = usePageSize('compliance');
 
@@ -881,9 +888,10 @@ function ComplianceContent() {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
     const [docTypes, setDocTypes] = useState<ComplianceDocumentTypeConfig[]>([]);
-    const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
+    const [selectedSupplierId, setSelectedSupplierId] = useState<string>(searchParams.get("supplier") || "");
     const [documents, setDocuments] = useState<ComplianceDocument[]>([]);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState(searchParams.get("q") || "");
+    const [activeDocTab, setActiveDocTab] = useState<string>(searchParams.get("docTab") || "");
     const [loadingDocs, setLoadingDocs] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
@@ -910,6 +918,17 @@ function ComplianceContent() {
             .catch(console.error)
             .finally(() => setLoadingDocs(false));
     }, [selectedSupplierId]);
+
+    // Keep the URL in sync with the selected supplier/search/document-type tab
+    // so browser back/forward restores the exact view instead of resetting it.
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (selectedSupplierId) params.set("supplier", selectedSupplierId);
+        if (search) params.set("q", search);
+        if (activeDocTab) params.set("docTab", activeDocTab);
+        const query = params.toString();
+        router.replace(query ? `/compliance?${query}` : "/compliance", { scroll: false });
+    }, [selectedSupplierId, search, activeDocTab, router]);
 
     const handleSaved = (doc: ComplianceDocument) => {
         setDocuments(prev => {
@@ -1039,6 +1058,8 @@ function ComplianceContent() {
                                             docTypes={docTypes}
                                             viewMode={viewMode}
                                             pageSize={pageSize}
+                                            activeTab={activeDocTab}
+                                            onTabChange={setActiveDocTab}
                                             onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
                                             onDelete={setDeletingDoc}
                                         />

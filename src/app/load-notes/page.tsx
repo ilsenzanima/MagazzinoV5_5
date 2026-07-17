@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,12 +45,24 @@ import { it } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export default function LoadNotesPage() {
+function LoadNotesContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [notes, setNotes] = useState<LoadNote[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
+    const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+    const [activeTab, setActiveTab] = useState(searchParams.get("tab") === "completed" ? "completed" : "pending");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    // Keep the URL in sync with search/tab so browser back/forward restores
+    // the exact view instead of resetting it.
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (searchTerm) params.set("q", searchTerm);
+        if (activeTab !== "pending") params.set("tab", activeTab);
+        const query = params.toString();
+        router.replace(query ? `/load-notes?${query}` : "/load-notes", { scroll: false });
+    }, [searchTerm, activeTab, router]);
 
     const fetchNotes = async () => {
         setLoading(true);
@@ -148,7 +160,7 @@ export default function LoadNotesPage() {
                     </div>
                 </div>
 
-                <Tabs defaultValue="pending" className="w-full">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="grid w-full max-w-[400px] grid-cols-2 mb-4">
                         <TabsTrigger value="pending">
                             Da Processare
@@ -221,6 +233,18 @@ export default function LoadNotesPage() {
                 </Tabs>
             </div>
         </DashboardLayout>
+    );
+}
+
+export default function LoadNotesPage() {
+    return (
+        <Suspense fallback={
+            <DashboardLayout>
+                <div className="text-center py-12 text-muted-foreground">Caricamento...</div>
+            </DashboardLayout>
+        }>
+            <LoadNotesContent />
+        </Suspense>
     );
 }
 

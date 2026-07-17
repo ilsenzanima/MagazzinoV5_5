@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, Printer, Recycle } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
-import { useState, useEffect, useDeferredValue } from "react";
+import { useState, useEffect, useRef, useDeferredValue } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { deliveryNotesApi, DeliveryNote, DeliveryNoteItem } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -25,6 +26,8 @@ interface MovementsContentProps {
 
 export default function MovementsContent({ initialMovements, initialTotalItems }: MovementsContentProps) {
   const { userRole } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useViewMode('movimentazioni');
   const [pageSize, setPageSize] = usePageSize('movimentazioni');
   const ITEMS_PER_PAGE = pageSize;
@@ -35,17 +38,24 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   const [error, setError] = useState<string | null>(null);
 
   // Pagination & Search state
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const deferredSearch = useDeferredValue(searchTerm);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(1);
+  const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") || "");
+  const [dateTo, setDateTo] = useState(searchParams.get("dateTo") || "");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [totalPages, setTotalPages] = useState(initialTotalPages);
 
   // Track if it's the first render to avoid fetching what we already have
   const [isFirstRender, setIsFirstRender] = useState(true);
 
+  // Skip the reset-to-page-1 on the very first render so a page restored
+  // from the URL (e.g. via browser back) isn't immediately wiped out.
+  const isFirstPageReset = useRef(true);
   useEffect(() => {
+    if (isFirstPageReset.current) {
+      isFirstPageReset.current = false;
+      return;
+    }
     setPage(1);
   }, [deferredSearch, dateFrom, dateTo, pageSize]);
 
@@ -59,6 +69,18 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
     loadMovements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, deferredSearch, dateFrom, dateTo, pageSize]);
+
+  // Keep the URL in sync with search/date filters/page so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (deferredSearch) params.set("q", deferredSearch);
+    if (dateFrom) params.set("dateFrom", dateFrom);
+    if (dateTo) params.set("dateTo", dateTo);
+    if (page !== 1) params.set("page", String(page));
+    const query = params.toString();
+    router.replace(query ? `/movements?${query}` : "/movements", { scroll: false });
+  }, [deferredSearch, dateFrom, dateTo, page, router]);
 
   // Helper to extract numeric part from delivery note number (e.g., "4/PP26" -> 4)
   const extractBollaNumber = (number: string): number => {

@@ -10,7 +10,8 @@ import {
   Users, Building2, Package, Briefcase, HardHat, Info, ShieldAlert, X
 } from "lucide-react";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { purchasesApi } from "@/lib/services/purchases";
 import { invoicesApi } from "@/lib/services/invoices";
@@ -184,8 +185,24 @@ interface SectionState {
   loading: boolean;
 }
 
-export default function CestinoPage() {
+function CestinoContent() {
   const { userRole } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<SectionKey>(
+    initialTab && initialTab in SECTION_LABELS ? (initialTab as SectionKey) : "purchases"
+  );
+
+  // Keep the URL in sync with the active section tab so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (activeTab !== "purchases") params.set("tab", activeTab);
+    const query = params.toString();
+    router.replace(query ? `/cestino?${query}` : "/cestino", { scroll: false });
+  }, [activeTab, router]);
 
   const [sections, setSections] = useState<Record<SectionKey, SectionState>>(() => ({
     purchases: { items: [], loading: false },
@@ -397,7 +414,7 @@ export default function CestinoPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="purchases">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SectionKey)}>
           <TabsList className="flex flex-wrap h-auto gap-1 bg-slate-100 dark:bg-muted p-1">
             {tabs.map(({ key, label, icon: Icon }) => (
               <TabsTrigger key={key} value={key} className="gap-1.5 text-xs sm:text-sm">
@@ -504,5 +521,19 @@ export default function CestinoPage() {
         </Tabs>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function CestinoPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </DashboardLayout>
+    }>
+      <CestinoContent />
+    </Suspense>
   );
 }

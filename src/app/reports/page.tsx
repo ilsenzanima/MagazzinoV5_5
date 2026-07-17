@@ -1,17 +1,34 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, Users, ClipboardList, QrCode, Download } from "lucide-react";
+import { Package, Users, ClipboardList, QrCode, Download, Loader2 } from "lucide-react";
 import ArticlesReport from "@/components/reports/articles-report";
 import AttendanceReport from "@/components/reports/attendance-report";
 import InventoryReport from "@/components/reports/inventory-report";
 import QrPrintReport from "@/components/reports/qr-print-report";
 import DownloadReport from "@/components/reports/download-report";
 
-export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState("articles");
+const REPORT_TABS = ["articles", "attendance", "inventory", "qr", "download"];
+
+function ReportsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    initialTab && REPORT_TABS.includes(initialTab) ? initialTab : "articles"
+  );
+
+  // Keep the URL in sync with the active tab so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (activeTab !== "articles") params.set("tab", activeTab);
+    const query = params.toString();
+    router.replace(query ? `/reports?${query}` : "/reports", { scroll: false });
+  }, [activeTab, router]);
 
   return (
     <DashboardLayout>
@@ -67,5 +84,19 @@ export default function ReportsPage() {
         </Tabs>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </DashboardLayout>
+    }>
+      <ReportsContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Worker, workersApi } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,18 @@ interface WorkersContentProps {
 
 export default function WorkersContent({ initialWorkers }: WorkersContentProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [workers, setWorkers] = useState<Worker[]>(initialWorkers);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState(searchParams.get("q") || "");
+
+    // Keep the URL in sync with the search term so browser back/forward
+    // restores the exact view instead of resetting it.
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (search) params.set("q", search);
+        const query = params.toString();
+        router.replace(query ? `/workers?${query}` : "/workers", { scroll: false });
+    }, [search, router]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,19 +62,35 @@ const ALL_YEARS = "all";
 const CURRENT_YEAR = new Date().getFullYear();
 const LAST_5_YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2, CURRENT_YEAR - 3, CURRENT_YEAR - 4];
 
-export default function ProposalsPage() {
+function ProposalsPageContent() {
   const { userRole } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useViewMode("proposte");
 
   const [proposals, setProposals] = useState<ProposalWithClient[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [clientFilter, setClientFilter] = useState<string>("all");
-  const [stageTab, setStageTab] = useState<"progress" | "accepted">("progress");
-  const [yearTab, setYearTab] = useState<string>(ALL_YEARS);
+  const [search, setSearch] = useState(searchParams.get("q") || "");
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("status") || "all");
+  const [clientFilter, setClientFilter] = useState<string>(searchParams.get("client") || "all");
+  const [stageTab, setStageTab] = useState<"progress" | "accepted">(
+    searchParams.get("stage") === "accepted" ? "accepted" : "progress"
+  );
+  const [yearTab, setYearTab] = useState<string>(searchParams.get("year") || ALL_YEARS);
+
+  // Keep the URL in sync with search/filters/tabs so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (clientFilter !== "all") params.set("client", clientFilter);
+    if (stageTab !== "progress") params.set("stage", stageTab);
+    if (yearTab !== ALL_YEARS) params.set("year", yearTab);
+    const query = params.toString();
+    router.replace(query ? `/proposals?${query}` : "/proposals", { scroll: false });
+  }, [search, statusFilter, clientFilter, stageTab, yearTab, router]);
 
   // Nuova proposta dialog
   const [newProposalOpen, setNewProposalOpen] = useState(false);
@@ -543,5 +559,19 @@ export default function ProposalsPage() {
         </DialogContent>
       </Dialog>
     </DashboardLayout>
+  );
+}
+
+export default function ProposalsPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </DashboardLayout>
+    }>
+      <ProposalsPageContent />
+    </Suspense>
   );
 }

@@ -8,26 +8,50 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Loader2, FileText, Calendar, User, Paperclip } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
-import { useState, useEffect, Suspense, useDeferredValue } from "react";
+import { useState, useEffect, useRef, Suspense, useDeferredValue } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { invoicesApi, Invoice } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 
 function InvoicesContent() {
   const { userRole } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+  const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") || "");
+  const [dateTo, setDateTo] = useState(searchParams.get("dateTo") || "");
   const debouncedSearch = useDeferredValue(searchTerm);
 
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [totalItems, setTotalItems] = useState(0);
   const LIMIT = 12;
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo]);
+  // Skip the reset-to-page-1 on the very first render so a page restored
+  // from the URL (e.g. via browser back) isn't immediately wiped out.
+  const isFirstRun = useRef(true);
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    setPage(1);
+  }, [debouncedSearch, dateFrom, dateTo]);
 
   useEffect(() => { loadInvoices(); }, [page, debouncedSearch, dateFrom, dateTo]);
+
+  // Keep the URL in sync with search/date filters/page so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (dateFrom) params.set("dateFrom", dateFrom);
+    if (dateTo) params.set("dateTo", dateTo);
+    if (page !== 1) params.set("page", String(page));
+    const query = params.toString();
+    router.replace(query ? `/invoices?${query}` : "/invoices", { scroll: false });
+  }, [debouncedSearch, dateFrom, dateTo, page, router]);
 
   const loadInvoices = async () => {
     try {
