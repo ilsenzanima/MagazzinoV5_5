@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
-import { useState, useEffect, Suspense, useDeferredValue } from "react";
+import { useState, useEffect, useRef, Suspense, useDeferredValue } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { purchasesApi, invoicesApi, Purchase, Invoice } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
@@ -68,16 +68,17 @@ function FilterBar({
 
 function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
   const { userRole } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialSupplierId = searchParams?.get("supplierId");
 
   const [items, setItems] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams?.get("q") || "");
+  const [dateFrom, setDateFrom] = useState(searchParams?.get("dateFrom") || "");
+  const [dateTo, setDateTo] = useState(searchParams?.get("dateTo") || "");
   const debouncedSearch = useDeferredValue(searchTerm);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(Number(searchParams?.get("page")) || 1);
   const [totalItems, setTotalItems] = useState(0);
   const [convertOrder, setConvertOrder] = useState<Purchase | null>(null);
   const [viewMode, setViewMode] = useViewMode(orderType === 'order' ? 'ordini' : 'acquisti');
@@ -87,8 +88,30 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
   const newHref = isOrder ? "/purchases/new?type=order" : "/purchases/new";
   const newLabel = isOrder ? "Nuovo Ordine" : "Nuovo Acquisto";
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo, initialSupplierId, pageSize]);
+  // Skip the reset-to-page-1 on the very first render so a page restored
+  // from the URL (e.g. via browser back) isn't immediately wiped out.
+  const isFirstRun = useRef(true);
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    setPage(1);
+  }, [debouncedSearch, dateFrom, dateTo, initialSupplierId, pageSize]);
+
   useEffect(() => { load(); }, [page, debouncedSearch, dateFrom, dateTo, initialSupplierId, orderType, pageSize]);
+
+  // Keep the URL in sync with search/date filters/page so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    if (debouncedSearch) params.set("q", debouncedSearch); else params.delete("q");
+    if (dateFrom) params.set("dateFrom", dateFrom); else params.delete("dateFrom");
+    if (dateTo) params.set("dateTo", dateTo); else params.delete("dateTo");
+    if (page !== 1) params.set("page", String(page)); else params.delete("page");
+    router.replace(`/purchases?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, dateFrom, dateTo, page]);
 
   const load = async () => {
     try {
@@ -328,19 +351,43 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
 
 function InvoicesTab() {
   const { userRole } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams?.get("q") || "");
+  const [dateFrom, setDateFrom] = useState(searchParams?.get("dateFrom") || "");
+  const [dateTo, setDateTo] = useState(searchParams?.get("dateTo") || "");
   const debouncedSearch = useDeferredValue(searchTerm);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(Number(searchParams?.get("page")) || 1);
   const [totalItems, setTotalItems] = useState(0);
   const [viewMode, setViewMode] = useViewMode('fatture');
   const [pageSize, setPageSize] = usePageSize('fatture');
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo, pageSize]);
+  // Skip the reset-to-page-1 on the very first render so a page restored
+  // from the URL (e.g. via browser back) isn't immediately wiped out.
+  const isFirstRun = useRef(true);
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    setPage(1);
+  }, [debouncedSearch, dateFrom, dateTo, pageSize]);
+
   useEffect(() => { loadInvoices(); }, [page, debouncedSearch, dateFrom, dateTo, pageSize]);
+
+  // Keep the URL in sync with search/date filters/page so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    if (debouncedSearch) params.set("q", debouncedSearch); else params.delete("q");
+    if (dateFrom) params.set("dateFrom", dateFrom); else params.delete("dateFrom");
+    if (dateTo) params.set("dateTo", dateTo); else params.delete("dateTo");
+    if (page !== 1) params.set("page", String(page)); else params.delete("page");
+    router.replace(`/purchases?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, dateFrom, dateTo, page]);
 
   const loadInvoices = async () => {
     try {
@@ -502,6 +549,10 @@ function PurchasesPageContent() {
     const params = new URLSearchParams(searchParams?.toString() ?? "");
     params.set("tab", value);
     params.delete("supplierId");
+    params.delete("q");
+    params.delete("dateFrom");
+    params.delete("dateTo");
+    params.delete("page");
     router.replace(`/purchases?${params.toString()}`);
   };
 

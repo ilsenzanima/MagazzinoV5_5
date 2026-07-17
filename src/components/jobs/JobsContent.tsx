@@ -1,7 +1,7 @@
 "use client"
 
 import { notify } from "@/lib/notify";
-import { useState, useEffect, useDeferredValue } from "react";
+import { useState, useEffect, useRef, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,15 +52,21 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const [viewMode, setViewMode] = useViewMode('commesse');
   const [pageSize, setPageSize] = usePageSize('commesse');
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterKind, setFilterKind] = useState<'all' | JobCategory>('all');
+  const initialCategory = searchParams.get('category');
+  const isValidCategory = (v: string | null): v is JobCategory =>
+    !!v && Object.keys(JOB_CATEGORY_LABELS).includes(v);
+
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || "");
+  const [filterKind, setFilterKind] = useState<'all' | JobCategory>(
+    isValidCategory(initialCategory) ? initialCategory : 'all'
+  );
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   // Pagination
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
   const limit = pageSize;
   const [totalItems, setTotalItems] = useState(initialTotal);
   const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / 12) || 1);
@@ -68,10 +74,27 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   // Search Debounce
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  // Reset page on search or page size change
+  // Skip the reset-to-page-1 on the very first render so a page restored
+  // from the URL (e.g. via browser back) isn't immediately wiped out.
+  const isFirstRun = useRef(true);
   useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
     setPage(1);
   }, [deferredSearchTerm, filterClientId, pageSize, filterKind]);
+
+  // Keep the URL in sync with search/category/page so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (deferredSearchTerm) params.set("q", deferredSearchTerm); else params.delete("q");
+    if (filterKind !== "all") params.set("category", filterKind); else params.delete("category");
+    if (page !== 1) params.set("page", String(page)); else params.delete("page");
+    router.replace(`/jobs?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deferredSearchTerm, filterKind, page]);
 
   // Sync state with props when validation/refresh happens
   useEffect(() => {
