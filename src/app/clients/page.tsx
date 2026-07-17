@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useDeferredValue } from "react";
+import { useState, useEffect, useRef, useDeferredValue, Suspense } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Client, clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
@@ -21,28 +22,48 @@ import { useViewMode } from "@/hooks/useViewMode";
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-export default function ClientsPage() {
+function ClientsPageContent() {
   const { userRole } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useViewMode('committenti');
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const debouncedSearch = useDeferredValue(searchTerm);
-  const [activeLetter, setActiveLetter] = useState<string | null>(null);
+  const [activeLetter, setActiveLetter] = useState<string | null>(searchParams.get("letter"));
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Pagination
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [totalItems, setTotalItems] = useState(0);
   const LIMIT = 24;
 
+  // Skip the reset-to-page-1 on the very first render so a page restored
+  // from the URL (e.g. via browser back) isn't immediately wiped out.
+  const isFirstRun = useRef(true);
   useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
     setPage(1);
   }, [debouncedSearch, activeLetter]);
 
   useEffect(() => {
     loadClients();
   }, [page, debouncedSearch, activeLetter]);
+
+  // Keep the URL in sync with search/letter/page so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (activeLetter) params.set("letter", activeLetter);
+    if (page !== 1) params.set("page", String(page));
+    const query = params.toString();
+    router.replace(query ? `/clients?${query}` : "/clients", { scroll: false });
+  }, [debouncedSearch, activeLetter, page, router]);
 
   const loadClients = async () => {
     try {
@@ -243,5 +264,20 @@ export default function ClientsPage() {
         </div>
       )}
     </DashboardLayout>
+  );
+}
+
+export default function ClientsPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento committenti...</span>
+        </div>
+      </DashboardLayout>
+    }>
+      <ClientsPageContent />
+    </Suspense>
   );
 }

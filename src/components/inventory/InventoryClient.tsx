@@ -23,7 +23,7 @@ import { PageSizeSelector } from "@/components/ui/page-size-selector";
 import { usePageSize } from "@/hooks/usePageSize";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { InventoryItem } from "@/lib/mock-data";
 import { inventoryApi, itemTypesApi, ItemType } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -88,25 +88,30 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const { userRole } = useAuth();
   const [viewMode, setViewMode] = useViewMode('magazzino');
   const [pageSize, setPageSize] = usePageSize('magazzino');
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "all";
+  const initialSearch = searchParams.get("q") || "";
+  const initialBrand = searchParams.get("brand") || "all";
+  const initialType = searchParams.get("type") || "all";
+  const initialPage = Number(searchParams.get("page")) || 1;
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialSearch);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>(initialItems);
   const [itemTypes, setItemTypes] = useState<ItemType[]>(initialTypes);
-  const [selectedBrand, setSelectedBrand] = useState<string>("all");
-  const [selectedType, setSelectedType] = useState<string>("all");
+  const [selectedBrand, setSelectedBrand] = useState<string>(initialBrand);
+  const [selectedType, setSelectedType] = useState<string>(initialType);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(false); // Initial loading is false because we have props
   const [error, setError] = useState<string | null>(null);
   const [pendingMap, setPendingMap] = useState<Map<string, { uscita: number; reso: number }>>(new Map());
 
   // Pagination state
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialPage);
   const limit = pageSize;
   const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / 12) || 1);
   const [totalItems, setTotalItems] = useState(initialTotal);
@@ -121,6 +126,19 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     }, 500);
     return () => clearTimeout(handler);
   }, [searchTerm, debouncedSearchTerm]);
+
+  // Keep the URL in sync with tab/search/filters/page so browser back/forward
+  // restores the exact view instead of resetting it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (activeTab !== "all") params.set("tab", activeTab);
+    if (debouncedSearchTerm) params.set("q", debouncedSearchTerm);
+    if (selectedBrand !== "all") params.set("brand", selectedBrand);
+    if (selectedType !== "all") params.set("type", selectedType);
+    if (page !== 1) params.set("page", String(page));
+    const query = params.toString();
+    router.replace(query ? `/inventory?${query}` : "/inventory", { scroll: false });
+  }, [activeTab, debouncedSearchTerm, selectedBrand, selectedType, page, router]);
 
   // Load types if not provided (fallback)
   useEffect(() => {
