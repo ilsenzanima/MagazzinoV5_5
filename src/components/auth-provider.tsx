@@ -15,6 +15,7 @@ interface AuthContextType {
   realRole: 'admin' | 'user' | 'operativo' | null; // The actual role from DB
   simulatedRole: 'admin' | 'user' | 'operativo' | null; // The role being simulated
   setSimulatedRole: (role: 'admin' | 'user' | 'operativo' | null) => void;
+  fullName: string | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,6 +27,7 @@ const AuthContext = createContext<AuthContextType>({
   realRole: null,
   simulatedRole: null,
   setSimulatedRole: () => { },
+  fullName: null,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [realRole, setRealRole] = useState<'admin' | 'user' | 'operativo' | null>(null);
   const [simulatedRole, setSimulatedRole] = useState<'admin' | 'user' | 'operativo' | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fullName, setFullName] = useState<string | null>(null);
   const router = useRouter();
 
   // Cache keys
@@ -283,6 +286,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
+  // Fetch display name for the sidebar/profile menu (independent of the role cache above)
+  useEffect(() => {
+    if (!user) {
+      setFullName(null);
+      return;
+    }
+
+    let cancelled = false;
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled) setFullName(data?.full_name || null);
+      });
+
+    return () => { cancelled = true; };
+  }, [user]);
+
   // Update simulated role persistence
   const updateSimulatedRole = (role: 'admin' | 'user' | 'operativo' | null) => {
     setSimulatedRole(role);
@@ -311,7 +334,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userRole,
     realRole,
     simulatedRole,
-    setSimulatedRole: updateSimulatedRole
+    setSimulatedRole: updateSimulatedRole,
+    fullName
   };
 
   return (

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetHeader } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
   LayoutDashboard,
   Package,
@@ -26,7 +27,9 @@ import {
   Trash2,
   FileText,
   ShieldCheck,
-  GanttChartSquare
+  GanttChartSquare,
+  UserCircle,
+  ChevronRight
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -39,7 +42,8 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function Sidebar({ className, onLinkClick }: SidebarProps) {
   const pathname = usePathname();
-  const { user, signOut, userRole } = useAuth();
+  const { user, signOut, userRole, fullName } = useAuth();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const routeGroups = [
     {
@@ -150,6 +154,16 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
         },
       ]
     },
+    {
+      items: [
+        {
+          label: "Impostazioni",
+          icon: Settings,
+          href: "/settings",
+          active: pathname === "/settings",
+        },
+      ]
+    },
     ...(userRole === 'admin' ? [{
       items: [
         {
@@ -198,41 +212,59 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
         </div>
       </div>
 
-      <div className="p-4 bg-sidebar border-t border-sidebar-border">
-        <Link href="/settings" onClick={onLinkClick}>
-          <Button
-            variant={pathname === "/settings" ? "secondary" : "ghost"}
-            className={cn(
-              "w-full justify-start mb-2",
-              pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent" : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-            )}
+      {user && (
+        <div className="p-2 bg-sidebar border-t border-sidebar-border">
+          <button
+            type="button"
+            onClick={() => setIsProfileOpen(true)}
+            className="w-full flex items-center space-x-3 p-2 rounded-md hover:bg-sidebar-accent/50 transition-colors text-left"
           >
-            <Settings className="mr-2 h-4 w-4" />
-            Impostazioni
-          </Button>
-        </Link>
-
-        {user && (
-          <div className="mb-4 px-2 flex items-center space-x-3 bg-sidebar-accent/50 p-2 rounded-md">
             <Avatar className="h-8 w-8">
               <AvatarImage src={`/avatars/${userRole || 'user'}.png`} />
-              <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+              <AvatarFallback>{(fullName || user.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div className="overflow-hidden">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">{user.email}</p>
+            <div className="overflow-hidden flex-1">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{fullName || user.email}</p>
               <p className="text-xs text-sidebar-foreground/60 capitalize">{userRole || 'User'}</p>
             </div>
-          </div>
-        )}
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-destructive hover:text-destructive hover:bg-sidebar-accent"
-          onClick={signOut}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Esci
-        </Button>
-      </div>
+            <ChevronRight className="h-4 w-4 text-sidebar-foreground/40 shrink-0" />
+          </button>
+        </div>
+      )}
+
+      <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={`/avatars/${userRole || 'user'}.png`} />
+                <AvatarFallback>{(fullName || user?.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <span className="flex flex-col">
+                <span>{fullName || user?.email}</span>
+                <span className="text-xs font-normal text-muted-foreground capitalize">{userRole || 'User'}</span>
+              </span>
+            </DialogTitle>
+            <DialogDescription>{user?.email}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-col gap-2">
+            <Link href="/settings/profile" onClick={() => { setIsProfileOpen(false); onLinkClick?.(); }} className="w-full">
+              <Button variant="outline" className="w-full justify-start">
+                <UserCircle className="mr-2 h-4 w-4" />
+                Vai al profilo
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-destructive hover:text-destructive"
+              onClick={() => { setIsProfileOpen(false); signOut(); }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Esci
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
