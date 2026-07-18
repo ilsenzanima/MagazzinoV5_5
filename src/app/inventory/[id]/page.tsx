@@ -836,7 +836,10 @@ export default function InventoryDetailPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="supplierCode">Codice Fornitore Principale</Label>
+                  <Label htmlFor="supplierCode" className="flex items-center">
+                    Codice Fornitore Principale
+                    <FieldTip text="Codice del fornitore principale. Se acquisti lo stesso articolo da più fornitori con codici diversi, aggiungili qui sotto in 'Altri Codici Fornitore'." />
+                  </Label>
                   {isEditing ? (
                     <Input
                       id="supplierCode"
@@ -920,7 +923,10 @@ export default function InventoryDetailPage() {
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label htmlFor="model">Modello / Variante</Label>
+                    <Label htmlFor="model" className="flex items-center">
+                      Modello / Variante
+                      <FieldTip text="Distingue varianti dello stesso prodotto (es. colore, misura, diametro). Usa 'Crea Variante' per clonare questo articolo cambiando solo questo campo." />
+                    </Label>
                     {!isEditing && (
                       <Link href={`/inventory/new?cloneId=${item.id}`} title="Crea variante da questo articolo">
                         <Button variant="ghost" size="sm" className="h-6 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2">
@@ -1053,8 +1059,20 @@ export default function InventoryDetailPage() {
             {/* Tabs: Lotti / Storico Movimenti */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="lots">Lotti</TabsTrigger>
-                <TabsTrigger value="movements">Storico Movimenti</TabsTrigger>
+                <TabsTrigger value="lots">
+                  Lotti
+                  <HelpTip
+                    title="Lotti"
+                    description="Lo stock è tracciato per lotto d'acquisto con logica FIFO: si consuma prima il lotto più vecchio. Se una quantità non risulta assegnata a nessun lotto, puoi riassegnarla da qui."
+                  />
+                </TabsTrigger>
+                <TabsTrigger value="movements">
+                  Storico Movimenti
+                  <HelpTip
+                    title="Storico Movimenti"
+                    description="Ogni riga è un movimento di magazzino: Carico/Entrata aumentano lo stock, Scarico/Uscita/Vendita lo diminuiscono. Un movimento 'Fittizio' è registrato per pareggiare i conti senza spostare merce reale."
+                  />
+                </TabsTrigger>
                 <TabsTrigger value="conformita">
                   Certificazione
                   <HelpTip

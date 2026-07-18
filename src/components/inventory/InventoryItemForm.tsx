@@ -302,7 +302,10 @@ export function InventoryItemForm({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="supplierCode">Codice Fornitore / Originale</Label>
+                            <Label htmlFor="supplierCode" className="flex items-center">
+                                Codice Fornitore / Originale
+                                <FieldTip text="Codice del fornitore principale (es. da catalogo). Dopo la creazione potrai aggiungere altri codici se acquisti lo stesso articolo da fornitori diversi." />
+                            </Label>
                             <Input
                                 id="supplierCode"
                                 placeholder="Es. Codice catalogo fornitore"
@@ -322,7 +325,10 @@ export function InventoryItemForm({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="model">Modello / Variante / Dimensioni</Label>
+                            <Label htmlFor="model" className="flex items-center">
+                                Modello / Variante / Dimensioni
+                                <FieldTip text="Distingue varianti dello stesso prodotto (es. colore, misura, diametro). Dopo aver creato l'articolo potrai clonarlo in una nuova variante dalla sua scheda." />
+                            </Label>
                             <Input
                                 id="model"
                                 placeholder="Es. DN 50, 10mm, XL..."
