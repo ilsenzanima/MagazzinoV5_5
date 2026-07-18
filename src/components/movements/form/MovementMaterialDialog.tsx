@@ -28,6 +28,7 @@ import { purchasesApi } from "@/lib/services/purchases";
 import { PurchaseItemToImport } from "@/hooks/useMovementForm";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { HelpTip } from "@/components/ui/help-tip";
 import { notify } from "@/lib/notify";
 
 interface MovementMaterialDialogProps {
@@ -378,10 +379,18 @@ export function MovementMaterialDialog({
                                     <TabsTrigger value="cantiere" className="flex-1">
                                         <Package className="h-4 w-4 mr-2" />
                                         In Cantiere
+                                        <HelpTip
+                                            title="In Cantiere"
+                                            description="Materiale già portato in questo cantiere in precedenza, disponibile per un reso. Se compare come 'Fittizio' significa che era stato scaricato senza aggancio a un lotto specifico."
+                                        />
                                     </TabsTrigger>
                                     <TabsTrigger value="note" className="flex-1">
                                         <FileText className="h-4 w-4 mr-2" />
                                         Note di Carico
+                                        <HelpTip
+                                            title="Note di Carico"
+                                            description="Importa materiale già elencato in una nota di carico registrata, senza doverlo ricercare manualmente."
+                                        />
                                     </TabsTrigger>
                                 </>
                             ) : activeTab === "exit" || activeTab === "sale" ? (
@@ -389,14 +398,26 @@ export function MovementMaterialDialog({
                                     <TabsTrigger value="magazzino" className="flex-1">
                                         <Search className="h-4 w-4 mr-2" />
                                         Magazzino
+                                        <HelpTip
+                                            title="Magazzino"
+                                            description="Cerca tra tutti gli articoli disponibili a magazzino, indipendentemente dal cantiere."
+                                        />
                                     </TabsTrigger>
                                     <TabsTrigger value="note" className="flex-1">
                                         <FileText className="h-4 w-4 mr-2" />
                                         Note di Carico
+                                        <HelpTip
+                                            title="Note di Carico"
+                                            description="Importa materiale già elencato in una nota di carico registrata, senza doverlo ricercare manualmente."
+                                        />
                                     </TabsTrigger>
                                     <TabsTrigger value="acquisti" className="flex-1">
                                         <ShoppingCart className="h-4 w-4 mr-2" />
                                         Da Acquisto
+                                        <HelpTip
+                                            title="Da Acquisto"
+                                            description="Importa una o più righe direttamente da una bolla d'acquisto già registrata, invece di cercare gli articoli uno per uno."
+                                        />
                                     </TabsTrigger>
                                 </>
                             ) : (
@@ -404,10 +425,18 @@ export function MovementMaterialDialog({
                                     <TabsTrigger value="magazzino" className="flex-1">
                                         <Search className="h-4 w-4 mr-2" />
                                         Magazzino
+                                        <HelpTip
+                                            title="Magazzino"
+                                            description="Cerca tra tutti gli articoli disponibili a magazzino, indipendentemente dal cantiere."
+                                        />
                                     </TabsTrigger>
                                     <TabsTrigger value="note" className="flex-1">
                                         <FileText className="h-4 w-4 mr-2" />
                                         Note di Carico
+                                        <HelpTip
+                                            title="Note di Carico"
+                                            description="Importa materiale già elencato in una nota di carico registrata, senza doverlo ricercare manualmente."
+                                        />
                                     </TabsTrigger>
                                 </>
                             )}

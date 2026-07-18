@@ -15,6 +15,7 @@ import Link from "next/link";
 import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { useMovementForm } from "@/hooks/useMovementForm";
+import { HelpTip } from "@/components/ui/help-tip";
 
 import { MovementHeader } from "./form/MovementHeader";
 import { MovementJobSelector } from "./form/MovementJobSelector";
@@ -98,6 +99,10 @@ export default function NewMovementContent({
                     >
                         <ArrowUpRight className="mr-2 h-4 w-4" />
                         Uscita
+                        <HelpTip
+                            title="Uscita"
+                            description="Materiale che esce dal magazzino verso un cantiere o una destinazione esterna, scalando lo stock disponibile."
+                        />
                     </TabsTrigger>
                     <TabsTrigger
                         value="entry"
@@ -105,6 +110,10 @@ export default function NewMovementContent({
                     >
                         <ArrowDownRight className="mr-2 h-4 w-4" />
                         Entrata / Reso
+                        <HelpTip
+                            title="Entrata / Reso"
+                            description="Copre sia gli ingressi normali di materiale sia i resi da cantiere: in entrambi i casi lo stock disponibile aumenta."
+                        />
                     </TabsTrigger>
                     <TabsTrigger
                         value="sale"
@@ -112,6 +121,10 @@ export default function NewMovementContent({
                     >
                         <ShoppingBag className="mr-2 h-4 w-4" />
                         Vendita
+                        <HelpTip
+                            title="Vendita"
+                            description="Come un'uscita, ma il materiale viene ceduto a un cliente invece che portato in cantiere."
+                        />
                     </TabsTrigger>
                     <TabsTrigger
                         value="waste"
@@ -119,6 +132,10 @@ export default function NewMovementContent({
                     >
                         <Recycle className="mr-2 h-4 w-4" />
                         Eccedenze
+                        <HelpTip
+                            title="Eccedenze"
+                            description="Per materiale di scarto/eccedenza: si registra in peso (kg) invece che a pezzi o quantità, è sempre un movimento fittizio e aggiunge automaticamente una nota legale sul deposito temporaneo."
+                        />
                     </TabsTrigger>
                 </TabsList>
 

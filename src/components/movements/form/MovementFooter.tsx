@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FieldTip } from "@/components/ui/field-tip";
 
 interface MovementFooterProps {
     transportMean: string;
@@ -42,7 +43,10 @@ export function MovementFooter({
                 <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Trasporto</h3>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <Label>Mezzo</Label>
+                        <Label className="flex items-center">
+                            Mezzo
+                            <FieldTip text="Chi effettua il trasporto secondo la bolla: Mittente (chi spedisce), Destinatario (chi riceve) o Vettore (un trasportatore terzo)." />
+                        </Label>
                         <Select value={transportMean} onValueChange={setTransportMean}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Seleziona mezzo..." />

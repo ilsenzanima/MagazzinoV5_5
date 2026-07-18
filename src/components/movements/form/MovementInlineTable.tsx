@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { MovementLine, PurchaseItemToImport } from "@/hooks/useMovementForm";
 import { InventoryItem, Job } from "@/lib/types";
 import { MovementMaterialDialog } from "./MovementMaterialDialog";
+import { FieldTip } from "@/components/ui/field-tip";
 
 interface MovementInlineTableProps {
     lines: MovementLine[];
@@ -99,13 +100,28 @@ export function MovementInlineTable({
                                 <TableRow>
                                     <TableHead className="min-w-[160px]">Materiale</TableHead>
                                     {showLotto && (
-                                        <TableHead className="min-w-[160px]">Lotto</TableHead>
+                                        <TableHead className="min-w-[160px]">
+                                            <span className="inline-flex items-center">
+                                                Lotto
+                                                <FieldTip text="L'acquisto da cui viene scalato il materiale, in ordine FIFO (si consuma prima il lotto più vecchio). 'Esaurito' significa che quel lotto non ha più quantità residua." />
+                                            </span>
+                                        </TableHead>
                                     )}
                                     {showFittizio && (
-                                        <TableHead className="w-[72px] text-center">Fittizio</TableHead>
+                                        <TableHead className="w-[72px] text-center">
+                                            <span className="inline-flex items-center">
+                                                Fittizio
+                                                <FieldTip text="Registra il movimento senza scalare da un lotto specifico né spostare merce reale: serve per pareggiare i conti. Si blocca da solo quando tutti i lotti disponibili sono esauriti." />
+                                            </span>
+                                        </TableHead>
                                     )}
                                     {showPiecesAndQty && (
-                                        <TableHead className="w-[88px] text-center">Pezzi</TableHead>
+                                        <TableHead className="w-[88px] text-center">
+                                            <span className="inline-flex items-center">
+                                                Pezzi
+                                                <FieldTip text="Collegato alla Quantità dal coefficiente di moltiplicazione dell'articolo: modificando uno dei due campi, l'altro si ricalcola automaticamente." />
+                                            </span>
+                                        </TableHead>
                                     )}
                                     {showPiecesAndQty && (
                                         <TableHead className="w-[100px] text-center">Quantità</TableHead>
