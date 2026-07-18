@@ -23,6 +23,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/components/auth-provider";
+import { FieldTip } from "@/components/ui/field-tip";
 export interface InventoryFormData {
     code: string;
     name: string;
@@ -273,7 +274,10 @@ export function InventoryItemForm({
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="code">Codice Articolo</Label>
+                                <Label htmlFor="code" className="flex items-center">
+                                    Codice Articolo
+                                    <FieldTip text="Generato automaticamente in ordine progressivo, non è modificabile." />
+                                </Label>
                                 <Input
                                     id="code"
                                     value={code}
@@ -349,7 +353,10 @@ export function InventoryItemForm({
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="minStock">Scorta Minima</Label>
+                                <Label htmlFor="minStock" className="flex items-center">
+                                    Scorta Minima
+                                    <FieldTip text={'Sotto questa soglia l\'articolo compare nel filtro "Basse Scorte". Se lasci 0, l\'avviso non scatta mai.'} />
+                                </Label>
                                 <Input
                                     id="minStock"
                                     type="number"
@@ -379,7 +386,10 @@ export function InventoryItemForm({
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="coefficient">Coeff. Moltiplicazione</Label>
+                                <Label htmlFor="coefficient" className="flex items-center">
+                                    Coeff. Moltiplicazione
+                                    <FieldTip text="Converte l'unità di stock in pezzi fisici. Es: una lastra di cartongesso 2500x1200mm equivale a 3 mq; se in stock tieni 1 pezzo (la lastra), il coefficiente è 3." />
+                                </Label>
                                 <Input
                                     id="coefficient"
                                     type="number"

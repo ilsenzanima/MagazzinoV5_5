@@ -5,25 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Ruler, Plus, RotateCcw, Info } from "lucide-react";
+import { Ruler, Plus, RotateCcw } from "lucide-react";
+import { FieldTip } from "@/components/ui/field-tip";
 import type { DuctInput } from "@/lib/cutting-simulator/calculations";
 
 interface DuctFormProps {
     onCalculate: (input: DuctInput) => void;
-}
-
-/**
- * Componente tooltip inline per spiegare i campi.
- */
-function FieldTip({ text }: { text: string }) {
-    return (
-        <span className="inline-flex items-center ml-1 group relative cursor-help">
-            <Info className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-xs bg-popover text-popover-foreground border border-border rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-52 text-center z-50 leading-relaxed">
-                {text}
-            </span>
-        </span>
-    );
 }
 
 export function DuctForm({ onCalculate }: DuctFormProps) {

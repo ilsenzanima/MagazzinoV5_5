@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 interface HelpTipProps {
     title: string
     description?: string
-    fetchItems: () => Promise<string[]>
+    fetchItems?: () => Promise<string[]>
     emptyText?: string
 }
 
@@ -18,7 +18,7 @@ export function HelpTip({ title, description, fetchItems, emptyText = "Nessun ti
 
     const handleOpenChange = async (next: boolean) => {
         setOpen(next)
-        if (next && items === null) {
+        if (next && items === null && fetchItems) {
             try {
                 setLoading(true)
                 setItems(await fetchItems())
@@ -51,14 +51,16 @@ export function HelpTip({ title, description, fetchItems, emptyText = "Nessun ti
             >
                 <p className="font-medium mb-1">{title}</p>
                 {description && <p className="text-xs text-slate-500 mb-2">{description}</p>}
-                {loading ? (
-                    <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
-                ) : items && items.length > 0 ? (
-                    <ul className="space-y-1 list-disc pl-4">
-                        {items.map((it, i) => <li key={i}>{it}</li>)}
-                    </ul>
-                ) : (
-                    <p className="text-xs text-slate-400 italic">{emptyText}</p>
+                {fetchItems && (
+                    loading ? (
+                        <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
+                    ) : items && items.length > 0 ? (
+                        <ul className="space-y-1 list-disc pl-4">
+                            {items.map((it, i) => <li key={i}>{it}</li>)}
+                        </ul>
+                    ) : (
+                        <p className="text-xs text-slate-400 italic">{emptyText}</p>
+                    )
                 )}
             </PopoverContent>
         </Popover>

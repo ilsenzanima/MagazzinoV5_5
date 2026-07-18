@@ -64,6 +64,8 @@ import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
 import { ItemConformita } from "@/components/inventory/ItemConformita";
+import { FieldTip } from "@/components/ui/field-tip";
+import { HelpTip } from "@/components/ui/help-tip";
 import dynamic from "next/dynamic";
 import { loadNotesService } from "@/lib/services/load-notes";
 const ImageCropper = dynamic(
@@ -804,7 +806,10 @@ export default function InventoryDetailPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="code">Codice Articolo</Label>
+                    <Label htmlFor="code" className="flex items-center">
+                      Codice Articolo
+                      <FieldTip text="Generato automaticamente in ordine progressivo, non è modificabile." />
+                    </Label>
                     <Input id="code" value={item.code} readOnly className="bg-slate-50 dark:bg-muted text-slate-500 dark:text-slate-400" />
                     <p className="text-[10px] text-slate-400 dark:text-slate-500">Generato Automaticamente</p>
                   </div>
@@ -959,7 +964,10 @@ export default function InventoryDetailPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="minStock">Scorta Minima</Label>
+                    <Label htmlFor="minStock" className="flex items-center">
+                      Scorta Minima
+                      <FieldTip text={'Sotto questa soglia l\'articolo compare nel filtro "Basse Scorte". Se lasci 0, l\'avviso non scatta mai.'} />
+                    </Label>
                     {isEditing ? (
                       <Input
                         id="minStock"
@@ -996,7 +1004,10 @@ export default function InventoryDetailPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="coefficient">Coeff. Moltiplicazione</Label>
+                    <Label htmlFor="coefficient" className="flex items-center">
+                      Coeff. Moltiplicazione
+                      <FieldTip text="Converte l'unità di stock in pezzi fisici. Es: una lastra di cartongesso 2500x1200mm equivale a 3 mq; se in stock tieni 1 pezzo (la lastra), il coefficiente è 3." />
+                    </Label>
                     {isEditing ? (
                       <div className="space-y-1">
                         <Input
@@ -1044,7 +1055,13 @@ export default function InventoryDetailPage() {
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="lots">Lotti</TabsTrigger>
                 <TabsTrigger value="movements">Storico Movimenti</TabsTrigger>
-                <TabsTrigger value="conformita">Certificazione</TabsTrigger>
+                <TabsTrigger value="conformita">
+                  Certificazione
+                  <HelpTip
+                    title="Certificazione"
+                    description="Le certificazioni qui collegate sono solo scorciatoie ai documenti già presenti nella libreria conformità: associarle o rimuoverle non crea né elimina alcun documento."
+                  />
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="lots" className="mt-4">
