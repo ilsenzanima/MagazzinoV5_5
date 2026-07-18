@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { HelpTip } from "@/components/ui/help-tip";
 
 export default function LoadNoteDetailPage() {
     const params = useParams();
@@ -141,7 +142,12 @@ export default function LoadNoteDetailPage() {
                                 Modifica
                             </Button>
                         </Link>
-                        <Button variant="outline" size="sm" onClick={handleToggleStatus}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleToggleStatus}
+                            title={note.status === 'pending' ? "Cambia solo lo stato della nota, puoi sempre riaprirla" : undefined}
+                        >
                             {note.status === 'pending' ? (
                                 <><Archive className="mr-2 h-4 w-4" /> Archivia</>
                             ) : (
@@ -195,6 +201,10 @@ export default function LoadNoteDetailPage() {
                         <CardTitle className="text-base flex items-center gap-2">
                             <Package className="h-4 w-4" />
                             Materiali ({note.items.length})
+                            <HelpTip
+                                title="Materiali"
+                                description="La spunta è solo un promemoria visivo: non scarica il magazzino né si collega automaticamente a un movimento. Se importi una riga in un Movimento dal dialog materiale, viene spuntata da sola, ma puoi comunque spuntarla o de-spuntarla manualmente in qualsiasi momento."
+                            />
                         </CardTitle>
                         <CardDescription>Spunta gli articoli già processati per tenerli traccia</CardDescription>
                     </CardHeader>

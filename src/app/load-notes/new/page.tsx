@@ -16,6 +16,7 @@ import { loadNotesService } from "@/lib/services/load-notes";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { inventoryApi, jobsApi, InventoryItem, Job } from "@/lib/api";
+import { FieldTip } from "@/components/ui/field-tip";
 
 interface NoteLine {
     tempId: string;
@@ -264,7 +265,10 @@ export default function NewLoadNotePage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Tipo Nota</Label>
+                                <Label className="flex items-center">
+                                    Tipo Nota
+                                    <FieldTip text="Uscita: materiale che esce verso il cantiere. Reso: materiale che torna indietro." />
+                                </Label>
                                 <div className="flex gap-1">
                                     <Button
                                         type="button"
@@ -290,7 +294,10 @@ export default function NewLoadNotePage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Commessa {!notes && <span className="text-destructive text-xs">*</span>}</Label>
+                                <Label className="flex items-center">
+                                    Commessa {!notes && <span className="text-destructive text-xs">*</span>}
+                                    <FieldTip text="Basta compilare Commessa o Note, non servono entrambi." />
+                                </Label>
                                 <div
                                     className="flex items-center justify-between border rounded-md px-3 py-2 cursor-pointer hover:bg-muted h-10"
                                     onClick={() => setIsJobSelectorOpen(true)}
@@ -336,7 +343,12 @@ export default function NewLoadNotePage() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Materiale</TableHead>
-                                            <TableHead className="w-[90px] text-center">Pezzi</TableHead>
+                                            <TableHead className="w-[90px] text-center">
+                                                <span className="inline-flex items-center justify-center w-full">
+                                                    Pezzi
+                                                    <FieldTip text="Collegato alla Quantità dal coefficiente dell'articolo: modificando uno dei due campi, l'altro si ricalcola automaticamente." />
+                                                </span>
+                                            </TableHead>
                                             <TableHead className="w-[110px] text-center">Quantità</TableHead>
                                             <TableHead className="w-[44px]"></TableHead>
                                         </TableRow>

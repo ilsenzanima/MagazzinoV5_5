@@ -20,6 +20,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { HelpTip } from "@/components/ui/help-tip";
 import {
     Plus,
     Search,
@@ -169,6 +170,10 @@ function LoadNotesContent() {
                                     {pendingNotes.length}
                                 </Badge>
                             )}
+                            <HelpTip
+                                title="Da Processare"
+                                description="Non significa che il materiale non sia stato preso: è solo che nessuno ha ancora archiviato la nota dopo averla riconciliata. Puoi archiviarla o riaprirla in qualsiasi momento."
+                            />
                         </TabsTrigger>
                         <TabsTrigger value="completed">Completate</TabsTrigger>
                     </TabsList>
@@ -413,7 +418,7 @@ function NotesTable({
                                         variant="ghost"
                                         size="icon"
                                         onClick={(e) => onToggle(note.id, note.status, e)}
-                                        title={note.status === 'pending' ? "Segna come completata" : "Riapri nota"}
+                                        title={note.status === 'pending' ? "Archivia: cambia solo lo stato della nota, puoi sempre riaprirla" : "Riapri nota"}
                                     >
                                         {note.status === 'pending' ? (
                                             <Archive className="h-4 w-4 text-green-600" />
