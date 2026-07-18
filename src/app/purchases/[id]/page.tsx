@@ -33,6 +33,8 @@ import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocume
 import { PurchaseDDTConformita } from "@/components/purchases/details/PurchaseDDTConformita";
 import { useAuth } from "@/components/auth-provider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { FieldTip } from "@/components/ui/field-tip";
+import { HelpTip } from "@/components/ui/help-tip";
 import { Badge } from "@/components/ui/badge";
 import { complianceApi, ComplianceDocument } from "@/lib/services/compliance";
 import { createClient } from "@/lib/supabase/client";
@@ -693,7 +695,10 @@ export default function PurchaseDetailPage() {
                                 )}
                             </div>
                             <div className="md:col-span-2 border-t pt-4 mt-2">
-                                <Label className="text-slate-500 mb-1 block">Commessa (Generale)</Label>
+                                <Label className="text-slate-500 mb-1 flex items-center">
+                                    Commessa (Generale)
+                                    <FieldTip text="Solo un default applicato alle nuove righe della tabella: puoi comunque cambiare la commessa (o mettere 'Magazzino') su ogni singola riga." />
+                                </Label>
                                 <div
                                     className={`flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 bg-white dark:bg-slate-800 max-w-md ${isEditingHeader ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700" : "cursor-default opacity-70"}`}
                                     onClick={() => isEditingHeader && setIsHeaderJobSelectorOpen(true)}
@@ -899,7 +904,10 @@ export default function PurchaseDetailPage() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <div className="flex items-center gap-1.5">
                                         <Truck className="h-4 w-4 text-slate-400 shrink-0" />
-                                        <span className="text-sm text-slate-500 shrink-0">Costo trasporto €</span>
+                                        <span className="text-sm text-slate-500 shrink-0 inline-flex items-center">
+                                            Costo trasporto €
+                                            <FieldTip text="'Applica trasporto a tutte le righe' distribuisce l'importo e lo somma al prezzo unitario di ogni riga. Una volta applicato, per cambiarlo devi prima premere 'Modifica' per revocarlo da tutte le righe." />
+                                        </span>
                                         <Input
                                             type="number"
                                             min="0"
@@ -1364,7 +1372,13 @@ export default function PurchaseDetailPage() {
                     {/* Traceability Table */}
                     {!isOrder && <Card>
                         <CardHeader>
-                            <CardTitle>Tracciabilità Lotti</CardTitle>
+                            <CardTitle className="flex items-center">
+                                Tracciabilità Lotti
+                                <HelpTip
+                                    title="Tracciabilità Lotti"
+                                    description="Stato di ogni riga d'acquisto: Disponibile (ancora in magazzino), A cantiere (consegnata a una commessa), Parziale (in parte consumata), Esaurito (tutta consumata), Eccedenza (rientrata più di quanto uscito)."
+                                />
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {/* Desktop View */}

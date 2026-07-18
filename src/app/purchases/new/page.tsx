@@ -28,6 +28,7 @@ import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
 import { useBatchUpload } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
+import { FieldTip } from "@/components/ui/field-tip";
 
 interface PurchaseLine {
     tempId: string;
@@ -554,7 +555,10 @@ function NewPurchaseContent() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Commessa (Generale)</Label>
+                                <Label className="flex items-center">
+                                    Commessa (Generale)
+                                    <FieldTip text="Solo un default applicato alle nuove righe della tabella: puoi comunque cambiare la commessa (o mettere 'Magazzino') su ogni singola riga." />
+                                </Label>
                                 <div
                                     className="flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 bg-white dark:bg-slate-800 h-10"
                                     onClick={() => setIsHeaderJobSelectorOpen(true)}

@@ -17,6 +17,7 @@ import { suppliersApi, invoicesApi, supplierGroupsApi, Supplier } from "@/lib/ap
 import { useAuth } from "@/components/auth-provider";
 import { useBatchUpload } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
+import { HelpTip } from "@/components/ui/help-tip";
 
 interface UnlinkedPurchase {
     id: string;
@@ -259,7 +260,13 @@ export default function NewInvoicePage() {
                     {/* Bolle collegate */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Bolle da Collegare</CardTitle>
+                            <CardTitle className="flex items-center">
+                                Bolle da Collegare
+                                <HelpTip
+                                    title="Bolle da Collegare"
+                                    description="Solo le bolle d'acquisto (mai gli ordini) del fornitore selezionato che non hanno già un'altra fattura collegata. Il totale della fattura è la somma delle bolle che spunti qui."
+                                />
+                            </CardTitle>
                             <CardDescription>
                                 {!formData.supplierId
                                     ? "Seleziona prima un fornitore per vedere le bolle disponibili"

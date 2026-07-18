@@ -22,6 +22,7 @@ import { ViewToggle } from "@/components/ui/view-toggle";
 import { useViewMode } from "@/hooks/useViewMode";
 import { PageSizeSelector } from "@/components/ui/page-size-selector";
 import { usePageSize } from "@/hooks/usePageSize";
+import { HelpTip } from "@/components/ui/help-tip";
 
 // ── Shared filter bar ─────────────────────────────────────────────────────────
 
@@ -199,7 +200,10 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0 ml-2">
                                 {isOrder && purchase.convertedPurchaseId && (
-                                  <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                  <span
+                                    title="Ordine già convertito in un Acquisto: non è più eliminabile."
+                                    className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300"
+                                  >
                                     Evaso
                                   </span>
                                 )}
@@ -298,7 +302,10 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                               </span>
                             )}
                             {isOrder && purchase.convertedPurchaseId && (
-                              <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Evaso</span>
+                              <span
+                                title="Ordine già convertito in un Acquisto: non è più eliminabile."
+                                className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300"
+                              >Evaso</span>
                             )}
                             {purchase.invoiceId && <span title="Fattura collegata"><Receipt className="h-4 w-4 text-blue-500" /></span>}
                             {!isOrder && (purchase.isExhausted
@@ -577,15 +584,27 @@ function PurchasesPageContent() {
             <TabsTrigger value="acquisti" className="flex items-center gap-1.5 flex-1 sm:flex-none basis-[calc(50%-0.125rem)] sm:basis-auto">
               <ShoppingCart className="h-4 w-4" />
               Acquisti
+              <HelpTip
+                title="Acquisti"
+                description="Bolle di merce effettivamente arrivata dal fornitore, che movimenta il magazzino."
+              />
             </TabsTrigger>
             <TabsTrigger value="ordini" className="flex items-center gap-1.5 flex-1 sm:flex-none basis-[calc(50%-0.125rem)] sm:basis-auto">
               <ClipboardList className="h-4 w-4" />
               Ordini
+              <HelpTip
+                title="Ordini"
+                description="Richieste fatte al fornitore non ancora evase: non movimentano il magazzino. Quando la merce arriva, si convertono in Acquisto dal bottone 'Converti'."
+              />
             </TabsTrigger>
             {canSeeFatture && (
               <TabsTrigger value="fatture" className="flex items-center gap-1.5 flex-1 sm:flex-none basis-[calc(50%-0.125rem)] sm:basis-auto">
                 <Receipt className="h-4 w-4" />
                 Fatture
+                <HelpTip
+                  title="Fatture"
+                  description="Un documento che raggruppa una o più bolle d'acquisto (mai ordini) dello stesso fornitore, per riconciliare quanto ricevuto con quanto fatturato."
+                />
               </TabsTrigger>
             )}
           </TabsList>

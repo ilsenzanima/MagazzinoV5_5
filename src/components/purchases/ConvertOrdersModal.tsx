@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, FileText, Calendar, ArrowRight, Link2 } from "lucide-react";
 import { purchasesApi, Purchase } from "@/lib/api";
+import { HelpTip } from "@/components/ui/help-tip";
 
 interface Props {
     open: boolean;
@@ -97,6 +98,10 @@ export function ConvertOrdersModal({ open, onOpenChange, triggerOrder }: Props) 
                     Fornitore: <span className="font-medium text-slate-800 dark:text-slate-200">{triggerOrder.supplierName}</span>
                     <br />
                     Seleziona gli ordini da unire in un unico acquisto.
+                    <HelpTip
+                        title="Crea nuovo acquisto vs Associa ad acquisto esistente"
+                        description="'Crea nuovo acquisto' registra una nuova bolla a partire dagli ordini selezionati. 'Associa ad acquisto esistente' collega invece gli ordini a una bolla già registrata per lo stesso fornitore, senza crearne una nuova."
+                    />
                 </div>
 
                 <div className="flex gap-2 mb-3">
