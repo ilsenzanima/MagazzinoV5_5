@@ -11,6 +11,17 @@ export async function getSoftDeletePayload() {
     };
 }
 
+export async function getVerifiedPayload() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Utente non autenticato');
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+    return {
+        verified_at: new Date().toISOString(),
+        verified_by: user.id,
+        verified_by_name: profile?.full_name || user.email || 'Utente sconosciuto',
+    };
+}
+
 /**
  * Elimina un file da Google Drive dato il suo fileId. Ignora silenziosamente
  * i valori che non sono fileId Drive (URL legacy Supabase Storage con '/').

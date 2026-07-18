@@ -26,12 +26,14 @@ import {
   Trash2,
   FileText,
   ShieldCheck,
+  PackageCheck,
   GanttChartSquare
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
 import { useEffect, useState } from "react";
 import { MobileNavBar } from "./MobileNavBar";
+import { inventoryApi } from "@/lib/services/inventory";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   onLinkClick?: () => void;
@@ -40,6 +42,22 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Sidebar({ className, onLinkClick }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut, userRole } = useAuth();
+
+  // Puntino "live" sulla voce Controllo Articoli: numero di articoli in attesa di verifica
+  const [unverifiedCount, setUnverifiedCount] = useState(0);
+
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    let cancelled = false;
+    const checkUnverified = () => {
+      inventoryApi.getUnverifiedCount()
+        .then(count => { if (!cancelled) setUnverifiedCount(count); })
+        .catch(err => console.error("Failed to load unverified count", err));
+    };
+    checkUnverified();
+    const interval = setInterval(checkUnverified, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [userRole]);
 
   const routeGroups = [
     {
@@ -58,7 +76,7 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           label: "Inventario",
           icon: Package,
           href: "/inventory",
-          active: pathname === "/inventory" || pathname.startsWith("/inventory/"),
+          active: pathname === "/inventory" || (pathname.startsWith("/inventory/") && pathname !== "/inventory/verifica"),
         },
         {
           label: "Acquisti",
@@ -153,6 +171,13 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
     ...(userRole === 'admin' ? [{
       items: [
         {
+          label: "Controllo Articoli",
+          icon: PackageCheck,
+          href: "/inventory/verifica",
+          active: pathname === "/inventory/verifica",
+          badge: unverifiedCount > 0,
+        },
+        {
           label: "Cestino",
           icon: Trash2,
           href: "/cestino",
@@ -186,6 +211,9 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
                     >
                       <route.icon className="mr-2 h-4 w-4" />
                       {route.label}
+                      {'badge' in route && route.badge && (
+                        <span className="ml-2 h-2 w-2 rounded-full bg-red-500 shrink-0" title="Nuovi elementi da controllare" />
+                      )}
                     </Button>
                   </Link>
                 ))}

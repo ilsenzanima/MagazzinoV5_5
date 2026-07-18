@@ -22,7 +22,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { useAuth } from "@/components/auth-provider";
 import { FieldTip } from "@/components/ui/field-tip";
 export interface InventoryFormData {
     code: string;
@@ -55,8 +54,6 @@ export function InventoryItemForm({
     onCancel,
     isSubmitting = false
 }: InventoryItemFormProps) {
-    const { userRole } = useAuth();
-
     // Reference data
     const [brands, setBrands] = useState<Brand[]>([]);
     const [types, setTypes] = useState<ItemType[]>([]);
@@ -397,11 +394,9 @@ export function InventoryItemForm({
                                     min="0.01"
                                     value={formData.coefficient}
                                     onChange={(e) => setFormData({ ...formData, coefficient: e.target.value })}
-                                    disabled={userRole !== 'admin'}
-                                    className={userRole !== 'admin' ? "opacity-50" : ""}
                                 />
                                 <p className="text-[10px] text-slate-400">
-                                    {userRole === 'admin' ? "Visibile solo admin" : "Modificabile solo da Admin"}
+                                    Dopo la creazione sarà modificabile solo da un Admin: verifica il valore prima di salvare.
                                 </p>
                             </div>
                         </div>

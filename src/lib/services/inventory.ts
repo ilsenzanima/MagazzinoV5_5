@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { InventoryItem, InventorySupplierCode, Brand, ItemType, Unit } from '@/lib/types';
-import { fetchWithTimeout, getSoftDeletePayload } from './utils';
+import { fetchWithTimeout, getSoftDeletePayload, getVerifiedPayload } from './utils';
 
 // Mappers
 export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
@@ -240,6 +240,37 @@ export const inventoryApi = {
             deletedAt: d.deleted_at as string,
             deletedByName: d.deleted_by_name as string | null,
         }));
+    },
+
+    // Articoli non ancora controllati da un admin, più recenti per primi
+    getUnverified: async () => {
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('*')
+            .is('verified_at', null)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            ...mapDbItemToInventoryItem(d),
+            createdAt: d.created_at as string,
+        }));
+    },
+
+    getUnverifiedCount: async () => {
+        const { count, error } = await supabase
+            .from('inventory')
+            .select('*', { count: 'exact', head: true })
+            .is('verified_at', null)
+            .is('deleted_at', null);
+        if (error) throw error;
+        return count || 0;
+    },
+
+    verify: async (id: string) => {
+        const payload = await getVerifiedPayload();
+        const { error } = await supabase.from('inventory').update(payload).eq('id', id);
+        if (error) throw error;
     },
 
     // Upload image to Storage
