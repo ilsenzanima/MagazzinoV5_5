@@ -18,6 +18,7 @@ import { notify } from "@/lib/notify";
 import { InvoiceDocuments } from "@/components/invoices/InvoiceDocuments";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FieldTip } from "@/components/ui/field-tip";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 
 // ── Inline editable price row ─────────────────────────────────────────────────
@@ -481,7 +482,10 @@ export default function InvoiceDetailPage() {
                                         <Input type="date" value={editData.invoiceDate} onChange={e => setEditData(d => ({ ...d, invoiceDate: e.target.value }))} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Note</Label>
+                                        <Label className="flex items-center">
+                                            Note
+                                            <FieldTip text="Nota interna libera, visibile solo qui nell'app: non compare su stampe, PDF o altri documenti." />
+                                        </Label>
                                         <Input value={editData.notes} onChange={e => setEditData(d => ({ ...d, notes: e.target.value }))} placeholder="Note opzionali" />
                                     </div>
                                 </div>
