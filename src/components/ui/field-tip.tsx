@@ -1,17 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import { Info } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /**
  * Tooltip inline per spiegare un campo di un form al passaggio del mouse.
+ * Il contenuto è portalizzato (Radix Popover) così non viene tagliato da
+ * contenitori con overflow (es. tabelle scrollabili) e si riposiziona da
+ * solo se non c'è spazio.
  */
 export function FieldTip({ text }: { text: string }) {
+    const [open, setOpen] = useState(false);
+
     return (
-        <span className="inline-flex items-center ml-1 group relative cursor-help">
-            <Info className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-xs bg-popover text-popover-foreground border border-border rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-52 text-center z-50 leading-relaxed">
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <span
+                    className="inline-flex items-center ml-1 cursor-help"
+                    tabIndex={0}
+                    onMouseEnter={() => setOpen(true)}
+                    onMouseLeave={() => setOpen(false)}
+                    onFocus={() => setOpen(true)}
+                    onBlur={() => setOpen(false)}
+                >
+                    <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-primary transition-colors" />
+                </span>
+            </PopoverTrigger>
+            <PopoverContent
+                side="top"
+                className="w-52 px-3 py-2 rounded-lg shadow-xl text-xs text-center leading-relaxed pointer-events-none"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+            >
                 {text}
-            </span>
-        </span>
+            </PopoverContent>
+        </Popover>
     );
 }
