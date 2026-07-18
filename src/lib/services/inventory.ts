@@ -2,6 +2,18 @@ import { supabase } from '@/lib/supabase';
 import { InventoryItem, InventorySupplierCode, Brand, ItemType, Unit } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload, getVerifiedPayload } from './utils';
 
+export interface UntrackedStockItem {
+    itemId: string;
+    code: string;
+    name: string;
+    brand: string | null;
+    model: string | null;
+    unit: string;
+    totalQuantity: number;
+    trackedQuantity: number;
+    untrackedQuantity: number;
+}
+
 // Mappers
 export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     id: dbItem.id,
@@ -265,6 +277,29 @@ export const inventoryApi = {
             .is('deleted_at', null);
         if (error) throw error;
         return count || 0;
+    },
+
+    // Articoli con stock non riconducibile a nessun lotto d'acquisto residuo
+    // (vedi vista inventory_untracked_stock). La tolleranza filtra il rumore
+    // di arrotondamento sui decimali.
+    getUntrackedStock: async (tolerance: number = 0.5) => {
+        const { data, error } = await supabase
+            .from('inventory_untracked_stock')
+            .select('*')
+            .gt('untracked_quantity', tolerance)
+            .order('untracked_quantity', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            itemId: d.item_id as string,
+            code: d.code as string,
+            name: d.name as string,
+            brand: d.brand as string | null,
+            model: d.model as string | null,
+            unit: d.unit as string,
+            totalQuantity: Number(d.total_quantity),
+            trackedQuantity: Number(d.tracked_quantity),
+            untrackedQuantity: Number(d.untracked_quantity),
+        }));
     },
 
     verify: async (id: string) => {
