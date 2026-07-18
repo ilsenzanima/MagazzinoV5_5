@@ -697,7 +697,7 @@ export default function PurchaseDetailPage() {
                             <div className="md:col-span-2 border-t pt-4 mt-2">
                                 <Label className="text-slate-500 mb-1 flex items-center">
                                     Commessa (Generale)
-                                    <FieldTip text="Solo un default applicato alle nuove righe della tabella: puoi comunque cambiare la commessa (o mettere 'Magazzino') su ogni singola riga." />
+                                    <FieldTip text="Usala quando il materiale di questa bolla viene girato direttamente a una commessa con la spedizione, invece di restare a magazzino. Si applica come default a tutte le righe, ma puoi comunque cambiarlo riga per riga." />
                                 </Label>
                                 <div
                                     className={`flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 bg-white dark:bg-slate-800 max-w-md ${isEditingHeader ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700" : "cursor-default opacity-70"}`}
@@ -906,7 +906,9 @@ export default function PurchaseDetailPage() {
                                         <Truck className="h-4 w-4 text-slate-400 shrink-0" />
                                         <span className="text-sm text-slate-500 shrink-0 inline-flex items-center">
                                             Costo trasporto €
-                                            <FieldTip text="'Applica trasporto a tutte le righe' distribuisce l'importo e lo somma al prezzo unitario di ogni riga. Una volta applicato, per cambiarlo devi prima premere 'Modifica' per revocarlo da tutte le righe." />
+                                            <FieldTip text={isOrder
+                                                ? "Negli ordini questo valore è solo indicativo: non viene distribuito sulle righe. Diventa effettivo solo dopo la conversione dell'ordine in Acquisto."
+                                                : "'Applica trasporto a tutte le righe' distribuisce l'importo e lo somma al prezzo unitario di ogni riga. Una volta applicato, per cambiarlo devi prima premere 'Modifica' per revocarlo da tutte le righe."} />
                                         </span>
                                         <Input
                                             type="number"
@@ -972,7 +974,12 @@ export default function PurchaseDetailPage() {
                                             <TableHead className="text-right">Q.tà Tot.</TableHead>
                                             {showTransportCols && <TableHead className="text-right text-amber-600">Trasp./u.</TableHead>}
                                             <TableHead className="text-right">Prezzo Unit.</TableHead>
-                                            <TableHead className="text-right">Totale Riga</TableHead>
+                                            <TableHead className="text-right">
+                                                <span className="inline-flex items-center justify-end w-full">
+                                                    Totale Riga
+                                                    <FieldTip text="Se conosci il totale della riga (es. dalla bolla del fornitore) è preferibile inserirlo invece del Prezzo Unitario: il sistema ricalcola da solo il prezzo unitario corretto, tenendo conto del coefficiente usato per questo materiale." />
+                                                </span>
+                                            </TableHead>
                                             {showTransportCols && <TableHead className="text-right text-amber-600">P.U. c/Trasp.</TableHead>}
                                             {showTransportCols && <TableHead className="text-right text-amber-600">Tot. c/Trasp.</TableHead>}
                                             <TableHead>Destinazione</TableHead>

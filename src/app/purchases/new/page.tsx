@@ -557,7 +557,7 @@ function NewPurchaseContent() {
                             <div className="space-y-2">
                                 <Label className="flex items-center">
                                     Commessa (Generale)
-                                    <FieldTip text="Solo un default applicato alle nuove righe della tabella: puoi comunque cambiare la commessa (o mettere 'Magazzino') su ogni singola riga." />
+                                    <FieldTip text="Usala quando il materiale di questa bolla viene girato direttamente a una commessa con la spedizione, invece di restare a magazzino. Si applica come default a tutte le righe, ma puoi comunque cambiarlo riga per riga." />
                                 </Label>
                                 <div
                                     className="flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 bg-white dark:bg-slate-800 h-10"
@@ -647,7 +647,12 @@ function NewPurchaseContent() {
                                             <TableHead className="w-[70px] text-center">Coeff.</TableHead>
                                             <TableHead className="w-[110px] text-center">Quantità</TableHead>
                                             <TableHead className="w-[120px] text-right">Prezzo Unit.</TableHead>
-                                            <TableHead className="w-[120px] text-right">Totale Riga</TableHead>
+                                            <TableHead className="w-[120px] text-right">
+                                                <span className="inline-flex items-center justify-end w-full">
+                                                    Totale Riga
+                                                    <FieldTip text="Se conosci il totale della riga (es. dalla bolla del fornitore) è preferibile inserirlo qui invece del Prezzo Unitario: il sistema ricalcola da solo il prezzo unitario corretto, tenendo conto del coefficiente usato per questo materiale." />
+                                                </span>
+                                            </TableHead>
                                             <TableHead className="w-[120px] text-center">Commessa</TableHead>
                                             <TableHead className="w-[44px]"></TableHead>
                                         </TableRow>
