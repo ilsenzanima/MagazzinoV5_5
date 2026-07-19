@@ -134,6 +134,7 @@ export interface InventoryCountItem {
     coefficient: number;
     systemPieces: number;  // Total pieces across all lots
     systemQuantity: number;
+    recentlyActive: boolean; // Movimentato o acquistato nell'ultimo anno
 }
 
 export interface InventoryCountData {
@@ -174,6 +175,36 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
             itemPiecesMap.set(lot.item_id, currentPieces + piecesToAdd);
         }
 
+        // Articoli movimentati (bolle) o acquistati nell'ultimo anno: da evidenziare nel
+        // foglio conta come "da controllare prima", perché più probabile che siano cambiati.
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const cutoffDate = oneYearAgo.toISOString().slice(0, 10);
+
+        const [movementsRes, purchasesRes] = await Promise.all([
+            supabase
+                .from('delivery_note_items')
+                .select('inventory_id, delivery_notes!inner(date)')
+                .gte('delivery_notes.date', cutoffDate),
+            supabase
+                .from('purchase_items')
+                .select('item_id, purchases!inner(delivery_note_date, deleted_at, order_type)')
+                .gte('purchases.delivery_note_date', cutoffDate)
+                .is('purchases.deleted_at', null)
+                .eq('purchases.order_type', 'purchase'),
+        ]);
+
+        if (movementsRes.error) console.error('Error fetching recent movements:', movementsRes.error);
+        if (purchasesRes.error) console.error('Error fetching recent purchases:', purchasesRes.error);
+
+        const recentlyActiveIds = new Set<string>();
+        (movementsRes.data || []).forEach((r: { inventory_id: string | null }) => {
+            if (r.inventory_id) recentlyActiveIds.add(r.inventory_id);
+        });
+        (purchasesRes.data || []).forEach((r: { item_id: string | null }) => {
+            if (r.item_id) recentlyActiveIds.add(r.item_id);
+        });
+
         const countItems: InventoryCountItem[] = [];
 
         // Build items from ALL inventory (not just those with lots)
@@ -196,7 +227,8 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
                 itemImage: item.image_url || undefined,
                 coefficient: coeff,
                 systemPieces: totalPieces,
-                systemQuantity: totalPieces * coeff
+                systemQuantity: totalPieces * coeff,
+                recentlyActive: recentlyActiveIds.has(item.id)
             });
         }
 

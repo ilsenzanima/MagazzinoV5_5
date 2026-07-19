@@ -130,6 +130,13 @@ export default function InventoryReport() {
                             (es. colli, rotoli, scatole). Questa è la giacenza attuale da verificare durante la conta.
                         </div>
                     </div>
+                    <div className="flex items-start gap-2 mt-2">
+                        <span className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 rounded-sm bg-emerald-200 border border-emerald-400 dark:bg-emerald-800 dark:border-emerald-600" />
+                        <div>
+                            <strong>Righe evidenziate:</strong> articoli movimentati o acquistati nell&apos;ultimo anno.
+                            Sono i più probabili ad aver cambiato giacenza: conviene controllarli per primi.
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -161,7 +168,10 @@ export default function InventoryReport() {
                                         {items.map((item, idx) => (
                                             <TableRow
                                                 key={`${item.itemId}-${idx}`}
-                                                className="dark:border-slate-700"
+                                                className={item.recentlyActive
+                                                    ? "bg-emerald-50 dark:bg-emerald-950/40 dark:border-slate-700"
+                                                    : "dark:border-slate-700"
+                                                }
                                             >
                                                 <TableCell className="font-mono text-sm dark:text-slate-300">{item.itemCode}</TableCell>
                                                 <TableCell className="max-w-[250px] truncate dark:text-slate-300">

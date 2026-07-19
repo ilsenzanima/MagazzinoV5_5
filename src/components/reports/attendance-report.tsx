@@ -11,10 +11,24 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
+const ABSENCE_LABELS: Record<string, string> = {
+    holiday: 'Ferie',
+    permit: 'Permesso',
+    sick: 'Malattia',
+    injury: 'Infortunio',
+    course: 'Corso',
+    strike: 'Sciopero',
+    absence: 'Assenza Ingiustificata',
+    medical_exam: 'Visita Medica',
+};
+
 function getAttendanceLocation(a: Attendance): string {
-    if (a.jobId) return a.jobName || a.jobDescription || a.jobCode || 'Commessa';
-    if (a.warehouseId) return a.warehouseName || 'Magazzino';
-    return '—';
+    if (a.status === 'presence' || a.status === 'transfer') {
+        if (a.jobId) return a.jobName || a.jobDescription || a.jobCode || 'Commessa';
+        if (a.warehouseId) return a.warehouseName || 'Magazzino';
+        return '—';
+    }
+    return ABSENCE_LABELS[a.status] ?? a.status;
 }
 
 const MONTHS = [
@@ -103,13 +117,14 @@ export default function AttendanceReport() {
 
     const selectedWorker = workers.find(w => w.id === selectedWorkerId) ?? null;
 
-    // Righe giorno per giorno per il dipendente selezionato: se in uno stesso giorno ci sono
-    // più presenze, vengono aggiunte più righe lasciando vuoto il riferimento al giorno
-    // per le righe successive alla prima.
+    // Righe giorno per giorno per il dipendente selezionato: comprende ogni registrazione
+    // (presenze, trasferte, magazzino, ferie, malattie, ecc.). Se in uno stesso giorno ci
+    // sono più registrazioni, vengono aggiunte più righe lasciando vuoto il riferimento al
+    // giorno per le righe successive alla prima.
     const selectedWorkerRows = (() => {
         if (!selectedWorkerId) return [];
         const entries = attendance
-            .filter(a => a.workerId === selectedWorkerId && (a.status === 'presence' || a.status === 'transfer'))
+            .filter(a => a.workerId === selectedWorkerId)
             .slice()
             .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -118,12 +133,14 @@ export default function AttendanceReport() {
             const isFirstOfDay = a.date !== lastDate;
             lastDate = a.date;
             const day = new Date(`${a.date}T00:00:00`);
+            const isWork = a.status === 'presence' || a.status === 'transfer';
             return {
                 id: a.id,
                 dayNumber: isFirstOfDay ? format(day, 'd') : '',
                 dayName: isFirstOfDay ? format(day, 'EEEE', { locale: it }) : '',
                 hours: a.hours,
                 isTransfer: a.status === 'transfer',
+                isWork,
                 location: getAttendanceLocation(a),
             };
         });
@@ -277,12 +294,17 @@ export default function AttendanceReport() {
                         <CardTitle className="text-lg dark:text-white">
                             {selectedWorker.lastName} {selectedWorker.firstName} - {monthLabel}
                         </CardTitle>
+                        {selectedWorkerRows.length > 0 && (
+                            <p className="text-xs text-slate-400 dark:text-slate-500">
+                                Le righe evidenziate sono ferie, malattie e altre assenze.
+                            </p>
+                        )}
                     </CardHeader>
                     <CardContent>
                         {selectedWorkerRows.length === 0 ? (
                             <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                                 <MapPin className="h-10 w-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-                                <p>Nessuna presenza registrata in questo mese.</p>
+                                <p>Nessuna registrazione presente in questo mese.</p>
                             </div>
                         ) : (
                             <div className="overflow-auto max-h-[400px]">
@@ -296,7 +318,13 @@ export default function AttendanceReport() {
                                     </thead>
                                     <tbody>
                                         {selectedWorkerRows.map(row => (
-                                            <tr key={row.id} className="border-b dark:border-slate-800">
+                                            <tr
+                                                key={row.id}
+                                                className={cn(
+                                                    "border-b dark:border-slate-800",
+                                                    !row.isWork && "bg-amber-50/60 dark:bg-amber-950/20"
+                                                )}
+                                            >
                                                 <td className="py-2 pr-2 dark:text-white">
                                                     {row.dayNumber && (
                                                         <span className="font-medium">
@@ -304,7 +332,7 @@ export default function AttendanceReport() {
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className="py-2 pr-2 dark:text-slate-300">
+                                                <td className={cn("py-2 pr-2", row.isWork ? "dark:text-slate-300" : "text-amber-700 dark:text-amber-300")}>
                                                     {row.hours}{row.isTransfer ? " (Trasferta)" : ""}
                                                 </td>
                                                 <td className="py-2 pr-2 dark:text-slate-300">{row.location}</td>

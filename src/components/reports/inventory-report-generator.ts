@@ -48,6 +48,9 @@ export const generateInventoryCountReport = async (data: InventoryCountData) => 
     doc.text(`Data: ${dateStr}`, 14, 26);
     doc.setFontSize(9);
     doc.text('Annotare le differenze riscontrate durante la verifica fisica.', 14, 33);
+    doc.setFillColor(224, 247, 232);
+    doc.rect(14, 36, 3, 3, 'F');
+    doc.text('= movimentato o acquistato nell\'ultimo anno (verificare per primo)', 19, 38.5);
 
     const columns = [
         'Codice',
@@ -62,6 +65,7 @@ export const generateInventoryCountReport = async (data: InventoryCountData) => 
     let currentType = '';
     const body: any[][] = [];
     const rowItemIds: (string | null)[] = [];
+    const recentlyActiveMap = new Map(data.items.map(item => [item.itemId, item.recentlyActive]));
 
     data.items.forEach(item => {
         // Add type header row when type changes
@@ -84,7 +88,7 @@ export const generateInventoryCountReport = async (data: InventoryCountData) => 
     });
 
     autoTable(doc, {
-        startY: 38,
+        startY: 43,
         head: [columns],
         body: body,
         theme: 'grid',
@@ -107,9 +111,15 @@ export const generateInventoryCountReport = async (data: InventoryCountData) => 
             4: { cellWidth: 24, halign: 'center' }  // Differenza
         },
         didParseCell: (data) => {
-            // Style empty cell for manual entry
-            if (data.section === 'body' && data.column.index === 4) {
-                data.cell.styles.fillColor = [255, 255, 240]; // Light yellow for entry cell
+            if (data.section !== 'body') return;
+            const itemId = rowItemIds[data.row.index];
+            // Righe movimentate/acquistate nell'ultimo anno: da controllare per prime
+            if (itemId && recentlyActiveMap.get(itemId)) {
+                data.cell.styles.fillColor = [224, 247, 232]; // Light green
+            }
+            // Style empty cell for manual entry (sempre giallo, anche sopra il verde)
+            if (data.column.index === 4) {
+                data.cell.styles.fillColor = [255, 255, 240];
             }
         },
         didDrawCell: (cellData) => {
