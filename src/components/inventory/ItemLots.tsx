@@ -82,7 +82,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                 </div>
                                 {untrackedPieces !== undefined && untrackedPieces > 0 && (
                                     <div className="text-sm text-red-600 dark:text-red-400">
-                                        {untrackedPieces} pezzi
+                                        {untrackedPieces.toFixed(2)} pezzi
                                     </div>
                                 )}
                                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
@@ -198,7 +198,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                             <TableCell className="text-right">
                                                 <div className="font-bold">{lot.remainingQty.toFixed(2)} {itemUnit}</div>
                                                 {lot.remainingPieces !== undefined && (
-                                                    <div className="text-xs text-slate-400">{lot.remainingPieces} pz</div>
+                                                    <div className="text-xs text-slate-400">{lot.remainingPieces.toFixed(2)} pz</div>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">

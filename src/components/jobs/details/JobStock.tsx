@@ -14,6 +14,10 @@ import { useAuth } from "@/components/auth-provider"
 import { fictitiousPricesApi } from "@/lib/services/fictitiousPrices"
 import { notify } from "@/lib/notify"
 
+// Rounds to 2 decimals to avoid floating-point noise (e.g. 30.950000000000003)
+// when accumulating quantities/pieces from many movements in JS.
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 interface JobStockProps {
     movements: Movement[]
     jobId: string
@@ -146,8 +150,8 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                 // Find or create batch
                 let batch = current.batches.find(b => b.sourceKey === sourceKey)
                 if (batch) {
-                    batch.qty += qtyChange
-                    batch.pieces += piecesChange
+                    batch.qty = round2(batch.qty + qtyChange)
+                    batch.pieces = round2(batch.pieces + piecesChange)
                     if (m.reference && m.deliveryNoteId) {
                         batch.referenceMap.set(m.reference, { noteId: m.deliveryNoteId, isReturn: !isSiteIn })
                     }
@@ -203,9 +207,9 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         // Calculate totals and filter out empty batches
         map.forEach((item, key) => {
             item.batches = item.batches.filter(b => Math.abs(b.qty) > 0.001)
-            item.totalQty = item.batches.reduce((sum, b) => sum + b.qty, 0)
-            item.totalPieces = item.batches.reduce((sum, b) => sum + b.pieces, 0)
-            item.totalValue = item.batches.reduce((sum, b) => sum + (b.qty * b.price), 0)
+            item.totalQty = round2(item.batches.reduce((sum, b) => sum + b.qty, 0))
+            item.totalPieces = round2(item.batches.reduce((sum, b) => sum + b.pieces, 0))
+            item.totalValue = round2(item.batches.reduce((sum, b) => sum + (b.qty * b.price), 0))
             // Check if any batch has missing price (price === 0)
             item.hasMissingPrice = item.batches.some(b => b.price === 0)
 
@@ -233,7 +237,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
 
     // Calculate Total Value including fictitious items
     const totalValue = useMemo(() => {
-        return groupedStock.reduce((sum, item) => {
+        return round2(groupedStock.reduce((sum, item) => {
             if (item.isFictitious) {
                 // Use batch-computed value if available, fallback to manual price
                 if (item.totalValue > 0) {
@@ -244,7 +248,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
             } else {
                 return sum + item.totalValue
             }
-        }, 0)
+        }, 0))
     }, [groupedStock, fictitiousPrices])
 
     // Count unique items (for display)

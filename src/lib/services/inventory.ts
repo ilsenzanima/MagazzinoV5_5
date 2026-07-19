@@ -2,6 +2,10 @@ import { supabase } from '@/lib/supabase';
 import { InventoryItem, InventorySupplierCode, Brand, ItemType, Unit } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload, getVerifiedPayload } from './utils';
 
+// Rounds to 2 decimals to avoid floating-point noise (e.g. 30.950000000000003)
+// when accumulating quantities/pieces from many movements in JS.
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 export interface UntrackedStockItem {
     itemId: string;
     code: string;
@@ -471,16 +475,16 @@ export const inventoryApi = {
             exits?.forEach((dni: any) => {
                 if (dni.is_fictitious) return; // Skip fictitious
                 if (dni.delivery_notes.type === 'exit' || dni.delivery_notes.type === 'sale') {
-                    usedQty += dni.quantity || 0;
-                    usedPieces += dni.pieces || 0;
+                    usedQty = round2(usedQty + (dni.quantity || 0));
+                    usedPieces = round2(usedPieces + (dni.pieces || 0));
                 } else if (dni.delivery_notes.type === 'entry') {
-                    usedQty -= dni.quantity || 0;
-                    usedPieces -= dni.pieces || 0;
+                    usedQty = round2(usedQty - (dni.quantity || 0));
+                    usedPieces = round2(usedPieces - (dni.pieces || 0));
                 }
             });
 
-            const remainingQty = Math.max(0, Math.min(pi.quantity - usedQty, pi.quantity));
-            const remainingPieces = Math.max(0, Math.min((pi.pieces || 0) - usedPieces, pi.pieces || 0));
+            const remainingQty = round2(Math.max(0, Math.min(pi.quantity - usedQty, pi.quantity)));
+            const remainingPieces = round2(Math.max(0, Math.min((pi.pieces || 0) - usedPieces, pi.pieces || 0)));
 
             return {
                 id: pi.id,
@@ -516,16 +520,16 @@ export const inventoryApi = {
         if (itemError) throw itemError;
 
         // Calculate tracked quantity (sum of all lots with remaining > 0)
-        const trackedQuantity = sortedLots
+        const trackedQuantity = round2(sortedLots
             .filter(lot => lot.remainingQty > 0.001)
-            .reduce((sum, lot) => sum + lot.remainingQty, 0);
-        const trackedPieces = sortedLots
+            .reduce((sum, lot) => sum + lot.remainingQty, 0));
+        const trackedPieces = round2(sortedLots
             .filter(lot => lot.remainingPieces && lot.remainingPieces > 0)
-            .reduce((sum, lot) => sum + (lot.remainingPieces || 0), 0);
+            .reduce((sum, lot) => sum + (lot.remainingPieces || 0), 0));
 
         // Calculate untracked (difference between total and tracked)
-        const untrackedQuantity = Math.max(0, (item.quantity || 0) - trackedQuantity);
-        const untrackedPieces = Math.max(0, (item.pieces || 0) - trackedPieces);
+        const untrackedQuantity = round2(Math.max(0, (item.quantity || 0) - trackedQuantity));
+        const untrackedPieces = round2(Math.max(0, (item.pieces || 0) - trackedPieces));
 
         return {
             lots: sortedLots,
