@@ -130,6 +130,7 @@ export interface InventoryCountItem {
     itemBrand: string;
     itemType: string;
     itemUnit: string;
+    itemImage?: string; // Image URL, for the count sheet thumbnail
     coefficient: number;
     systemPieces: number;  // Total pieces across all lots
     systemQuantity: number;
@@ -157,7 +158,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
         // Get ALL inventory items
         const { data: items, error: itemsError } = await supabase
             .from('inventory')
-            .select('id, code, name, model, brand, category, unit, coefficient, pieces');
+            .select('id, code, name, model, brand, category, unit, coefficient, pieces, image_url');
 
         if (itemsError) {
             console.error('Error fetching inventory:', itemsError);
@@ -192,6 +193,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
                 itemBrand: item.brand || '',
                 itemType: item.category || '',
                 itemUnit: item.unit || '',
+                itemImage: item.image_url || undefined,
                 coefficient: coeff,
                 systemPieces: totalPieces,
                 systemQuantity: totalPieces * coeff

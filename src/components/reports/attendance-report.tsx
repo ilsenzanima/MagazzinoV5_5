@@ -4,11 +4,18 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileDown, Loader2, Users } from "lucide-react";
+import { FileDown, Loader2, Users, MapPin } from "lucide-react";
 import { attendanceApi, workersApi, Attendance, Worker } from "@/lib/api";
 import { generateMonthlyReport } from "@/components/attendance/report-generator";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+
+function getAttendanceLocation(a: Attendance): string {
+    if (a.jobId) return a.jobName || a.jobDescription || a.jobCode || 'Commessa';
+    if (a.warehouseId) return a.warehouseName || 'Magazzino';
+    return '—';
+}
 
 const MONTHS = [
     { value: 0, label: "Gennaio" },
@@ -33,6 +40,7 @@ export default function AttendanceReport() {
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
 
     // Generate year options (current year and 2 previous)
     const currentYear = new Date().getFullYear();
@@ -56,6 +64,9 @@ export default function AttendanceReport() {
             const activeWorkers = workersData.filter(w => w.isActive);
             setWorkers(activeWorkers);
             setAttendance(attendanceData);
+            setSelectedWorkerId(prev =>
+                prev && activeWorkers.some(w => w.id === prev) ? prev : (activeWorkers[0]?.id ?? null)
+            );
         } catch (err) {
             console.error("Error loading attendance data:", err);
             setError("Errore nel caricamento dei dati presenze");
@@ -89,6 +100,34 @@ export default function AttendanceReport() {
         .reduce((sum, a) => sum + a.hours, 0);
 
     const monthLabel = format(new Date(selectedYear, selectedMonth, 1), 'MMMM yyyy', { locale: it });
+
+    const selectedWorker = workers.find(w => w.id === selectedWorkerId) ?? null;
+
+    // Righe giorno per giorno per il dipendente selezionato: se in uno stesso giorno ci sono
+    // più presenze, vengono aggiunte più righe lasciando vuoto il riferimento al giorno
+    // per le righe successive alla prima.
+    const selectedWorkerRows = (() => {
+        if (!selectedWorkerId) return [];
+        const entries = attendance
+            .filter(a => a.workerId === selectedWorkerId && (a.status === 'presence' || a.status === 'transfer'))
+            .slice()
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        let lastDate = '';
+        return entries.map(a => {
+            const isFirstOfDay = a.date !== lastDate;
+            lastDate = a.date;
+            const day = new Date(`${a.date}T00:00:00`);
+            return {
+                id: a.id,
+                dayNumber: isFirstOfDay ? format(day, 'd') : '',
+                dayName: isFirstOfDay ? format(day, 'EEEE', { locale: it }) : '',
+                hours: a.hours,
+                isTransfer: a.status === 'transfer',
+                location: getAttendanceLocation(a),
+            };
+        });
+    })();
 
     if (loading) {
         return (
@@ -186,6 +225,11 @@ export default function AttendanceReport() {
             <Card>
                 <CardHeader className="pb-2">
                     <CardTitle className="text-lg dark:text-white">Dipendenti - {monthLabel}</CardTitle>
+                    {workers.length > 0 && (
+                        <p className="text-xs text-slate-400 dark:text-slate-500">
+                            Clicca su un dipendente per vedere il dettaglio giornaliero qui sotto.
+                        </p>
+                    )}
                 </CardHeader>
                 <CardContent>
                     {workers.length === 0 ? (
@@ -200,20 +244,79 @@ export default function AttendanceReport() {
                                 const workerHours = workerAttendance
                                     .filter(a => a.status === 'presence' || a.status === 'transfer')
                                     .reduce((sum, a) => sum + a.hours, 0);
+                                const isSelected = worker.id === selectedWorkerId;
 
                                 return (
-                                    <div key={worker.id} className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-800 dark:border-slate-700">
+                                    <button
+                                        key={worker.id}
+                                        type="button"
+                                        onClick={() => setSelectedWorkerId(worker.id)}
+                                        className={cn(
+                                            "text-left p-3 border rounded-lg transition-colors",
+                                            isSelected
+                                                ? "bg-blue-50 border-blue-400 ring-1 ring-blue-400 dark:bg-blue-950 dark:border-blue-600"
+                                                : "bg-slate-50 border-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                                        )}
+                                    >
                                         <p className="font-medium dark:text-white">{worker.lastName} {worker.firstName}</p>
                                         <p className="text-sm text-slate-500 dark:text-slate-400">
                                             {workerHours} ore lavorate
                                         </p>
-                                    </div>
+                                    </button>
                                 );
                             })}
                         </div>
                     )}
                 </CardContent>
             </Card>
+
+            {/* Dettaglio giornaliero del dipendente selezionato */}
+            {selectedWorker && (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-lg dark:text-white">
+                            {selectedWorker.lastName} {selectedWorker.firstName} - {monthLabel}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {selectedWorkerRows.length === 0 ? (
+                            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                                <MapPin className="h-10 w-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                                <p>Nessuna presenza registrata in questo mese.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-auto max-h-[400px]">
+                                <table className="w-full text-sm">
+                                    <thead className="sticky top-0 bg-white dark:bg-slate-900">
+                                        <tr className="border-b dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
+                                            <th className="py-2 pr-2 font-medium w-32">Giorno</th>
+                                            <th className="py-2 pr-2 font-medium w-24">Ore</th>
+                                            <th className="py-2 pr-2 font-medium">Presso</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {selectedWorkerRows.map(row => (
+                                            <tr key={row.id} className="border-b dark:border-slate-800">
+                                                <td className="py-2 pr-2 dark:text-white">
+                                                    {row.dayNumber && (
+                                                        <span className="font-medium">
+                                                            {row.dayNumber} <span className="capitalize text-slate-500 dark:text-slate-400">{row.dayName}</span>
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="py-2 pr-2 dark:text-slate-300">
+                                                    {row.hours}{row.isTransfer ? " (Trasferta)" : ""}
+                                                </td>
+                                                <td className="py-2 pr-2 dark:text-slate-300">{row.location}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }

@@ -12,6 +12,7 @@ export default function InventoryReport() {
     const [data, setData] = useState<InventoryCountData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [generating, setGenerating] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -31,9 +32,16 @@ export default function InventoryReport() {
         }
     };
 
-    const handleExportPDF = () => {
-        if (data) {
-            generateInventoryCountReport(data);
+    const handleExportPDF = async () => {
+        if (!data) return;
+        try {
+            setGenerating(true);
+            await generateInventoryCountReport(data);
+        } catch (err) {
+            console.error("Error generating PDF:", err);
+            setError("Errore nella generazione del PDF");
+        } finally {
+            setGenerating(false);
         }
     };
 
@@ -93,8 +101,8 @@ export default function InventoryReport() {
                         <p className="text-xl font-bold dark:text-white">{Object.keys(groupedItems).length}</p>
                     </Card>
                 </div>
-                <Button onClick={handleExportPDF} className="gap-2">
-                    <FileDown className="h-4 w-4" />
+                <Button onClick={handleExportPDF} disabled={generating} className="gap-2">
+                    {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                     Stampa Foglio Conta
                 </Button>
             </div>
@@ -106,7 +114,7 @@ export default function InventoryReport() {
                         <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                         <div>
                             <strong>Istruzioni:</strong> Esporta il foglio PDF e usalo per la conta fisica dell&apos;inventario.
-                            Compila la colonna &quot;Contati&quot; durante la verifica e annota le differenze.
+                            Annota nella colonna &quot;Diff.&quot; le differenze riscontrate durante la verifica.
                         </div>
                     </div>
                 </CardContent>

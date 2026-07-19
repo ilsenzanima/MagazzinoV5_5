@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import QRCode from "react-qr-code"
 import Barcode from "react-barcode"
 import { inventoryApi, inventorySupplierCodesApi } from "@/lib/api"
@@ -15,10 +16,10 @@ import { Loader2, Printer, QrCode, Barcode as BarcodeIcon, Search, CheckSquare, 
 type Mode = "qr" | "barcode"
 type LabelSize = "sm" | "md" | "lg" | "full"
 
-const SIZE_CONFIG: Record<Exclude<LabelSize, "full">, { label: string; qr: number; barcodeWidth: number; barcodeHeight: number; class: string }> = {
-  sm: { label: "Piccolo",  qr: 64,  barcodeWidth: 1.2, barcodeHeight: 40,  class: "w-[110px]" },
-  md: { label: "Medio",   qr: 96,  barcodeWidth: 1.6, barcodeHeight: 55,  class: "w-[160px]" },
-  lg: { label: "Grande",  qr: 128, barcodeWidth: 2.0, barcodeHeight: 70,  class: "w-[210px]" },
+const SIZE_CONFIG: Record<Exclude<LabelSize, "full">, { label: string; qr: number; barcodeWidth: number; barcodeHeight: number; class: string; minClass: string }> = {
+  sm: { label: "Piccolo",  qr: 64,  barcodeWidth: 1.2, barcodeHeight: 40,  class: "w-[110px]", minClass: "min-w-[110px]" },
+  md: { label: "Medio",   qr: 96,  barcodeWidth: 1.6, barcodeHeight: 55,  class: "w-[160px]", minClass: "min-w-[160px]" },
+  lg: { label: "Grande",  qr: 128, barcodeWidth: 2.0, barcodeHeight: 70,  class: "w-[210px]", minClass: "min-w-[210px]" },
 }
 
 // ─── Etichetta compatta (sm/md/lg) ───────────────────────────────────────────
@@ -31,8 +32,14 @@ interface CompactLabelProps {
 function CompactLabel({ item, mode, size }: CompactLabelProps) {
   const cfg = SIZE_CONFIG[size]
   const value = item.code || item.id
+  // Il QR è quadrato a dimensione fissa, quindi la larghezza del cartellino va bene fissa.
+  // Il codice a barre invece si allarga in base alla lunghezza del valore codificato: se
+  // forzassimo la stessa larghezza del QR la cornice risulterebbe più stretta del codice
+  // stampato. Per il codice a barre usiamo quindi una larghezza minima e lasciamo che il
+  // cartellino si adatti al contenuto.
+  const sizeClass = mode === "qr" ? cfg.class : cfg.minClass
   return (
-    <div className={`label-card flex flex-col items-center gap-1 p-2 border rounded ${cfg.class} break-inside-avoid`}>
+    <div className={`label-card flex flex-col items-center gap-1 p-2 border rounded ${sizeClass} break-inside-avoid`}>
       {mode === "qr"
         ? <QRCode value={value} size={cfg.qr} />
         : <Barcode value={value} width={cfg.barcodeWidth} height={cfg.barcodeHeight} displayValue={false} margin={0} />
@@ -57,8 +64,11 @@ function FullPageLabel({ item, mode, supplierCodes, isLast }: FullPageLabelProps
     <div
       className="label-card full-page-label"
       style={{
+        boxSizing: "border-box",
         width: "100%",
-        minHeight: "270mm",
+        height: "277mm",
+        maxHeight: "277mm",
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -150,7 +160,15 @@ export default function QrPrintReport() {
   const [size, setSize] = useState<LabelSize>("md")
   const [supplierCodesMap, setSupplierCodesMap] = useState<Map<string, InventorySupplierCode[]>>(new Map())
   const [loadingCodes, setLoadingCodes] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
+
+  // L'area di stampa viene teletrasportata (portal) direttamente in <body> solo lato client:
+  // in questo modo, in stampa, basta nascondere gli altri figli di <body> (sidebar, header,
+  // ecc.) invece di dover nascondere con "visibility" tutto il resto della pagina, che
+  // restando comunque nel flusso del documento generava un'inutile pagina bianca finale
+  // con solo intestazione e piè di pagina della stampa.
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     inventoryApi.getAll()
@@ -217,12 +235,13 @@ export default function QrPrintReport() {
           #qr-print-area { position: fixed; left: -9999px; top: 0; width: 210mm; }
         }
         @media print {
-          body * { visibility: hidden; }
-          #qr-print-area, #qr-print-area * { visibility: visible; }
+          @page { size: A4; margin: 10mm; }
+          /* #qr-print-area è teletrasportato come figlio diretto di <body>: nascondendo solo
+             i suoi fratelli (e non l'intero sottoalbero con "visibility"), non resta più
+             nel documento nessun contenuto invisibile che occupi spazio e generi pagine
+             bianche in più. */
+          body > *:not(#qr-print-area) { display: none !important; }
           #qr-print-area {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
             width: 100% !important;
             background: white !important;
           }
@@ -337,27 +356,30 @@ export default function QrPrintReport() {
         </div>
       </div>
 
-      {/* Area di stampa */}
-      <div
-        id="qr-print-area"
-        ref={printRef}
-        style={size === "full" ? { display: "flex", flexDirection: "column" } : { display: "flex", flexWrap: "wrap", gap: "12px", padding: "16px" }}
-      >
-        {size === "full"
-          ? selectedItems.map((item, i) => (
-              <FullPageLabel
-                key={item.id}
-                item={item}
-                mode={mode}
-                supplierCodes={supplierCodesMap.get(item.id) ?? []}
-                isLast={i === selectedItems.length - 1}
-              />
-            ))
-          : selectedItems.map(item => (
-              <CompactLabel key={item.id} item={item} mode={mode} size={size as Exclude<LabelSize, "full">} />
-            ))
-        }
-      </div>
+      {/* Area di stampa, teletrasportata in <body> (vedi commento sopra) */}
+      {mounted && createPortal(
+        <div
+          id="qr-print-area"
+          ref={printRef}
+          style={size === "full" ? { display: "flex", flexDirection: "column" } : { display: "flex", flexWrap: "wrap", gap: "12px", padding: "16px" }}
+        >
+          {size === "full"
+            ? selectedItems.map((item, i) => (
+                <FullPageLabel
+                  key={item.id}
+                  item={item}
+                  mode={mode}
+                  supplierCodes={supplierCodesMap.get(item.id) ?? []}
+                  isLast={i === selectedItems.length - 1}
+                />
+              ))
+            : selectedItems.map(item => (
+                <CompactLabel key={item.id} item={item} mode={mode} size={size as Exclude<LabelSize, "full">} />
+              ))
+          }
+        </div>,
+        document.body
+      )}
     </>
   )
 }

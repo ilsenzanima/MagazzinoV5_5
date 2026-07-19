@@ -4,14 +4,13 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, Users, ClipboardList, QrCode, Download, Loader2 } from "lucide-react";
+import { Package, Users, ClipboardList, QrCode, Loader2 } from "lucide-react";
 import ArticlesReport from "@/components/reports/articles-report";
 import AttendanceReport from "@/components/reports/attendance-report";
 import InventoryReport from "@/components/reports/inventory-report";
 import QrPrintReport from "@/components/reports/qr-print-report";
-import DownloadReport from "@/components/reports/download-report";
 
-const REPORT_TABS = ["articles", "attendance", "inventory", "qr", "download"];
+const REPORT_TABS = ["articles", "attendance", "inventory", "qr"];
 
 function ReportsContent() {
   const router = useRouter();
@@ -39,7 +38,7 @@ function ReportsContent() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
+          <TabsList className="grid w-full grid-cols-4 lg:w-[640px]">
             <TabsTrigger value="articles" className="gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Articoli</span>
@@ -55,10 +54,6 @@ function ReportsContent() {
             <TabsTrigger value="qr" className="gap-2">
               <QrCode className="h-4 w-4" />
               <span className="hidden sm:inline">QR / Codici</span>
-            </TabsTrigger>
-            <TabsTrigger value="download" className="gap-2">
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Download</span>
             </TabsTrigger>
           </TabsList>
 
@@ -76,10 +71,6 @@ function ReportsContent() {
 
           <TabsContent value="qr" className="mt-6">
             <QrPrintReport />
-          </TabsContent>
-
-          <TabsContent value="download" className="mt-6">
-            <DownloadReport />
           </TabsContent>
         </Tabs>
       </div>
