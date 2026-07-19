@@ -20,7 +20,6 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { HelpTip } from "@/components/ui/help-tip";
 import {
     Plus,
     Search,
@@ -170,10 +169,6 @@ function LoadNotesContent() {
                                     {pendingNotes.length}
                                 </Badge>
                             )}
-                            <HelpTip
-                                title="Da Processare"
-                                description="Non significa che il materiale non sia stato preso: è solo che nessuno ha ancora archiviato la nota dopo averla riconciliata. Puoi archiviarla o riaprirla in qualsiasi momento."
-                            />
                         </TabsTrigger>
                         <TabsTrigger value="completed">Completate</TabsTrigger>
                     </TabsList>
