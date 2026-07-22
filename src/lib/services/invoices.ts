@@ -25,6 +25,7 @@ const mapDbToInvoice = (db: any): Invoice => ({
             (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1),
             0
         ),
+        hasReturn: p.purchase_items?.some((i: any) => !!i.returned_at) ?? false,
         items: p.purchase_items?.map((i: any) => ({
             id: i.id,
             itemName: i.inventory?.name,
@@ -33,6 +34,9 @@ const mapDbToInvoice = (db: any): Invoice => ({
             price: i.price,
             transportApplied: i.transport_applied ?? false,
             transportUnitCost: i.transport_unit_cost ?? 0,
+            returnedQuantity: i.returned_quantity ?? null,
+            returnedPieces: i.returned_pieces ?? null,
+            returnedAt: i.returned_at ?? null,
         })),
     })),
 });
@@ -52,7 +56,7 @@ export const invoicesApi = {
         let query = supabase
             .from('invoices')
             .select(
-                '*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity))',
+                '*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity, returned_at))',
                 { count: 'estimated' }
             )
             .is('deleted_at', null)
@@ -73,7 +77,7 @@ export const invoicesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('invoices')
-                .select('*, suppliers(name), purchases(id, delivery_note_number, delivery_note_date, transport_cost, purchase_items(id, price, quantity, transport_applied, transport_unit_cost, inventory(name, model)))')
+                .select('*, suppliers(name), purchases(id, delivery_note_number, delivery_note_date, transport_cost, purchase_items(id, price, quantity, transport_applied, transport_unit_cost, returned_quantity, returned_pieces, returned_at, inventory(name, model)))')
                 .eq('id', id)
                 .single()
         );

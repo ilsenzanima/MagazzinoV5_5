@@ -293,7 +293,7 @@ export interface Purchase {
     createdBy?: string;
     createdByName?: string;
     createdAt: string;
-    items?: { price: number; quantity?: number; itemName?: string; itemModel?: string }[];
+    items?: { price: number; quantity?: number; itemName?: string; itemModel?: string; returnedAt?: string | null }[];
     orderType?: 'purchase' | 'order';
     price?: number;
     quantity?: number;
@@ -305,6 +305,7 @@ export interface Purchase {
     documentUrls?: string[];
     totalAmount?: number;
     isExhausted?: boolean;
+    hasReturn?: boolean;
     invoiceId?: string | null;
     invoiceNumber?: string | null;
     convertedPurchaseId?: string | null;
@@ -330,7 +331,8 @@ export interface Invoice {
         deliveryNoteDate?: string;
         totalAmount?: number;
         transportCost?: number;
-        items?: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; transportApplied?: boolean; transportUnitCost?: number }[];
+        hasReturn?: boolean;
+        items?: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; transportApplied?: boolean; transportUnitCost?: number; returnedQuantity?: number | null; returnedPieces?: number | null; returnedAt?: string | null }[];
     }[];
 }
 
@@ -352,6 +354,13 @@ export interface PurchaseItem {
     createdAt: string;
     transportApplied?: boolean;
     transportUnitCost?: number;
+    returnedQuantity?: number | null;
+    returnedPieces?: number | null;
+    returnedAt?: string | null;
+    returnedBy?: string | null;
+    returnedByName?: string | null;
+    preReturnQuantity?: number | null;
+    preReturnPieces?: number | null;
 }
 
 // Delivery Notes (DDT)

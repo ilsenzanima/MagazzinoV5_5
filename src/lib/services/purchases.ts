@@ -19,7 +19,9 @@ export const mapDbToPurchase = (db: any): Purchase => ({
         quantity: item.quantity,
         itemName: item.inventory?.name,
         itemModel: item.inventory?.model,
+        returnedAt: item.returned_at ?? null,
     })),
+    hasReturn: db.purchase_items?.some((item: any) => !!item.returned_at) ?? false,
     orderType: db.order_type ?? 'purchase',
     jobId: db.job_id,
     jobCode: db.jobs?.code,
@@ -69,7 +71,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model))')
+                .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model), returned_at)')
                 .is('deleted_at', null)
                 .order('delivery_note_date', { ascending: false })
         );
@@ -82,7 +84,7 @@ export const purchasesApi = {
 
         let query = supabase
             .from('purchases')
-            .select('*, suppliers(name), jobs(code, name, clients(name)), purchase_items(price, quantity, inventory(name, model)), invoices(invoice_number), converted_purchase:converted_purchase_id(delivery_note_number)', { count: 'estimated' })
+            .select('*, suppliers(name), jobs(code, name, clients(name)), purchase_items(price, quantity, inventory(name, model), returned_at), invoices(invoice_number), converted_purchase:converted_purchase_id(delivery_note_number)', { count: 'estimated' })
             .eq('order_type', orderType)
             .is('deleted_at', null);
 
@@ -183,7 +185,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('*, suppliers(name), purchase_items(price, quantity), profiles(full_name)')
+                .select('*, suppliers(name), purchase_items(price, quantity, returned_at), profiles(full_name)')
                 .eq('job_id', jobId)
                 .is('deleted_at', null)
                 .order('delivery_note_date', { ascending: false })
@@ -297,7 +299,7 @@ export const purchasesApi = {
     getDeleted: async () => {
         const { data, error } = await supabase
             .from('purchases')
-            .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model))')
+            .select('*, suppliers(name), purchase_items(price, quantity, inventory(name, model), returned_at)')
             .not('deleted_at', 'is', null)
             .order('deleted_at', { ascending: false });
         if (error) throw error;
@@ -340,7 +342,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchase_items')
-                .select('*, inventory(name, code, model, unit), jobs(code, name)')
+                .select('*, inventory(name, code, model, unit), jobs(code, name), returned_by_profile:profiles!purchase_items_returned_by_fkey(full_name)')
                 .eq('purchase_id', purchaseId)
         );
 
@@ -363,7 +365,120 @@ export const purchasesApi = {
             createdAt: item.created_at,
             transportApplied: item.transport_applied ?? false,
             transportUnitCost: item.transport_unit_cost ?? 0,
+            returnedQuantity: item.returned_quantity ?? null,
+            returnedPieces: item.returned_pieces ?? null,
+            returnedAt: item.returned_at ?? null,
+            returnedBy: item.returned_by ?? null,
+            returnedByName: item.returned_by_profile?.full_name ?? null,
+            preReturnQuantity: item.pre_return_quantity ?? null,
+            preReturnPieces: item.pre_return_pieces ?? null,
         }));
+    },
+
+    // Get the quantity/pieces of a purchase item still un-consumed (not moved out
+    // via exit/sale delivery notes), i.e. the max that can still be returned.
+    getItemRemaining: async (itemId: string) => {
+        const { data: item, error: itemError } = await supabase
+            .from('purchase_items')
+            .select('quantity, pieces, coefficient')
+            .eq('id', itemId)
+            .single();
+        if (itemError) throw itemError;
+
+        const { data: movements, error: movementsError } = await supabase
+            .from('delivery_note_items')
+            .select('quantity, pieces, delivery_notes!inner(type, is_fictitious)')
+            .eq('purchase_item_id', itemId)
+            .in('delivery_notes.type', ['exit', 'sale']);
+        if (movementsError) throw movementsError;
+
+        const consumed = (movements || []).reduce((acc: { quantity: number; pieces: number }, m: any) => {
+            if (m.delivery_notes?.is_fictitious) return acc;
+            acc.quantity += m.quantity || 0;
+            acc.pieces += m.pieces || 0;
+            return acc;
+        }, { quantity: 0, pieces: 0 });
+
+        return {
+            quantity: item.quantity,
+            pieces: item.pieces,
+            coefficient: item.coefficient ?? 1,
+            remainingQuantity: Math.max(0, (item.quantity || 0) - consumed.quantity),
+            remainingPieces: item.pieces != null ? Math.max(0, item.pieces - consumed.pieces) : null,
+        };
+    },
+
+    // Apply a return (reso) to the supplier on a purchase item: subtracts the
+    // returned pieces/quantity from the row (same effect as a manual edit),
+    // keeping track of the returned amount and the pre-return values for restore.
+    applyReturn: async (itemId: string, { pieces, quantity }: { pieces?: number; quantity: number }) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Utente non autenticato");
+
+        const { data: current, error: currentError } = await supabase
+            .from('purchase_items')
+            .select('quantity, pieces, coefficient, returned_at')
+            .eq('id', itemId)
+            .single();
+        if (currentError) throw currentError;
+        if (current.returned_at) {
+            throw new Error("Esiste già un reso attivo su questa riga. Eliminalo prima di applicarne uno nuovo.");
+        }
+
+        const remaining = await purchasesApi.getItemRemaining(itemId);
+        if (quantity <= 0) throw new Error("La quantità resa deve essere maggiore di zero");
+        if (quantity > remaining.remainingQuantity + 0.001) {
+            throw new Error(`Quantità resa superiore alla disponibilità (max ${remaining.remainingQuantity})`);
+        }
+        if (remaining.remainingPieces != null && pieces != null && pieces > remaining.remainingPieces + 0.001) {
+            throw new Error(`Pezzi resi superiori alla disponibilità (max ${remaining.remainingPieces})`);
+        }
+
+        const newQuantity = Math.max(0, (current.quantity || 0) - quantity);
+        const newPieces = current.pieces != null && pieces != null ? Math.max(0, current.pieces - pieces) : current.pieces;
+
+        const { error } = await supabase
+            .from('purchase_items')
+            .update({
+                quantity: newQuantity,
+                pieces: newPieces,
+                returned_quantity: quantity,
+                returned_pieces: pieces ?? null,
+                returned_at: new Date().toISOString(),
+                returned_by: user.id,
+                pre_return_quantity: current.quantity,
+                pre_return_pieces: current.pieces,
+            })
+            .eq('id', itemId);
+        if (error) throw error;
+    },
+
+    // Cancel an active return on a purchase item, restoring the pre-return values.
+    cancelReturn: async (itemId: string) => {
+        const { data: current, error: currentError } = await supabase
+            .from('purchase_items')
+            .select('returned_at, pre_return_quantity, pre_return_pieces')
+            .eq('id', itemId)
+            .single();
+        if (currentError) throw currentError;
+        if (!current.returned_at) {
+            throw new Error("Nessun reso attivo su questa riga");
+        }
+
+        const { error } = await supabase
+            .from('purchase_items')
+            .update({
+                quantity: current.pre_return_quantity,
+                pieces: current.pre_return_pieces,
+                returned_quantity: null,
+                returned_pieces: null,
+                returned_at: null,
+                returned_by: null,
+                pre_return_quantity: null,
+                pre_return_pieces: null,
+            })
+            .eq('id', itemId);
+        if (error) throw error;
     },
     addItem: async (item: Partial<PurchaseItem>) => {
         const dbItem: any = {

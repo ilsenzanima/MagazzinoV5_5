@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Search, Loader2, FileText, Calendar, User, AlertTriangle,
-  Paperclip, Package, PackageX, Receipt, ShoppingCart, ClipboardList, ArrowRightLeft
+  Paperclip, Package, PackageX, Receipt, ShoppingCart, ClipboardList, ArrowRightLeft, Undo2
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
@@ -218,6 +218,9 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                                 {purchase.documentUrl && (
                                   <span title="Documento allegato"><Paperclip className="h-4 w-4 text-violet-500" /></span>
                                 )}
+                                {!isOrder && purchase.hasReturn && (
+                                  <span title="Materiale reso al fornitore"><Undo2 className="h-4 w-4 text-amber-600" /></span>
+                                )}
                                 {!isOrder && hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
                                   <span title="Prezzo mancante"><AlertTriangle className="h-5 w-5 text-amber-500" /></span>
                                 )}
@@ -313,6 +316,9 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                               : <span title="Disponibile"><Package className="h-4 w-4 text-emerald-500" /></span>
                             )}
                             {purchase.documentUrl && <span title="Allegato"><Paperclip className="h-4 w-4 text-violet-500" /></span>}
+                            {!isOrder && purchase.hasReturn && (
+                              <span title="Materiale reso al fornitore"><Undo2 className="h-4 w-4 text-amber-600" /></span>
+                            )}
                             {!isOrder && hasMissingPrices && (userRole === 'admin' || userRole === 'operativo') && (
                               <span title="Prezzo mancante"><AlertTriangle className="h-4 w-4 text-amber-500" /></span>
                             )}

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     ArrowLeft, FileText, Calendar, User, Loader2, ExternalLink,
-    Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus, Lock, Unlock, Truck, CheckCircle2
+    Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus, Lock, Unlock, Truck, CheckCircle2, Undo2
 } from "lucide-react";
 import Link from "next/link";
 import { Fragment, useEffect, useState } from "react";
@@ -28,7 +28,7 @@ function ItemPriceRow({
     canEdit,
     onSaved,
 }: {
-    item: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number };
+    item: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; returnedQuantity?: number | null; returnedPieces?: number | null; returnedAt?: string | null };
     canEdit: boolean;
     onSaved: () => void;
 }) {
@@ -93,6 +93,15 @@ function ItemPriceRow({
             <td className="py-1.5 pr-2">
                 <span className="font-medium text-slate-700 dark:text-slate-300">{item.itemName || '—'}</span>
                 {item.itemModel && <span className="text-slate-400 ml-1">({item.itemModel})</span>}
+                {item.returnedAt && (
+                    <span
+                        className="inline-flex items-center gap-1 ml-2 rounded-full bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300 align-middle"
+                        title={`Reso al fornitore registrato il ${new Date(item.returnedAt).toLocaleDateString('it-IT')}`}
+                    >
+                        <Undo2 className="h-2.5 w-2.5" />
+                        Reso: {item.returnedPieces ? `${item.returnedPieces} pz` : `${item.returnedQuantity}`}
+                    </span>
+                )}
             </td>
             <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-16">{qty}</td>
             {canEdit && editing ? (
@@ -545,6 +554,15 @@ export default function InvoiceDetailPage() {
                         <CardHeader className="py-4">
                             <CardTitle>Bolle Collegate</CardTitle>
                         </CardHeader>
+                        {linkedPurchases.some(p => p.hasReturn) && (
+                            <div className="mx-4 mb-3 flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                                <Undo2 className="h-4 w-4 shrink-0 mt-0.5" />
+                                <span>
+                                    Attenzione: una o più bolle collegate a questa fattura hanno subito un reso al fornitore dopo l&apos;emissione.
+                                    Verificare eventuali discrepanze tra gli importi fatturati e quelli effettivamente dovuti.
+                                </span>
+                            </div>
+                        )}
                         <CardContent className="p-0">
                             {/* Bolle attuali */}
                             {linkedPurchases.length > 0 ? (
@@ -579,6 +597,11 @@ export default function InvoiceDetailPage() {
                                             {p.deliveryNoteDate && (
                                                 <span className="ml-1.5 text-xs font-normal text-slate-400">
                                                     ({new Date(p.deliveryNoteDate).toLocaleDateString('it-IT')})
+                                                </span>
+                                            )}
+                                            {p.hasReturn && (
+                                                <span title="Bolla con materiale reso al fornitore" className="ml-1.5 inline-block align-middle">
+                                                    <Undo2 className="h-3.5 w-3.5 text-amber-600 inline" />
                                                 </span>
                                             )}
                                         </td>

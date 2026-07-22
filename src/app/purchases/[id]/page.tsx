@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink, Truck, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink, Truck, CheckCircle2, Undo2, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
@@ -94,6 +94,15 @@ export default function PurchaseDetailPage() {
     // Edit Item State
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [editValues, setEditValues] = useState<{ price: string, quantity: string, pieces: string, total: string }>({ price: "", quantity: "", pieces: "", total: "" });
+
+    // Return (Reso) State
+    const [returnItem, setReturnItem] = useState<PurchaseItem | null>(null);
+    const [returnValues, setReturnValues] = useState({ pieces: "", quantity: "" });
+    const [returnRemaining, setReturnRemaining] = useState<{ remainingQuantity: number; remainingPieces: number | null } | null>(null);
+    const [loadingReturnRemaining, setLoadingReturnRemaining] = useState(false);
+    const [applyingReturn, setApplyingReturn] = useState(false);
+    const [cancelReturnItemId, setCancelReturnItemId] = useState<string | null>(null);
+    const [cancelingReturn, setCancelingReturn] = useState(false);
 
     // Edit Header State
     const [isEditingHeader, setIsEditingHeader] = useState(false);
@@ -502,6 +511,85 @@ export default function PurchaseDetailPage() {
 
     const cancelEdit = () => {
         setEditingItemId(null);
+    };
+
+    // Return (Reso) Functions
+    const itemCoefficientFor = (item: PurchaseItem) => {
+        const inventoryItem = inventory.find(inv => inv.id === item.itemId);
+        return inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
+    };
+
+    const openReturnDialog = async (item: PurchaseItem) => {
+        setReturnItem(item);
+        setReturnValues({ pieces: "", quantity: "" });
+        setReturnRemaining(null);
+        setLoadingReturnRemaining(true);
+        try {
+            const remaining = await purchasesApi.getItemRemaining(item.id);
+            setReturnRemaining({ remainingQuantity: remaining.remainingQuantity, remainingPieces: remaining.remainingPieces });
+        } catch (error) {
+            console.error("Failed to load remaining quantity", error);
+            alert("Errore nel calcolo della quantità disponibile per il reso");
+            setReturnItem(null);
+        } finally {
+            setLoadingReturnRemaining(false);
+        }
+    };
+
+    const handleReturnPiecesChange = (piecesStr: string) => {
+        if (!returnItem) return;
+        const coeff = itemCoefficientFor(returnItem);
+        const pieces = parseFloat(piecesStr);
+        const quantityStr = !isNaN(pieces) ? (pieces * coeff).toFixed(2) : "";
+        setReturnValues({ pieces: piecesStr, quantity: quantityStr });
+    };
+
+    const handleReturnQuantityChange = (quantityStr: string) => {
+        if (!returnItem) return;
+        const coeff = itemCoefficientFor(returnItem);
+        const quantity = parseFloat(quantityStr);
+        const piecesStr = !isNaN(quantity) && coeff ? (quantity / coeff).toFixed(2) : returnValues.pieces;
+        setReturnValues({ pieces: piecesStr, quantity: quantityStr });
+    };
+
+    const submitReturn = async () => {
+        if (!returnItem) return;
+        const quantity = parseFloat(returnValues.quantity);
+        const pieces = returnValues.pieces ? parseFloat(returnValues.pieces) : undefined;
+
+        if (isNaN(quantity) || quantity <= 0) {
+            alert("Inserisci una quantità resa valida");
+            return;
+        }
+
+        try {
+            setApplyingReturn(true);
+            await purchasesApi.applyReturn(returnItem.id, { pieces, quantity });
+            const updatedItems = await purchasesApi.getItems(id);
+            setItems(updatedItems);
+            setReturnItem(null);
+        } catch (error: any) {
+            console.error("Failed to apply return", error);
+            alert(`Errore durante la registrazione del reso: ${error.message || ""}`);
+        } finally {
+            setApplyingReturn(false);
+        }
+    };
+
+    const handleCancelReturn = async () => {
+        if (!cancelReturnItemId) return;
+        try {
+            setCancelingReturn(true);
+            await purchasesApi.cancelReturn(cancelReturnItemId);
+            const updatedItems = await purchasesApi.getItems(id);
+            setItems(updatedItems);
+            setCancelReturnItemId(null);
+        } catch (error: any) {
+            console.error("Failed to cancel return", error);
+            alert(`Errore durante l'eliminazione del reso: ${error.message || ""}`);
+        } finally {
+            setCancelingReturn(false);
+        }
     };
 
     const toggleExpanded = (itemId: string) => {
@@ -995,6 +1083,15 @@ export default function PurchaseDetailPage() {
                                                         {item.itemModel && <span className="text-slate-500 font-medium ml-1">({item.itemModel})</span>}
                                                     </div>
                                                     <div className="text-xs text-slate-500">{item.itemCode}</div>
+                                                    {item.returnedAt && (
+                                                        <span
+                                                            className="inline-flex items-center gap-1 mt-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300"
+                                                            title={`Reso registrato il ${new Date(item.returnedAt).toLocaleDateString('it-IT')}${item.returnedByName ? ` da ${item.returnedByName}` : ''}`}
+                                                        >
+                                                            <Undo2 className="h-3 w-3" />
+                                                            Reso: {item.returnedPieces ? `${item.returnedPieces} pz` : `${item.returnedQuantity}`}
+                                                        </span>
+                                                    )}
                                                 </TableCell>
 
                                                 {/* Editable Fields */}
@@ -1161,13 +1258,40 @@ export default function PurchaseDetailPage() {
                                                         </div>
                                                     ) : (
                                                         (userRole === 'admin' || userRole === 'operativo') && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => startEditing(item)}
-                                                            >
-                                                                Modifica
-                                                            </Button>
+                                                            <div className="flex justify-end gap-1">
+                                                                {item.returnedAt ? (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                        title="Elimina reso e ripristina i valori originali"
+                                                                        onClick={() => setCancelReturnItemId(item.id)}
+                                                                    >
+                                                                        <RotateCcw className="h-3.5 w-3.5 mr-1" /> Elimina reso
+                                                                    </Button>
+                                                                ) : (
+                                                                    <>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            onClick={() => startEditing(item)}
+                                                                        >
+                                                                            Modifica
+                                                                        </Button>
+                                                                        {!isOrder && (
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                                                                title="Registra reso al fornitore"
+                                                                                onClick={() => openReturnDialog(item)}
+                                                                            >
+                                                                                <Undo2 className="h-3.5 w-3.5 mr-1" /> Reso
+                                                                            </Button>
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                            </div>
                                                         )
                                                     )}
                                                 </TableCell>
@@ -1230,6 +1354,15 @@ export default function PurchaseDetailPage() {
                                                         </span>
                                                     )}
                                                 </div>
+                                                {item.returnedAt && (
+                                                    <span
+                                                        className="inline-flex items-center gap-1 mt-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300"
+                                                        title={`Reso registrato il ${new Date(item.returnedAt).toLocaleDateString('it-IT')}${item.returnedByName ? ` da ${item.returnedByName}` : ''}`}
+                                                    >
+                                                        <Undo2 className="h-3 w-3" />
+                                                        Reso: {item.returnedPieces ? `${item.returnedPieces} pz` : `${item.returnedQuantity}`}
+                                                    </span>
+                                                )}
                                             </div>
 
                                             {(userRole === 'admin' || userRole === 'operativo') && (
@@ -1250,10 +1383,21 @@ export default function PurchaseDetailPage() {
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </>
-                                                    ) : (
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" onClick={() => startEditing(item)}>
-                                                            <Edit className="h-3.5 w-3.5" />
+                                                    ) : item.returnedAt ? (
+                                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" title="Elimina reso e ripristina i valori originali" onClick={() => setCancelReturnItemId(item.id)}>
+                                                            <RotateCcw className="h-3.5 w-3.5" />
                                                         </Button>
+                                                    ) : (
+                                                        <>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" onClick={() => startEditing(item)}>
+                                                                <Edit className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            {!isOrder && (
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600" title="Registra reso al fornitore" onClick={() => openReturnDialog(item)}>
+                                                                    <Undo2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                             )}
@@ -1755,6 +1899,60 @@ export default function PurchaseDetailPage() {
                         </DialogContent>
                     </Dialog>
 
+                    <Dialog open={!!returnItem} onOpenChange={(open) => { if (!open) setReturnItem(null); }}>
+                        <DialogContent className="max-w-lg">
+                            <DialogHeader>
+                                <DialogTitle>Registra Reso al Fornitore</DialogTitle>
+                                <DialogDescription>
+                                    {returnItem?.itemName}{returnItem?.itemModel ? ` (${returnItem.itemModel})` : ''}
+                                </DialogDescription>
+                            </DialogHeader>
+                            {loadingReturnRemaining ? (
+                                <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                            ) : returnItem && returnRemaining && (
+                                <div className="space-y-4">
+                                    <p className="text-xs text-slate-500">
+                                        Disponibile per il reso: {returnRemaining.remainingPieces != null ? `${returnRemaining.remainingPieces} pz` : ''} ({returnRemaining.remainingQuantity} {returnItem.itemUnit || ''})
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Pezzi resi <span className="text-xs text-muted-foreground font-normal">(Coeff: {itemCoefficientFor(returnItem)})</span></Label>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={returnValues.pieces}
+                                                onChange={(e) => handleReturnPiecesChange(e.target.value)}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Quantità resa {itemCoefficientFor(returnItem) !== 1 ? '(Calc.)' : ''}</Label>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={returnValues.quantity}
+                                                onChange={(e) => handleReturnQuantityChange(e.target.value)}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        La quantità resa verrà sottratta dalla riga (come se non fosse mai arrivata) e l&apos;importo si ridurrà di conseguenza. Potrai eliminare il reso in qualsiasi momento per ripristinare i valori originali.
+                                    </p>
+                                </div>
+                            )}
+                            <DialogFooter className="mt-4">
+                                <Button variant="outline" onClick={() => setReturnItem(null)}>Annulla</Button>
+                                <Button onClick={submitReturn} disabled={applyingReturn || loadingReturnRemaining} className="bg-amber-600 hover:bg-amber-700">
+                                    {applyingReturn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
+                                    Registra Reso
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
                     <ItemSelectorDialog
                         open={isItemSelectorOpen}
                         onOpenChange={setIsItemSelectorOpen}
@@ -1805,6 +2003,15 @@ export default function PurchaseDetailPage() {
             title="Elimina riga"
             description="Eliminare questa riga è un'azione definitiva e non può essere annullata. Procedere solo se la riga è stata inserita per errore."
             onConfirm={handleDeleteItem}
+        />
+
+        <ConfirmDeleteDialog
+            open={!!cancelReturnItemId}
+            onOpenChange={(open) => { if (!open) setCancelReturnItemId(null); }}
+            title="Elimina reso"
+            description="I valori di pezzi e quantità della riga verranno ripristinati a come erano prima del reso. Procedere?"
+            loading={cancelingReturn}
+            onConfirm={handleCancelReturn}
         />
         </>
     );
