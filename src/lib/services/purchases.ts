@@ -473,6 +473,8 @@ export const purchasesApi = {
         if (item.jobId !== undefined) dbItem.job_id = item.jobId;
         if (item.transportApplied !== undefined) dbItem.transport_applied = item.transportApplied;
         if (item.coefficient !== undefined) dbItem.coefficient = item.coefficient;
+        if (item.preReturnQuantity !== undefined) dbItem.pre_return_quantity = item.preReturnQuantity;
+        if (item.preReturnPieces !== undefined) dbItem.pre_return_pieces = item.preReturnPieces;
 
         const { data, error } = await supabase.from('purchase_items').update(dbItem).eq('id', id).select().single();
         if (error) throw error;

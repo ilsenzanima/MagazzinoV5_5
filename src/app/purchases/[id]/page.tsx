@@ -486,12 +486,24 @@ export default function PurchaseDetailPage() {
                 return;
             }
 
-            await purchasesApi.updateItem(itemId, {
+            const item = items.find(i => i.id === itemId);
+            const updatePayload: Partial<PurchaseItem> = {
                 price: newPrice,
                 quantity: newQty,
                 pieces: newPieces,
                 coefficient: itemCoefficient
-            });
+            };
+
+            // Se c'è un reso attivo, sposta anche il valore di ripristino della
+            // stessa variazione, cosi' "Elimina reso" resta coerente con la modifica.
+            if (item?.returnedAt) {
+                updatePayload.preReturnQuantity = (item.preReturnQuantity ?? item.quantity) + (newQty - item.quantity);
+                if (item.pieces != null && newPieces != null) {
+                    updatePayload.preReturnPieces = (item.preReturnPieces ?? item.pieces) + (newPieces - item.pieces);
+                }
+            }
+
+            await purchasesApi.updateItem(itemId, updatePayload);
 
             // Update local state
             setItems(items.map(i => i.id === itemId ? {
@@ -499,7 +511,9 @@ export default function PurchaseDetailPage() {
                 price: newPrice,
                 quantity: newQty,
                 pieces: newPieces,
-                coefficient: itemCoefficient
+                coefficient: itemCoefficient,
+                preReturnQuantity: updatePayload.preReturnQuantity ?? i.preReturnQuantity,
+                preReturnPieces: updatePayload.preReturnPieces ?? i.preReturnPieces,
             } : i));
             setEditingItemId(null);
         } catch (error) {
@@ -1245,11 +1259,29 @@ export default function PurchaseDetailPage() {
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
+                                                            {!isOrder && !item.returnedAt && (
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                                                    title="Registra reso al fornitore"
+                                                                    onClick={() => openReturnDialog(item)}
+                                                                >
+                                                                    <Undo2 className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         (userRole === 'admin' || userRole === 'operativo') && (
                                                             <div className="flex justify-end gap-1">
-                                                                {item.returnedAt ? (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => startEditing(item)}
+                                                                >
+                                                                    Modifica
+                                                                </Button>
+                                                                {item.returnedAt && (
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="sm"
@@ -1259,27 +1291,6 @@ export default function PurchaseDetailPage() {
                                                                     >
                                                                         <RotateCcw className="h-3.5 w-3.5 mr-1" /> Elimina reso
                                                                     </Button>
-                                                                ) : (
-                                                                    <>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() => startEditing(item)}
-                                                                        >
-                                                                            Modifica
-                                                                        </Button>
-                                                                        {!isOrder && (
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                                                                                title="Registra reso al fornitore"
-                                                                                onClick={() => openReturnDialog(item)}
-                                                                            >
-                                                                                <Undo2 className="h-3.5 w-3.5 mr-1" /> Reso
-                                                                            </Button>
-                                                                        )}
-                                                                    </>
                                                                 )}
                                                             </div>
                                                         )
@@ -1372,19 +1383,20 @@ export default function PurchaseDetailPage() {
                                                             <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}>
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
+                                                            {!isOrder && !item.returnedAt && (
+                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-amber-600" title="Registra reso al fornitore" onClick={() => openReturnDialog(item)}>
+                                                                    <Undo2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            )}
                                                         </>
-                                                    ) : item.returnedAt ? (
-                                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" title="Elimina reso e ripristina i valori originali" onClick={() => setCancelReturnItemId(item.id)}>
-                                                            <RotateCcw className="h-3.5 w-3.5" />
-                                                        </Button>
                                                     ) : (
                                                         <>
                                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" onClick={() => startEditing(item)}>
                                                                 <Edit className="h-3.5 w-3.5" />
                                                             </Button>
-                                                            {!isOrder && (
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600" title="Registra reso al fornitore" onClick={() => openReturnDialog(item)}>
-                                                                    <Undo2 className="h-3.5 w-3.5" />
+                                                            {item.returnedAt && (
+                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" title="Elimina reso e ripristina i valori originali" onClick={() => setCancelReturnItemId(item.id)}>
+                                                                    <RotateCcw className="h-3.5 w-3.5" />
                                                                 </Button>
                                                             )}
                                                         </>
