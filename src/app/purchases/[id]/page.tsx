@@ -99,7 +99,6 @@ export default function PurchaseDetailPage() {
     const [returnItem, setReturnItem] = useState<PurchaseItem | null>(null);
     const [returnValues, setReturnValues] = useState({ pieces: "", quantity: "" });
     const [returnRemaining, setReturnRemaining] = useState<{ remainingQuantity: number; remainingPieces: number | null } | null>(null);
-    const [loadingReturnRemaining, setLoadingReturnRemaining] = useState(false);
     const [applyingReturn, setApplyingReturn] = useState(false);
     const [cancelReturnItemId, setCancelReturnItemId] = useState<string | null>(null);
     const [cancelingReturn, setCancelingReturn] = useState(false);
@@ -519,21 +518,12 @@ export default function PurchaseDetailPage() {
         return inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
     };
 
-    const openReturnDialog = async (item: PurchaseItem) => {
+    const openReturnDialog = (item: PurchaseItem) => {
         setReturnItem(item);
         setReturnValues({ pieces: "", quantity: "" });
-        setReturnRemaining(null);
-        setLoadingReturnRemaining(true);
-        try {
-            const remaining = await purchasesApi.getItemRemaining(item.id);
-            setReturnRemaining({ remainingQuantity: remaining.remainingQuantity, remainingPieces: remaining.remainingPieces });
-        } catch (error) {
-            console.error("Failed to load remaining quantity", error);
-            alert("Errore nel calcolo della quantità disponibile per il reso");
-            setReturnItem(null);
-        } finally {
-            setLoadingReturnRemaining(false);
-        }
+        // Il limite e' il valore puro della riga (quantity/pieces attuali), a prescindere
+        // da dove si trovi fisicamente il materiale (magazzino o cantiere).
+        setReturnRemaining({ remainingQuantity: item.quantity, remainingPieces: item.pieces ?? null });
     };
 
     const handleReturnPiecesChange = (piecesStr: string) => {
@@ -1907,9 +1897,7 @@ export default function PurchaseDetailPage() {
                                     {returnItem?.itemName}{returnItem?.itemModel ? ` (${returnItem.itemModel})` : ''}
                                 </DialogDescription>
                             </DialogHeader>
-                            {loadingReturnRemaining ? (
-                                <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
-                            ) : returnItem && returnRemaining && (
+                            {returnItem && returnRemaining && (
                                 <div className="space-y-4">
                                     <p className="text-xs text-slate-500">
                                         Disponibile per il reso: {returnRemaining.remainingPieces != null ? `${returnRemaining.remainingPieces} pz` : ''} ({returnRemaining.remainingQuantity} {returnItem.itemUnit || ''})
@@ -1945,7 +1933,7 @@ export default function PurchaseDetailPage() {
                             )}
                             <DialogFooter className="mt-4">
                                 <Button variant="outline" onClick={() => setReturnItem(null)}>Annulla</Button>
-                                <Button onClick={submitReturn} disabled={applyingReturn || loadingReturnRemaining} className="bg-amber-600 hover:bg-amber-700">
+                                <Button onClick={submitReturn} disabled={applyingReturn} className="bg-amber-600 hover:bg-amber-700">
                                     {applyingReturn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
                                     Registra Reso
                                 </Button>

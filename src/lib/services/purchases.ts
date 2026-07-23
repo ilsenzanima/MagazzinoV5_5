@@ -375,42 +375,12 @@ export const purchasesApi = {
         }));
     },
 
-    // Get the quantity/pieces of a purchase item still un-consumed (not moved out
-    // via exit/sale delivery notes), i.e. the max that can still be returned.
-    getItemRemaining: async (itemId: string) => {
-        const { data: item, error: itemError } = await supabase
-            .from('purchase_items')
-            .select('quantity, pieces, coefficient')
-            .eq('id', itemId)
-            .single();
-        if (itemError) throw itemError;
-
-        const { data: movements, error: movementsError } = await supabase
-            .from('delivery_note_items')
-            .select('quantity, pieces, is_fictitious, delivery_notes!inner(type)')
-            .eq('purchase_item_id', itemId);
-        if (movementsError) throw movementsError;
-
-        const consumed = (movements || []).reduce((acc: { quantity: number; pieces: number }, m: any) => {
-            if (m.is_fictitious) return acc;
-            if (m.delivery_notes?.type !== 'exit' && m.delivery_notes?.type !== 'sale') return acc;
-            acc.quantity += m.quantity || 0;
-            acc.pieces += m.pieces || 0;
-            return acc;
-        }, { quantity: 0, pieces: 0 });
-
-        return {
-            quantity: item.quantity,
-            pieces: item.pieces,
-            coefficient: item.coefficient ?? 1,
-            remainingQuantity: Math.max(0, (item.quantity || 0) - consumed.quantity),
-            remainingPieces: item.pieces != null ? Math.max(0, item.pieces - consumed.pieces) : null,
-        };
-    },
-
     // Apply a return (reso) to the supplier on a purchase item: subtracts the
     // returned pieces/quantity from the row (same effect as a manual edit),
     // keeping track of the returned amount and the pre-return values for restore.
+    // Il limite e' il valore "puro" della riga (quantity/pieces attuali), a
+    // prescindere da dove si trovi fisicamente il materiale (magazzino o cantiere):
+    // i movimenti interni (trasferimenti, bolle) non riducono il resabile.
     applyReturn: async (itemId: string, { pieces, quantity }: { pieces?: number; quantity: number }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Utente non autenticato");
@@ -425,13 +395,12 @@ export const purchasesApi = {
             throw new Error("Esiste già un reso attivo su questa riga. Eliminalo prima di applicarne uno nuovo.");
         }
 
-        const remaining = await purchasesApi.getItemRemaining(itemId);
         if (quantity <= 0) throw new Error("La quantità resa deve essere maggiore di zero");
-        if (quantity > remaining.remainingQuantity + 0.001) {
-            throw new Error(`Quantità resa superiore alla disponibilità (max ${remaining.remainingQuantity})`);
+        if (quantity > (current.quantity || 0) + 0.001) {
+            throw new Error(`Quantità resa superiore alla quantità della riga (max ${current.quantity})`);
         }
-        if (remaining.remainingPieces != null && pieces != null && pieces > remaining.remainingPieces + 0.001) {
-            throw new Error(`Pezzi resi superiori alla disponibilità (max ${remaining.remainingPieces})`);
+        if (current.pieces != null && pieces != null && pieces > current.pieces + 0.001) {
+            throw new Error(`Pezzi resi superiori ai pezzi della riga (max ${current.pieces})`);
         }
 
         const newQuantity = Math.max(0, (current.quantity || 0) - quantity);
