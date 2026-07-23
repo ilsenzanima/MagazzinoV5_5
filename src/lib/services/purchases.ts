@@ -387,13 +387,13 @@ export const purchasesApi = {
 
         const { data: movements, error: movementsError } = await supabase
             .from('delivery_note_items')
-            .select('quantity, pieces, delivery_notes!inner(type, is_fictitious)')
-            .eq('purchase_item_id', itemId)
-            .in('delivery_notes.type', ['exit', 'sale']);
+            .select('quantity, pieces, is_fictitious, delivery_notes!inner(type)')
+            .eq('purchase_item_id', itemId);
         if (movementsError) throw movementsError;
 
         const consumed = (movements || []).reduce((acc: { quantity: number; pieces: number }, m: any) => {
-            if (m.delivery_notes?.is_fictitious) return acc;
+            if (m.is_fictitious) return acc;
+            if (m.delivery_notes?.type !== 'exit' && m.delivery_notes?.type !== 'sale') return acc;
             acc.quantity += m.quantity || 0;
             acc.pieces += m.pieces || 0;
             return acc;
