@@ -215,7 +215,7 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
             {routeGroups.map((group, groupIndex) => (
               <div key={groupIndex} className="space-y-1">
                 {group.items.map((route) => (
-                  <Link key={route.href} href={route.href} onClick={onLinkClick}>
+                  <Link key={route.href} href={route.href} onClick={onLinkClick} prefetch={false}>
                     <Button
                       variant={route.active ? "secondary" : "ghost"}
                       className={cn(
