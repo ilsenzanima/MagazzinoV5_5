@@ -62,8 +62,24 @@ export async function fetchAllRows<T>(
     return rows;
 }
 
-export function fetchWithTimeout<T>(promise: PromiseLike<T>, ms: number = 30000): Promise<T> {
-    return new Promise((resolve, reject) => {
+// Errori di rete transitori (connessione chiusa a metà, DNS momentaneamente
+// irraggiungibile, ecc.): vale la pena ritentare. Errori applicativi/PostgREST
+// (permessi, vincoli, validazione) non rientrano in questo pattern e falliscono subito.
+const RETRYABLE_ERROR_PATTERN = /failed to fetch|networkerror|network request failed|load failed|fetch failed|err_connection|err_network|err_internet_disconnected/i;
+
+function isRetryableError(err: unknown): boolean {
+    const message = (err as { message?: unknown } | null)?.message ?? err ?? '';
+    return RETRYABLE_ERROR_PATTERN.test(String(message));
+}
+
+/**
+ * Esegue una query Supabase con timeout. I query builder di postgrest-js sono
+ * "thenable" e rieseguono la richiesta HTTP da zero ad ogni chiamata di `.then()`,
+ * quindi in caso di errore di rete transitorio si ritenta la stessa query invece
+ * di propagare subito l'errore all'utente.
+ */
+export function fetchWithTimeout<T>(promise: PromiseLike<T>, ms: number = 30000, retries: number = 2): Promise<T> {
+    const attemptOnce = (): Promise<T> => new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
             reject(new Error("Richiesta scaduta (timeout)"));
         }, ms);
@@ -78,6 +94,28 @@ export function fetchWithTimeout<T>(promise: PromiseLike<T>, ms: number = 30000)
             }
         );
     });
+
+    const run = async (attemptsLeft: number): Promise<T> => {
+        try {
+            const res = await attemptOnce();
+            // Le query supabase non falliscono la promise sugli errori di rete:
+            // li restituiscono come { data: null, error: {...} }.
+            const resError = (res as { error?: unknown } | null)?.error;
+            if (resError && attemptsLeft > 0 && isRetryableError(resError)) {
+                await new Promise((r) => setTimeout(r, (retries - attemptsLeft + 1) * 600));
+                return run(attemptsLeft - 1);
+            }
+            return res;
+        } catch (err) {
+            if (attemptsLeft > 0 && isRetryableError(err)) {
+                await new Promise((r) => setTimeout(r, (retries - attemptsLeft + 1) * 600));
+                return run(attemptsLeft - 1);
+            }
+            throw err;
+        }
+    };
+
+    return run(retries);
 }
 
 /**
