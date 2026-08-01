@@ -64,16 +64,21 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
     return () => { cancelled = true; clearInterval(interval); };
   }, [userRole]);
 
-  // Puntino "live" sulla voce Anomalie: numero di lotti con residuo negativo
-  const [negativeLotCount, setNegativeLotCount] = useState(0);
+  // Puntino "live" sulla voce Anomalie: lotti con residuo negativo o commesse eliminate ancora referenziate
+  const [anomalyCount, setAnomalyCount] = useState(0);
 
   useEffect(() => {
     if (userRole !== 'admin') return;
     let cancelled = false;
     const checkAnomalies = () => {
-      inventoryApi.getNegativeLotMovements()
-        .then(rows => { if (!cancelled) setNegativeLotCount(rows.length); })
-        .catch(err => console.error("Failed to load negative lot movements", err));
+      Promise.all([
+        inventoryApi.getNegativeLotMovements(),
+        inventoryApi.getOrphanedJobReferences(),
+      ])
+        .then(([negativeLots, orphanedJobs]) => {
+          if (!cancelled) setAnomalyCount(negativeLots.length + orphanedJobs.length);
+        })
+        .catch(err => console.error("Failed to load anomalies", err));
     };
     checkAnomalies();
     const interval = setInterval(checkAnomalies, 60000);
@@ -213,7 +218,7 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           icon: AlertTriangle,
           href: "/anomalie",
           active: pathname === "/anomalie",
-          badge: negativeLotCount > 0,
+          badge: anomalyCount > 0,
         },
         {
           label: "Cestino",
