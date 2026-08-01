@@ -30,7 +30,8 @@ import {
   PackageCheck,
   GanttChartSquare,
   UserCircle,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -60,6 +61,27 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
     };
     checkUnverified();
     const interval = setInterval(checkUnverified, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [userRole]);
+
+  // Puntino "live" sulla voce Anomalie: lotti con residuo negativo o commesse eliminate ancora referenziate
+  const [anomalyCount, setAnomalyCount] = useState(0);
+
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    let cancelled = false;
+    const checkAnomalies = () => {
+      Promise.all([
+        inventoryApi.getNegativeLotMovements(),
+        inventoryApi.getOrphanedJobReferences(),
+      ])
+        .then(([negativeLots, orphanedJobs]) => {
+          if (!cancelled) setAnomalyCount(negativeLots.length + orphanedJobs.length);
+        })
+        .catch(err => console.error("Failed to load anomalies", err));
+    };
+    checkAnomalies();
+    const interval = setInterval(checkAnomalies, 60000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [userRole]);
 
@@ -190,6 +212,13 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/inventory/verifica",
           active: pathname === "/inventory/verifica",
           badge: unverifiedCount > 0,
+        },
+        {
+          label: "Anomalie",
+          icon: AlertTriangle,
+          href: "/anomalie",
+          active: pathname === "/anomalie",
+          badge: anomalyCount > 0,
         },
         {
           label: "Cestino",

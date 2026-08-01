@@ -18,6 +18,34 @@ export interface UntrackedStockItem {
     untrackedQuantity: number;
 }
 
+export interface NegativeLotMovement {
+    purchaseItemId: string;
+    itemId: string;
+    code: string;
+    name: string;
+    unit: string;
+    purchaseRef: string;
+    purchaseDate: string;
+    remainingQuantity: number;
+    remainingPieces: number | null;
+    deliveryNoteItemId: string;
+    deliveryNoteId: string;
+    deliveryNoteNumber: string;
+    deliveryNoteDate: string;
+    deliveryNoteType: string;
+    itemQuantity: number;
+    itemPieces: number | null;
+}
+
+export interface OrphanedJobReference {
+    sourceType: 'purchase' | 'delivery_note';
+    sourceId: string;
+    reference: string;
+    referenceDate: string;
+    jobId: string;
+    jobCode: string;
+}
+
 // Mappers
 export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     id: dbItem.id,
@@ -303,6 +331,53 @@ export const inventoryApi = {
             totalQuantity: Number(d.total_quantity),
             trackedQuantity: Number(d.tracked_quantity),
             untrackedQuantity: Number(d.untracked_quantity),
+        }));
+    },
+
+    // Righe di bolle collegate a un lotto d'acquisto la cui quantità residua è
+    // scesa sotto zero (vedi vista negative_lot_movements): quasi sempre un
+    // aggancio errato al lotto di un acquisto diretto per un'altra commessa.
+    getNegativeLotMovements: async (): Promise<NegativeLotMovement[]> => {
+        const { data, error } = await supabase
+            .from('negative_lot_movements')
+            .select('*')
+            .order('delivery_note_date', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            purchaseItemId: d.purchase_item_id as string,
+            itemId: d.item_id as string,
+            code: d.code as string,
+            name: d.name as string,
+            unit: d.unit as string,
+            purchaseRef: d.purchase_ref as string,
+            purchaseDate: d.purchase_date as string,
+            remainingQuantity: Number(d.remaining_quantity),
+            remainingPieces: d.remaining_pieces === null ? null : Number(d.remaining_pieces),
+            deliveryNoteItemId: d.delivery_note_item_id as string,
+            deliveryNoteId: d.delivery_note_id as string,
+            deliveryNoteNumber: d.delivery_note_number as string,
+            deliveryNoteDate: d.delivery_note_date as string,
+            deliveryNoteType: d.delivery_note_type as string,
+            itemQuantity: Number(d.item_quantity),
+            itemPieces: d.item_pieces === null ? null : Number(d.item_pieces),
+        }));
+    },
+
+    // Acquisti o bolle che puntano a una commessa spostata nel cestino
+    // (vedi vista orphaned_job_references).
+    getOrphanedJobReferences: async (): Promise<OrphanedJobReference[]> => {
+        const { data, error } = await supabase
+            .from('orphaned_job_references')
+            .select('*')
+            .order('reference_date', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((d: any) => ({
+            sourceType: d.source_type as 'purchase' | 'delivery_note',
+            sourceId: d.source_id as string,
+            reference: d.reference as string,
+            referenceDate: d.reference_date as string,
+            jobId: d.job_id as string,
+            jobCode: d.job_code as string,
         }));
     },
 
