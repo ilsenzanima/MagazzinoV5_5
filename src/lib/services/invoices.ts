@@ -5,18 +5,8 @@ import { compressImageIfNeeded } from '@/lib/image-compress';
 import { uploadFileToDrive } from '@/lib/drive-upload';
 import { supplierGroupsApi } from './supplier-groups';
 
-const mapDbToInvoice = (db: any): Invoice => ({
-    id: db.id,
-    supplierId: db.supplier_id,
-    supplierName: db.suppliers?.name,
-    invoiceNumber: db.invoice_number,
-    invoiceDate: db.invoice_date,
-    documentUrls: db.document_urls ?? [],
-    totalAmount: db.total_amount,
-    notes: db.notes,
-    createdBy: db.created_by,
-    createdAt: db.created_at,
-    purchases: db.purchases?.map((p: any) => ({
+const mapDbToInvoice = (db: any): Invoice => {
+    const purchases = db.purchases?.map((p: any) => ({
         id: p.id,
         deliveryNoteNumber: p.delivery_note_number,
         deliveryNoteDate: p.delivery_note_date,
@@ -38,8 +28,29 @@ const mapDbToInvoice = (db: any): Invoice => ({
             returnedPieces: i.returned_pieces ?? null,
             returnedAt: i.returned_at ?? null,
         })),
-    })),
-});
+    }));
+
+    return {
+        id: db.id,
+        supplierId: db.supplier_id,
+        supplierName: db.suppliers?.name,
+        invoiceNumber: db.invoice_number,
+        invoiceDate: db.invoice_date,
+        documentUrls: db.document_urls ?? [],
+        // Calcolato dinamicamente dalle bolle/righe collegate quando disponibili (query con
+        // purchases annidate), così l'elenco non dipende dalla colonna invoices.total_amount:
+        // quest'ultima va risincronizzata esplicitamente ad ogni modifica (vedi updateTotal) ed
+        // è facile dimenticarsene in qualche punto, lasciandola a 0/stale. Se le bolle non sono
+        // state incluse nella query, resta il fallback sulla colonna salvata.
+        totalAmount: purchases
+            ? purchases.reduce((s: number, p: any) => s + (p.totalAmount ?? 0), 0)
+            : db.total_amount,
+        notes: db.notes,
+        createdBy: db.created_by,
+        createdAt: db.created_at,
+        purchases,
+    };
+};
 
 export const invoicesApi = {
     getPaginated: async ({
