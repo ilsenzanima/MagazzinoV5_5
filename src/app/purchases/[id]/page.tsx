@@ -361,9 +361,9 @@ export default function PurchaseDetailPage() {
             setItems(updatedItems);
             setDeleteItemDialogOpen(false);
             setItemToDelete(null);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to delete item", error);
-            alert("Errore durante l'eliminazione");
+            alert(`Errore durante l'eliminazione: ${error?.message || "riprova o contatta l'assistenza."}`);
         }
     };
 
@@ -614,9 +614,9 @@ export default function PurchaseDetailPage() {
             setSavingTransport(true);
             await purchasesApi.saveTransportCost(id, val);
             setTransportCost(val);
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert("Errore nel salvataggio del costo trasporto");
+            alert(`Errore nel salvataggio del costo trasporto: ${e?.message || "riprova o contatta l'assistenza."}`);
         } finally {
             setSavingTransport(false);
         }
@@ -632,9 +632,9 @@ export default function PurchaseDetailPage() {
             await purchasesApi.applyTransportToAllItems(id, val, eligible);
             setTransportCost(val);
             await loadData();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert("Errore durante l'applicazione del trasporto");
+            alert(`Errore durante l'applicazione del trasporto: ${e?.message || "riprova o contatta l'assistenza."}`);
         } finally {
             setApplyingTransport(false);
         }
@@ -646,9 +646,9 @@ export default function PurchaseDetailPage() {
             setApplyingTransport(true);
             await purchasesApi.reverseTransportOnItems(items);
             await loadData();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert("Errore durante la rimozione del trasporto");
+            alert(`Errore durante la rimozione del trasporto: ${e?.message || "riprova o contatta l'assistenza."}`);
         } finally {
             setApplyingTransport(false);
         }
