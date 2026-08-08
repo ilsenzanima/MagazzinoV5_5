@@ -126,7 +126,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         const map = new Map<string, GroupedItem>()
 
         movements.forEach(m => {
-            const isSiteIn = ['purchase', 'unload', 'exit'].includes(m.type)
+            const isSiteIn = ['purchase', 'unload', 'exit', 'sale'].includes(m.type)
             const qtyChange = isSiteIn ? Math.abs(m.quantity) : -Math.abs(m.quantity)
 
             let piecesChange = 0
@@ -573,7 +573,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                 </div>
                             ) : (
                                 movements.map((move) => {
-                                    const isSiteIn = ['purchase', 'unload', 'exit'].includes(move.type)
+                                    const isSiteIn = ['purchase', 'unload', 'exit', 'sale'].includes(move.type)
                                     const displayQty = isSiteIn ? Math.abs(move.quantity) : -Math.abs(move.quantity)
 
                                     return (
@@ -653,7 +653,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                         </TableRow>
                                     ) : (
                                         movements.map((move) => {
-                                            const isSiteIn = ['purchase', 'unload', 'exit'].includes(move.type)
+                                            const isSiteIn = ['purchase', 'unload', 'exit', 'sale'].includes(move.type)
                                             const displayQty = isSiteIn ? Math.abs(move.quantity) : -Math.abs(move.quantity)
 
                                             return (
