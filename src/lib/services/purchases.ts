@@ -589,7 +589,11 @@ export const purchasesApi = {
         const applied = items.filter(i => i.transportApplied && (i.transportUnitCost ?? 0) > 0);
         if (applied.length === 0) return;
         const updates = applied.map(item => {
-            const originalPrice = parseFloat((item.price - (item.transportUnitCost ?? 0)).toFixed(5));
+            // Clamp a 0: se la riga è stata modificata a mano dopo l'applicazione del
+            // trasporto, il prezzo potrebbe non includerlo più per intero. Sottrarre il
+            // costo trasporto potrebbe quindi produrre un prezzo negativo, rifiutato dal
+            // vincolo price >= 0 e bloccando l'intera operazione (aggiunta/eliminazione riga).
+            const originalPrice = Math.max(0, parseFloat((item.price - (item.transportUnitCost ?? 0)).toFixed(5)));
             return supabase
                 .from('purchase_items')
                 .update({ price: originalPrice, transport_applied: false, transport_unit_cost: 0 })

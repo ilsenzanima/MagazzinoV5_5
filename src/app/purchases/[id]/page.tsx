@@ -341,9 +341,9 @@ export default function PurchaseDetailPage() {
             } else {
                 setSelectedJobForLine(selectedHeaderJob);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to add item", error);
-            alert("Errore durante l'aggiunta dell'articolo");
+            alert(`Errore durante l'aggiunta dell'articolo: ${error?.message || "riprova o contatta l'assistenza."}`);
         } finally {
             setAddingItem(false);
         }
@@ -382,6 +382,10 @@ export default function PurchaseDetailPage() {
     };
 
     const startEditing = (item: PurchaseItem) => {
+        if (item.transportApplied) {
+            alert("Questa riga ha il trasporto applicato. Premi 'Rimuovi trasporto' (sopra la tabella) prima di modificare quantità, pezzi o prezzo di questa riga.");
+            return;
+        }
         setEditingItemId(item.id);
 
         // Use coefficient from inventory if available, otherwise fallback to item's saved coefficient
@@ -1277,6 +1281,8 @@ export default function PurchaseDetailPage() {
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
+                                                                    disabled={item.transportApplied}
+                                                                    title={item.transportApplied ? "Rimuovi il trasporto da questa riga prima di modificarla" : undefined}
                                                                     onClick={() => startEditing(item)}
                                                                 >
                                                                     Modifica
@@ -1391,7 +1397,14 @@ export default function PurchaseDetailPage() {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" onClick={() => startEditing(item)}>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7 text-slate-500"
+                                                                disabled={item.transportApplied}
+                                                                title={item.transportApplied ? "Rimuovi il trasporto da questa riga prima di modificarla" : undefined}
+                                                                onClick={() => startEditing(item)}
+                                                            >
                                                                 <Edit className="h-3.5 w-3.5" />
                                                             </Button>
                                                             {item.returnedAt && (
