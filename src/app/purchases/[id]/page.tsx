@@ -530,6 +530,17 @@ export default function PurchaseDetailPage() {
         setEditingItemId(null);
     };
 
+    // Una riga senza job_id proprio "segue" la commessa dell'intestazione (stessa
+    // regola COALESCE(purchase_items.job_id, purchases.job_id) usata dai trigger DB
+    // che spostano davvero il materiale tra magazzino e cantiere). Il badge deve
+    // riflettere questo, non solo il job_id fisso salvato sulla singola riga.
+    const effectiveItemJobId = (item: PurchaseItem) => item.jobId ?? purchase?.jobId ?? null;
+    const effectiveItemJobLabel = (item: PurchaseItem) => {
+        if (item.jobId) return item.jobName || item.jobCode;
+        if (purchase?.jobId) return selectedHeaderJob?.name || selectedHeaderJob?.code || purchase.jobCode;
+        return null;
+    };
+
     // Return (Reso) Functions
     const itemCoefficientFor = (item: PurchaseItem) => {
         const inventoryItem = inventory.find(inv => inv.id === item.itemId);
@@ -1231,9 +1242,9 @@ export default function PurchaseDetailPage() {
                                                 )}
 
                                                 <TableCell>
-                                                    {item.jobId ? (
+                                                    {effectiveItemJobId(item) ? (
                                                         <span className="text-blue-600 font-medium text-sm">
-                                                            Commessa: {item.jobName || item.jobCode}
+                                                            Commessa: {effectiveItemJobLabel(item)}
                                                         </span>
                                                     ) : (
                                                         <span className="text-green-600 font-medium text-sm">
@@ -1351,9 +1362,9 @@ export default function PurchaseDetailPage() {
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-0.5">
                                                     <span className="text-xs font-mono text-slate-500">{item.itemCode}</span>
-                                                    {item.jobId ? (
+                                                    {effectiveItemJobId(item) ? (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
-                                                            {item.jobName || item.jobCode}
+                                                            {effectiveItemJobLabel(item)}
                                                         </span>
                                                     ) : (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 font-medium">
@@ -1561,7 +1572,7 @@ export default function PurchaseDetailPage() {
                                     <TableBody>
                                         {items.map((item) => {
                                             const batch = batchAvailability.find(b => b.id === item.id);
-                                            const isJobAssigned = purchase?.jobId != null;
+                                            const isJobAssigned = effectiveItemJobId(item) != null;
                                             // FIX: Use batch remainingQty if available, otherwise fallback.
                                             // Don't force 0 for isJobAssigned if we have actual batch data (which includes returns).
                                             // Se il lotto non è nella vista (es. esaurito o pezzi=null) mostriamo 0,
@@ -1591,7 +1602,7 @@ export default function PurchaseDetailPage() {
                                             // FIX:For direct purchases, show "Net at Job" (Original - Remaining).
                                             // This accounts for returns.
                                             if (isJobAssigned && jobMovements.length === 0) {
-                                                const job = jobs.find(j => j.id === purchase.jobId);
+                                                const job = jobs.find(j => j.id === effectiveItemJobId(item));
                                                 const netAtJob = Math.max(0, item.quantity - (remaining || 0));
 
                                                 if (job && netAtJob > 0.001) {
@@ -1681,7 +1692,7 @@ export default function PurchaseDetailPage() {
                             <div className="md:hidden space-y-2">
                                 {items.map((item) => {
                                     const batch = batchAvailability.find(b => b.id === item.id);
-                                    const isJobAssigned = purchase?.jobId != null;
+                                    const isJobAssigned = effectiveItemJobId(item) != null;
                                     // FIX: Use batch remainingQty if available, otherwise fallback.
                                     const remaining = batch ? batch.remainingQty : 0;
                                     const original = item.quantity;
@@ -1706,7 +1717,7 @@ export default function PurchaseDetailPage() {
                                     let jobMovements = itemJobMovements[item.id] || [];
                                     // FIX: For direct purchases, show "Net at Job" (Original - Remaining).
                                     if (isJobAssigned && jobMovements.length === 0) {
-                                        const job = jobs.find(j => j.id === purchase.jobId);
+                                        const job = jobs.find(j => j.id === effectiveItemJobId(item));
                                         const netAtJob = Math.max(0, item.quantity - (remaining || 0));
 
                                         if (job && netAtJob > 0.001) {
