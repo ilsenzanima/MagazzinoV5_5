@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowDownRight, ArrowUpRight, ShoppingBag, Clock, FileText, Truck, ChevronRight } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ShoppingBag, Clock, FileText, Truck, ChevronRight, Repeat } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import Link from "next/link";
@@ -18,7 +18,7 @@ interface DeliveryNoteItem {
 
 interface Movement {
   id: string;
-  type: 'entry' | 'exit' | 'sale' | 'waste';
+  type: 'entry' | 'exit' | 'sale' | 'waste' | 'transfer';
   number: string;
   date: string;
   created_at: string;
@@ -47,6 +47,8 @@ export const RecentMovements = memo(function RecentMovements({ data }: RecentMov
         return { icon: ShoppingBag, label: 'Vendita', color: 'blue' };
       case 'waste':
         return { icon: FileText, label: 'Eccedenze', color: 'violet' };
+      case 'transfer':
+        return { icon: Repeat, label: 'Trasferimento', color: 'teal' };
       default:
         return { icon: FileText, label: type, color: 'slate' };
     }

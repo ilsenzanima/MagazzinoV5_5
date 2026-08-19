@@ -87,7 +87,7 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
     const [itemsLoading, setItemsLoading] = useState(false);
 
     // Form State
-    const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale' | 'waste'>(initialNote.type);
+    const [activeTab, setActiveTab] = useState<'entry' | 'exit' | 'sale' | 'waste' | 'transfer'>(initialNote.type);
     const [numberPart, setNumberPart] = useState(initialNote.number.split('/')[0]);
     const [date, setDate] = useState(initialNote.date.split('T')[0]);
     const [selectedJob, setSelectedJob] = useState<Job | null>(
@@ -188,12 +188,12 @@ export default function EditMovementContent({ initialInventory, initialJobs, ini
         updateLocations(activeTab, job);
     };
 
-    const handleTabChange = (tab: 'entry' | 'exit' | 'sale' | 'waste') => {
+    const handleTabChange = (tab: 'entry' | 'exit' | 'sale' | 'waste' | 'transfer') => {
         setActiveTab(tab);
         updateLocations(tab, selectedJob);
     };
 
-    const updateLocations = (tab: 'entry' | 'exit' | 'sale' | 'waste', job: Job | null) => {
+    const updateLocations = (tab: 'entry' | 'exit' | 'sale' | 'waste' | 'transfer', job: Job | null) => {
         let jobAddress = "";
         if (job) {
             if (job.clientName) {

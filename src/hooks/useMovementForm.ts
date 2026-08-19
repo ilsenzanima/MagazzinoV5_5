@@ -79,13 +79,14 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
 
     const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
     const [jobs, setJobs] = useState<Job[]>(initialJobs);
-    const [primaryWarehouse, setPrimaryWarehouse] = useState<Warehouse | null>(null);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("");
 
     const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
     const [jobsLoading, setJobsLoading] = useState(false);
     const [itemsLoading, setItemsLoading] = useState(false);
 
-    const [activeTab, setActiveTab] = useState<"entry" | "exit" | "sale" | "waste">(
+    const [activeTab, setActiveTab] = useState<"entry" | "exit" | "sale" | "waste" | "transfer">(
         initialNote?.type || "exit"
     );
     const [numberPart, setNumberPart] = useState(initialNote?.number.split("/")[0] || "");
@@ -144,11 +145,53 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     const fullNumber = numberPart ? `${numberPart}/PP${yearSuffix}` : `/PP${yearSuffix}`;
 
     useEffect(() => {
-        warehousesApi.getPrimary().then(setPrimaryWarehouse).catch(console.error);
+        warehousesApi.getAll().then((list) => {
+            setWarehouses(list);
+            // Solo per un movimento nuovo precompiliamo col magazzino principale.
+            // In modifica il campo resta quello salvato finché l'utente non
+            // sceglie esplicitamente un magazzino dal menu a tendina.
+            if (!isEditing) {
+                const primary = list.find((w) => w.isPrimary);
+                if (primary) setSelectedWarehouseId(primary.id);
+            }
+        }).catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Quale campo (ritiro/consegna) rappresenta il "lato magazzino" del documento,
+    // compilato solo tramite selezione esplicita del magazzino (handleWarehouseSelect),
+    // mai ricalcolato automaticamente al cambio di tab/commessa.
+    const warehouseSideField = (
+        tab: "entry" | "exit" | "sale" | "waste" | "transfer"
+    ): "pickup" | "delivery" | "both" | null => {
+        if (tab === "entry") return "delivery";
+        if (tab === "exit" || tab === "sale") return "pickup";
+        if (tab === "transfer") return "both";
+        return null; // waste: nessun lato magazzino, destinazione fissa deposito
+    };
+
+    const handleWarehouseSelect = useCallback(
+        (warehouseId: string) => {
+            setSelectedWarehouseId(warehouseId);
+            const warehouse = warehouses.find((w) => w.id === warehouseId);
+            if (!warehouse) return;
+            const text = warehouse.address ? `${warehouse.name}\n${warehouse.address}` : warehouse.name;
+            const side = warehouseSideField(activeTab);
+            if (side === "pickup") setPickupLocation(text);
+            else if (side === "delivery") setDeliveryLocation(text);
+            else if (side === "both") {
+                setPickupLocation(text);
+                setDeliveryLocation(text);
+            }
+        },
+        [warehouses, activeTab]
+    );
+
     // In modifica, i campi causale/luoghi/note salvati non vanno sovrascritti
-    // con i default finché l'utente non cambia tab o cantiere
+    // con i default finché l'utente non cambia tab o cantiere. Il "lato magazzino"
+    // di ritiro/consegna non viene mai toccato da questo effect: lo scrive solo
+    // handleWarehouseSelect, così un cambio di commessa non cancella eventuali
+    // integrazioni manuali fatte dall'utente sulla dicitura del magazzino.
     const editingDefaultsSuppressed = useRef(isEditing);
     const initialTabJob = useRef({ tab: activeTab, jobId: selectedJob?.id ?? null });
 
@@ -180,23 +223,16 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             jobAddress += `DESTINAZIONE: ${destinationText}`;
         }
 
-        const warehouseAddress = primaryWarehouse?.address
-            ? `${primaryWarehouse.name}\n${primaryWarehouse.address}`
-            : "OPI FIRESAFE S.R.L. MAGAZZINO\nVia A. Malignani, 9 - 33010 - REANA DEL ROJALE (UD)";
-
         if (activeTab === "entry") {
             setCausal("Rientro da cantiere");
             setPickupLocation(jobAddress || "DESTINAZIONE");
-            setDeliveryLocation(warehouseAddress);
             setTransportTime("17:00");
         } else if (activeTab === "exit") {
             setCausal("Uscita merce per cantiere");
-            setPickupLocation(warehouseAddress);
             setDeliveryLocation(jobAddress || "DESTINAZIONE");
             setTransportTime("08:00");
         } else if (activeTab === "sale") {
             setCausal("Vendita");
-            setPickupLocation(warehouseAddress);
             setDeliveryLocation(jobAddress || "Cliente");
             setTransportTime("08:00");
         } else if (activeTab === "waste") {
@@ -206,6 +242,10 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 "OPI FIRESAFE S.R.L. DEPOSITO TEMPORANEO\nVia Monfalcone, 33 - 33052 - Cervignano del Friuli (UD)"
             );
             setTransportTime("08:00");
+        } else if (activeTab === "transfer") {
+            setCausal("Trasferimento tra magazzini");
+            setTransportTime("08:00");
+            // pickup/delivery sono entrambi "lato magazzino": li scrive handleWarehouseSelect.
         }
 
         if (selectedJob) {
@@ -216,7 +256,16 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         } else {
             setNotes("");
         }
-    }, [activeTab, selectedJob, primaryWarehouse]);
+    }, [activeTab, selectedJob]);
+
+    // Solo per un movimento nuovo (non in modifica): precompila/riallinea il
+    // lato magazzino ad ogni cambio di tab o di magazzino selezionato.
+    useEffect(() => {
+        if (isEditing) return;
+        if (!selectedWarehouseId) return;
+        handleWarehouseSelect(selectedWarehouseId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, selectedWarehouseId, isEditing]);
 
     useEffect(() => {
         if (activeTab === "entry" && selectedJob) {
@@ -415,7 +464,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                         pieces: prefill?.pieces || "",
                         purchaseItemId: undefined,
                         purchaseRef: undefined,
-                        isFictitious: tab === "waste",
+                        isFictitious: tab === "waste" || tab === "transfer",
                         availableBatches: [],
                         batchesLoading: tab === "exit" || tab === "sale",
                     };
@@ -677,7 +726,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                     kgEccedenza: "",
                     purchaseItemId: item.purchaseItemId,
                     purchaseRef: item.purchaseRef,
-                    isFictitious: tab === "waste",
+                    isFictitious: tab === "waste" || tab === "transfer",
                     availableBatches: [
                         {
                             id: item.purchaseItemId,
@@ -817,6 +866,9 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         isEditing,
         inventory,
         jobs,
+        warehouses,
+        selectedWarehouseId,
+        handleWarehouseSelect,
         isJobSelectorOpen,
         setIsJobSelectorOpen,
         jobsLoading,

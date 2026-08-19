@@ -30,7 +30,7 @@ import { FieldTip } from "@/components/ui/field-tip";
 
 interface MovementInlineTableProps {
     lines: MovementLine[];
-    activeTab: "entry" | "exit" | "sale" | "waste";
+    activeTab: "entry" | "exit" | "sale" | "waste" | "transfer";
     selectedJob?: Job | null;
     jobBatchAvailability: any[];
     inventory: InventoryItem[];
@@ -77,7 +77,7 @@ export function MovementInlineTable({
 
     const isEntryWithJob = activeTab === "entry" && !!selectedJob;
     const showLotto = activeTab === "exit" || activeTab === "sale" || activeTab === "entry";
-    const showFittizio = activeTab !== "waste";
+    const showFittizio = activeTab !== "waste" && activeTab !== "transfer";
     const showKgEccedenza = activeTab === "waste";
     const showPiecesAndQty = activeTab !== "waste";
 

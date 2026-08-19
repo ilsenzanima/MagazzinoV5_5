@@ -351,6 +351,8 @@ export interface PurchaseItem {
     jobId?: string;
     jobCode?: string;
     jobName?: string;
+    warehouseId?: string;
+    warehouseName?: string;
     createdAt: string;
     transportApplied?: boolean;
     transportUnitCost?: number;
@@ -390,7 +392,7 @@ export interface DeliveryNoteItem {
 
 export interface DeliveryNote {
     id: string;
-    type: 'entry' | 'exit' | 'sale' | 'waste';
+    type: 'entry' | 'exit' | 'sale' | 'waste' | 'transfer';
     number: string;
     date: string;
     jobId?: string;

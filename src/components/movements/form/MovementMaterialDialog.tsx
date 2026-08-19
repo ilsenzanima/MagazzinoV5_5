@@ -35,7 +35,7 @@ interface MovementMaterialDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     rowId: string;
-    activeTab: "entry" | "exit" | "sale" | "waste";
+    activeTab: "entry" | "exit" | "sale" | "waste" | "transfer";
     selectedJob?: Job | null;
     jobBatchAvailability: any[];
     inventory: InventoryItem[];

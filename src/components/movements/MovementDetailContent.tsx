@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search, MoveRight } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search, MoveRight, Repeat } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -267,6 +267,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                 {movement.type === 'entry' && <ArrowDownRight className="h-6 w-6 text-green-600" />}
                                 {movement.type === 'exit' && <ArrowUpRight className="h-6 w-6 text-orange-600" />}
                                 {movement.type === 'sale' && <ShoppingBag className="h-6 w-6 text-blue-600" />}
+                                {movement.type === 'transfer' && <Repeat className="h-6 w-6 text-teal-600" />}
                                 <span className="break-all">DDT {movement.number}</span>
                             </div>
                         </h1>

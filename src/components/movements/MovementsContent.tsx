@@ -5,7 +5,7 @@ import { notify } from "@/lib/notify";;
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, Printer, Recycle } from "lucide-react";
+import { Plus, Search, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, Printer, Recycle, Repeat } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
 import { useState, useEffect, useRef, useDeferredValue } from "react";
@@ -135,6 +135,9 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   const getTypeConfig = (movement: DeliveryNote) => {
     if (movement.type === 'waste') {
       return { label: 'Eccedenze', color: 'bg-violet-100 text-violet-700 hover:bg-violet-100', icon: Recycle };
+    }
+    if (movement.type === 'transfer') {
+      return { label: 'Trasferimento', color: 'bg-teal-100 text-teal-700 hover:bg-teal-100', icon: Repeat };
     }
 
     switch (movement.type) {

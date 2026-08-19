@@ -1,8 +1,10 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Truck, MapPin } from "lucide-react";
+import { Truck, MapPin, Warehouse as WarehouseIcon } from "lucide-react";
+import type { Warehouse } from "@/lib/types";
 
 interface MovementHeaderProps {
     numberPart: string;
@@ -16,6 +18,9 @@ interface MovementHeaderProps {
     setPickupLocation: (v: string) => void;
     deliveryLocation: string;
     setDeliveryLocation: (v: string) => void;
+    warehouses: Warehouse[];
+    selectedWarehouseId: string;
+    onWarehouseSelect: (id: string) => void;
     children?: React.ReactNode; // For JobSelector
 }
 
@@ -25,6 +30,7 @@ export function MovementHeader({
     causal, setCausal,
     pickupLocation, setPickupLocation,
     deliveryLocation, setDeliveryLocation,
+    warehouses, selectedWarehouseId, onWarehouseSelect,
     children
 }: MovementHeaderProps) {
     return (
@@ -61,6 +67,25 @@ export function MovementHeader({
 
                 {/* Job Selector Slot */}
                 {children}
+
+                <div className="space-y-2">
+                    <Label className="flex items-center gap-1">
+                        <WarehouseIcon className="h-3 w-3" />
+                        Magazzino
+                    </Label>
+                    <Select value={selectedWarehouseId} onValueChange={onWarehouseSelect}>
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Scegli magazzino..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {warehouses.map(w => (
+                                <SelectItem key={w.id} value={w.id}>
+                                    {w.name}{w.isPrimary ? " (principale)" : ""}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
 
                 <div className="space-y-2">
                     <Label>Causale</Label>

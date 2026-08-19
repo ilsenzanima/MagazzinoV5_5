@@ -39,6 +39,8 @@ import { Badge } from "@/components/ui/badge";
 import { complianceApi, ComplianceDocument } from "@/lib/services/compliance";
 import { createClient } from "@/lib/supabase/client";
 import { ShieldCheck } from "lucide-react";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 
 export default function PurchaseDetailPage() {
     const { userRole } = useAuth();
@@ -69,6 +71,7 @@ export default function PurchaseDetailPage() {
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
     // Add Item State
     const [isAddPopupOpen, setIsAddPopupOpen] = useState(false); // New state for popup
@@ -80,7 +83,8 @@ export default function PurchaseDetailPage() {
         coefficient: 1,
         price: "",
         isJob: false,
-        jobId: ""
+        jobId: "",
+        warehouseId: ""
     });
 
     // Dialog States
@@ -118,7 +122,7 @@ export default function PurchaseDetailPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData, sourceOrdersData, hiddenSupplierIds] = await Promise.all([
+            const [purchaseData, itemsData, inventoryData, jobsData, availabilityData, suppliersData, jobMovementsData, sourceOrdersData, hiddenSupplierIds, warehousesData] = await Promise.all([
                 purchasesApi.getById(id),
                 purchasesApi.getItems(id),
                 inventoryApi.getAll(),
@@ -127,7 +131,8 @@ export default function PurchaseDetailPage() {
                 suppliersApi.getAll(),
                 purchasesApi.getPurchaseItemJobMovements(id),
                 purchasesApi.getSourceOrders(id),
-                supplierGroupsApi.getHiddenFromPurchasesIds()
+                supplierGroupsApi.getHiddenFromPurchasesIds(),
+                warehousesApi.getAll()
             ]);
 
             setPurchase(purchaseData);
@@ -148,6 +153,9 @@ export default function PurchaseDetailPage() {
             setBatchAvailability(availabilityData);
             setSuppliers(suppliersData.filter(s => s.id === purchaseData.supplierId || !hiddenSupplierIds.includes(s.id)));
             setItemJobMovements(jobMovementsData);
+            setWarehouses(warehousesData);
+            const primaryWarehouseId = warehousesData.find(w => w.isPrimary)?.id || "";
+            setNewItem(prev => ({ ...prev, warehouseId: primaryWarehouseId }));
 
             if (purchaseData.jobId) {
                 const job = jobsData.find(j => j.id === purchaseData.jobId);
@@ -318,7 +326,8 @@ export default function PurchaseDetailPage() {
                 pieces: piecesVal,
                 coefficient: newItem.coefficient,
                 price: priceVal,
-                jobId: newItem.isJob ? newItem.jobId : undefined
+                jobId: newItem.isJob ? newItem.jobId : undefined,
+                warehouseId: !newItem.isJob ? (newItem.warehouseId || undefined) : undefined
             });
 
             // Reload items
@@ -326,6 +335,7 @@ export default function PurchaseDetailPage() {
             setItems(updatedItems);
 
             // Reset form
+            const primaryWarehouseId = warehouses.find(w => w.isPrimary)?.id || "";
             setNewItem({
                 itemId: "",
                 quantity: "",
@@ -333,7 +343,8 @@ export default function PurchaseDetailPage() {
                 coefficient: 1,
                 price: "",
                 isJob: !!selectedHeaderJob,
-                jobId: selectedHeaderJob?.id || ""
+                jobId: selectedHeaderJob?.id || "",
+                warehouseId: primaryWarehouseId
             });
             // Keep selected job for line if header job is set
             if (!selectedHeaderJob) {
@@ -540,6 +551,13 @@ export default function PurchaseDetailPage() {
         if (purchase?.jobId) return selectedHeaderJob?.name || selectedHeaderJob?.code || purchase.jobCode;
         return null;
     };
+
+    // Righe senza commessa vanno "a magazzino": se e' stato indicato un magazzino
+    // diverso da quello principale, la riga va segnalata perche' serve un
+    // Trasferimento Magazzino per allineare fisicamente lo stock.
+    const primaryWarehouseId = warehouses.find(w => w.isPrimary)?.id ?? null;
+    const needsTransferBadge = (item: PurchaseItem) =>
+        !effectiveItemJobId(item) && !!item.warehouseId && item.warehouseId !== primaryWarehouseId;
 
     // Return (Reso) Functions
     const itemCoefficientFor = (item: PurchaseItem) => {
@@ -1246,6 +1264,13 @@ export default function PurchaseDetailPage() {
                                                         <span className="text-blue-600 font-medium text-sm">
                                                             Commessa: {effectiveItemJobLabel(item)}
                                                         </span>
+                                                    ) : needsTransferBadge(item) ? (
+                                                        <span
+                                                            className="text-amber-700 font-medium text-sm"
+                                                            title="Materiale arrivato in un magazzino non principale: serve un movimento di Trasferimento Magazzino."
+                                                        >
+                                                            ⚠ {item.warehouseName} · Trasferimento da fare
+                                                        </span>
                                                     ) : (
                                                         <span className="text-green-600 font-medium text-sm">
                                                             Magazzino
@@ -1365,6 +1390,13 @@ export default function PurchaseDetailPage() {
                                                     {effectiveItemJobId(item) ? (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
                                                             {effectiveItemJobLabel(item)}
+                                                        </span>
+                                                    ) : needsTransferBadge(item) ? (
+                                                        <span
+                                                            className="text-[10px] px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-medium"
+                                                            title="Materiale arrivato in un magazzino non principale: serve un movimento di Trasferimento Magazzino."
+                                                        >
+                                                            ⚠ {item.warehouseName} · Trasferimento
                                                         </span>
                                                     ) : (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 font-medium">
@@ -1899,6 +1931,32 @@ export default function PurchaseDetailPage() {
                                                     <span className="text-muted-foreground">Scegli cantiere...</span>
                                                 )}
                                             </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!newItem.isJob && warehouses.length > 1 && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                                        <div className="space-y-2">
+                                            <Label>Magazzino di destinazione</Label>
+                                            <Select
+                                                value={newItem.warehouseId}
+                                                onValueChange={(v) => setNewItem({ ...newItem, warehouseId: v })}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Magazzino principale" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {warehouses.map(w => (
+                                                        <SelectItem key={w.id} value={w.id}>
+                                                            {w.name}{w.isPrimary ? " (principale)" : ""}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight">
+                                                Se non e' il magazzino principale, la riga verra' segnalata come da trasferire.
+                                            </p>
                                         </div>
                                     </div>
                                 )}

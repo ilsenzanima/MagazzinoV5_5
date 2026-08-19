@@ -358,7 +358,8 @@ async function buildDeliveryNotePdfDoc(
         'exit': 'uscita',
         'entry': 'rientro',
         'sale': 'vendita',
-        'waste': 'eccedenza'
+        'waste': 'eccedenza',
+        'transfer': 'trasferimento'
     };
     const dateFormatted = format(new Date(movement.date), 'yyyyMMMdd', { locale: it });
     // Use jobName if available, otherwise fall back to description or code

@@ -342,7 +342,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchase_items')
-                .select('*, inventory(name, code, model, unit), jobs(code, name), returned_by_profile:profiles!purchase_items_returned_by_fkey(full_name)')
+                .select('*, inventory(name, code, model, unit), jobs(code, name), warehouses(name), returned_by_profile:profiles!purchase_items_returned_by_fkey(full_name)')
                 .eq('purchase_id', purchaseId)
         );
 
@@ -362,6 +362,8 @@ export const purchasesApi = {
             jobId: item.job_id,
             jobCode: item.jobs?.code,
             jobName: item.jobs?.name,
+            warehouseId: item.warehouse_id,
+            warehouseName: item.warehouses?.name,
             createdAt: item.created_at,
             transportApplied: item.transport_applied ?? false,
             transportUnitCost: item.transport_unit_cost ?? 0,
@@ -458,6 +460,7 @@ export const purchasesApi = {
             coefficient: item.coefficient,
             price: item.price,
             job_id: item.jobId,
+            warehouse_id: item.warehouseId,
         };
         if (item.transportApplied !== undefined) dbItem.transport_applied = item.transportApplied;
         if (item.transportUnitCost !== undefined) dbItem.transport_unit_cost = item.transportUnitCost;
@@ -471,6 +474,7 @@ export const purchasesApi = {
         if (item.pieces !== undefined) dbItem.pieces = item.pieces;
         if (item.price !== undefined) dbItem.price = item.price;
         if (item.jobId !== undefined) dbItem.job_id = item.jobId;
+        if (item.warehouseId !== undefined) dbItem.warehouse_id = item.warehouseId;
         if (item.transportApplied !== undefined) dbItem.transport_applied = item.transportApplied;
         if (item.coefficient !== undefined) dbItem.coefficient = item.coefficient;
         if (item.preReturnQuantity !== undefined) dbItem.pre_return_quantity = item.preReturnQuantity;

@@ -29,6 +29,8 @@ import { useAuth } from "@/components/auth-provider";
 import { useBatchUpload } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { FieldTip } from "@/components/ui/field-tip";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 
 interface PurchaseLine {
     tempId: string;
@@ -48,6 +50,7 @@ interface PurchaseLine {
     isJob: boolean;
     jobId?: string;
     jobCode?: string;
+    warehouseId?: string;
     transportApplied?: boolean;
     transportUnitCost?: number;
 }
@@ -107,6 +110,8 @@ function NewPurchaseContent() {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const primaryWarehouseId = warehouses.find(w => w.isPrimary)?.id ?? "";
 
     // Form State - Header
     const [formData, setFormData] = useState({
@@ -153,15 +158,17 @@ function NewPurchaseContent() {
     const loadData = async () => {
         try {
             setInitialLoading(true);
-            const [suppliersData, inventoryData, jobsData, hiddenSupplierIds] = await Promise.all([
+            const [suppliersData, inventoryData, jobsData, hiddenSupplierIds, warehousesData] = await Promise.all([
                 suppliersApi.getAll(),
                 inventoryApi.getPaginated({ page: 1, limit: 50 }),
                 jobsApi.getPaginated({ page: 1, limit: 50, status: 'active' }),
-                supplierGroupsApi.getHiddenFromPurchasesIds()
+                supplierGroupsApi.getHiddenFromPurchasesIds(),
+                warehousesApi.getAll()
             ]);
             setSuppliers(suppliersData.filter(s => !hiddenSupplierIds.includes(s.id)));
             setInventory(inventoryData.items);
             setJobs(jobsData.data);
+            setWarehouses(warehousesData);
 
             // ── Pre-populate from orders ──────────────────────────────────────
             if (fromOrderIds.length > 0) {
@@ -456,6 +463,7 @@ function NewPurchaseContent() {
                     coefficient: line.coefficient,
                     price: parseFloat(line.price),
                     jobId: line.jobId,
+                    warehouseId: !line.jobId ? line.warehouseId : undefined,
                     transportApplied: line.transportApplied ?? false,
                     transportUnitCost: line.transportUnitCost ?? undefined,
                 });
@@ -782,13 +790,36 @@ function NewPurchaseContent() {
                                                                     />
                                                                 </div>
                                                             ) : (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => openJobSelector(line.tempId)}
-                                                                    className="text-green-600 font-medium text-xs hover:text-green-800 hover:underline"
-                                                                >
-                                                                    Magazzino
-                                                                </button>
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => openJobSelector(line.tempId)}
+                                                                        className="text-green-600 font-medium text-xs hover:text-green-800 hover:underline"
+                                                                    >
+                                                                        Magazzino
+                                                                    </button>
+                                                                    {warehouses.length > 1 && (
+                                                                        <Select
+                                                                            value={line.warehouseId || primaryWarehouseId}
+                                                                            onValueChange={(v) => setLines(prev => prev.map(l =>
+                                                                                l.tempId === line.tempId ? { ...l, warehouseId: v } : l
+                                                                            ))}
+                                                                        >
+                                                                            <SelectTrigger
+                                                                                className={`h-5 w-auto max-w-[90px] border-0 bg-transparent px-1 text-[10px] shadow-none ${line.warehouseId && line.warehouseId !== primaryWarehouseId ? "text-amber-700 font-medium" : "text-slate-400"}`}
+                                                                            >
+                                                                                <SelectValue />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                {warehouses.map(w => (
+                                                                                    <SelectItem key={w.id} value={w.id} className="text-xs">
+                                                                                        {w.name}{w.isPrimary ? " (principale)" : ""}
+                                                                                    </SelectItem>
+                                                                                ))}
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    )}
+                                                                </div>
                                                             )
                                                         )}
                                                     </TableCell>

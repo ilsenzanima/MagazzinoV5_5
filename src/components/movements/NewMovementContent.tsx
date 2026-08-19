@@ -10,6 +10,7 @@ import {
     ArrowUpRight,
     ShoppingBag,
     Recycle,
+    Repeat,
 } from "lucide-react";
 import Link from "next/link";
 import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
@@ -92,7 +93,7 @@ export default function NewMovementContent({
                 onValueChange={(v: any) => form.setActiveTab(v)}
                 className="w-full"
             >
-                <TabsList className="grid w-full grid-cols-4 mb-6">
+                <TabsList className="grid w-full grid-cols-5 mb-6">
                     <TabsTrigger
                         value="exit"
                         className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800"
@@ -137,6 +138,17 @@ export default function NewMovementContent({
                             description="Per materiale di scarto/eccedenza: si registra in peso (kg) invece che a pezzi o quantità, è sempre un movimento fittizio e aggiunge automaticamente una nota legale sul deposito temporaneo."
                         />
                     </TabsTrigger>
+                    <TabsTrigger
+                        value="transfer"
+                        className="data-[state=active]:bg-teal-100 data-[state=active]:text-teal-800"
+                    >
+                        <Repeat className="mr-2 h-4 w-4" />
+                        Trasferimento
+                        <HelpTip
+                            title="Trasferimento Magazzino"
+                            description="Formalità documentale per allineare uno spostamento tra magazzini: stessa ricerca materiali dell'Uscita, ma le righe sono sempre fittizie e non modificano lo stock. Il rientro è sempre nello stesso magazzino."
+                        />
+                    </TabsTrigger>
                 </TabsList>
 
                 <div className="space-y-6">
@@ -152,6 +164,9 @@ export default function NewMovementContent({
                         setPickupLocation={form.setPickupLocation}
                         deliveryLocation={form.deliveryLocation}
                         setDeliveryLocation={form.setDeliveryLocation}
+                        warehouses={form.warehouses}
+                        selectedWarehouseId={form.selectedWarehouseId}
+                        onWarehouseSelect={form.handleWarehouseSelect}
                     >
                         <MovementJobSelector
                             selectedJob={form.selectedJob}
