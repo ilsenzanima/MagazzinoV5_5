@@ -94,6 +94,7 @@ export default function PurchaseDetailPage() {
     const [selectedItemForLine, setSelectedItemForLine] = useState<InventoryItem | null>(null);
     const [selectedJobForLine, setSelectedJobForLine] = useState<Job | null>(null);
     const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
+    const [isHeaderJob, setIsHeaderJob] = useState(false);
 
     // Edit Item State
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -161,6 +162,7 @@ export default function PurchaseDetailPage() {
                 const job = jobsData.find(j => j.id === purchaseData.jobId);
                 if (job) {
                     setSelectedHeaderJob(job);
+                    setIsHeaderJob(true);
                     // Set default for new item
                     setNewItem(prev => ({
                         ...prev,
@@ -224,6 +226,7 @@ export default function PurchaseDetailPage() {
         try {
             await purchasesApi.update(id, { jobId: job.id });
             setSelectedHeaderJob(job);
+            setIsHeaderJob(true);
             // Update current line default
             setNewItem(prev => ({
                 ...prev,
@@ -243,13 +246,11 @@ export default function PurchaseDetailPage() {
         setIsHeaderJobSelectorOpen(false);
     };
 
-    const handleClearHeaderJob = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!confirm("Rimuovere la commessa dall'intestazione?")) return;
-
+    const clearHeaderJob = async () => {
         try {
             await purchasesApi.update(id, { jobId: "" });
             setSelectedHeaderJob(null);
+            setIsHeaderJob(false);
             if (purchase) {
                 setPurchase({ ...purchase, jobId: undefined, jobCode: undefined });
             }
@@ -257,6 +258,23 @@ export default function PurchaseDetailPage() {
             console.error("Failed to clear purchase job", error);
             alert("Errore durante la rimozione della commessa");
         }
+    };
+
+    // Switch Magazzino/Commessa in intestazione: verso commessa apre subito il
+    // selettore, verso magazzino chiede conferma e sgancia la commessa (stessa
+    // azione della X, solo raggiungibile anche dallo switch).
+    const handleHeaderModeSwitch = async (wantJob: boolean) => {
+        if (wantJob) {
+            setIsHeaderJob(true);
+            setIsHeaderJobSelectorOpen(true);
+            return;
+        }
+        if (!purchase?.jobId) {
+            setIsHeaderJob(false);
+            return;
+        }
+        if (!confirm("Rimuovere la commessa dall'intestazione?")) return;
+        await clearHeaderJob();
     };
 
     // Il magazzino d'intestazione è puramente informativo (non sposta giacenza),
@@ -854,60 +872,56 @@ export default function PurchaseDetailPage() {
                                 )}
                             </div>
                             <div className="md:col-span-2 border-t pt-4 mt-2">
-                                <Label className="text-slate-500 mb-1 flex items-center">
-                                    Commessa (Generale)
-                                    <FieldTip text="Usala quando il materiale di questa bolla viene girato direttamente a una commessa con la spedizione, invece di restare a magazzino. Si applica come default a tutte le righe, ma puoi comunque cambiarlo riga per riga." />
-                                </Label>
-                                <div
-                                    className={`flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 bg-white dark:bg-slate-800 max-w-md ${isEditingHeader ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700" : "cursor-default opacity-70"}`}
-                                    onClick={() => isEditingHeader && setIsHeaderJobSelectorOpen(true)}
-                                >
-                                    {selectedHeaderJob ? (
-                                        <div className="flex flex-col overflow-hidden">
-                                            <span className="font-medium text-sm truncate">{selectedHeaderJob.name || selectedHeaderJob.code}</span>
-                                            <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.code}{selectedHeaderJob.clientName ? ` · ${selectedHeaderJob.clientName}` : ''}</span>
+                                <div className="flex items-center justify-between mb-1">
+                                    <Label className="text-slate-500 flex items-center">
+                                        {isHeaderJob ? "Commessa (Generale)" : "Magazzino (Generale)"}
+                                        <FieldTip text="Si applica come default a tutte le righe che non hanno un magazzino o una commessa propri. Cambiarlo qui aggiorna subito le righe che lo seguono, senza doverle modificare una per una." />
+                                    </Label>
+                                    {isEditingHeader && warehouses.length > 1 && (
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className={`text-[10px] ${!isHeaderJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>Magazzino</span>
+                                            <Switch
+                                                checked={isHeaderJob}
+                                                onCheckedChange={handleHeaderModeSwitch}
+                                            />
+                                            <span className={`text-[10px] ${isHeaderJob ? "text-blue-700 font-semibold" : "text-slate-400"}`}>Commessa</span>
                                         </div>
-                                    ) : (
-                                        <span className="text-sm text-slate-500 truncate">Seleziona per applicare a nuovi articoli...</span>
-                                    )}
-                                    {/* X button only visible in edit mode */}
-                                    {isEditingHeader && selectedHeaderJob ? (
-                                        <div
-                                            className="p-1 hover:bg-red-100 rounded-full"
-                                            onClick={handleClearHeaderJob}
-                                        >
-                                            <X className="h-4 w-4 text-slate-400 hover:text-red-500 flex-shrink-0" />
-                                        </div>
-                                    ) : (
-                                        <Search className="h-4 w-4 text-slate-400 flex-shrink-0 ml-1" />
                                     )}
                                 </div>
+                                {isHeaderJob ? (
+                                    <div
+                                        className={`flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 bg-white dark:bg-slate-800 max-w-md ${isEditingHeader ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700" : "cursor-default opacity-70"}`}
+                                        onClick={() => isEditingHeader && setIsHeaderJobSelectorOpen(true)}
+                                    >
+                                        {selectedHeaderJob ? (
+                                            <div className="flex flex-col overflow-hidden">
+                                                <span className="font-medium text-sm truncate">{selectedHeaderJob.name || selectedHeaderJob.code}</span>
+                                                <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.code}{selectedHeaderJob.clientName ? ` · ${selectedHeaderJob.clientName}` : ''}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-slate-500 truncate">Seleziona per applicare a nuovi articoli...</span>
+                                        )}
+                                        <Search className="h-4 w-4 text-slate-400 flex-shrink-0 ml-1" />
+                                    </div>
+                                ) : (
+                                    <Select
+                                        value={purchase.warehouseId || warehouses.find(w => w.isPrimary)?.id}
+                                        onValueChange={handleHeaderWarehouseSelect}
+                                        disabled={!isEditingHeader}
+                                    >
+                                        <SelectTrigger className="max-w-md">
+                                            <SelectValue placeholder="Magazzino principale" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {warehouses.map(w => (
+                                                <SelectItem key={w.id} value={w.id}>
+                                                    {w.name}{w.isPrimary ? " (principale)" : ""}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             </div>
-
-                            {warehouses.length > 1 && (
-                            <div className="md:col-span-2 pt-2">
-                                <Label className="text-slate-500 mb-1 flex items-center">
-                                    Magazzino (Generale)
-                                    <FieldTip text="Si applica come default a tutte le righe non assegnate a una commessa e senza un magazzino proprio. Cambiarlo qui aggiorna subito le righe che lo seguono, senza doverle modificare una per una." />
-                                </Label>
-                                <Select
-                                    value={purchase.warehouseId || warehouses.find(w => w.isPrimary)?.id}
-                                    onValueChange={handleHeaderWarehouseSelect}
-                                    disabled={!isEditingHeader}
-                                >
-                                    <SelectTrigger className="max-w-md">
-                                        <SelectValue placeholder="Magazzino principale" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {warehouses.map(w => (
-                                            <SelectItem key={w.id} value={w.id}>
-                                                {w.name}{w.isPrimary ? " (principale)" : ""}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            )}
 
                             {/* Fattura, ordine di origine o acquisto collegato */}
                             {(purchase.invoiceId || purchase.convertedPurchaseId || sourceOrders.length > 0 || complianceDocs.length > 0) && (

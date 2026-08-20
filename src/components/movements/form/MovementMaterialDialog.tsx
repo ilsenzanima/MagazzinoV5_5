@@ -393,7 +393,7 @@ export function MovementMaterialDialog({
                                         />
                                     </TabsTrigger>
                                 </>
-                            ) : activeTab === "exit" || activeTab === "sale" ? (
+                            ) : showPurchaseTab ? (
                                 <>
                                     <TabsTrigger value="magazzino" className="flex-1">
                                         <Search className="h-4 w-4 mr-2" />

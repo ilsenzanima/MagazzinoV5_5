@@ -135,6 +135,7 @@ function NewPurchaseContent() {
     const [openJobSelectorForRowId, setOpenJobSelectorForRowId] = useState<string | null>(null);
     const [isHeaderJobSelectorOpen, setIsHeaderJobSelectorOpen] = useState(false);
     const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
+    const [isHeaderJob, setIsHeaderJob] = useState(false);
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -191,6 +192,7 @@ function NewPurchaseContent() {
                             ?? await jobsApi.getById(headerJobId).catch(() => null);
                         if (job) {
                             setSelectedHeaderJob(job);
+                            setIsHeaderJob(true);
                             setFormData(prev => ({ ...prev, supplierId: first.supplierId, jobId: job.id }));
                         } else {
                             setFormData(prev => ({ ...prev, supplierId: first.supplierId }));
@@ -347,6 +349,7 @@ function NewPurchaseContent() {
 
     const handleHeaderJobSelect = (job: Job) => {
         setSelectedHeaderJob(job);
+        setIsHeaderJob(true);
         setFormData(prev => ({ ...prev, jobId: job.id }));
         setIsHeaderJobSelectorOpen(false);
     };
@@ -577,60 +580,74 @@ function NewPurchaseContent() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="flex items-center">
-                                    Commessa (Generale)
-                                    <FieldTip text="Usala quando il materiale di questa bolla viene girato direttamente a una commessa con la spedizione, invece di restare a magazzino. Si applica come default a tutte le righe, ma puoi comunque cambiarlo riga per riga." />
-                                </Label>
-                                <div
-                                    className="flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 bg-white dark:bg-slate-800 h-10"
-                                    onClick={() => setIsHeaderJobSelectorOpen(true)}
-                                >
-                                    {selectedHeaderJob ? (
-                                        <div className="flex flex-col overflow-hidden">
-                                            <span className="font-medium text-sm truncate">{selectedHeaderJob.name || selectedHeaderJob.code}</span>
-                                            <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.code}{selectedHeaderJob.clientName ? ` · ${selectedHeaderJob.clientName}` : ''}</span>
+                                <div className="flex items-center justify-between">
+                                    <Label className="flex items-center">
+                                        {isHeaderJob ? "Commessa (Generale)" : "Magazzino (Generale)"}
+                                        <FieldTip text="Si applica come default a tutte le righe che non hanno un magazzino o una commessa propri. Puoi comunque cambiarlo riga per riga." />
+                                    </Label>
+                                    {warehouses.length > 1 && (
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className={`text-[10px] ${!isHeaderJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>Magazzino</span>
+                                            <Switch
+                                                checked={isHeaderJob}
+                                                onCheckedChange={(checked) => {
+                                                    setIsHeaderJob(checked);
+                                                    if (checked) {
+                                                        setIsHeaderJobSelectorOpen(true);
+                                                    } else {
+                                                        setSelectedHeaderJob(null);
+                                                        setFormData(prev => ({ ...prev, jobId: "" }));
+                                                    }
+                                                }}
+                                            />
+                                            <span className={`text-[10px] ${isHeaderJob ? "text-blue-700 font-semibold" : "text-slate-400"}`}>Commessa</span>
                                         </div>
-                                    ) : (
-                                        <span className="text-sm text-slate-500 truncate">Seleziona per intero acquisto...</span>
-                                    )}
-                                    {selectedHeaderJob ? (
-                                        <X
-                                            className="h-4 w-4 text-slate-400 hover:text-red-500 flex-shrink-0 ml-1"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedHeaderJob(null);
-                                                setFormData(prev => ({ ...prev, jobId: "" }));
-                                            }}
-                                        />
-                                    ) : (
-                                        <Search className="h-4 w-4 text-slate-400 flex-shrink-0 ml-1" />
                                     )}
                                 </div>
+                                {isHeaderJob ? (
+                                    <div
+                                        className="flex items-center justify-between border dark:border-slate-600 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 bg-white dark:bg-slate-800 h-10"
+                                        onClick={() => setIsHeaderJobSelectorOpen(true)}
+                                    >
+                                        {selectedHeaderJob ? (
+                                            <div className="flex flex-col overflow-hidden">
+                                                <span className="font-medium text-sm truncate">{selectedHeaderJob.name || selectedHeaderJob.code}</span>
+                                                <span className="text-[10px] text-slate-500 truncate">{selectedHeaderJob.code}{selectedHeaderJob.clientName ? ` · ${selectedHeaderJob.clientName}` : ''}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-slate-500 truncate">Seleziona per intero acquisto...</span>
+                                        )}
+                                        {selectedHeaderJob ? (
+                                            <X
+                                                className="h-4 w-4 text-slate-400 hover:text-red-500 flex-shrink-0 ml-1"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedHeaderJob(null);
+                                                    setFormData(prev => ({ ...prev, jobId: "" }));
+                                                }}
+                                            />
+                                        ) : (
+                                            <Search className="h-4 w-4 text-slate-400 flex-shrink-0 ml-1" />
+                                        )}
+                                    </div>
+                                ) : (
+                                    <Select
+                                        value={formData.warehouseId || primaryWarehouseId}
+                                        onValueChange={(v) => setFormData(prev => ({ ...prev, warehouseId: v }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Magazzino principale" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {warehouses.map(w => (
+                                                <SelectItem key={w.id} value={w.id}>
+                                                    {w.name}{w.isPrimary ? " (principale)" : ""}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             </div>
-
-                            {warehouses.length > 1 && (
-                            <div className="space-y-2">
-                                <Label className="flex items-center">
-                                    Magazzino (Generale)
-                                    <FieldTip text="Si applica come default a tutte le righe non assegnate a una commessa e senza un magazzino proprio. Puoi comunque cambiarlo riga per riga." />
-                                </Label>
-                                <Select
-                                    value={formData.warehouseId || primaryWarehouseId}
-                                    onValueChange={(v) => setFormData(prev => ({ ...prev, warehouseId: v }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Magazzino principale" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {warehouses.map(w => (
-                                            <SelectItem key={w.id} value={w.id}>
-                                                {w.name}{w.isPrimary ? " (principale)" : ""}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            )}
 
                             <div className="space-y-2 md:col-span-4 border-t pt-2">
                                 <Label>Documento Allegato (PDF, Immagine)</Label>

@@ -272,30 +272,38 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         }
     }, [activeTab, selectedJob]);
 
-    // Per le Eccedenze il deposito temporaneo di default è la sede operativa,
-    // non quella principale: la selezioniamo automaticamente al primo ingresso
-    // nel tab (solo per un movimento nuovo, e solo se l'utente non ha già
-    // scelto esplicitamente un magazzino diverso dal default generico).
-    useEffect(() => {
-        if (isEditing || activeTab !== "waste" || warehouses.length === 0) return;
-        const primary = warehouses.find((w) => w.isPrimary);
-        if (toWarehouseId && toWarehouseId !== primary?.id) return;
-        const operational =
-            warehouses.find((w) => !w.isPrimary && /operativ/i.test(w.name)) ||
-            warehouses.find((w) => !w.isPrimary);
-        if (operational) handleToWarehouseSelect(operational.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, warehouses, isEditing]);
-
     // Solo per un movimento nuovo (non in modifica): precompila/riallinea il
     // lato/i magazzino ad ogni cambio di tab o di magazzino selezionato.
+    // Le Eccedenze sono un caso speciale sul lato "a": il deposito temporaneo
+    // di default è la sede operativa (non quella principale), a meno che
+    // l'utente non abbia già scelto esplicitamente un magazzino diverso dal
+    // default generico. Un solo effect: due effect separati che scrivono
+    // entrambi su toWarehouseId nello stesso render si sovrascrivono a
+    // vicenda (l'ultimo vince), quindi la logica va tenuta unita qui.
     useEffect(() => {
         if (isEditing) return;
         const roles = warehouseRoles(activeTab);
-        if (roles.from === "pickup" && fromWarehouseId) handleFromWarehouseSelect(fromWarehouseId);
-        if (roles.to === "delivery" && toWarehouseId) handleToWarehouseSelect(toWarehouseId);
+
+        if (roles.from === "pickup" && fromWarehouseId) {
+            handleFromWarehouseSelect(fromWarehouseId);
+        }
+
+        if (roles.to === "delivery") {
+            if (activeTab === "waste") {
+                const primary = warehouses.find((w) => w.isPrimary);
+                const isGenericDefault = !toWarehouseId || toWarehouseId === primary?.id;
+                const target = isGenericDefault
+                    ? warehouses.find((w) => !w.isPrimary && /operativ/i.test(w.name)) ||
+                      warehouses.find((w) => !w.isPrimary) ||
+                      primary
+                    : warehouses.find((w) => w.id === toWarehouseId);
+                if (target) handleToWarehouseSelect(target.id);
+            } else if (toWarehouseId) {
+                handleToWarehouseSelect(toWarehouseId);
+            }
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, fromWarehouseId, toWarehouseId, isEditing]);
+    }, [activeTab, fromWarehouseId, toWarehouseId, warehouses, isEditing]);
 
     useEffect(() => {
         if (activeTab === "entry" && selectedJob) {
