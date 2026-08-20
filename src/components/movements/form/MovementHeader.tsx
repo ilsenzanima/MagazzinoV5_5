@@ -118,6 +118,12 @@ export function MovementHeader({
                     </div>
                 )}
 
+                {activeTab === "transfer" && fromWarehouseId && toWarehouseId && fromWarehouseId === toWarehouseId && (
+                    <p className="text-xs text-red-600 dark:text-red-400 -mt-2">
+                        Il magazzino di partenza e di destinazione coincidono: scegli due magazzini diversi.
+                    </p>
+                )}
+
                 <div className="space-y-2">
                     <Label>Causale</Label>
                     <Input

@@ -788,6 +788,11 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             return;
         }
 
+        if (activeTab === "transfer" && fromWarehouseId && toWarehouseId && fromWarehouseId === toWarehouseId) {
+            notify.warning("Il magazzino di partenza e di destinazione coincidono: scegli due magazzini diversi");
+            return;
+        }
+
         const validLines = lines.filter((l) => {
             if (!l.itemId) return false;
             if (activeTab === "waste") return !!l.kgEccedenza && parseFloat(l.kgEccedenza) > 0;
