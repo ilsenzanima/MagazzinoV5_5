@@ -301,6 +301,8 @@ export interface Purchase {
     jobCode?: string;
     jobName?: string;
     jobClientName?: string;
+    warehouseId?: string;
+    warehouseName?: string;
     documentUrl?: string | null;
     documentUrls?: string[];
     totalAmount?: number;

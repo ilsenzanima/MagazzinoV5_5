@@ -27,6 +27,8 @@ export const mapDbToPurchase = (db: any): Purchase => ({
     jobCode: db.jobs?.code,
     jobName: db.jobs?.name,
     jobClientName: db.jobs?.clients?.name,
+    warehouseId: db.warehouse_id,
+    warehouseName: db.warehouses?.name,
     documentUrl: db.document_url,
     documentUrls: (db.document_urls && db.document_urls.length > 0)
         ? db.document_urls
@@ -59,6 +61,10 @@ export const mapPurchaseToDb = (purchase: Partial<Purchase>) => {
     // This prevents accidental clearing of job_id when editing other fields
     if ('jobId' in purchase) {
         dbPurchase.job_id = purchase.jobId || null;
+    }
+    // Stesso criterio per warehouse_id (magazzino generale di intestazione)
+    if ('warehouseId' in purchase) {
+        dbPurchase.warehouse_id = purchase.warehouseId || null;
     }
 
     if (purchase.transportCost !== undefined) dbPurchase.transport_cost = purchase.transportCost;
@@ -198,7 +204,7 @@ export const purchasesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('*, suppliers(name), profiles(full_name), invoices(invoice_number), converted_purchase:converted_purchase_id(id, delivery_note_number)')
+                .select('*, suppliers(name), profiles(full_name), invoices(invoice_number), converted_purchase:converted_purchase_id(id, delivery_note_number), warehouses(name)')
                 .eq('id', id)
                 .single()
         );

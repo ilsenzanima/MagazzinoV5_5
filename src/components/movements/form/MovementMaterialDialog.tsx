@@ -107,7 +107,7 @@ export function MovementMaterialDialog({
     const [purchaseDetailsMap, setPurchaseDetailsMap] = useState<Record<string, PurchaseDetail>>({});
     const [selectedPurchaseItemIds, setSelectedPurchaseItemIds] = useState<Set<string>>(new Set());
 
-    const showPurchaseTab = activeTab === "exit" || activeTab === "sale";
+    const showPurchaseTab = activeTab === "exit" || activeTab === "sale" || activeTab === "transfer";
 
     useEffect(() => {
         if (open) {
@@ -807,7 +807,7 @@ export function MovementMaterialDialog({
                             </div>
                         )}
                     </TabsContent>
-                    {/* ---- DA ACQUISTO (solo uscita e vendita) ---- */}
+                    {/* ---- DA ACQUISTO (uscita, vendita, trasferimento) ---- */}
                     {showPurchaseTab && <TabsContent
                         value="acquisti"
                         className="flex-1 overflow-hidden flex flex-col px-6 pb-6 mt-4"

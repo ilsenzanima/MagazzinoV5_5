@@ -155,7 +155,7 @@ export default function PurchaseDetailPage() {
             setItemJobMovements(jobMovementsData);
             setWarehouses(warehousesData);
             const primaryWarehouseId = warehousesData.find(w => w.isPrimary)?.id || "";
-            setNewItem(prev => ({ ...prev, warehouseId: primaryWarehouseId }));
+            setNewItem(prev => ({ ...prev, warehouseId: purchaseData.warehouseId || primaryWarehouseId }));
 
             if (purchaseData.jobId) {
                 const job = jobsData.find(j => j.id === purchaseData.jobId);
@@ -259,6 +259,27 @@ export default function PurchaseDetailPage() {
         }
     };
 
+    // Il magazzino d'intestazione è puramente informativo (non sposta giacenza),
+    // quindi cambiarlo si applica subito come nuovo default per le righe che
+    // seguono l'intestazione (senza un warehouse_id proprio): nessuna riga va
+    // toccata una per una.
+    const handleHeaderWarehouseSelect = async (warehouseId: string) => {
+        try {
+            await purchasesApi.update(id, { warehouseId });
+            const warehouse = warehouses.find(w => w.id === warehouseId);
+            if (purchase) {
+                setPurchase({ ...purchase, warehouseId, warehouseName: warehouse?.name });
+            }
+            setNewItem(prev => ({ ...prev, warehouseId }));
+            // Ricarica le righe per aggiornare l'etichetta "sede attuale"
+            const updatedItems = await purchasesApi.getItems(id);
+            setItems(updatedItems);
+        } catch (error) {
+            console.error("Failed to update purchase warehouse", error);
+            alert("Errore nell'aggiornamento del magazzino");
+        }
+    };
+
     const handleNewItemQuantityChange = (quantityStr: string) => {
         const quantity = parseFloat(quantityStr);
 
@@ -333,7 +354,13 @@ export default function PurchaseDetailPage() {
                 // Solo una commessa diversa da quella d'intestazione va salvata esplicitamente
                 // sulla riga (assegnazione indipendente).
                 jobId: (newItem.isJob && newItem.jobId !== (purchase?.jobId || undefined)) ? newItem.jobId : undefined,
-                warehouseId: !newItem.isJob ? (newItem.warehouseId || undefined) : undefined
+                // Stesso criterio del job_id: se il magazzino scelto e' quello
+                // d'intestazione (o il principale in assenza di intestazione),
+                // lasciamo la riga senza warehouse_id proprio così segue
+                // l'intestazione via COALESCE lato vista "sede attuale".
+                warehouseId: (!newItem.isJob && newItem.warehouseId && newItem.warehouseId !== (purchase?.warehouseId || warehouses.find(w => w.isPrimary)?.id))
+                    ? newItem.warehouseId
+                    : undefined
             });
 
             // Reload items
@@ -856,6 +883,31 @@ export default function PurchaseDetailPage() {
                                     )}
                                 </div>
                             </div>
+
+                            {warehouses.length > 1 && (
+                            <div className="md:col-span-2 pt-2">
+                                <Label className="text-slate-500 mb-1 flex items-center">
+                                    Magazzino (Generale)
+                                    <FieldTip text="Si applica come default a tutte le righe non assegnate a una commessa e senza un magazzino proprio. Cambiarlo qui aggiorna subito le righe che lo seguono, senza doverle modificare una per una." />
+                                </Label>
+                                <Select
+                                    value={purchase.warehouseId || warehouses.find(w => w.isPrimary)?.id}
+                                    onValueChange={handleHeaderWarehouseSelect}
+                                    disabled={!isEditingHeader}
+                                >
+                                    <SelectTrigger className="max-w-md">
+                                        <SelectValue placeholder="Magazzino principale" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {warehouses.map(w => (
+                                            <SelectItem key={w.id} value={w.id}>
+                                                {w.name}{w.isPrimary ? " (principale)" : ""}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            )}
 
                             {/* Fattura, ordine di origine o acquisto collegato */}
                             {(purchase.invoiceId || purchase.convertedPurchaseId || sourceOrders.length > 0 || complianceDocs.length > 0) && (

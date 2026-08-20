@@ -119,7 +119,8 @@ function NewPurchaseContent() {
         supplierId: "",
         deliveryNoteNumber: "",
         deliveryNoteDate: new Date().toISOString().split('T')[0],
-        jobId: ""
+        jobId: "",
+        warehouseId: ""
     });
 
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -170,6 +171,8 @@ function NewPurchaseContent() {
             setInventory(inventoryData.items);
             setJobs(jobsData.data);
             setWarehouses(warehousesData);
+            const primaryId = warehousesData.find(w => w.isPrimary)?.id;
+            if (primaryId) setFormData(prev => ({ ...prev, warehouseId: primaryId }));
 
             // ── Pre-populate from orders ──────────────────────────────────────
             if (fromOrderIds.length > 0) {
@@ -449,6 +452,7 @@ function NewPurchaseContent() {
                 deliveryNoteDate: formData.deliveryNoteDate,
                 notes: '',
                 jobId: formData.jobId || undefined,
+                warehouseId: formData.warehouseId || undefined,
                 documentUrls,
                 orderType: isOrder ? 'order' : 'purchase',
             });
@@ -468,7 +472,12 @@ function NewPurchaseContent() {
                     // così, rimuovendo poi la commessa dall'intestazione, il materiale torna
                     // correttamente a magazzino invece di restare agganciato alla vecchia commessa.
                     jobId: line.jobId && line.jobId !== (formData.jobId || undefined) ? line.jobId : undefined,
-                    warehouseId: !line.jobId ? line.warehouseId : undefined,
+                    // Stesso criterio: se il magazzino della riga e' quello d'intestazione
+                    // (o il principale in assenza di intestazione), lasciamo la riga senza
+                    // warehouse_id proprio così segue l'intestazione via COALESCE.
+                    warehouseId: (!line.jobId && line.warehouseId && line.warehouseId !== (formData.warehouseId || primaryWarehouseId))
+                        ? line.warehouseId
+                        : undefined,
                     transportApplied: line.transportApplied ?? false,
                     transportUnitCost: line.transportUnitCost ?? undefined,
                 });
@@ -598,6 +607,30 @@ function NewPurchaseContent() {
                                     )}
                                 </div>
                             </div>
+
+                            {warehouses.length > 1 && (
+                            <div className="space-y-2">
+                                <Label className="flex items-center">
+                                    Magazzino (Generale)
+                                    <FieldTip text="Si applica come default a tutte le righe non assegnate a una commessa e senza un magazzino proprio. Puoi comunque cambiarlo riga per riga." />
+                                </Label>
+                                <Select
+                                    value={formData.warehouseId || primaryWarehouseId}
+                                    onValueChange={(v) => setFormData(prev => ({ ...prev, warehouseId: v }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Magazzino principale" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {warehouses.map(w => (
+                                            <SelectItem key={w.id} value={w.id}>
+                                                {w.name}{w.isPrimary ? " (principale)" : ""}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            )}
 
                             <div className="space-y-2 md:col-span-4 border-t pt-2">
                                 <Label>Documento Allegato (PDF, Immagine)</Label>
@@ -806,13 +839,13 @@ function NewPurchaseContent() {
                                                                     </button>
                                                                 ) : !line.isJob && warehouses.length > 1 ? (
                                                                     <Select
-                                                                        value={line.warehouseId || primaryWarehouseId}
+                                                                        value={line.warehouseId || formData.warehouseId || primaryWarehouseId}
                                                                         onValueChange={(v) => setLines(prev => prev.map(l =>
                                                                             l.tempId === line.tempId ? { ...l, warehouseId: v } : l
                                                                         ))}
                                                                     >
                                                                         <SelectTrigger
-                                                                            className={`h-7 w-full min-w-[100px] max-w-[130px] text-xs ${line.warehouseId && line.warehouseId !== primaryWarehouseId ? "text-cyan-700 font-medium border-cyan-300" : ""}`}
+                                                                            className={`h-7 w-full min-w-[100px] max-w-[130px] text-xs ${line.warehouseId && line.warehouseId !== (formData.warehouseId || primaryWarehouseId) ? "text-cyan-700 font-medium border-cyan-300" : ""}`}
                                                                         >
                                                                             <SelectValue />
                                                                         </SelectTrigger>
