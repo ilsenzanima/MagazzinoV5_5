@@ -4,25 +4,31 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileDown, Loader2, ClipboardList, Info } from "lucide-react";
 import { getInventoryCountData, InventoryCountData } from "@/lib/services/reports";
 import { generateInventoryCountReport } from "./inventory-report-generator";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 
 export default function InventoryReport() {
     const [data, setData] = useState<InventoryCountData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [generating, setGenerating] = useState(false);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
 
     useEffect(() => {
         loadData();
+        warehousesApi.getAll().then(setWarehouses).catch(console.error);
     }, []);
 
-    const loadData = async () => {
+    const loadData = async (warehouseId?: string) => {
         try {
             setLoading(true);
             setError(null);
-            const result = await getInventoryCountData();
+            const result = await getInventoryCountData(warehouseId !== "all" ? warehouseId : undefined);
             setData(result);
         } catch (err) {
             console.error("Error loading inventory count data:", err);
@@ -30,6 +36,13 @@ export default function InventoryReport() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const stockWarehouses = warehouses.filter((w) => w.isPrimary || /operativ/i.test(w.name));
+
+    const handleWarehouseChange = (warehouseId: string) => {
+        setSelectedWarehouse(warehouseId);
+        loadData(warehouseId);
     };
 
     const handleExportPDF = async () => {
@@ -63,14 +76,31 @@ export default function InventoryReport() {
         );
     }
 
+    const warehouseTabs = stockWarehouses.length > 1 && (
+        <Tabs value={selectedWarehouse} onValueChange={handleWarehouseChange}>
+            <TabsList
+                className="bg-slate-100 dark:bg-slate-800"
+                style={{ display: "grid", gridTemplateColumns: `repeat(${stockWarehouses.length + 1}, minmax(0, 1fr))` }}
+            >
+                <TabsTrigger value="all">Tutti</TabsTrigger>
+                {stockWarehouses.map((w) => (
+                    <TabsTrigger key={w.id} value={w.id} className="truncate" title={w.name}>{w.name}</TabsTrigger>
+                ))}
+            </TabsList>
+        </Tabs>
+    );
+
     if (!data || data.items.length === 0) {
         return (
-            <Card className="border-dashed">
-                <CardContent className="pt-6 text-center text-slate-500 dark:text-slate-400">
-                    <ClipboardList className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
-                    <p>Nessun articolo in magazzino da contare.</p>
-                </CardContent>
-            </Card>
+            <div className="space-y-4">
+                {warehouseTabs}
+                <Card className="border-dashed">
+                    <CardContent className="pt-6 text-center text-slate-500 dark:text-slate-400">
+                        <ClipboardList className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+                        <p>Nessun articolo in magazzino da contare.</p>
+                    </CardContent>
+                </Card>
+            </div>
         );
     }
 
@@ -89,6 +119,7 @@ export default function InventoryReport() {
 
     return (
         <div className="space-y-4">
+            {warehouseTabs}
             {/* Summary and Export */}
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                 <div className="flex gap-4">

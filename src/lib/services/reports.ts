@@ -26,7 +26,9 @@ export interface ArticlesReportData {
 
 // Get all articles with stock > 0, broken down by lot
 // If targetDate is provided, calculates stock as of that date using RPC function
-export const getArticlesWithStock = async (targetDate?: string): Promise<ArticlesReportData> => {
+// warehouseId, se indicato, filtra i lotti sulla sede attuale (solo per la vista
+// "oggi": lo storico per data non traccia la sede, il filtro viene ignorato in quel caso)
+export const getArticlesWithStock = async (targetDate?: string, warehouseId?: string): Promise<ArticlesReportData> => {
     try {
         let lots: any[] = [];
 
@@ -53,6 +55,10 @@ export const getArticlesWithStock = async (targetDate?: string): Promise<Article
                 throw error;
             }
             lots = data || [];
+
+            if (warehouseId) {
+                lots = lots.filter(lot => lot.current_warehouse_id === warehouseId);
+            }
         }
 
         // Get all inventory items to get names and other details
@@ -144,7 +150,8 @@ export interface InventoryCountData {
 
 // Get all items for inventory count - aggregated by item (not by lot)
 // Shows ALL items including those with 0 pieces (to confirm they are at zero)
-export const getInventoryCountData = async (): Promise<InventoryCountData> => {
+// warehouseId, se indicato, filtra i lotti sulla sede attuale del lotto
+export const getInventoryCountData = async (warehouseId?: string): Promise<InventoryCountData> => {
     try {
         // Get all lots (including those with 0 pieces for accurate calculation)
         const { data: lots, error: lotsError } = await supabase
@@ -155,6 +162,10 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
             console.error('Error fetching lots:', lotsError);
             throw lotsError;
         }
+
+        const filteredLots = warehouseId
+            ? (lots || []).filter(lot => lot.current_warehouse_id === warehouseId)
+            : (lots || []);
 
         // Get ALL inventory items
         const { data: items, error: itemsError } = await supabase
@@ -168,7 +179,7 @@ export const getInventoryCountData = async (): Promise<InventoryCountData> => {
 
         // Aggregate pieces by item (sum all lots)
         const itemPiecesMap = new Map<string, number>();
-        for (const lot of lots || []) {
+        for (const lot of filteredLots) {
             const currentPieces = itemPiecesMap.get(lot.item_id) || 0;
             // Only add positive remaining pieces
             const piecesToAdd = Math.max(0, lot.remaining_pieces || 0);

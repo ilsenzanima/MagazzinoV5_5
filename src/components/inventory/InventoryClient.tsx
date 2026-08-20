@@ -56,6 +56,8 @@ import {
 import { brandsApi, Brand } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { loadNotesService } from "@/lib/services/load-notes";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 
 interface InventoryClientProps {
   initialItems: InventoryItem[];
@@ -94,6 +96,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const initialSearch = searchParams.get("q") || "";
   const initialBrand = searchParams.get("brand") || "all";
   const initialType = searchParams.get("type") || "all";
+  const initialWarehouse = searchParams.get("wh") || "all";
   const initialPage = Number(searchParams.get("page")) || 1;
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -105,6 +108,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [itemTypes, setItemTypes] = useState<ItemType[]>(initialTypes);
   const [selectedBrand, setSelectedBrand] = useState<string>(initialBrand);
   const [selectedType, setSelectedType] = useState<string>(initialType);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>(initialWarehouse);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(false); // Initial loading is false because we have props
   const [error, setError] = useState<string | null>(null);
@@ -135,10 +140,16 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     if (debouncedSearchTerm) params.set("q", debouncedSearchTerm);
     if (selectedBrand !== "all") params.set("brand", selectedBrand);
     if (selectedType !== "all") params.set("type", selectedType);
+    if (selectedWarehouse !== "all") params.set("wh", selectedWarehouse);
     if (page !== 1) params.set("page", String(page));
     const query = params.toString();
     router.replace(query ? `/inventory?${query}` : "/inventory", { scroll: false });
-  }, [activeTab, debouncedSearchTerm, selectedBrand, selectedType, page, router]);
+  }, [activeTab, debouncedSearchTerm, selectedBrand, selectedType, selectedWarehouse, page, router]);
+
+  // Load warehouses for the location tabs
+  useEffect(() => {
+    warehousesApi.getAll().then(setWarehouses).catch(console.error);
+  }, []);
 
   // Load types if not provided (fallback)
   useEffect(() => {
@@ -176,17 +187,22 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
   const activeFiltersCount = (selectedBrand !== "all" ? 1 : 0) + (selectedType !== "all" ? 1 : 0);
 
+  // Solo le sedi fisiche di stoccaggio (principale + operativa) diventano tab:
+  // altre voci anagrafiche nella tabella magazzini (es. sede legale) non sono
+  // mai destinazione reale di merce.
+  const stockWarehouses = warehouses.filter((w) => w.isPrimary || /operativ/i.test(w.name));
+
   // Load items when dependencies change
   useEffect(() => {
     // Skip first load if parameters match initial props
     // This prevents double fetching on mount
-    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && items === initialItems && pageSize === 12) {
+    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && items === initialItems && pageSize === 12) {
       return;
     }
 
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, pageSize]);
+  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, selectedWarehouse, pageSize]);
 
   const loadItems = async () => {
     try {
@@ -200,7 +216,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         search: debouncedSearchTerm,
         tab: activeTab,
         brand: selectedBrand !== "all" ? selectedBrand : undefined,
-        type: selectedType !== "all" ? selectedType : undefined
+        type: selectedType !== "all" ? selectedType : undefined,
+        warehouseId: selectedWarehouse !== "all" ? selectedWarehouse : undefined
       });
       setItems(paginatedItems);
       setTotalItems(total);
@@ -376,6 +393,27 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
           <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
           <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
+
+        {/* Tabs Magazzino: solo le sedi fisiche di stoccaggio (principale + operativa),
+            escludendo eventuali altre voci anagrafiche (es. sede legale) che non
+            sono destinazioni reali di merce. */}
+        {stockWarehouses.length > 1 && (
+          <Tabs
+            value={selectedWarehouse}
+            onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}
+            className="w-full"
+          >
+            <TabsList
+              className="grid w-full bg-slate-100 dark:bg-muted"
+              style={{ gridTemplateColumns: `repeat(${stockWarehouses.length + 1}, minmax(0, 1fr))` }}
+            >
+              <TabsTrigger value="all">Tutti</TabsTrigger>
+              {stockWarehouses.map((w) => (
+                <TabsTrigger key={w.id} value={w.id} className="truncate" title={w.name}>{w.name}</TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
 
         {/* Tabs */}
         <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }} className="w-full">

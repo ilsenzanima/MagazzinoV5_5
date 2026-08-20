@@ -4,10 +4,13 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileDown, Loader2, Package, Calendar, RotateCcw } from "lucide-react";
 import { getArticlesWithStock, ArticlesReportData, ArticleLot } from "@/lib/services/reports";
 import { generateArticlesReport } from "./articles-report-generator";
 import { format } from "date-fns";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 
 export default function ArticlesReport() {
     const [data, setData] = useState<ArticlesReportData | null>(null);
@@ -15,17 +18,20 @@ export default function ArticlesReport() {
     const [error, setError] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [isHistorical, setIsHistorical] = useState(false);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
     const tableContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         loadData();
+        warehousesApi.getAll().then(setWarehouses).catch(console.error);
     }, []);
 
-    const loadData = async (targetDate?: string) => {
+    const loadData = async (targetDate?: string, warehouseId?: string) => {
         try {
             setLoading(true);
             setError(null);
-            const result = await getArticlesWithStock(targetDate);
+            const result = await getArticlesWithStock(targetDate, warehouseId !== "all" ? warehouseId : undefined);
             setData(result);
             setIsHistorical(!!targetDate);
         } catch (err) {
@@ -36,16 +42,23 @@ export default function ArticlesReport() {
         }
     };
 
+    const stockWarehouses = warehouses.filter((w) => w.isPrimary || /operativ/i.test(w.name));
+
+    const handleWarehouseChange = (warehouseId: string) => {
+        setSelectedWarehouse(warehouseId);
+        loadData(isHistorical ? selectedDate : undefined, warehouseId);
+    };
+
     const handleLoadHistorical = () => {
         if (selectedDate) {
-            loadData(selectedDate);
+            loadData(selectedDate, selectedWarehouse);
         }
     };
 
     const handleResetToToday = () => {
         const today = new Date().toISOString().split('T')[0];
         setSelectedDate(today);
-        loadData(); // No date = current stock
+        loadData(undefined, selectedWarehouse); // No date = current stock
     };
 
     const handleExportPDF = () => {
@@ -92,9 +105,28 @@ export default function ArticlesReport() {
         );
     }
 
+    // Il filtro per sede si basa sulla posizione attuale del lotto: non ha senso
+    // per lo storico per data (non tracciato), quindi lo disabilitiamo in quel caso.
+    const warehouseTabs = stockWarehouses.length > 1 && (
+        <div title={isHistorical ? "Il filtro per sede non è disponibile per lo storico per data" : undefined}>
+            <Tabs value={selectedWarehouse} onValueChange={handleWarehouseChange}>
+                <TabsList
+                    className={`bg-slate-100 dark:bg-slate-800 ${isHistorical ? "opacity-50 pointer-events-none" : ""}`}
+                    style={{ display: "grid", gridTemplateColumns: `repeat(${stockWarehouses.length + 1}, minmax(0, 1fr))` }}
+                >
+                    <TabsTrigger value="all">Tutti</TabsTrigger>
+                    {stockWarehouses.map((w) => (
+                        <TabsTrigger key={w.id} value={w.id} className="truncate" title={w.name}>{w.name}</TabsTrigger>
+                    ))}
+                </TabsList>
+            </Tabs>
+        </div>
+    );
+
     if (!data || data.articles.length === 0) {
         return (
             <div className="space-y-4">
+                {warehouseTabs}
                 {/* Date Selector - inline */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-md">
                     <Calendar className="h-4 w-4 text-slate-400" />
@@ -126,6 +158,7 @@ export default function ArticlesReport() {
 
     return (
         <div className="space-y-4">
+            {warehouseTabs}
             {/* Date Selector and Summary */}
             <div className="flex flex-wrap gap-2 items-center">
                 {/* Date Selector - inline */}

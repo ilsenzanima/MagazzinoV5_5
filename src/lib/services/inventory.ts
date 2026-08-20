@@ -149,19 +149,20 @@ export const inventoryApi = {
     },
 
     // Modificato per usare RPC avanzata se c'è ricerca o filtri complessi
-    getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string; brand?: string; type?: string }) => {
+    getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string; brand?: string; type?: string; warehouseId?: string }) => {
         const from = (options.page - 1) * options.limit;
 
         // Se c'è una ricerca o tab specifici, o filtri avanzati, usiamo la RPC get_inventory_search
-        // Nota: La RPC deve essere stata creata nel DB e aggiornata per supportare brand/type
-        if (options.search || options.tab || options.brand || options.type) {
+        // Nota: La RPC deve essere stata creata nel DB e aggiornata per supportare brand/type/warehouse
+        if (options.search || options.tab || options.brand || options.type || options.warehouseId) {
             const { data, error } = await supabase.rpc('get_inventory_search', {
                 p_search: options.search || '',
                 p_status: options.tab || 'all',
                 p_limit: options.limit,
                 p_offset: from,
                 p_brand: options.brand || null,
-                p_type: options.type || null
+                p_type: options.type || null,
+                p_warehouse_id: options.warehouseId || null
             });
 
             if (error) {
