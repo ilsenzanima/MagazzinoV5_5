@@ -166,14 +166,16 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     // (ritiro/consegna) va scritto il magazzino corrispondente. Uscita/Vendita
     // usano solo "da" (ritiro), Entrata/Reso solo "a" (consegna: un reso torna
     // sempre in un magazzino, tipicamente quello principale), Trasferimento
-    // usa entrambi, Eccedenze nessuno dei due.
+    // usa entrambi, Eccedenze solo "a" (la destinazione del deposito temporaneo
+    // è selezionabile, di default la sede operativa).
     const warehouseRoles = (
         tab: "entry" | "exit" | "sale" | "waste" | "transfer"
     ): { from: "pickup" | null; to: "delivery" | null } => {
         if (tab === "entry") return { from: null, to: "delivery" };
         if (tab === "exit" || tab === "sale") return { from: "pickup", to: null };
         if (tab === "transfer") return { from: "pickup", to: "delivery" };
-        return { from: null, to: null }; // waste
+        if (tab === "waste") return { from: null, to: "delivery" };
+        return { from: null, to: null };
     };
 
     const warehouseText = (w: Warehouse) => (w.address ? `${w.name}\n${w.address}` : w.name);
@@ -250,10 +252,9 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         } else if (activeTab === "waste") {
             setCausal("Trasporto eccedenze cantiere");
             setPickupLocation(jobAddress || "CANTIERE");
-            setDeliveryLocation(
-                "OPI FIRESAFE S.R.L. DEPOSITO TEMPORANEO\nVia Monfalcone, 33 - 33052 - Cervignano del Friuli (UD)"
-            );
             setTransportTime("08:00");
+            // La destinazione (deposito temporaneo) è "lato magazzino": la scrive
+            // handleToWarehouseSelect, di default sulla sede operativa.
         } else if (activeTab === "transfer") {
             setCausal("Trasferimento tra magazzini");
             setTransportTime("08:00");
@@ -270,6 +271,21 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             setNotes("");
         }
     }, [activeTab, selectedJob]);
+
+    // Per le Eccedenze il deposito temporaneo di default è la sede operativa,
+    // non quella principale: la selezioniamo automaticamente al primo ingresso
+    // nel tab (solo per un movimento nuovo, e solo se l'utente non ha già
+    // scelto esplicitamente un magazzino diverso dal default generico).
+    useEffect(() => {
+        if (isEditing || activeTab !== "waste" || warehouses.length === 0) return;
+        const primary = warehouses.find((w) => w.isPrimary);
+        if (toWarehouseId && toWarehouseId !== primary?.id) return;
+        const operational =
+            warehouses.find((w) => !w.isPrimary && /operativ/i.test(w.name)) ||
+            warehouses.find((w) => !w.isPrimary);
+        if (operational) handleToWarehouseSelect(operational.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, warehouses, isEditing]);
 
     // Solo per un movimento nuovo (non in modifica): precompila/riallinea il
     // lato/i magazzino ad ogni cambio di tab o di magazzino selezionato.
@@ -833,7 +849,11 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                 selectedJob?.clientAddress ||
                 pickupLocation ||
                 "cantiere";
-            const wasteNote = `Materiali eccedenti provenienti dal cantiere di ${siteAddr} e diretti alla sede di via Monfalcone n.33 – 33052 Cervignano del Friuli (UD) per deposito temporaneo.`;
+            const destinationWarehouse = warehouses.find((w) => w.id === toWarehouseId);
+            const destinationText = destinationWarehouse
+                ? `${destinationWarehouse.name}${destinationWarehouse.address ? ` (${destinationWarehouse.address})` : ""}`
+                : "sede di deposito temporaneo";
+            const wasteNote = `Materiali eccedenti provenienti dal cantiere di ${siteAddr} e diretti a ${destinationText} per deposito temporaneo.`;
             finalNotes = finalNotes ? `${finalNotes}\n${wasteNote}` : wasteNote;
         }
 

@@ -37,7 +37,7 @@ export function MovementHeader({
     children
 }: MovementHeaderProps) {
     const showFrom = activeTab === "exit" || activeTab === "sale" || activeTab === "transfer";
-    const showTo = activeTab === "entry" || activeTab === "transfer";
+    const showTo = activeTab === "entry" || activeTab === "transfer" || activeTab === "waste";
     return (
         <Card>
             <CardHeader>
@@ -99,7 +99,7 @@ export function MovementHeader({
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-1">
                                     <WarehouseIcon className="h-3 w-3" />
-                                    {activeTab === "transfer" ? "A (magazzino)" : "Magazzino"}
+                                    {activeTab === "transfer" ? "A (magazzino)" : activeTab === "waste" ? "Deposito temporaneo" : "Magazzino"}
                                 </Label>
                                 <Select value={toWarehouseId} onValueChange={onToWarehouseSelect}>
                                     <SelectTrigger className="w-full">

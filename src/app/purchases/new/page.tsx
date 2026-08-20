@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Save, Trash2, Loader2, Search, X, Upload } from "lucide-react";
 import Link from "next/link";
@@ -462,7 +463,11 @@ function NewPurchaseContent() {
                     pieces: !isNaN(pieces) ? pieces : (line.coefficient === 1 ? qty : undefined),
                     coefficient: line.coefficient,
                     price: parseFloat(line.price),
-                    jobId: line.jobId,
+                    // Se la commessa della riga e' la stessa dell'intestazione, lasciamo il
+                    // job_id della riga vuoto (segue l'intestazione via COALESCE lato trigger):
+                    // così, rimuovendo poi la commessa dall'intestazione, il materiale torna
+                    // correttamente a magazzino invece di restare agganciato alla vecchia commessa.
+                    jobId: line.jobId && line.jobId !== (formData.jobId || undefined) ? line.jobId : undefined,
                     warehouseId: !line.jobId ? line.warehouseId : undefined,
                     transportApplied: line.transportApplied ?? false,
                     transportUnitCost: line.transportUnitCost ?? undefined,
@@ -661,7 +666,7 @@ function NewPurchaseContent() {
                                                     <FieldTip text="Se conosci il totale della riga (es. dalla bolla del fornitore) è preferibile inserirlo qui invece del Prezzo Unitario: il sistema ricalcola da solo il prezzo unitario corretto, tenendo conto del coefficiente usato per questo materiale." />
                                                 </span>
                                             </TableHead>
-                                            <TableHead className="w-[120px] text-center">Commessa</TableHead>
+                                            <TableHead className="w-[140px] text-center">Magazzino / Commessa</TableHead>
                                             <TableHead className="w-[44px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -771,56 +776,56 @@ function NewPurchaseContent() {
                                                         </div>
                                                     </TableCell>
 
-                                                    {/* Commessa */}
+                                                    {/* Magazzino / Commessa */}
                                                     <TableCell className="py-2 px-1 text-center">
                                                         {line.itemId && (
-                                                            line.isJob && line.jobCode ? (
-                                                                <div className="flex items-center justify-center gap-1">
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className={`text-[9px] ${!line.isJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>
+                                                                        Magazzino
+                                                                    </span>
+                                                                    <Switch
+                                                                        checked={line.isJob}
+                                                                        onCheckedChange={(checked) =>
+                                                                            checked ? openJobSelector(line.tempId) : clearLineJob(line.tempId)
+                                                                        }
+                                                                        className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
+                                                                    />
+                                                                    <span className={`text-[9px] ${line.isJob ? "text-blue-700 font-semibold" : "text-slate-400"}`}>
+                                                                        Commessa
+                                                                    </span>
+                                                                </div>
+                                                                {line.isJob && line.jobCode ? (
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => openJobSelector(line.tempId)}
-                                                                        className="text-blue-600 font-medium text-xs truncate max-w-[80px] hover:underline"
+                                                                        className="text-blue-600 font-medium text-xs truncate max-w-[120px] hover:underline"
                                                                         title={line.jobCode}
                                                                     >
                                                                         {line.jobCode}
                                                                     </button>
-                                                                    <X
-                                                                        className="h-3 w-3 text-slate-400 hover:text-red-500 cursor-pointer shrink-0"
-                                                                        onClick={() => clearLineJob(line.tempId)}
-                                                                    />
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex flex-col items-center gap-0.5">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => openJobSelector(line.tempId)}
-                                                                        className="text-green-600 font-medium text-xs hover:text-green-800 hover:underline"
+                                                                ) : !line.isJob && warehouses.length > 1 ? (
+                                                                    <Select
+                                                                        value={line.warehouseId || primaryWarehouseId}
+                                                                        onValueChange={(v) => setLines(prev => prev.map(l =>
+                                                                            l.tempId === line.tempId ? { ...l, warehouseId: v } : l
+                                                                        ))}
                                                                     >
-                                                                        Magazzino
-                                                                    </button>
-                                                                    {warehouses.length > 1 && (
-                                                                        <Select
-                                                                            value={line.warehouseId || primaryWarehouseId}
-                                                                            onValueChange={(v) => setLines(prev => prev.map(l =>
-                                                                                l.tempId === line.tempId ? { ...l, warehouseId: v } : l
-                                                                            ))}
+                                                                        <SelectTrigger
+                                                                            className={`h-7 w-full min-w-[100px] max-w-[130px] text-xs ${line.warehouseId && line.warehouseId !== primaryWarehouseId ? "text-cyan-700 font-medium border-cyan-300" : ""}`}
                                                                         >
-                                                                            <SelectTrigger
-                                                                                className={`h-5 w-auto max-w-[90px] border-0 bg-transparent px-1 text-[10px] shadow-none ${line.warehouseId && line.warehouseId !== primaryWarehouseId ? "text-cyan-700 font-medium" : "text-slate-400"}`}
-                                                                            >
-                                                                                <SelectValue />
-                                                                            </SelectTrigger>
-                                                                            <SelectContent>
-                                                                                {warehouses.map(w => (
-                                                                                    <SelectItem key={w.id} value={w.id} className="text-xs">
-                                                                                        {w.name}{w.isPrimary ? " (principale)" : ""}
-                                                                                    </SelectItem>
-                                                                                ))}
-                                                                            </SelectContent>
-                                                                        </Select>
-                                                                    )}
-                                                                </div>
-                                                            )
+                                                                            <SelectValue />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            {warehouses.map(w => (
+                                                                                <SelectItem key={w.id} value={w.id} className="text-xs">
+                                                                                    {w.name}{w.isPrimary ? " (principale)" : ""}
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                ) : null}
+                                                            </div>
                                                         )}
                                                     </TableCell>
 

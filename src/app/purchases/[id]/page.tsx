@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink, Truck, CheckCircle2, Undo2, RotateCcw } from "lucide-react";
@@ -326,7 +326,13 @@ export default function PurchaseDetailPage() {
                 pieces: piecesVal,
                 coefficient: newItem.coefficient,
                 price: priceVal,
-                jobId: newItem.isJob ? newItem.jobId : undefined,
+                // Se la commessa scelta e' la stessa dell'intestazione, lasciamo il job_id
+                // della riga vuoto (segue l'intestazione via COALESCE lato trigger): così,
+                // se in seguito si rimuove la commessa dall'intestazione, il materiale torna
+                // correttamente a magazzino invece di restare "agganciato" alla vecchia commessa.
+                // Solo una commessa diversa da quella d'intestazione va salvata esplicitamente
+                // sulla riga (assegnazione indipendente).
+                jobId: (newItem.isJob && newItem.jobId !== (purchase?.jobId || undefined)) ? newItem.jobId : undefined,
                 warehouseId: !newItem.isJob ? (newItem.warehouseId || undefined) : undefined
             });
 
@@ -1905,13 +1911,18 @@ export default function PurchaseDetailPage() {
                                         </p>
                                     </div>
                                     <div className="md:col-span-2 flex items-center gap-2 pb-2">
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs ${!newItem.isJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>
+                                                Magazzino
+                                            </span>
+                                            <Switch
                                                 id="isJobNew"
                                                 checked={newItem.isJob}
-                                                onCheckedChange={(c) => setNewItem({ ...newItem, isJob: c as boolean })}
+                                                onCheckedChange={(c) => setNewItem({ ...newItem, isJob: c })}
                                             />
-                                            <Label htmlFor="isJobNew" className="cursor-pointer">Per Commessa?</Label>
+                                            <Label htmlFor="isJobNew" className={`cursor-pointer text-xs ${newItem.isJob ? "text-blue-700 font-semibold" : "text-slate-400"}`}>
+                                                Commessa
+                                            </Label>
                                         </div>
                                     </div>
                                 </div>
