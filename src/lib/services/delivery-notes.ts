@@ -16,6 +16,8 @@ export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
     causal: db.causal,
     pickupLocation: db.pickup_location,
     deliveryLocation: db.delivery_location,
+    fromWarehouseId: db.from_warehouse_id,
+    toWarehouseId: db.to_warehouse_id,
     transportMean: db.transport_mean,
     transportTime: db.transport_time,
     appearance: db.appearance,

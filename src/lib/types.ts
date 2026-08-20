@@ -353,6 +353,8 @@ export interface PurchaseItem {
     jobName?: string;
     warehouseId?: string;
     warehouseName?: string;
+    currentWarehouseId?: string;
+    currentWarehouseName?: string;
     createdAt: string;
     transportApplied?: boolean;
     transportUnitCost?: number;
@@ -404,6 +406,8 @@ export interface DeliveryNote {
     causal: string;
     pickupLocation: string;
     deliveryLocation: string;
+    fromWarehouseId?: string;
+    toWarehouseId?: string;
     transportMean?: string;
     transportTime?: string;
     appearance?: string;

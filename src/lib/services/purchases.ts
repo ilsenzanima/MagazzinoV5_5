@@ -347,6 +347,18 @@ export const purchasesApi = {
         );
 
         if (error) throw error;
+
+        const itemIds = data.map((item: any) => item.id);
+        const { data: currentWarehouses } = itemIds.length > 0
+            ? await supabase
+                .from('purchase_item_current_warehouse')
+                .select('purchase_item_id, warehouse_id, warehouse_name')
+                .in('purchase_item_id', itemIds)
+            : { data: [] as any[] };
+        const currentWarehouseByItemId = new Map(
+            (currentWarehouses ?? []).map((cw: any) => [cw.purchase_item_id, cw])
+        );
+
         return data.map((item: any) => ({
             id: item.id,
             purchaseId: item.purchase_id,
@@ -364,6 +376,8 @@ export const purchasesApi = {
             jobName: item.jobs?.name,
             warehouseId: item.warehouse_id,
             warehouseName: item.warehouses?.name,
+            currentWarehouseId: currentWarehouseByItemId.get(item.id)?.warehouse_id ?? item.warehouse_id,
+            currentWarehouseName: currentWarehouseByItemId.get(item.id)?.warehouse_name ?? item.warehouses?.name,
             createdAt: item.created_at,
             transportApplied: item.transport_applied ?? false,
             transportUnitCost: item.transport_unit_cost ?? 0,

@@ -165,8 +165,11 @@ export default function NewMovementContent({
                         deliveryLocation={form.deliveryLocation}
                         setDeliveryLocation={form.setDeliveryLocation}
                         warehouses={form.warehouses}
-                        selectedWarehouseId={form.selectedWarehouseId}
-                        onWarehouseSelect={form.handleWarehouseSelect}
+                        activeTab={form.activeTab}
+                        fromWarehouseId={form.fromWarehouseId}
+                        toWarehouseId={form.toWarehouseId}
+                        onFromWarehouseSelect={form.handleFromWarehouseSelect}
+                        onToWarehouseSelect={form.handleToWarehouseSelect}
                     >
                         <MovementJobSelector
                             selectedJob={form.selectedJob}

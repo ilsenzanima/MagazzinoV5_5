@@ -24,6 +24,8 @@ interface MovementData {
   causal: string
   pickupLocation: string
   deliveryLocation: string
+  fromWarehouseId?: string
+  toWarehouseId?: string
   transportMean?: string
   transportTime?: string
   appearance?: string
@@ -74,6 +76,8 @@ export async function createMovement(data: MovementData, lines: MovementLine[]):
       causal: data.causal,
       pickup_location: data.pickupLocation,
       delivery_location: data.deliveryLocation,
+      from_warehouse_id: data.fromWarehouseId || null,
+      to_warehouse_id: data.toWarehouseId || null,
       transport_mean: data.transportMean || null,
       transport_time: data.transportTime || null,
       appearance: data.appearance || null,
@@ -236,6 +240,8 @@ export async function updateMovement(id: string, data: MovementData, lines: Move
       causal: data.causal,
       pickup_location: data.pickupLocation,
       delivery_location: data.deliveryLocation,
+      from_warehouse_id: data.fromWarehouseId || null,
+      to_warehouse_id: data.toWarehouseId || null,
       transport_mean: data.transportMean,
       transport_time: data.transportTime,
       appearance: data.appearance,

@@ -806,7 +806,7 @@ function NewPurchaseContent() {
                                                                             ))}
                                                                         >
                                                                             <SelectTrigger
-                                                                                className={`h-5 w-auto max-w-[90px] border-0 bg-transparent px-1 text-[10px] shadow-none ${line.warehouseId && line.warehouseId !== primaryWarehouseId ? "text-amber-700 font-medium" : "text-slate-400"}`}
+                                                                                className={`h-5 w-auto max-w-[90px] border-0 bg-transparent px-1 text-[10px] shadow-none ${line.warehouseId && line.warehouseId !== primaryWarehouseId ? "text-cyan-700 font-medium" : "text-slate-400"}`}
                                                                             >
                                                                                 <SelectValue />
                                                                             </SelectTrigger>

@@ -552,12 +552,13 @@ export default function PurchaseDetailPage() {
         return null;
     };
 
-    // Righe senza commessa vanno "a magazzino": se e' stato indicato un magazzino
-    // diverso da quello principale, la riga va segnalata perche' serve un
-    // Trasferimento Magazzino per allineare fisicamente lo stock.
+    // Righe senza commessa vanno "a magazzino": la sede attuale (currentWarehouseId,
+    // calcolata anche da eventuali trasferimenti/resi successivi, non solo dal
+    // magazzino di arrivo) determina il colore dell'etichetta, per sapere a colpo
+    // d'occhio dove si trova fisicamente la merce.
     const primaryWarehouseId = warehouses.find(w => w.isPrimary)?.id ?? null;
-    const needsTransferBadge = (item: PurchaseItem) =>
-        !effectiveItemJobId(item) && !!item.warehouseId && item.warehouseId !== primaryWarehouseId;
+    const isAtSecondaryWarehouse = (item: PurchaseItem) =>
+        !effectiveItemJobId(item) && !!item.currentWarehouseId && item.currentWarehouseId !== primaryWarehouseId;
 
     // Return (Reso) Functions
     const itemCoefficientFor = (item: PurchaseItem) => {
@@ -1264,12 +1265,12 @@ export default function PurchaseDetailPage() {
                                                         <span className="text-blue-600 font-medium text-sm">
                                                             Commessa: {effectiveItemJobLabel(item)}
                                                         </span>
-                                                    ) : needsTransferBadge(item) ? (
+                                                    ) : isAtSecondaryWarehouse(item) ? (
                                                         <span
-                                                            className="text-amber-700 font-medium text-sm"
-                                                            title="Materiale arrivato in un magazzino non principale: serve un movimento di Trasferimento Magazzino."
+                                                            className="text-cyan-700 font-medium text-sm"
+                                                            title="Sede attuale della merce (tiene conto di eventuali trasferimenti o resi successivi)."
                                                         >
-                                                            ⚠ {item.warehouseName} · Trasferimento da fare
+                                                            {item.currentWarehouseName}
                                                         </span>
                                                     ) : (
                                                         <span className="text-green-600 font-medium text-sm">
@@ -1391,12 +1392,12 @@ export default function PurchaseDetailPage() {
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
                                                             {effectiveItemJobLabel(item)}
                                                         </span>
-                                                    ) : needsTransferBadge(item) ? (
+                                                    ) : isAtSecondaryWarehouse(item) ? (
                                                         <span
-                                                            className="text-[10px] px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-medium"
-                                                            title="Materiale arrivato in un magazzino non principale: serve un movimento di Trasferimento Magazzino."
+                                                            className="text-[10px] px-1.5 py-0.5 rounded-sm bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300 font-medium"
+                                                            title="Sede attuale della merce (tiene conto di eventuali trasferimenti o resi successivi)."
                                                         >
-                                                            ⚠ {item.warehouseName} · Trasferimento
+                                                            {item.currentWarehouseName}
                                                         </span>
                                                     ) : (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 font-medium">
@@ -1954,8 +1955,8 @@ export default function PurchaseDetailPage() {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight">
-                                                Se non e' il magazzino principale, la riga verra' segnalata come da trasferire.
+                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                                                Se non e' il magazzino principale, l'etichetta mostrera' la sede dove si trova la merce.
                                             </p>
                                         </div>
                                     </div>

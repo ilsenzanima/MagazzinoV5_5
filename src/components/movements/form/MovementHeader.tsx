@@ -19,8 +19,11 @@ interface MovementHeaderProps {
     deliveryLocation: string;
     setDeliveryLocation: (v: string) => void;
     warehouses: Warehouse[];
-    selectedWarehouseId: string;
-    onWarehouseSelect: (id: string) => void;
+    activeTab: "entry" | "exit" | "sale" | "waste" | "transfer";
+    fromWarehouseId: string;
+    toWarehouseId: string;
+    onFromWarehouseSelect: (id: string) => void;
+    onToWarehouseSelect: (id: string) => void;
     children?: React.ReactNode; // For JobSelector
 }
 
@@ -30,9 +33,11 @@ export function MovementHeader({
     causal, setCausal,
     pickupLocation, setPickupLocation,
     deliveryLocation, setDeliveryLocation,
-    warehouses, selectedWarehouseId, onWarehouseSelect,
+    warehouses, activeTab, fromWarehouseId, toWarehouseId, onFromWarehouseSelect, onToWarehouseSelect,
     children
 }: MovementHeaderProps) {
+    const showFrom = activeTab === "exit" || activeTab === "sale" || activeTab === "transfer";
+    const showTo = activeTab === "entry" || activeTab === "transfer";
     return (
         <Card>
             <CardHeader>
@@ -68,24 +73,50 @@ export function MovementHeader({
                 {/* Job Selector Slot */}
                 {children}
 
-                <div className="space-y-2">
-                    <Label className="flex items-center gap-1">
-                        <WarehouseIcon className="h-3 w-3" />
-                        Magazzino
-                    </Label>
-                    <Select value={selectedWarehouseId} onValueChange={onWarehouseSelect}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Scegli magazzino..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {warehouses.map(w => (
-                                <SelectItem key={w.id} value={w.id}>
-                                    {w.name}{w.isPrimary ? " (principale)" : ""}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+                {(showFrom || showTo) && (
+                    <div className={`grid grid-cols-1 gap-4 ${showFrom && showTo ? "md:grid-cols-2" : ""}`}>
+                        {showFrom && (
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-1">
+                                    <WarehouseIcon className="h-3 w-3" />
+                                    {activeTab === "transfer" ? "Da (magazzino)" : "Magazzino"}
+                                </Label>
+                                <Select value={fromWarehouseId} onValueChange={onFromWarehouseSelect}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Scegli magazzino..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {warehouses.map(w => (
+                                            <SelectItem key={w.id} value={w.id}>
+                                                {w.name}{w.isPrimary ? " (principale)" : ""}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        {showTo && (
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-1">
+                                    <WarehouseIcon className="h-3 w-3" />
+                                    {activeTab === "transfer" ? "A (magazzino)" : "Magazzino"}
+                                </Label>
+                                <Select value={toWarehouseId} onValueChange={onToWarehouseSelect}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Scegli magazzino..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {warehouses.map(w => (
+                                            <SelectItem key={w.id} value={w.id}>
+                                                {w.name}{w.isPrimary ? " (principale)" : ""}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="space-y-2">
                     <Label>Causale</Label>

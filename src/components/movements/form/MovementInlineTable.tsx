@@ -76,7 +76,7 @@ export function MovementInlineTable({
     };
 
     const isEntryWithJob = activeTab === "entry" && !!selectedJob;
-    const showLotto = activeTab === "exit" || activeTab === "sale" || activeTab === "entry";
+    const showLotto = activeTab === "exit" || activeTab === "sale" || activeTab === "entry" || activeTab === "transfer";
     const showFittizio = activeTab !== "waste" && activeTab !== "transfer";
     const showKgEccedenza = activeTab === "waste";
     const showPiecesAndQty = activeTab !== "waste";
