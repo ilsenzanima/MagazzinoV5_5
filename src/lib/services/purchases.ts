@@ -552,7 +552,11 @@ export const purchasesApi = {
         if (item.coefficient !== undefined) dbItem.coefficient = item.coefficient;
         if (item.preReturnQuantity !== undefined) dbItem.pre_return_quantity = item.preReturnQuantity;
         if (item.preReturnPieces !== undefined) dbItem.pre_return_pieces = item.preReturnPieces;
+        if (item.returnedQuantity !== undefined) dbItem.returned_quantity = item.returnedQuantity;
+        if (item.returnedPieces !== undefined) dbItem.returned_pieces = item.returnedPieces;
         if (item.returnedPrice !== undefined) dbItem.returned_price = item.returnedPrice;
+        if (item.returnedAt !== undefined) dbItem.returned_at = item.returnedAt;
+        if (item.returnedBy !== undefined) dbItem.returned_by = item.returnedBy;
 
         const { data, error } = await supabase.from('purchase_items').update(dbItem).eq('id', id).select().single();
         if (error) throw error;

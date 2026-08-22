@@ -561,16 +561,28 @@ export default function PurchaseDetailPage() {
                 coefficient: itemCoefficient
             };
 
-            // Se c'è un reso attivo, sposta anche il valore di ripristino della
-            // stessa variazione, cosi' "Elimina reso" resta coerente con la modifica.
-            if (item?.returnedAt) {
-                updatePayload.preReturnQuantity = (item.preReturnQuantity ?? item.quantity) + (newQty - item.quantity);
-                if (item.pieces != null && newPieces != null) {
-                    updatePayload.preReturnPieces = (item.preReturnPieces ?? item.pieces) + (newPieces - item.pieces);
-                }
+            // Se c'è un reso attivo che non ha più senso con la nuova quantità
+            // (non si può aver reso più di quanto sia mai arrivato con la bolla),
+            // il reso viene annullato automaticamente: la riga d'acquisto è la
+            // fonte di verità, un reso non può sopravvivere a una correzione che
+            // lo rende impossibile.
+            const returnInvalidated = !!item?.returnedAt && (
+                newQty < (item.returnedQuantity ?? 0) - 0.001 ||
+                (item.returnedPieces != null && newPieces != null && newPieces < item.returnedPieces - 0.001)
+            );
+            if (returnInvalidated) {
+                updatePayload.returnedQuantity = null;
+                updatePayload.returnedPieces = null;
+                updatePayload.returnedPrice = null;
+                updatePayload.returnedAt = null;
+                updatePayload.returnedBy = null;
             }
 
             await purchasesApi.updateItem(itemId, updatePayload);
+
+            if (returnInvalidated) {
+                alert(`Il reso registrato su questa riga (${item?.returnedQuantity} ${item?.itemUnit || ''}) è stato annullato: la nuova quantità è inferiore a quanto era stato segnato come reso.`);
+            }
 
             // Update local state
             setItems(items.map(i => i.id === itemId ? {
@@ -579,10 +591,20 @@ export default function PurchaseDetailPage() {
                 quantity: newQty,
                 pieces: newPieces,
                 coefficient: itemCoefficient,
-                preReturnQuantity: updatePayload.preReturnQuantity ?? i.preReturnQuantity,
-                preReturnPieces: updatePayload.preReturnPieces ?? i.preReturnPieces,
+                ...(returnInvalidated ? {
+                    returnedQuantity: null,
+                    returnedPieces: null,
+                    returnedPrice: null,
+                    returnedAt: null,
+                    returnedBy: null,
+                    returnedByName: null,
+                } : {}),
             } : i));
             setEditingItemId(null);
+
+            // La modifica di quantity/pieces cambia anche il disponibile calcolato
+            // per il lotto: riallinea batchAvailability per i prossimi resi.
+            purchasesApi.getPurchaseBatchAvailability(id).then(setBatchAvailability).catch(console.error);
         } catch (error) {
             console.error("Failed to update item", error);
             alert("Errore durante l'aggiornamento");
