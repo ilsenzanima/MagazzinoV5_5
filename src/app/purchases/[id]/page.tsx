@@ -102,6 +102,7 @@ export default function PurchaseDetailPage() {
 
     // Return (Reso) State
     const [returnItem, setReturnItem] = useState<PurchaseItem | null>(null);
+    const [isEditingReturn, setIsEditingReturn] = useState(false);
     const [returnValues, setReturnValues] = useState({ pieces: "", quantity: "", price: "" });
     const [returnRemaining, setReturnRemaining] = useState<{ remainingQuantity: number; remainingPieces: number | null } | null>(null);
     const [applyingReturn, setApplyingReturn] = useState(false);
@@ -617,17 +618,35 @@ export default function PurchaseDetailPage() {
         return inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
     };
 
-    const openReturnDialog = (item: PurchaseItem) => {
+    const openReturnDialog = (item: PurchaseItem, editExisting: boolean = false) => {
         setReturnItem(item);
-        setReturnValues({ pieces: "", quantity: "", price: item.price ? item.price.toString() : "" });
+        setIsEditingReturn(editExisting);
+        const batch = batchAvailability.find(b => b.id === item.id);
         // Il limite e' quanto e' REALMENTE ancora disponibile a magazzino per questo
         // lotto (non la quantita' grezza della riga): un reso e' possibile solo su
-        // materiale ancora fisicamente in magazzino, non in commessa.
-        const batch = batchAvailability.find(b => b.id === item.id);
-        setReturnRemaining({
-            remainingQuantity: batch?.remainingQty ?? 0,
-            remainingPieces: batch?.remainingPieces ?? null,
-        });
+        // materiale ancora fisicamente in magazzino, non in commessa. In modifica,
+        // il disponibile calcolato esclude gia' il reso in corso: lo si riaggiunge
+        // per mostrare il vero margine disponibile (comprensivo di quanto gia'
+        // "riservato" da questo stesso reso).
+        if (editExisting) {
+            setReturnValues({
+                pieces: item.returnedPieces != null ? item.returnedPieces.toString() : "",
+                quantity: item.returnedQuantity != null ? item.returnedQuantity.toString() : "",
+                price: item.returnedPrice != null ? item.returnedPrice.toString() : (item.price ? item.price.toString() : ""),
+            });
+            setReturnRemaining({
+                remainingQuantity: (batch?.remainingQty ?? 0) + (item.returnedQuantity ?? 0),
+                remainingPieces: batch?.remainingPieces != null || item.returnedPieces != null
+                    ? (batch?.remainingPieces ?? 0) + (item.returnedPieces ?? 0)
+                    : null,
+            });
+        } else {
+            setReturnValues({ pieces: "", quantity: "", price: item.price ? item.price.toString() : "" });
+            setReturnRemaining({
+                remainingQuantity: batch?.remainingQty ?? 0,
+                remainingPieces: batch?.remainingPieces ?? null,
+            });
+        }
     };
 
     const handleReturnPiecesChange = (piecesStr: string) => {
@@ -670,7 +689,11 @@ export default function PurchaseDetailPage() {
 
         try {
             setApplyingReturn(true);
-            await purchasesApi.applyReturn(returnItem.id, { pieces, quantity, price });
+            if (isEditingReturn) {
+                await purchasesApi.updateReturn(returnItem.id, { pieces, quantity, price });
+            } else {
+                await purchasesApi.applyReturn(returnItem.id, { pieces, quantity, price });
+            }
             const [updatedItems, updatedAvailability] = await Promise.all([
                 purchasesApi.getItems(id),
                 purchasesApi.getPurchaseBatchAvailability(id),
@@ -678,9 +701,10 @@ export default function PurchaseDetailPage() {
             setItems(updatedItems);
             setBatchAvailability(updatedAvailability);
             setReturnItem(null);
+            setIsEditingReturn(false);
         } catch (error: any) {
             console.error("Failed to apply return", error);
-            alert(`Errore durante la registrazione del reso: ${error.message || ""}`);
+            alert(`Errore durante ${isEditingReturn ? "la modifica" : "la registrazione"} del reso: ${error.message || ""}`);
         } finally {
             setApplyingReturn(false);
         }
@@ -1466,15 +1490,26 @@ export default function PurchaseDetailPage() {
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         {(userRole === 'admin' || userRole === 'operativo') && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="text-red-600 hover:text-red-700 hover:bg-red-100"
-                                                                title="Elimina reso"
-                                                                onClick={() => setCancelReturnItemId(item.id)}
-                                                            >
-                                                                <RotateCcw className="h-3.5 w-3.5 mr-1" /> Elimina reso
-                                                            </Button>
+                                                            <div className="flex justify-end gap-1">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="text-red-600 hover:text-red-700 hover:bg-red-100"
+                                                                    title="Modifica reso"
+                                                                    onClick={() => openReturnDialog(item, true)}
+                                                                >
+                                                                    <Pen className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="text-red-600 hover:text-red-700 hover:bg-red-100"
+                                                                    title="Elimina reso"
+                                                                    onClick={() => setCancelReturnItemId(item.id)}
+                                                                >
+                                                                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Elimina reso
+                                                                </Button>
+                                                            </div>
                                                         )}
                                                     </TableCell>
                                                 </TableRow>
@@ -1699,9 +1734,14 @@ export default function PurchaseDetailPage() {
                                                     </div>
                                                 </div>
                                                 {(userRole === 'admin' || userRole === 'operativo') && (
-                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600 shrink-0" title="Elimina reso" onClick={() => setCancelReturnItemId(item.id)}>
-                                                        <RotateCcw className="h-3.5 w-3.5" />
-                                                    </Button>
+                                                    <div className="flex gap-0 shrink-0">
+                                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" title="Modifica reso" onClick={() => openReturnDialog(item, true)}>
+                                                            <Pen className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" title="Elimina reso" onClick={() => setCancelReturnItemId(item.id)}>
+                                                            <RotateCcw className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
                                                 )}
                                             </div>
                                             <div className="flex items-center justify-between text-sm pt-1 border-t border-red-200/50 dark:border-red-900/50">
@@ -2158,10 +2198,10 @@ export default function PurchaseDetailPage() {
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={!!returnItem} onOpenChange={(open) => { if (!open) setReturnItem(null); }}>
+                    <Dialog open={!!returnItem} onOpenChange={(open) => { if (!open) { setReturnItem(null); setIsEditingReturn(false); } }}>
                         <DialogContent className="max-w-lg">
                             <DialogHeader>
-                                <DialogTitle>Registra Reso al Fornitore</DialogTitle>
+                                <DialogTitle>{isEditingReturn ? "Modifica Reso al Fornitore" : "Registra Reso al Fornitore"}</DialogTitle>
                                 <DialogDescription>
                                     {returnItem?.itemName}{returnItem?.itemModel ? ` (${returnItem.itemModel})` : ''}
                                 </DialogDescription>
@@ -2217,10 +2257,10 @@ export default function PurchaseDetailPage() {
                                 </div>
                             )}
                             <DialogFooter className="mt-4">
-                                <Button variant="outline" onClick={() => setReturnItem(null)}>Annulla</Button>
+                                <Button variant="outline" onClick={() => { setReturnItem(null); setIsEditingReturn(false); }}>Annulla</Button>
                                 <Button onClick={submitReturn} disabled={applyingReturn} className="bg-amber-600 hover:bg-amber-700">
                                     {applyingReturn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
-                                    Registra Reso
+                                    {isEditingReturn ? "Salva Modifiche" : "Registra Reso"}
                                 </Button>
                             </DialogFooter>
                         </DialogContent>

@@ -162,6 +162,148 @@ function ItemPriceRow({
     );
 }
 
+// ── Inline editable return (reso) price row ─────────────────────────────────
+
+function ReturnPriceRow({
+    item,
+    canEdit,
+    onSaved,
+}: {
+    item: { id: string; itemName?: string; itemModel?: string; returnedQuantity?: number | null; returnedPrice?: number | null };
+    canEdit: boolean;
+    onSaved: () => void;
+}) {
+    const qty = item.returnedQuantity ?? 0;
+    const [editing, setEditing] = useState(false);
+    const [price, setPrice] = useState(item.returnedPrice != null ? item.returnedPrice.toFixed(5) : "");
+    const [total, setTotal] = useState(
+        item.returnedPrice != null && qty ? (item.returnedPrice * qty).toFixed(2) : ""
+    );
+    const [saving, setSaving] = useState(false);
+
+    const handlePriceChange = (val: string) => {
+        setPrice(val);
+        const p = parseFloat(val);
+        if (!isNaN(p) && qty) setTotal((p * qty).toFixed(2));
+    };
+
+    const handleTotalChange = (val: string) => {
+        setTotal(val);
+    };
+
+    const handleTotalBlur = () => {
+        const t = parseFloat(total);
+        if (isNaN(t) || !qty) return;
+        const newPrice = (t / qty).toFixed(5);
+        setPrice(newPrice);
+        setTotal(t.toFixed(2));
+        commitPrice(parseFloat(newPrice));
+    };
+
+    const handlePriceBlur = () => {
+        const p = parseFloat(price);
+        if (isNaN(p)) return;
+        if (qty) setTotal((p * qty).toFixed(2));
+        commitPrice(p);
+    };
+
+    const commitPrice = async (p: number) => {
+        if (isNaN(p) || p < 0) return;
+        if (p === item.returnedPrice) return;
+        try {
+            setSaving(true);
+            await purchasesApi.updateItem(item.id, { returnedPrice: p });
+            notify.success("Prezzo del reso aggiornato");
+            setEditing(false);
+            await onSaved();
+        } catch (e) {
+            notify.error(`Errore: ${e instanceof Error ? e.message : ''}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const cancelEdit = () => {
+        setPrice(item.returnedPrice != null ? item.returnedPrice.toFixed(5) : "");
+        setTotal(item.returnedPrice != null && qty ? (item.returnedPrice * qty).toFixed(2) : "");
+        setEditing(false);
+    };
+
+    return (
+        <tr className="border-b border-red-100 dark:border-red-900/50 last:border-0 bg-red-50/60 dark:bg-red-950/30">
+            <td className="py-1.5 pr-2">
+                <span className="font-medium text-red-700 dark:text-red-400 inline-flex items-center gap-1">
+                    <Undo2 className="h-3 w-3" />
+                    {item.itemName || '—'}
+                </span>
+                {item.itemModel && <span className="text-red-400 ml-1">({item.itemModel})</span>}
+                <span className="ml-2 text-[10px] font-semibold text-red-500 uppercase">Reso al fornitore</span>
+            </td>
+            <td className="py-1.5 text-right text-red-600 dark:text-red-400 w-16">{item.returnedQuantity}</td>
+            {canEdit && editing ? (
+                <>
+                    <td className="py-1 w-32 pl-2">
+                        <div className="flex items-center gap-1">
+                            <span className="text-red-400 text-xs shrink-0">€</span>
+                            <Input
+                                autoFocus
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="0.00001"
+                                value={price}
+                                onChange={e => handlePriceChange(e.target.value)}
+                                onBlur={handlePriceBlur}
+                                className="h-7 text-right px-1 text-xs w-24"
+                                placeholder="0.00000"
+                                title="Prezzo unitario del reso. In alternativa inserisci il Totale Riga nel campo accanto."
+                            />
+                        </div>
+                    </td>
+                    <td className="py-1 w-32 pl-2">
+                        <div className="flex items-center gap-1">
+                            <span className="text-red-400 text-xs shrink-0">€</span>
+                            <Input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="0.01"
+                                value={total}
+                                onChange={e => handleTotalChange(e.target.value)}
+                                onBlur={handleTotalBlur}
+                                className="h-7 text-right px-1 text-xs w-24"
+                                placeholder="0.00"
+                            />
+                        </div>
+                    </td>
+                    <td className="py-1 w-10 pl-1">
+                        {saving
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin text-red-400" />
+                            : <button onClick={cancelEdit} title="Annulla" className="text-red-400 hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
+                        }
+                    </td>
+                </>
+            ) : (
+                <>
+                    <td className="py-1.5 text-right text-red-600 dark:text-red-400 w-24 pr-1 font-mono text-xs">
+                        {item.returnedPrice != null ? `€ ${item.returnedPrice.toFixed(5)}` : '—'}
+                    </td>
+                    <td className="py-1.5 text-right text-red-700 dark:text-red-400 w-24 pr-1 font-medium">
+                        {item.returnedPrice != null && qty ? `− € ${(item.returnedPrice * qty).toFixed(2)}` : '—'}
+                    </td>
+                    {canEdit && (
+                        <td className="py-1 w-10 pl-1">
+                            <button onClick={() => setEditing(true)} title="Modifica prezzo del reso" className="text-red-300 hover:text-red-600 transition-colors">
+                                <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                        </td>
+                    )}
+                </>
+            )}
+        </tr>
+    );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function InvoiceDetailPage() {
@@ -657,30 +799,11 @@ export default function InvoiceDetailPage() {
                                                                                     onSaved={syncTotalAfterItemEdit}
                                                                                 />
                                                                                 {item.returnedAt && (
-                                                                                    <tr className="border-b border-red-100 dark:border-red-900/50 last:border-0 bg-red-50/60 dark:bg-red-950/30">
-                                                                                        <td className="py-1.5 pr-2">
-                                                                                            <span className="font-medium text-red-700 dark:text-red-400 inline-flex items-center gap-1">
-                                                                                                <Undo2 className="h-3 w-3" />
-                                                                                                {item.itemName || '—'}
-                                                                                            </span>
-                                                                                            {item.itemModel && <span className="text-red-400 ml-1">({item.itemModel})</span>}
-                                                                                            <span className="ml-2 text-[10px] font-semibold text-red-500 uppercase">Reso al fornitore</span>
-                                                                                        </td>
-                                                                                        <td className="py-1.5 text-right text-red-600 dark:text-red-400 w-16">{item.returnedQuantity}</td>
-                                                                                        {canSeeAmounts && (
-                                                                                            <>
-                                                                                                <td className="py-1 w-32 pl-2 text-red-600 dark:text-red-400">
-                                                                                                    € {item.returnedPrice != null ? item.returnedPrice.toFixed(5) : '-'}
-                                                                                                </td>
-                                                                                                <td className="py-1 w-32 pl-2 font-medium text-red-700 dark:text-red-400">
-                                                                                                    {item.returnedPrice != null && item.returnedQuantity != null
-                                                                                                        ? `− € ${(item.returnedQuantity * item.returnedPrice).toFixed(2)}`
-                                                                                                        : '-'}
-                                                                                                </td>
-                                                                                                <td className="w-10" />
-                                                                                            </>
-                                                                                        )}
-                                                                                    </tr>
+                                                                                    <ReturnPriceRow
+                                                                                        item={item}
+                                                                                        canEdit={canSeeAmounts}
+                                                                                        onSaved={syncTotalAfterItemEdit}
+                                                                                    />
                                                                                 )}
                                                                             </Fragment>
                                                                         ))}

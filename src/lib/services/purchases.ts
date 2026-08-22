@@ -450,6 +450,56 @@ export const purchasesApi = {
         if (error) throw error;
     },
 
+    // Modify an already-active return (quantity/pieces/price), without going
+    // through cancel+reapply. Il disponibile attuale del lotto esclude gia' il
+    // reso in corso: per validare la modifica si riaggiunge il reso corrente
+    // prima di confrontare col nuovo valore dichiarato.
+    updateReturn: async (itemId: string, { pieces, quantity, price }: { pieces?: number; quantity: number; price?: number }) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Utente non autenticato");
+
+        const { data: current, error: currentError } = await supabase
+            .from('purchase_items')
+            .select('price, returned_at, returned_quantity, returned_pieces')
+            .eq('id', itemId)
+            .single();
+        if (currentError) throw currentError;
+        if (!current.returned_at) {
+            throw new Error("Nessun reso attivo su questa riga da modificare");
+        }
+
+        if (quantity <= 0) throw new Error("La quantità resa deve essere maggiore di zero");
+
+        const { data: availability, error: availError } = await supabase
+            .from('purchase_batch_availability')
+            .select('remaining_quantity, remaining_pieces')
+            .eq('purchase_item_id', itemId)
+            .maybeSingle();
+        if (availError) throw availError;
+        const remainingQuantity = (availability?.remaining_quantity ?? 0) + (current.returned_quantity ?? 0);
+        const remainingPieces = availability?.remaining_pieces != null || current.returned_pieces != null
+            ? (availability?.remaining_pieces ?? 0) + (current.returned_pieces ?? 0)
+            : null;
+
+        if (quantity > remainingQuantity + 0.001) {
+            throw new Error(`Quantità resa superiore al disponibile a magazzino per questo lotto (max ${remainingQuantity}). Il materiale deve essere fisicamente in magazzino per poter essere reso.`);
+        }
+        if (remainingPieces != null && pieces != null && pieces > remainingPieces + 0.001) {
+            throw new Error(`Pezzi resi superiori al disponibile a magazzino per questo lotto (max ${remainingPieces}). Il materiale deve essere fisicamente in magazzino per poter essere reso.`);
+        }
+
+        const { error } = await supabase
+            .from('purchase_items')
+            .update({
+                returned_quantity: quantity,
+                returned_pieces: pieces ?? null,
+                returned_price: price ?? current.price,
+                returned_by: user.id,
+            })
+            .eq('id', itemId);
+        if (error) throw error;
+    },
+
     // Cancel an active return on a purchase item.
     cancelReturn: async (itemId: string) => {
         const { data: current, error: currentError } = await supabase
