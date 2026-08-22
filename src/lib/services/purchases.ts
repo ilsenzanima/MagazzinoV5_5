@@ -389,6 +389,7 @@ export const purchasesApi = {
             transportUnitCost: item.transport_unit_cost ?? 0,
             returnedQuantity: item.returned_quantity ?? null,
             returnedPieces: item.returned_pieces ?? null,
+            returnedPrice: item.returned_price ?? null,
             returnedAt: item.returned_at ?? null,
             returnedBy: item.returned_by ?? null,
             returnedByName: item.returned_by_profile?.full_name ?? null,
@@ -397,19 +398,20 @@ export const purchasesApi = {
         }));
     },
 
-    // Apply a return (reso) to the supplier on a purchase item: subtracts the
-    // returned pieces/quantity from the row (same effect as a manual edit),
-    // keeping track of the returned amount and the pre-return values for restore.
-    // Il limite e' il valore "puro" della riga (quantity/pieces attuali), a
-    // prescindere da dove si trovi fisicamente il materiale (magazzino o cantiere):
-    // i movimenti interni (trasferimenti, bolle) non riducono il resabile.
-    applyReturn: async (itemId: string, { pieces, quantity }: { pieces?: number; quantity: number }) => {
+    // Apply a return (reso) to the supplier on a purchase item. Non tocca piu'
+    // quantity/pieces della riga (che restano sempre uguali a quanto arrivato
+    // con la bolla, coerenti con la fattura del fornitore): il reso e' tenuto
+    // separato in returned_quantity/returned_pieces/returned_price/returned_at.
+    // Il limite e' quanto e' REALMENTE ancora disponibile per quel lotto
+    // (purchase_batch_availability), non la quantita' grezza della riga: se il
+    // materiale e' gia' uscito (magazzino o commessa) non e' piu' reso possibile.
+    applyReturn: async (itemId: string, { pieces, quantity, price }: { pieces?: number; quantity: number; price?: number }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Utente non autenticato");
 
         const { data: current, error: currentError } = await supabase
             .from('purchase_items')
-            .select('quantity, pieces, coefficient, returned_at')
+            .select('price, returned_at')
             .eq('id', itemId)
             .single();
         if (currentError) throw currentError;
@@ -418,37 +420,41 @@ export const purchasesApi = {
         }
 
         if (quantity <= 0) throw new Error("La quantità resa deve essere maggiore di zero");
-        if (quantity > (current.quantity || 0) + 0.001) {
-            throw new Error(`Quantità resa superiore alla quantità della riga (max ${current.quantity})`);
-        }
-        if (current.pieces != null && pieces != null && pieces > current.pieces + 0.001) {
-            throw new Error(`Pezzi resi superiori ai pezzi della riga (max ${current.pieces})`);
-        }
 
-        const newQuantity = Math.max(0, (current.quantity || 0) - quantity);
-        const newPieces = current.pieces != null && pieces != null ? Math.max(0, current.pieces - pieces) : current.pieces;
+        const { data: availability, error: availError } = await supabase
+            .from('purchase_batch_availability')
+            .select('remaining_quantity, remaining_pieces')
+            .eq('purchase_item_id', itemId)
+            .maybeSingle();
+        if (availError) throw availError;
+        const remainingQuantity = availability?.remaining_quantity ?? 0;
+        const remainingPieces = availability?.remaining_pieces ?? null;
+
+        if (quantity > remainingQuantity + 0.001) {
+            throw new Error(`Quantità resa superiore al disponibile a magazzino per questo lotto (max ${remainingQuantity}). Il materiale deve essere fisicamente in magazzino per poter essere reso.`);
+        }
+        if (remainingPieces != null && pieces != null && pieces > remainingPieces + 0.001) {
+            throw new Error(`Pezzi resi superiori al disponibile a magazzino per questo lotto (max ${remainingPieces}). Il materiale deve essere fisicamente in magazzino per poter essere reso.`);
+        }
 
         const { error } = await supabase
             .from('purchase_items')
             .update({
-                quantity: newQuantity,
-                pieces: newPieces,
                 returned_quantity: quantity,
                 returned_pieces: pieces ?? null,
+                returned_price: price ?? current.price,
                 returned_at: new Date().toISOString(),
                 returned_by: user.id,
-                pre_return_quantity: current.quantity,
-                pre_return_pieces: current.pieces,
             })
             .eq('id', itemId);
         if (error) throw error;
     },
 
-    // Cancel an active return on a purchase item, restoring the pre-return values.
+    // Cancel an active return on a purchase item.
     cancelReturn: async (itemId: string) => {
         const { data: current, error: currentError } = await supabase
             .from('purchase_items')
-            .select('returned_at, pre_return_quantity, pre_return_pieces')
+            .select('returned_at')
             .eq('id', itemId)
             .single();
         if (currentError) throw currentError;
@@ -459,14 +465,11 @@ export const purchasesApi = {
         const { error } = await supabase
             .from('purchase_items')
             .update({
-                quantity: current.pre_return_quantity,
-                pieces: current.pre_return_pieces,
                 returned_quantity: null,
                 returned_pieces: null,
+                returned_price: null,
                 returned_at: null,
                 returned_by: null,
-                pre_return_quantity: null,
-                pre_return_pieces: null,
             })
             .eq('id', itemId);
         if (error) throw error;
@@ -499,6 +502,7 @@ export const purchasesApi = {
         if (item.coefficient !== undefined) dbItem.coefficient = item.coefficient;
         if (item.preReturnQuantity !== undefined) dbItem.pre_return_quantity = item.preReturnQuantity;
         if (item.preReturnPieces !== undefined) dbItem.pre_return_pieces = item.preReturnPieces;
+        if (item.returnedPrice !== undefined) dbItem.returned_price = item.returnedPrice;
 
         const { data, error } = await supabase.from('purchase_items').update(dbItem).eq('id', id).select().single();
         if (error) throw error;

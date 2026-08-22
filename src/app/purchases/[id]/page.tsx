@@ -13,7 +13,7 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink, Truck, CheckCircle2, Undo2, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     suppliersApi,
@@ -102,7 +102,7 @@ export default function PurchaseDetailPage() {
 
     // Return (Reso) State
     const [returnItem, setReturnItem] = useState<PurchaseItem | null>(null);
-    const [returnValues, setReturnValues] = useState({ pieces: "", quantity: "" });
+    const [returnValues, setReturnValues] = useState({ pieces: "", quantity: "", price: "" });
     const [returnRemaining, setReturnRemaining] = useState<{ remainingQuantity: number; remainingPieces: number | null } | null>(null);
     const [applyingReturn, setApplyingReturn] = useState(false);
     const [cancelReturnItemId, setCancelReturnItemId] = useState<string | null>(null);
@@ -619,10 +619,15 @@ export default function PurchaseDetailPage() {
 
     const openReturnDialog = (item: PurchaseItem) => {
         setReturnItem(item);
-        setReturnValues({ pieces: "", quantity: "" });
-        // Il limite e' il valore puro della riga (quantity/pieces attuali), a prescindere
-        // da dove si trovi fisicamente il materiale (magazzino o cantiere).
-        setReturnRemaining({ remainingQuantity: item.quantity, remainingPieces: item.pieces ?? null });
+        setReturnValues({ pieces: "", quantity: "", price: item.price ? item.price.toString() : "" });
+        // Il limite e' quanto e' REALMENTE ancora disponibile a magazzino per questo
+        // lotto (non la quantita' grezza della riga): un reso e' possibile solo su
+        // materiale ancora fisicamente in magazzino, non in commessa.
+        const batch = batchAvailability.find(b => b.id === item.id);
+        setReturnRemaining({
+            remainingQuantity: batch?.remainingQty ?? 0,
+            remainingPieces: batch?.remainingPieces ?? null,
+        });
     };
 
     const handleReturnPiecesChange = (piecesStr: string) => {
@@ -630,7 +635,7 @@ export default function PurchaseDetailPage() {
         const coeff = itemCoefficientFor(returnItem);
         const pieces = parseFloat(piecesStr);
         const quantityStr = !isNaN(pieces) ? (pieces * coeff).toFixed(2) : "";
-        setReturnValues({ pieces: piecesStr, quantity: quantityStr });
+        setReturnValues({ ...returnValues, pieces: piecesStr, quantity: quantityStr });
     };
 
     const handleReturnQuantityChange = (quantityStr: string) => {
@@ -638,24 +643,40 @@ export default function PurchaseDetailPage() {
         const coeff = itemCoefficientFor(returnItem);
         const quantity = parseFloat(quantityStr);
         const piecesStr = !isNaN(quantity) && coeff ? (quantity / coeff).toFixed(2) : returnValues.pieces;
-        setReturnValues({ pieces: piecesStr, quantity: quantityStr });
+        setReturnValues({ ...returnValues, pieces: piecesStr, quantity: quantityStr });
     };
 
     const submitReturn = async () => {
         if (!returnItem) return;
         const quantity = parseFloat(returnValues.quantity);
         const pieces = returnValues.pieces ? parseFloat(returnValues.pieces) : undefined;
+        const price = returnValues.price ? parseFloat(returnValues.price) : undefined;
 
         if (isNaN(quantity) || quantity <= 0) {
             alert("Inserisci una quantità resa valida");
             return;
         }
 
+        // Controllo lato client (oltre a quello server-side in applyReturn): il
+        // materiale deve essere fisicamente in magazzino per essere reso.
+        if (returnRemaining && quantity > returnRemaining.remainingQuantity + 0.001) {
+            alert(`Quantità resa superiore al disponibile a magazzino per questo lotto (max ${returnRemaining.remainingQuantity}). Se il materiale è già uscito (es. in commessa), va prima fatto rientrare a magazzino.`);
+            return;
+        }
+        if (returnRemaining?.remainingPieces != null && pieces != null && pieces > returnRemaining.remainingPieces + 0.001) {
+            alert(`Pezzi resi superiori al disponibile a magazzino per questo lotto (max ${returnRemaining.remainingPieces}). Se il materiale è già uscito (es. in commessa), va prima fatto rientrare a magazzino.`);
+            return;
+        }
+
         try {
             setApplyingReturn(true);
-            await purchasesApi.applyReturn(returnItem.id, { pieces, quantity });
-            const updatedItems = await purchasesApi.getItems(id);
+            await purchasesApi.applyReturn(returnItem.id, { pieces, quantity, price });
+            const [updatedItems, updatedAvailability] = await Promise.all([
+                purchasesApi.getItems(id),
+                purchasesApi.getPurchaseBatchAvailability(id),
+            ]);
             setItems(updatedItems);
+            setBatchAvailability(updatedAvailability);
             setReturnItem(null);
         } catch (error: any) {
             console.error("Failed to apply return", error);
@@ -670,8 +691,12 @@ export default function PurchaseDetailPage() {
         try {
             setCancelingReturn(true);
             await purchasesApi.cancelReturn(cancelReturnItemId);
-            const updatedItems = await purchasesApi.getItems(id);
+            const [updatedItems, updatedAvailability] = await Promise.all([
+                purchasesApi.getItems(id),
+                purchasesApi.getPurchaseBatchAvailability(id),
+            ]);
             setItems(updatedItems);
+            setBatchAvailability(updatedAvailability);
             setCancelReturnItemId(null);
         } catch (error: any) {
             console.error("Failed to cancel return", error);
@@ -1186,22 +1211,14 @@ export default function PurchaseDetailPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {items.map((item) => (
-                                            <TableRow key={item.id} className={item.price === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/20" : ""}>
+                                            <Fragment key={item.id}>
+                                            <TableRow className={item.price === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/20" : ""}>
                                                 <TableCell>
                                                     <div className="font-medium">
                                                         {item.itemName}
                                                         {item.itemModel && <span className="text-slate-500 font-medium ml-1">({item.itemModel})</span>}
                                                     </div>
                                                     <div className="text-xs text-slate-500">{item.itemCode}</div>
-                                                    {item.returnedAt && (
-                                                        <span
-                                                            className="inline-flex items-center gap-1 mt-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300"
-                                                            title={`Reso registrato il ${new Date(item.returnedAt).toLocaleDateString('it-IT')}${item.returnedByName ? ` da ${item.returnedByName}` : ''}`}
-                                                        >
-                                                            <Undo2 className="h-3 w-3" />
-                                                            Reso: {item.returnedPieces ? `${item.returnedPieces} pz` : `${item.returnedQuantity}`}
-                                                        </span>
-                                                    )}
                                                 </TableCell>
 
                                                 {/* Editable Fields */}
@@ -1396,22 +1413,73 @@ export default function PurchaseDetailPage() {
                                                                 >
                                                                     Modifica
                                                                 </Button>
-                                                                {item.returnedAt && (
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                                        title="Elimina reso e ripristina i valori originali"
-                                                                        onClick={() => setCancelReturnItemId(item.id)}
-                                                                    >
-                                                                        <RotateCcw className="h-3.5 w-3.5 mr-1" /> Elimina reso
-                                                                    </Button>
-                                                                )}
                                                             </div>
                                                         )
                                                     )}
                                                 </TableCell>
                                             </TableRow>
+                                            {item.returnedAt && (
+                                                <TableRow className="bg-red-50/60 dark:bg-red-950/30 border-red-100 dark:border-red-900">
+                                                    <TableCell>
+                                                        <div className="font-medium text-red-700 dark:text-red-400 flex items-center gap-1.5">
+                                                            <Undo2 className="h-3.5 w-3.5" />
+                                                            {item.itemName}
+                                                            {item.itemModel && <span className="text-red-500 font-medium ml-1">({item.itemModel})</span>}
+                                                        </div>
+                                                        <div
+                                                            className="text-xs text-red-500 dark:text-red-400"
+                                                            title={`Reso registrato il ${new Date(item.returnedAt).toLocaleDateString('it-IT')}${item.returnedByName ? ` da ${item.returnedByName}` : ''}`}
+                                                        >
+                                                            RESO AL FORNITORE
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-red-700 dark:text-red-400">
+                                                        {item.returnedPieces ?? '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-red-400">
+                                                        {item.coefficient || 1}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-red-700 dark:text-red-400">
+                                                        {item.returnedQuantity}
+                                                    </TableCell>
+                                                    {showTransportCols && <TableCell />}
+                                                    <TableCell className="text-right text-red-700 dark:text-red-400">
+                                                        {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                            item.returnedPrice != null ? `€ ${item.returnedPrice.toFixed(5)}` : '-'
+                                                        ) : (
+                                                            <span className="text-slate-400 italic text-xs">Riservato</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-medium text-red-700 dark:text-red-400">
+                                                        {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                            item.returnedPrice != null && item.returnedQuantity != null
+                                                                ? `− € ${(item.returnedQuantity * item.returnedPrice).toFixed(2)}`
+                                                                : '-'
+                                                        ) : (
+                                                            <span className="text-slate-400 italic text-xs">Riservato</span>
+                                                        )}
+                                                    </TableCell>
+                                                    {showTransportCols && <TableCell />}
+                                                    {showTransportCols && <TableCell />}
+                                                    <TableCell>
+                                                        <span className="text-red-600 dark:text-red-400 font-medium text-sm">Reso al fornitore</span>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        {(userRole === 'admin' || userRole === 'operativo') && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="text-red-600 hover:text-red-700 hover:bg-red-100"
+                                                                title="Elimina reso"
+                                                                onClick={() => setCancelReturnItemId(item.id)}
+                                                            >
+                                                                <RotateCcw className="h-3.5 w-3.5 mr-1" /> Elimina reso
+                                                            </Button>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                            </Fragment>
                                         ))}
                                         <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold text-lg">
                                             <TableCell colSpan={showTransportCols ? 6 : 5} className="text-right">
@@ -1449,7 +1517,8 @@ export default function PurchaseDetailPage() {
                             {/* Mobile View: Cards List */}
                             <div className="md:hidden space-y-2">
                                 {items.map((item) => (
-                                    <div key={item.id} className={`bg-slate-50 dark:bg-slate-800 p-2.5 rounded-md space-y-2 text-sm shadow-sm ${item.price === 0 ? "border-l-4 border-yellow-500" : "border border-slate-200 dark:border-slate-700"}`}>
+                                    <Fragment key={item.id}>
+                                    <div className={`bg-slate-50 dark:bg-slate-800 p-2.5 rounded-md space-y-2 text-sm shadow-sm ${item.price === 0 ? "border-l-4 border-yellow-500" : "border border-slate-200 dark:border-slate-700"}`}>
                                         <div className="flex justify-between items-start gap-2">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -1477,15 +1546,6 @@ export default function PurchaseDetailPage() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                {item.returnedAt && (
-                                                    <span
-                                                        className="inline-flex items-center gap-1 mt-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300"
-                                                        title={`Reso registrato il ${new Date(item.returnedAt).toLocaleDateString('it-IT')}${item.returnedByName ? ` da ${item.returnedByName}` : ''}`}
-                                                    >
-                                                        <Undo2 className="h-3 w-3" />
-                                                        Reso: {item.returnedPieces ? `${item.returnedPieces} pz` : `${item.returnedQuantity}`}
-                                                    </span>
-                                                )}
                                             </div>
 
                                             {(userRole === 'admin' || userRole === 'operativo') && (
@@ -1523,11 +1583,6 @@ export default function PurchaseDetailPage() {
                                                             >
                                                                 <Edit className="h-3.5 w-3.5" />
                                                             </Button>
-                                                            {item.returnedAt && (
-                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" title="Elimina reso e ripristina i valori originali" onClick={() => setCancelReturnItemId(item.id)}>
-                                                                    <RotateCcw className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            )}
                                                         </>
                                                     )}
                                                 </div>
@@ -1628,6 +1683,48 @@ export default function PurchaseDetailPage() {
                                             </div>
                                         )}
                                     </div>
+                                    {item.returnedAt && (
+                                        <div className="bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-2.5 rounded-md space-y-1.5 text-sm shadow-sm">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-1.5 text-red-700 dark:text-red-400">
+                                                        <Undo2 className="h-3.5 w-3.5 shrink-0" />
+                                                        <h4 className="font-semibold text-sm truncate">{item.itemName}</h4>
+                                                    </div>
+                                                    <div
+                                                        className="text-[10px] font-semibold text-red-500 dark:text-red-400 mt-0.5"
+                                                        title={`Reso registrato il ${new Date(item.returnedAt).toLocaleDateString('it-IT')}${item.returnedByName ? ` da ${item.returnedByName}` : ''}`}
+                                                    >
+                                                        RESO AL FORNITORE
+                                                    </div>
+                                                </div>
+                                                {(userRole === 'admin' || userRole === 'operativo') && (
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600 shrink-0" title="Elimina reso" onClick={() => setCancelReturnItemId(item.id)}>
+                                                        <RotateCcw className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center justify-between text-sm pt-1 border-t border-red-200/50 dark:border-red-900/50">
+                                                <div className="text-red-700 dark:text-red-400">
+                                                    <span className="font-semibold">{item.returnedQuantity}</span>
+                                                    {item.returnedPieces != null && <span className="text-red-500 text-xs ml-1">({item.returnedPieces} pz)</span>}
+                                                </div>
+                                                <div className="text-right">
+                                                    {(userRole === 'admin' || userRole === 'operativo') ? (
+                                                        <div className="flex flex-col items-end gap-0.5">
+                                                            <span className="font-mono text-xs text-red-500">P.U.: € {item.returnedPrice != null ? item.returnedPrice.toFixed(5) : '-'}</span>
+                                                            <span className="font-bold text-red-700 dark:text-red-400 text-xs">
+                                                                {item.returnedPrice != null && item.returnedQuantity != null ? `− € ${(item.returnedQuantity * item.returnedPrice).toFixed(2)}` : '-'}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400 italic text-xs">Riservato</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    </Fragment>
                                 ))}
                                 <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-md flex justify-between items-center font-bold text-sm">
                                     <span>{isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}</span>
@@ -2071,9 +2168,14 @@ export default function PurchaseDetailPage() {
                             </DialogHeader>
                             {returnItem && returnRemaining && (
                                 <div className="space-y-4">
-                                    <p className="text-xs text-slate-500">
-                                        Disponibile per il reso: {returnRemaining.remainingPieces != null ? `${returnRemaining.remainingPieces} pz` : ''} ({returnRemaining.remainingQuantity} {returnItem.itemUnit || ''})
-                                    </p>
+                                    <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 space-y-1">
+                                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                            Disponibile per il reso: {returnRemaining.remainingPieces != null ? `${returnRemaining.remainingPieces} pz` : ''} ({returnRemaining.remainingQuantity} {returnItem.itemUnit || ''})
+                                        </p>
+                                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                                            Il materiale reso deve essere fisicamente presente in magazzino, non in commessa o altrove. Se il disponibile qui sopra è inferiore a quanto vuoi rendere, il materiale va prima fatto rientrare a magazzino.
+                                        </p>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label>Pezzi resi <span className="text-xs text-muted-foreground font-normal">(Coeff: {itemCoefficientFor(returnItem)})</span></Label>
@@ -2098,8 +2200,19 @@ export default function PurchaseDetailPage() {
                                             />
                                         </div>
                                     </div>
-                                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                                        La quantità resa verrà sottratta dalla riga (come se non fosse mai arrivata) e l&apos;importo si ridurrà di conseguenza. Potrai eliminare il reso in qualsiasi momento per ripristinare i valori originali.
+                                    <div className="space-y-2">
+                                        <Label>Prezzo unitario del reso <span className="text-xs text-muted-foreground font-normal">(modificabile, es. per il trasporto applicato)</span></Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.00001"
+                                            value={returnValues.price}
+                                            onChange={(e) => setReturnValues({ ...returnValues, price: e.target.value })}
+                                            placeholder="0.00000"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        La riga dell&apos;acquisto non viene modificata (resta uguale alla bolla/fattura del fornitore): il reso viene registrato a parte e comparirà come riga aggiuntiva in rosso, anche in Fatturazione. Potrai eliminarlo in qualsiasi momento.
                                     </p>
                                 </div>
                             )}
@@ -2169,7 +2282,7 @@ export default function PurchaseDetailPage() {
             open={!!cancelReturnItemId}
             onOpenChange={(open) => { if (!open) setCancelReturnItemId(null); }}
             title="Elimina reso"
-            description="I valori di pezzi e quantità della riga verranno ripristinati a come erano prima del reso. Procedere?"
+            description="Il reso registrato su questa riga verrà rimosso: i pezzi torneranno disponibili a magazzino. La riga dell'acquisto non è mai stata modificata. Procedere?"
             loading={cancelingReturn}
             onConfirm={handleCancelReturn}
         />

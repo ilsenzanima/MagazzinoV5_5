@@ -323,6 +323,7 @@ export interface Invoice {
     invoiceNumber: string;
     invoiceDate: string;
     documentUrls?: string[];
+    creditNoteDocumentUrls?: string[];
     totalAmount?: number;
     notes?: string;
     createdBy?: string;
@@ -334,7 +335,7 @@ export interface Invoice {
         totalAmount?: number;
         transportCost?: number;
         hasReturn?: boolean;
-        items?: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; transportApplied?: boolean; transportUnitCost?: number; returnedQuantity?: number | null; returnedPieces?: number | null; returnedAt?: string | null }[];
+        items?: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; transportApplied?: boolean; transportUnitCost?: number; returnedQuantity?: number | null; returnedPieces?: number | null; returnedPrice?: number | null; returnedAt?: string | null }[];
     }[];
 }
 
@@ -362,6 +363,7 @@ export interface PurchaseItem {
     transportUnitCost?: number;
     returnedQuantity?: number | null;
     returnedPieces?: number | null;
+    returnedPrice?: number | null;
     returnedAt?: string | null;
     returnedBy?: string | null;
     returnedByName?: string | null;

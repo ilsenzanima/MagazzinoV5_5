@@ -28,7 +28,7 @@ function ItemPriceRow({
     canEdit,
     onSaved,
 }: {
-    item: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; returnedQuantity?: number | null; returnedPieces?: number | null; returnedAt?: string | null };
+    item: { id: string; itemName?: string; itemModel?: string; quantity?: number; price?: number; returnedQuantity?: number | null; returnedPieces?: number | null; returnedPrice?: number | null; returnedAt?: string | null };
     canEdit: boolean;
     onSaved: () => void;
 }) {
@@ -93,15 +93,6 @@ function ItemPriceRow({
             <td className="py-1.5 pr-2">
                 <span className="font-medium text-slate-700 dark:text-slate-300">{item.itemName || '—'}</span>
                 {item.itemModel && <span className="text-slate-400 ml-1">({item.itemModel})</span>}
-                {item.returnedAt && (
-                    <span
-                        className="inline-flex items-center gap-1 ml-2 rounded-full bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300 align-middle"
-                        title={`Reso al fornitore registrato il ${new Date(item.returnedAt).toLocaleDateString('it-IT')}`}
-                    >
-                        <Undo2 className="h-2.5 w-2.5" />
-                        Reso: {item.returnedPieces ? `${item.returnedPieces} pz` : `${item.returnedQuantity}`}
-                    </span>
-                )}
             </td>
             <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-16">{qty}</td>
             {canEdit && editing ? (
@@ -549,6 +540,17 @@ export default function InvoiceDetailPage() {
                         supplierName={invoice.supplierName}
                     />
 
+                    {/* ── Documenti Nota di Credito (reso al fornitore), separati dalla fattura ── */}
+                    <InvoiceDocuments
+                        invoiceId={id}
+                        documentUrls={invoice.creditNoteDocumentUrls}
+                        onUpdate={load}
+                        supplierName={invoice.supplierName}
+                        field="credit_note_document_urls"
+                        kind="credit_note"
+                        title="Documenti Nota di Credito"
+                    />
+
                     {/* ── Bolle collegate ── */}
                     <Card>
                         <CardHeader className="py-4">
@@ -648,12 +650,39 @@ export default function InvoiceDetailPage() {
                                                                     </thead>
                                                                     <tbody>
                                                                         {p.items!.map((item) => (
-                                                                            <ItemPriceRow
-                                                                                key={item.id}
-                                                                                item={item}
-                                                                                canEdit={canSeeAmounts}
-                                                                                onSaved={syncTotalAfterItemEdit}
-                                                                            />
+                                                                            <Fragment key={item.id}>
+                                                                                <ItemPriceRow
+                                                                                    item={item}
+                                                                                    canEdit={canSeeAmounts}
+                                                                                    onSaved={syncTotalAfterItemEdit}
+                                                                                />
+                                                                                {item.returnedAt && (
+                                                                                    <tr className="border-b border-red-100 dark:border-red-900/50 last:border-0 bg-red-50/60 dark:bg-red-950/30">
+                                                                                        <td className="py-1.5 pr-2">
+                                                                                            <span className="font-medium text-red-700 dark:text-red-400 inline-flex items-center gap-1">
+                                                                                                <Undo2 className="h-3 w-3" />
+                                                                                                {item.itemName || '—'}
+                                                                                            </span>
+                                                                                            {item.itemModel && <span className="text-red-400 ml-1">({item.itemModel})</span>}
+                                                                                            <span className="ml-2 text-[10px] font-semibold text-red-500 uppercase">Reso al fornitore</span>
+                                                                                        </td>
+                                                                                        <td className="py-1.5 text-right text-red-600 dark:text-red-400 w-16">{item.returnedQuantity}</td>
+                                                                                        {canSeeAmounts && (
+                                                                                            <>
+                                                                                                <td className="py-1 w-32 pl-2 text-red-600 dark:text-red-400">
+                                                                                                    € {item.returnedPrice != null ? item.returnedPrice.toFixed(5) : '-'}
+                                                                                                </td>
+                                                                                                <td className="py-1 w-32 pl-2 font-medium text-red-700 dark:text-red-400">
+                                                                                                    {item.returnedPrice != null && item.returnedQuantity != null
+                                                                                                        ? `− € ${(item.returnedQuantity * item.returnedPrice).toFixed(2)}`
+                                                                                                        : '-'}
+                                                                                                </td>
+                                                                                                <td className="w-10" />
+                                                                                            </>
+                                                                                        )}
+                                                                                    </tr>
+                                                                                )}
+                                                                            </Fragment>
                                                                         ))}
                                                                     </tbody>
                                                                 </table>

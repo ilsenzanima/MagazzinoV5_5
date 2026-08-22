@@ -16,9 +16,22 @@ interface InvoiceDocumentsProps {
   documentUrls?: string[];
   onUpdate: () => void;
   supplierName?: string;
+  // Per la fattura vera e propria (default) o per la nota di credito del reso:
+  // stessa UI, ma colonna DB, cartella Drive e titolo diversi.
+  field?: 'document_urls' | 'credit_note_document_urls';
+  kind?: 'invoice' | 'credit_note';
+  title?: string;
 }
 
-export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, supplierName }: InvoiceDocumentsProps) {
+export function InvoiceDocuments({
+  invoiceId,
+  documentUrls = [],
+  onUpdate,
+  supplierName,
+  field = 'document_urls',
+  kind = 'invoice',
+  title = 'Documenti Fattura',
+}: InvoiceDocumentsProps) {
   const supabase = createClient();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
@@ -48,12 +61,12 @@ export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, suppl
     setUploadingFiles(files);
     const uploadedUrls: string[] = [];
     const { failedCount } = await batchUpload.run(files, async (file) => {
-      uploadedUrls.push(await invoicesApi.uploadDocument(file, supplierName));
+      uploadedUrls.push(await invoicesApi.uploadDocument(file, supplierName, kind));
     });
     try {
       if (uploadedUrls.length) {
         const updated = [...documentUrls, ...uploadedUrls];
-        await supabase.from('invoices').update({ document_urls: updated }).eq('id', invoiceId);
+        await supabase.from('invoices').update({ [field]: updated }).eq('id', invoiceId);
         onUpdate();
       }
       if (failedCount > 0) {
@@ -91,7 +104,7 @@ export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, suppl
       setDeletingIndex(index);
       const removedUrl = documentUrls[index];
       const updated = documentUrls.filter((_, i) => i !== index);
-      await supabase.from('invoices').update({ document_urls: updated }).eq('id', invoiceId);
+      await supabase.from('invoices').update({ [field]: updated }).eq('id', invoiceId);
       await deleteDriveFileIfApplicable(removedUrl);
       onUpdate();
     } catch (error) {
@@ -110,7 +123,7 @@ export function InvoiceDocuments({ invoiceId, documentUrls = [], onUpdate, suppl
       onDrop={handleDrop}
     >
       <CardHeader className="flex flex-row items-center justify-between py-4">
-        <CardTitle className="text-base font-semibold">Documenti Fattura</CardTitle>
+        <CardTitle className="text-base font-semibold">{title}</CardTitle>
         <div className="relative">
           <input
             type="file"

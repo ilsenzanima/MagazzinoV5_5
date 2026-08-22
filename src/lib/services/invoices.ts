@@ -5,6 +5,14 @@ import { compressImageIfNeeded } from '@/lib/image-compress';
 import { uploadFileToDrive } from '@/lib/drive-upload';
 import { supplierGroupsApi } from './supplier-groups';
 
+// L'importo del reso (quantità resa * prezzo del reso, non il prezzo di riga)
+// si sottrae dal totale: la riga dell'acquisto resta sempre uguale a quanto
+// arrivato con la bolla/fattura del fornitore, il reso è una detrazione a parte.
+const returnAmount = (i: { returned_at?: string | null; returned_price?: number | null; returned_quantity?: number | null }): number =>
+    i.returned_at && i.returned_price != null && i.returned_quantity != null
+        ? i.returned_quantity * i.returned_price
+        : 0;
+
 const mapDbToInvoice = (db: any): Invoice => {
     const purchases = db.purchases?.map((p: any) => ({
         id: p.id,
@@ -12,7 +20,7 @@ const mapDbToInvoice = (db: any): Invoice => {
         deliveryNoteDate: p.delivery_note_date,
         transportCost: p.transport_cost ?? 0,
         totalAmount: p.purchase_items?.reduce(
-            (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1),
+            (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1) - returnAmount(i),
             0
         ),
         hasReturn: p.purchase_items?.some((i: any) => !!i.returned_at) ?? false,
@@ -26,6 +34,7 @@ const mapDbToInvoice = (db: any): Invoice => {
             transportUnitCost: i.transport_unit_cost ?? 0,
             returnedQuantity: i.returned_quantity ?? null,
             returnedPieces: i.returned_pieces ?? null,
+            returnedPrice: i.returned_price ?? null,
             returnedAt: i.returned_at ?? null,
         })),
     }));
@@ -37,6 +46,7 @@ const mapDbToInvoice = (db: any): Invoice => {
         invoiceNumber: db.invoice_number,
         invoiceDate: db.invoice_date,
         documentUrls: db.document_urls ?? [],
+        creditNoteDocumentUrls: db.credit_note_document_urls ?? [],
         // Calcolato dinamicamente dalle bolle/righe collegate quando disponibili (query con
         // purchases annidate), così l'elenco non dipende dalla colonna invoices.total_amount:
         // quest'ultima va risincronizzata esplicitamente ad ogni modifica (vedi updateTotal) ed
@@ -67,7 +77,7 @@ export const invoicesApi = {
         let query = supabase
             .from('invoices')
             .select(
-                '*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity, returned_at))',
+                '*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity, returned_quantity, returned_price, returned_at))',
                 { count: 'estimated' }
             )
             .is('deleted_at', null)
@@ -88,7 +98,7 @@ export const invoicesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('invoices')
-                .select('*, suppliers(name), purchases(id, delivery_note_number, delivery_note_date, transport_cost, purchase_items(id, price, quantity, transport_applied, transport_unit_cost, returned_quantity, returned_pieces, returned_at, inventory(name, model)))')
+                .select('*, suppliers(name), purchases(id, delivery_note_number, delivery_note_date, transport_cost, purchase_items(id, price, quantity, transport_applied, transport_unit_cost, returned_quantity, returned_pieces, returned_price, returned_at, inventory(name, model)))')
                 .eq('id', id)
                 .single()
         );
@@ -144,9 +154,10 @@ export const invoicesApi = {
         if (error) throw error;
     },
 
-    uploadDocument: async (file: File, supplierName?: string): Promise<string> => {
+    uploadDocument: async (file: File, supplierName?: string, kind: 'invoice' | 'credit_note' = 'invoice'): Promise<string> => {
         const compressed = await compressImageIfNeeded(file);
-        const result = await uploadFileToDrive(compressed, ['Fornitori', supplierName || 'Senza fornitore', 'Fatture']);
+        const folder = kind === 'credit_note' ? 'Note di Credito' : 'Fatture';
+        const result = await uploadFileToDrive(compressed, ['Fornitori', supplierName || 'Senza fornitore', folder]);
         return result.fileId;
     },
 
@@ -159,7 +170,7 @@ export const invoicesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('id, delivery_note_number, delivery_note_date, supplier_id, suppliers(name), purchase_items(price, quantity)')
+                .select('id, delivery_note_number, delivery_note_date, supplier_id, suppliers(name), purchase_items(price, quantity, returned_quantity, returned_price, returned_at)')
                 .in('supplier_id', supplierIds)
                 .eq('order_type', 'purchase')
                 .is('invoice_id', null)
@@ -174,7 +185,7 @@ export const invoicesApi = {
             supplierId: p.supplier_id,
             supplierName: p.suppliers?.name,
             totalAmount: p.purchase_items?.reduce(
-                (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1),
+                (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1) - returnAmount(i),
                 0
             ) ?? 0,
         }));
