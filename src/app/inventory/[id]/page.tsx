@@ -1070,7 +1070,7 @@ export default function InventoryDetailPage() {
                   Storico Movimenti
                   <HelpTip
                     title="Storico Movimenti"
-                    description="Ogni riga è un movimento di magazzino: Carico/Entrata aumentano lo stock, Scarico/Uscita/Vendita lo diminuiscono. Un movimento 'Fittizio' è registrato per pareggiare i conti senza spostare merce reale."
+                    description="Ogni riga è un movimento di magazzino: Carico/Entrata aumentano lo stock, Scarico/Uscita/Vendita/Reso al Fornitore lo diminuiscono. Un movimento 'Fittizio' è registrato per pareggiare i conti senza spostare merce reale."
                   />
                 </TabsTrigger>
                 <TabsTrigger value="conformita">
@@ -1162,6 +1162,10 @@ export default function InventoryDetailPage() {
                               case 'sale':
                                 typeLabel = "Vendita";
                                 typeColor = "bg-red-600";
+                                break;
+                              case 'return_to_supplier':
+                                typeLabel = "Reso al Fornitore";
+                                typeColor = "bg-red-700";
                                 break;
                               default:
                                 typeLabel = move.type;

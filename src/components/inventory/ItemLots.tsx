@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Package, ExternalLink } from "lucide-react";
+import { AlertTriangle, Package, ExternalLink, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { reassignLotToEntries } from "@/app/inventory/[id]/actions";
@@ -23,6 +23,9 @@ interface LotInfo {
     originalPieces?: number;
     remainingPieces?: number;
     price?: number;
+    returnedQuantity?: number | null;
+    returnedPieces?: number | null;
+    returnedAt?: string | null;
 }
 
 interface ItemLotsProps {
@@ -184,6 +187,15 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                                         <ExternalLink className="h-3 w-3 text-blue-500" />
                                                     )}
                                                 </div>
+                                                {lot.returnedAt && (
+                                                    <span
+                                                        className="inline-flex items-center gap-1 mt-1 rounded-full bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-300"
+                                                        title={`Reso al fornitore registrato il ${new Date(lot.returnedAt).toLocaleDateString('it-IT')}`}
+                                                    >
+                                                        <Undo2 className="h-2.5 w-2.5" />
+                                                        Reso: {lot.returnedPieces ? `${lot.returnedPieces} pz` : `${lot.returnedQuantity}`}
+                                                    </span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-sm text-slate-500 dark:text-slate-400">
                                                 {format(new Date(lot.date), 'dd/MM/yyyy')}

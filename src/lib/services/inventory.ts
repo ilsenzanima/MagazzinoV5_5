@@ -500,83 +500,32 @@ export const inventoryApi = {
 
     // Get all lots for an item (for Lots tab in item detail)
     // Includes ALL lots - even exhausted ones (remaining = 0)
+    // Usa purchase_lot_status (stessa formula di purchase_batch_availability ma
+    // senza il filtro "solo disponibili"), cosi' il disponibile per lotto tiene
+    // conto anche di eventuali resi al fornitore, invece di un calcolo separato
+    // che poteva disallinearsi (es. non sapeva nulla dei resi).
     getLotsForItem: async (itemId: string) => {
-        // Get ALL purchase items for this item (not just available ones)
         const { data: purchaseItems, error: piError } = await supabase
-            .from('purchase_items')
-            .select(`
-                id,
-                purchase_id,
-                quantity,
-                pieces,
-                price,
-                coefficient,
-                purchases!inner (
-                    id,
-                    delivery_note_number,
-                    delivery_note_date,
-                    job_id,
-                    deleted_at,
-                    order_type
-                )
-            `)
+            .from('purchase_lot_status')
+            .select('*')
             .eq('item_id', itemId);
 
         if (piError) throw piError;
 
-        // Exclude lots from soft-deleted purchases and from orders (not yet received)
-        const warehousePurchases = (purchaseItems || []).filter((pi: any) =>
-            !pi.purchases.deleted_at && pi.purchases.order_type !== 'order'
-        );
-
-        // For each purchase item, calculate remaining quantity
-        const lotsWithRemaining = await Promise.all(warehousePurchases.map(async (pi: any) => {
-            // Get total exits for this purchase item
-            const { data: exits, error: exitsError } = await supabase
-                .from('delivery_note_items')
-                .select(`
-                    quantity,
-                    pieces,
-                    is_fictitious,
-                    delivery_notes!inner (type)
-                `)
-                .eq('purchase_item_id', pi.id);
-
-            if (exitsError) throw exitsError;
-
-            // Calculate used quantity (exits - returns)
-            // For direct purchases, initial used quantity IS the full quantity (it went to job directly)
-            let usedQty = pi.purchases.job_id ? (pi.quantity || 0) : 0;
-            let usedPieces = pi.purchases.job_id ? (pi.pieces || 0) : 0;
-            exits?.forEach((dni: any) => {
-                if (dni.is_fictitious) return; // Skip fictitious
-                if (dni.delivery_notes.type === 'exit' || dni.delivery_notes.type === 'sale') {
-                    usedQty = round2(usedQty + (dni.quantity || 0));
-                    usedPieces = round2(usedPieces + (dni.pieces || 0));
-                } else if (dni.delivery_notes.type === 'entry') {
-                    usedQty = round2(usedQty - (dni.quantity || 0));
-                    usedPieces = round2(usedPieces - (dni.pieces || 0));
-                }
-            });
-
-            const remainingQty = round2(Math.max(0, Math.min(pi.quantity - usedQty, pi.quantity)));
-            const remainingPieces = round2(Math.max(0, Math.min((pi.pieces || 0) - usedPieces, pi.pieces || 0)));
-
-            return {
-                id: pi.id,
-                purchaseId: pi.purchase_id,
-                purchaseRef: pi.purchases.delivery_note_number,
-                date: pi.purchases.delivery_note_date,
-                originalQty: pi.quantity,
-                remainingQty: remainingQty,
-                originalPieces: pi.pieces,
-                remainingPieces: remainingPieces,
-                price: pi.price
-            };
-        }));
-
-        // Sort: first by availability (remaining > 0 first), then by date descending
-        const sortedLots = lotsWithRemaining.sort((a, b) => {
+        const sortedLots = (purchaseItems || []).map((pi: any) => ({
+            id: pi.purchase_item_id,
+            purchaseId: pi.purchase_id,
+            purchaseRef: pi.purchase_ref,
+            date: pi.purchase_date,
+            originalQty: Number(pi.original_quantity),
+            remainingQty: Number(pi.remaining_quantity),
+            originalPieces: pi.original_pieces != null ? Number(pi.original_pieces) : undefined,
+            remainingPieces: pi.remaining_pieces != null ? Number(pi.remaining_pieces) : undefined,
+            price: pi.unit_price != null ? Number(pi.unit_price) : undefined,
+            returnedQuantity: pi.returned_quantity != null ? Number(pi.returned_quantity) : null,
+            returnedPieces: pi.returned_pieces != null ? Number(pi.returned_pieces) : null,
+            returnedAt: pi.returned_at ?? null,
+        })).sort((a, b) => {
             // First: available lots before exhausted
             const aAvailable = a.remainingQty > 0.001 ? 1 : 0;
             const bAvailable = b.remainingQty > 0.001 ? 1 : 0;

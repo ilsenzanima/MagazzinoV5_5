@@ -245,7 +245,7 @@ export interface Movement {
     itemId: string;
     userId?: string;
     userName?: string;
-    type: 'load' | 'unload' | 'purchase' | 'entry' | 'exit' | 'sale' | 'waste';
+    type: 'load' | 'unload' | 'purchase' | 'entry' | 'exit' | 'sale' | 'waste' | 'return_to_supplier';
     quantity: number;
     reference: string;
     notes?: string;
