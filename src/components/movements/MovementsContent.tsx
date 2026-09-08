@@ -246,6 +246,36 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                 const typeConfig = getTypeConfig(movement);
                 const Icon = typeConfig.icon;
                 const jobLabel = movement.jobName || movement.jobDescription || movement.jobCode;
+
+                const handleQuickPrint = async (e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    // Load full delivery note data
+                    const fullNote = await deliveryNotesApi.getById(movement.id);
+
+                    // Group items by inventory ID
+                    const grouped = new Map<string, DeliveryNoteItem>();
+                    fullNote.items?.forEach(item => {
+                      const key = item.inventoryId;
+                      if (grouped.has(key)) {
+                        const existing = grouped.get(key)!;
+                        grouped.set(key, { ...existing, quantity: existing.quantity + item.quantity });
+                      } else {
+                        grouped.set(key, { ...item });
+                      }
+                    });
+                    const groupedItems = Array.from(grouped.values());
+
+                    // Generate and download PDF
+                    const { generateDeliveryNotePDF } = await import('@/lib/pdf/delivery-note-pdf');
+                    await generateDeliveryNotePDF(fullNote, groupedItems);
+                  } catch (error) {
+                    console.error("Failed to print", error);
+                    notify.error("Errore durante la stampa");
+                  }
+                };
+
                 return (
                   <Link href={`/movements/${movement.id}`} key={movement.id}>
                     <div className="flex items-start gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
@@ -267,9 +297,13 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                       <span className="text-slate-400 dark:text-slate-500 text-xs flex-1 break-words hidden lg:block">
                         {movement.itemNames?.join(', ') || '—'}
                       </span>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 ml-auto pt-0.5">
-                        {movement.itemCount ?? movement.items?.length ?? 0} art.
-                      </span>
+                      <button
+                        onClick={handleQuickPrint}
+                        className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 transition-colors shrink-0 ml-auto"
+                        title="Stampa rapida"
+                      >
+                        <Printer className="h-4 w-4" />
+                      </button>
                     </div>
                   </Link>
                 );

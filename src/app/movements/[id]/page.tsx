@@ -22,7 +22,7 @@ export default async function MovementDetailPage({ params }: { params: Promise<{
     .from('delivery_notes')
     .select(`
       *,
-      jobs(code, description, site_address),
+      jobs(code, description, site_address, job_name:name, client_id, clients(id, name)),
       delivery_note_items(
         *,
         inventory(name, code, unit, brand, category, description, price, model),
