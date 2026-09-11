@@ -100,6 +100,7 @@ export default function InventoryDetailPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [newSupplierCode, setNewSupplierCode] = useState({ supplierId: "", code: "", note: "" });
   const [editForm, setEditForm] = useState<Partial<InventoryItem>>({});
+  const [coefficientInput, setCoefficientInput] = useState<string>("1");
 
   // Movement Form State
   const [isMovementOpen, setIsMovementOpen] = useState(false);
@@ -276,6 +277,7 @@ export default function InventoryDetailPage() {
         coefficient: item.coefficient,
         description: item.description
       });
+      setCoefficientInput(item.coefficient != null ? String(item.coefficient) : "1");
       setIsEditing(true);
     }
   };
@@ -1020,8 +1022,13 @@ export default function InventoryDetailPage() {
                           id="coefficient"
                           type="number"
                           step="0.01"
-                          value={editForm.coefficient || 1}
-                          onChange={(e) => setEditForm({ ...editForm, coefficient: parseFloat(e.target.value) })}
+                          value={coefficientInput}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setCoefficientInput(raw);
+                            const parsed = parseFloat(raw);
+                            setEditForm({ ...editForm, coefficient: isNaN(parsed) ? undefined : parsed });
+                          }}
                           disabled={userRole !== 'admin'}
                           className={userRole !== 'admin' ? "bg-slate-100 dark:bg-muted" : ""}
                         />
