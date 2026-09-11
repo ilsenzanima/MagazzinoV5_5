@@ -772,7 +772,7 @@ function NewPurchaseContent() {
                                                     </TableCell>
 
                                                     {/* Quantità */}
-                                                    <TableCell className="py-2 px-1">
+                                                    <TableCell className="py-2 px-1 bg-blue-50 dark:bg-blue-950/30">
                                                         <div className="flex items-center gap-1">
                                                             <Input
                                                                 type="number"
@@ -808,7 +808,7 @@ function NewPurchaseContent() {
                                                     </TableCell>
 
                                                     {/* Totale Riga */}
-                                                    <TableCell className="py-2 px-1">
+                                                    <TableCell className="py-2 px-1 bg-blue-50 dark:bg-blue-950/30">
                                                         <div className="flex items-center gap-1 justify-end">
                                                             <span className="text-xs text-slate-400 shrink-0">€</span>
                                                             <Input
