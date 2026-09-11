@@ -1301,7 +1301,11 @@ export default function PurchaseDetailPage() {
                                                                     handleEditQuantityChange(e.target.value, coeff);
                                                                 }}
                                                             />
+                                                            <p className="text-[10px] text-slate-400 mt-0.5 leading-tight text-right">
+                                                                {item.itemUnit || ''}
+                                                            </p>
                                                         </TableCell>
+                                                        {showTransportCols && <TableCell />}
                                                         <TableCell className="text-right">
                                                             <Input
                                                                 type="number"
@@ -1665,7 +1669,7 @@ export default function PurchaseDetailPage() {
                                                     />
                                                 </div>
                                                 <div className="col-span-1">
-                                                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Quantità</Label>
+                                                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Quantità {item.itemUnit ? `(${item.itemUnit})` : ''}</Label>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
