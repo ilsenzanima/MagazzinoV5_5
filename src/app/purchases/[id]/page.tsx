@@ -1289,7 +1289,7 @@ export default function PurchaseDetailPage() {
                                                                 return inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
                                                             })()}
                                                         </TableCell>
-                                                        <TableCell className="text-right">
+                                                        <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30">
                                                             <Input
                                                                 type="number"
                                                                 step="0.01"
@@ -1332,7 +1332,7 @@ export default function PurchaseDetailPage() {
                                                         <TableCell className="text-right text-slate-500">
                                                             {item.coefficient || 1}
                                                         </TableCell>
-                                                        <TableCell className="text-right">
+                                                        <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30">
                                                             {item.quantity} <span className="text-slate-400 text-xs">{item.itemUnit || ''}</span>
                                                         </TableCell>
                                                         {showTransportCols && (userRole === 'admin' || userRole === 'operativo') && (
@@ -1362,7 +1362,7 @@ export default function PurchaseDetailPage() {
                                                     </>
                                                 )}
 
-                                                <TableCell className="text-right font-medium">
+                                                <TableCell className="text-right font-medium bg-blue-50 dark:bg-blue-950/30">
                                                     {(userRole === 'admin' || userRole === 'operativo') ? (
                                                         editingItemId === item.id ? (
                                                             <Input
@@ -1668,7 +1668,7 @@ export default function PurchaseDetailPage() {
                                                         }}
                                                     />
                                                 </div>
-                                                <div className="col-span-1">
+                                                <div className="col-span-1 bg-blue-50 dark:bg-blue-950/30 rounded p-1">
                                                     <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Quantità {item.itemUnit ? `(${item.itemUnit})` : ''}</Label>
                                                     <Input
                                                         type="number"
@@ -1697,7 +1697,7 @@ export default function PurchaseDetailPage() {
                                                         }}
                                                     />
                                                 </div>
-                                                <div className="col-span-1">
+                                                <div className="col-span-1 bg-blue-50 dark:bg-blue-950/30 rounded p-1">
                                                     <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Totale Riga</Label>
                                                     <Input
                                                         type="number"
@@ -1711,7 +1711,7 @@ export default function PurchaseDetailPage() {
                                             </div>
                                         ) : (
                                             <div className="flex items-center justify-between text-sm pt-1 border-t border-slate-200/50 dark:border-slate-700/50 mt-1">
-                                                <div>
+                                                <div className="bg-blue-50 dark:bg-blue-950/30 rounded px-1.5 py-0.5 inline-block">
                                                     <span className="font-semibold text-slate-700 dark:text-slate-300">
                                                         {item.quantity} <span className="text-slate-400 text-xs font-normal">{item.itemUnit || ''}</span>
                                                     </span>
@@ -1727,7 +1727,7 @@ export default function PurchaseDetailPage() {
                                                         ) : (
                                                             <div className="flex flex-col items-end gap-0.5">
                                                                 <span className="font-mono text-xs text-slate-500">P.U.: € {item.price.toFixed(5)}</span>
-                                                                <span className="font-bold text-slate-900 dark:text-white text-xs">Tot: € {(item.quantity * item.price).toFixed(2)}</span>
+                                                                <span className="font-bold text-slate-900 dark:text-white text-xs bg-blue-50 dark:bg-blue-950/30 rounded px-1.5 py-0.5">Tot: € {(item.quantity * item.price).toFixed(2)}</span>
                                                                 {showTransportCols && item.quantity > 0 && (() => {
                                                                     const tpu = transportCost / items.length / item.quantity;
                                                                     return (
