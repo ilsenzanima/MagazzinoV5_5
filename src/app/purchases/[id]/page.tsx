@@ -1328,7 +1328,9 @@ export default function PurchaseDetailPage() {
                                                         <TableCell className="text-right text-slate-500">
                                                             {item.coefficient || 1}
                                                         </TableCell>
-                                                        <TableCell className="text-right">{item.quantity}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            {item.quantity} <span className="text-slate-400 text-xs">{item.itemUnit || ''}</span>
+                                                        </TableCell>
                                                         {showTransportCols && (userRole === 'admin' || userRole === 'operativo') && (
                                                             <TableCell className="text-right text-amber-600 text-xs">
                                                                 {item.quantity > 0
@@ -1707,7 +1709,7 @@ export default function PurchaseDetailPage() {
                                             <div className="flex items-center justify-between text-sm pt-1 border-t border-slate-200/50 dark:border-slate-700/50 mt-1">
                                                 <div>
                                                     <span className="font-semibold text-slate-700 dark:text-slate-300">
-                                                        {item.quantity}
+                                                        {item.quantity} <span className="text-slate-400 text-xs font-normal">{item.itemUnit || ''}</span>
                                                     </span>
                                                     {item.pieces && <span className="text-slate-500 text-xs ml-1">({item.pieces} pz)</span>}
                                                 </div>
