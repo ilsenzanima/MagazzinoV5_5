@@ -467,7 +467,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       <span className="text-slate-500 dark:text-slate-400 text-xs w-24 shrink-0 truncate hidden sm:block">{item.brand}</span>
                       <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0 truncate hidden md:block">{item.type}</span>
                       <div className="flex items-center gap-1.5 ml-auto shrink-0">
-                        {pending?.uscita && pending.uscita > 0 && (
+                        {pending && pending.uscita > 0 && (
                           <span className="text-[10px] text-amber-600 border border-amber-300 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-full">
                             ↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 })}
                           </span>
