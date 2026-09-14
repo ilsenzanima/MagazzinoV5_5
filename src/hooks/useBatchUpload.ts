@@ -18,13 +18,14 @@ export function useBatchUpload() {
     }
 
     const run = async <T,>(
-        items: T[], 
+        items: T[],
         uploadOne: (item: T, index: number) => Promise<void>,
         concurrency = 2
     ) => {
         setRunning(true)
-        setStatuses(items.map(() => ({ status: "pending" })))
-        
+        const finalStatuses: UploadItemState[] = items.map(() => ({ status: "pending" }))
+        setStatuses(finalStatuses.map(s => ({ ...s })))
+
         let okCount = 0
         let nextIndex = 0
 
@@ -34,22 +35,25 @@ export function useBatchUpload() {
                 setStatus(currentIndex, { status: "uploading" })
                 try {
                     await uploadOne(items[currentIndex], currentIndex)
-                    setStatus(currentIndex, { status: "done" })
+                    finalStatuses[currentIndex] = { status: "done" }
+                    setStatus(currentIndex, finalStatuses[currentIndex])
                     okCount++
                 } catch (e: any) {
-                    setStatus(currentIndex, { status: "error", error: e?.message || "Errore" })
+                    console.error('Errore upload file', e)
+                    finalStatuses[currentIndex] = { status: "error", error: e?.message || "Errore" }
+                    setStatus(currentIndex, finalStatuses[currentIndex])
                 }
             }
         }
 
         const workers = Array.from(
-            { length: Math.min(concurrency, items.length) }, 
+            { length: Math.min(concurrency, items.length) },
             worker
         )
         await Promise.all(workers)
 
         setRunning(false)
-        return { okCount, failedCount: items.length - okCount }
+        return { okCount, failedCount: items.length - okCount, statuses: finalStatuses }
     }
 
     const reset = () => setStatuses([])

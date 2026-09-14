@@ -30,11 +30,15 @@ export async function getVerifiedPayload() {
 export async function deleteDriveFileIfApplicable(url: string | null | undefined): Promise<void> {
     if (!url || url.includes('/')) return;
     try {
-        await fetch('/api/drive/delete', {
+        const res = await fetch('/api/drive/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fileId: url }),
         });
+        if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            console.error('Errore eliminazione file Drive', res.status, body?.error);
+        }
     } catch (err) {
         console.error('Errore eliminazione file Drive', err);
     }

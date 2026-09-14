@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
             },
         })
     } catch (err: any) {
+        console.error('drive/download error', fileId, err)
         return NextResponse.json({ error: err.message ?? 'Errore download da Google Drive' }, { status: 500 })
     }
 }

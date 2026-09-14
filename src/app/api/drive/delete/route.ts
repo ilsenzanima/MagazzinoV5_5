@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
         await deleteFile(fileId)
         return NextResponse.json({ ok: true })
     } catch (err: any) {
+        console.error('drive/delete error', err)
         return NextResponse.json({ error: err.message ?? 'Errore eliminazione da Google Drive' }, { status: 500 })
     }
 }
