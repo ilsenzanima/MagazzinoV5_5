@@ -3,7 +3,7 @@ import { it } from 'date-fns/locale';
 import { effectiveUnitPrice, type CostAnalysisRow, type CostAnalysisParams } from '@/lib/services/cost-analysis';
 import type { Client } from '@/lib/types';
 
-const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true});
 
 export interface CostAnalysisPdfInput {
     client: Client | null;

@@ -201,7 +201,7 @@ export default function JobDetailsPage() {
                     : (movSalMap.get(m.id) || '-');
                 const unitPrice = m.itemPrice ?? 0;
                 const amount = m.type !== 'entry' && unitPrice > 0
-                    ? `€ ${(unitPrice * Math.abs(m.quantity)).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
+                    ? `€ ${(unitPrice * Math.abs(m.quantity)).toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`
                     : '-';
                 const desc = m.itemModel ? `${m.itemName || ''} (${m.itemModel})` : (m.itemName || '-');
                 const purDate = m.purchaseDate
@@ -221,13 +221,13 @@ export default function JobDetailsPage() {
             });
 
         checkPage(50);
-        sectionTitle(`MATERIALI  (totale acquisti: € ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })})`);
+        sectionTitle(`MATERIALI  (totale acquisti: € ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})})`);
 
         autoTable(doc, {
             startY: curY,
             head: [['Data mov.', 'Tipo', 'Acquisto', 'Data acq.', 'Fornitore', 'Articolo', 'Q.tà', 'Importo', 'SAL']],
             body: matRows,
-            foot: [['', '', '', '', '', 'TOTALE MATERIALI', '', `€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, '']],
+            foot: [['', '', '', '', '', 'TOTALE MATERIALI', '', `€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`, '']],
             theme: 'grid',
             styles: { fontSize: 6.5, cellPadding: 1.2 },
             headStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
@@ -338,16 +338,16 @@ export default function JobDetailsPage() {
             r.workerName,
             `${r.normalHours}h`,
             `${r.transferHours}h`,
-            `€ ${r.normalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
-            `€ ${r.trasfertaCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
-            `€ ${r.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
+            `€ ${r.normalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`,
+            `€ ${r.trasfertaCost.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`,
+            `€ ${r.total.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`,
         ]);
 
         autoTable(doc, {
             startY: curY,
             head: [['Operaio', 'Ore norm.', 'Ore trasf.', 'Costo normale', 'Costo trasferta', 'Totale operaio']],
             body: wCostRows,
-            foot: [['TOTALE ORE OPERAI', `${totalHours}h`, '', '', '', `€ ${workerCosts.totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`]],
+            foot: [['TOTALE ORE OPERAI', `${totalHours}h`, '', '', '', `€ ${workerCosts.totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`]],
             theme: 'grid',
             styles: { fontSize: 7, cellPadding: 1.5 },
             headStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
@@ -379,14 +379,14 @@ export default function JobDetailsPage() {
             const altriRows = salCosts.map(c => [
                 c.description,
                 c.salName || '-',
-                `€ ${c.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
+                `€ ${c.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`,
             ]);
 
             autoTable(doc, {
                 startY: curY,
                 head: [['Descrizione', 'SAL', 'Importo']],
                 body: altriRows,
-                foot: [['TOTALE ALTRI COSTI', '', `€ ${altriTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`]],
+                foot: [['TOTALE ALTRI COSTI', '', `€ ${altriTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`]],
                 theme: 'grid',
                 styles: { fontSize: 7, cellPadding: 1.5 },
                 headStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold' },
@@ -410,11 +410,11 @@ export default function JobDetailsPage() {
         autoTable(doc, {
             startY: curY,
             body: [
-                ['Materiali (acquisti diretti)',    `€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`],
-                ['Ore Operai (costo manodopera)',   `€ ${workerCosts.totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`],
-                ['Altri Costi',                     `€ ${altriTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`],
+                ['Materiali (acquisti diretti)',    `€ ${totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`],
+                ['Ore Operai (costo manodopera)',   `€ ${workerCosts.totalCost.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`],
+                ['Altri Costi',                     `€ ${altriTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`],
             ],
-            foot: [['TOTALE GENERALE', `€ ${grandTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`]],
+            foot: [['TOTALE GENERALE', `€ ${grandTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`]],
             theme: 'grid',
             styles: { fontSize: 8, cellPadding: 2 },
             footStyles: { fillColor: HDR_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 9 },

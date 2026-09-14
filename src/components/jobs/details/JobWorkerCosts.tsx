@@ -37,7 +37,7 @@ export function JobWorkerCosts({ jobId, materialCost, onTotalCostChange }: JobWo
             .finally(() => setLoading(false))
     }, [jobId, materialCost])
 
-    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

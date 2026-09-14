@@ -331,7 +331,7 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
         }
     }
 
-    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})
 
     if (loading) return (
         <div className="flex justify-center py-12">
@@ -740,7 +740,7 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
 }
 
 function WorkerHoursTable({ data, readOnly = false }: { data: WorkerHoursSalData; readOnly?: boolean }) {
-    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})
 
     const allDates = [...new Set(
         data.workers.flatMap(w => w.days.map(d => d.date))

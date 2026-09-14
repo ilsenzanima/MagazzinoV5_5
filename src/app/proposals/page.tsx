@@ -354,7 +354,7 @@ function ProposalsPageContent() {
                   </span>
                   {p.estimatedValue !== null && (
                     <span className="text-slate-600 dark:text-slate-300 text-xs w-28 shrink-0 text-right hidden md:block">
-                      € {p.estimatedValue.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+                      € {p.estimatedValue.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
                     </span>
                   )}
                   {(p.siteCity || p.siteStreet) && (
@@ -389,7 +389,7 @@ function ProposalsPageContent() {
                     <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">{p.clientName}</p>
                     {p.estimatedValue !== null && (
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        € {p.estimatedValue.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+                        € {p.estimatedValue.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
                       </p>
                     )}
                     {p.description && (

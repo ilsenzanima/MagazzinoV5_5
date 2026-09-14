@@ -199,7 +199,7 @@ export default function ArticlesReport() {
                 <Card className="px-3 py-1.5 bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
                     <p className="text-xs text-emerald-600 dark:text-emerald-400">Valore Totale</p>
                     <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
-                        € {data.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                        € {data.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
                     </p>
                 </Card>
 

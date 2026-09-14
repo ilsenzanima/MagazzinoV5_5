@@ -267,7 +267,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                 <div>
                                     <p className="text-sm text-slate-600 dark:text-slate-400">Valore Totale Cantiere</p>
                                     <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                        € {totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        € {totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true})}
                                     </p>
                                 </div>
                             </div>
@@ -345,7 +345,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                 </div>
                                                 <div className="text-right shrink-0 ml-2">
                                                     <div className="font-bold text-slate-900 dark:text-white">
-                                                        {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                                        {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
                                                     </div>
                                                     {(userRole === 'admin' || userRole === 'operativo') && !item.isFictitious && (
                                                         <div className="text-xs text-slate-500 flex items-center justify-end gap-1">
@@ -354,7 +354,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                     <AlertTriangle className="h-3 w-3 text-amber-500" />
                                                                 </span>
                                                             )}
-                                                            € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                            € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
                                                         </div>
                                                     )}
                                                 </div>
@@ -370,14 +370,14 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                         <div key={idx} className="bg-white dark:bg-slate-800 rounded-md p-2 border border-slate-200 dark:border-slate-700 text-sm space-y-1">
                                                             <div className="flex justify-between items-start">
                                                                 <div className="text-slate-600 dark:text-slate-300">
-                                                                    {batch.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                                                    {batch.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
                                                                     {Math.abs(batch.pieces) > 0.01 && (
-                                                                        <span className="text-slate-400 ml-1">({batch.pieces.toLocaleString('it-IT', { maximumFractionDigits: 0 })} pz)</span>
+                                                                        <span className="text-slate-400 ml-1">({batch.pieces.toLocaleString('it-IT', { maximumFractionDigits: 0 , useGrouping: true})} pz)</span>
                                                                     )}
                                                                 </div>
                                                                 {(userRole === 'admin' || userRole === 'operativo') && (
                                                                     <div className="text-right text-slate-600 dark:text-slate-300">
-                                                                        € {(batch.qty * batch.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                        € {(batch.qty * batch.price).toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
                                                                         <div className="text-xs text-slate-400">@ €{batch.price.toFixed(4)}</div>
                                                                     </div>
                                                                 )}
@@ -465,7 +465,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                         </TableCell>
                                                         <TableCell className="text-right text-slate-500">{item.batches.length}</TableCell>
                                                         <TableCell className="text-right font-bold text-slate-700 dark:text-slate-300">
-                                                            {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                                            {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             {userRole === 'user' ? (
@@ -473,7 +473,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                             ) : item.isFictitious ? (
                                                                 item.totalValue > 0 ? (
                                                                     <span className="text-slate-600 dark:text-slate-400 flex items-center justify-end gap-1">
-                                                                        € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                        € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
                                                                         <span className="text-xs text-amber-500 ml-1" title="Valore dal lotto di origine">auto</span>
                                                                     </span>
                                                                 ) : (
@@ -499,7 +499,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                             <AlertTriangle className="h-4 w-4 text-amber-500" />
                                                                         </span>
                                                                     )}
-                                                                    € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                    € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
                                                                 </span>
                                                             )}
                                                         </TableCell>
@@ -537,15 +537,15 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell className="text-right text-slate-500 text-sm">
-                                                                {Math.abs(batch.pieces) > 0.01 ? `${batch.pieces.toLocaleString('it-IT', { maximumFractionDigits: 0 })} pz` : '-'}
+                                                                {Math.abs(batch.pieces) > 0.01 ? `${batch.pieces.toLocaleString('it-IT', { maximumFractionDigits: 0 , useGrouping: true})} pz` : '-'}
                                                             </TableCell>
                                                             <TableCell className="text-right text-slate-600 dark:text-slate-400 text-sm">
-                                                                {batch.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                                                {batch.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
                                                             </TableCell>
                                                             <TableCell className="text-right text-slate-500 text-sm">
                                                                 {(userRole === 'admin' || userRole === 'operativo') && (
                                                                     <>
-                                                                        € {(batch.qty * batch.price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                                        € {(batch.qty * batch.price).toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
                                                                         <span className="text-xs text-slate-400 ml-1">(@€{batch.price.toFixed(4)})</span>
                                                                     </>
                                                                 )}

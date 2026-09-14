@@ -34,7 +34,7 @@ async function calcRoute(from: [number, number], to: [number, number]): Promise<
     return data
 }
 
-function fmt(n: number) { return n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+function fmt(n: number) { return n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true}) }
 
 export function ProposalDistanza({ siteAddress }: Props) {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([])

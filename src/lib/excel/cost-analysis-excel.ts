@@ -62,7 +62,7 @@ const grandTotalCell = (v: string | number, currency = false) => cell(v, {
 });
 const blank = () => cell('');
 
-const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true});
 
 /**
  * Genera un Excel per l'analisi costi di un'offerta, con lo stesso layout

@@ -469,11 +469,11 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       <div className="flex items-center gap-1.5 ml-auto shrink-0">
                         {pending && pending.uscita > 0 && (
                           <span className="text-[10px] text-amber-600 border border-amber-300 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-full">
-                            ↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 })}
+                            ↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})}
                           </span>
                         )}
                         <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full ${qtyColor}`}>
-                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
                         </span>
                       </div>
                     </div>
@@ -530,14 +530,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                             {item.coefficient !== 1 ? (
                               <>
                                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mr-1">
-                                  {(item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })} pz =
+                                  {(item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} pz =
                                 </span>
                                 <Badge variant="outline" className={
                                   item.quantity === 0 ? "text-red-600 border-red-200 bg-red-50" :
                                     item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
                                       "text-slate-600"
                                 }>
-                                  {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                  {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
                                 </Badge>
                               </>
                             ) : (
@@ -546,7 +546,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                                   item.quantity <= item.minStock ? "text-amber-600 border-amber-200 bg-amber-50" :
                                     "text-slate-600"
                               }>
-                                {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} {item.unit}
+                                {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
                               </Badge>
                             )}
                             {(() => {
@@ -556,12 +556,12 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                                 <>
                                   {pending.uscita > 0 && (
                                     <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
-                                      ↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 })} uscita
+                                      ↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} uscita
                                     </Badge>
                                   )}
                                   {pending.reso > 0 && (
                                     <Badge variant="outline" className="text-[10px] text-green-600 border-green-300 bg-green-50 dark:bg-green-900/20">
-                                      ↓ {pending.reso.toLocaleString('it-IT', { maximumFractionDigits: 2 })} entrata
+                                      ↓ {pending.reso.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} entrata
                                     </Badge>
                                   )}
                                 </>

@@ -22,7 +22,7 @@ interface JobAnalisiCostiProps {
     movements: Movement[]
 }
 
-const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true})
 
 // ── Cella numerica editabile ─────────────────────────────────────────────────
 function EditCell({ value, onSave, placeholder = '—' }: {

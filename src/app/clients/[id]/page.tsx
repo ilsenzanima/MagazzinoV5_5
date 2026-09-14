@@ -328,7 +328,7 @@ export default function ClientDetailPage() {
                       </span>
                       {p.estimatedValue !== null && (
                         <span className="text-blue-700 dark:text-blue-400 text-xs w-28 shrink-0 text-right hidden md:block">
-                          € {p.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                          € {p.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
                         </span>
                       )}
                       {(p.siteCity || p.siteStreet) && (
@@ -357,7 +357,7 @@ export default function ClientDetailPage() {
                           <Badge className={`text-xs shrink-0 ${PROP_STATUS_COLORS[p.status]}`} variant="secondary">{PROP_STATUS_LABELS[p.status]}</Badge>
                         </div>
                         {p.estimatedValue !== null && (
-                          <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">€ {p.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+                          <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">€ {p.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}</p>
                         )}
                         {p.description && <p className="text-xs text-slate-500 line-clamp-2">{p.description}</p>}
                         {(p.siteCity || p.siteStreet) && (

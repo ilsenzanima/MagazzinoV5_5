@@ -489,7 +489,7 @@ export default function ProposalDetailPage() {
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                                                     {proposal.estimatedValue !== null
-                                                        ? `€ ${proposal.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
+                                                        ? `€ ${proposal.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`
                                                         : <span className="text-slate-400 font-normal italic text-xs">Non impostato</span>}
                                                 </span>
                                                 {canEdit && <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => openInline("value")}><Pencil className="h-3 w-3" /></Button>}

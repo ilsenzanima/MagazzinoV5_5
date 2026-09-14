@@ -111,7 +111,7 @@ export function JobOrdini({ jobId, jobCode }: JobOrdiniProps) {
                                             </div>
                                             {canEdit && order.totalAmount !== undefined && (
                                                 <span className="font-semibold text-slate-900 dark:text-white">
-                                                    € {order.totalAmount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                                    € {order.totalAmount.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
                                                 </span>
                                             )}
                                         </div>

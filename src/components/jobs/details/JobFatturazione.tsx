@@ -219,7 +219,7 @@ function EntryCard({
                             <p className="text-xs text-slate-400 mt-0.5">{dateLabel}</p>
                         )}
                         <p className={`text-base font-bold mt-1 ${amountClass}`}>
-                            € {entry.amount.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+                            € {entry.amount.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
                         </p>
                         {entry.notes && (
                             <p className="text-xs text-slate-400 mt-0.5 truncate">{entry.notes}</p>
@@ -421,7 +421,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                                 <div className="flex items-center gap-2">
                                     <span className="text-xl font-bold text-slate-900 dark:text-white">
                                         {estimatedCost != null
-                                            ? `€ ${estimatedCost.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
+                                            ? `€ ${estimatedCost.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}`
                                             : <span className="text-slate-400 text-base font-normal italic">Non impostato</span>
                                         }
                                     </span>
@@ -440,7 +440,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                     <CardContent className="p-4">
                         <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">SAL Approvati</p>
                         <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
-                            € {totalSal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+                            € {totalSal.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
                         </p>
                         <p className="text-xs text-slate-400 mt-0.5">{sals.length} SAL</p>
                     </CardContent>
@@ -453,7 +453,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                             <div>
                                 <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Fatturato</p>
                                 <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
-                                    € {totalFatture.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+                                    € {totalFatture.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
                                 </p>
                                 <p className="text-xs text-slate-400 mt-0.5">{fatture.length} fatture</p>
                             </div>
@@ -461,7 +461,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                                 <div className="text-right">
                                     <p className="text-xs text-slate-500">Da fatturare</p>
                                     <p className={`text-base font-bold ${totalSal - totalFatture > 0.005 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                                        € {(totalSal - totalFatture).toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+                                        € {(totalSal - totalFatture).toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
                                     </p>
                                 </div>
                             )}

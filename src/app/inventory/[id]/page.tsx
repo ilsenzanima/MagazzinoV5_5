@@ -673,7 +673,7 @@ export default function InventoryDetailPage() {
                       {/* Calculated Quantity (Main) */}
                       <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-md text-center">
                         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
+                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
                         </div>
                         <div className="text-xs text-blue-400 dark:text-blue-500 font-medium">Quantità Totale</div>
                       </div>
@@ -688,7 +688,7 @@ export default function InventoryDetailPage() {
                             </span>
                             <span className={`font-bold ${pendingQty.uscita > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-slate-400 dark:text-slate-500'}`}>
                               {pendingQty.uscita > 0
-                                ? `${pendingQty.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit}`
+                                ? `${pendingQty.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} ${item.unit}`
                                 : '—'}
                             </span>
                           </div>
@@ -698,7 +698,7 @@ export default function InventoryDetailPage() {
                             </span>
                             <span className={`font-bold ${pendingQty.reso > 0 ? 'text-green-700 dark:text-green-300' : 'text-slate-400 dark:text-slate-500'}`}>
                               {pendingQty.reso > 0
-                                ? `${pendingQty.reso.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit}`
+                                ? `${pendingQty.reso.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} ${item.unit}`
                                 : '—'}
                             </span>
                           </div>
@@ -710,7 +710,7 @@ export default function InventoryDetailPage() {
                         <>
                           <div className="p-3 bg-slate-50 dark:bg-muted border border-slate-200 dark:border-slate-700 rounded-md text-center">
                             <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-                              {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                              {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' , useGrouping: true})}
                             </div>
                             <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Valore Stock Attuale</div>
                           </div>
@@ -728,7 +728,7 @@ export default function InventoryDetailPage() {
                       {item.coefficient !== 1 && (
                         <div className="text-center">
                           <span className="text-xs text-slate-400 dark:text-slate-500">
-                            {calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 })} Pezzi fisici
+                            {calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true}) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} Pezzi fisici
                           </span>
                         </div>
                       )}
