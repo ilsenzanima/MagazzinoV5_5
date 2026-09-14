@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Package, AlertTriangle, Euro } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/utils/format";
 
 interface StatsCardsProps {
   totalValue: number;
@@ -12,13 +13,6 @@ interface StatsCardsProps {
 
 export const StatsCards = memo(function StatsCards({ totalValue, lowStockCount, totalItems }: StatsCardsProps) {
   const { userRole } = useAuth();
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('it-IT', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(value);
-  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">

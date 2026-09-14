@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
         )
         return NextResponse.json({ uploadUrl, folderId })
     } catch (err: any) {
+        console.error('drive/upload-session error', err)
         return NextResponse.json({ error: err.message ?? "Errore nell'avvio dell'upload su Google Drive" }, { status: 500 })
     }
 }

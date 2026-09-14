@@ -32,6 +32,7 @@ import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocuments";
 import { PurchaseDDTConformita } from "@/components/purchases/details/PurchaseDDTConformita";
 import { useAuth } from "@/components/auth-provider";
+import { formatCurrency } from "@/lib/utils/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { FieldTip } from "@/components/ui/field-tip";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -1374,7 +1375,7 @@ export default function PurchaseDetailPage() {
                                                                 onBlur={handleEditTotalBlur}
                                                             />
                                                         ) : (
-                                                            `€ ${(item.quantity * item.price).toFixed(2)}`
+                                                            formatCurrency(item.quantity * item.price)
                                                         )
                                                     ) : (
                                                         <span className="text-slate-400 italic text-xs">Riservato</span>
@@ -1389,7 +1390,7 @@ export default function PurchaseDetailPage() {
                                                         </TableCell>
                                                         <TableCell className="text-right text-amber-700 font-bold">
                                                             {(userRole === 'admin' || userRole === 'operativo') && item.quantity > 0
-                                                                ? `€ ${((item.price + transportCost / items.length / item.quantity) * item.quantity).toFixed(2)}`
+                                                                ? formatCurrency((item.price + transportCost / items.length / item.quantity) * item.quantity)
                                                                 : <span className="text-slate-400 italic text-xs">Riservato</span>}
                                                         </TableCell>
                                                     </>
@@ -1505,7 +1506,7 @@ export default function PurchaseDetailPage() {
                                                     <TableCell className="text-right font-medium text-red-700 dark:text-red-400">
                                                         {(userRole === 'admin' || userRole === 'operativo') ? (
                                                             item.returnedPrice != null && item.returnedQuantity != null
-                                                                ? `− € ${(item.returnedQuantity * item.returnedPrice).toFixed(2)}`
+                                                                ? `− ${formatCurrency(item.returnedQuantity * item.returnedPrice)}`
                                                                 : '-'
                                                         ) : (
                                                             <span className="text-slate-400 italic text-xs">Riservato</span>
@@ -1550,7 +1551,7 @@ export default function PurchaseDetailPage() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {(userRole === 'admin' || userRole === 'operativo') ? (
-                                                    `€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`
+                                                    formatCurrency(items.reduce((acc, item) => acc + (item.quantity * item.price), 0))
                                                 ) : (
                                                     <span className="text-slate-400 italic text-sm">Riservato</span>
                                                 )}
@@ -1562,10 +1563,10 @@ export default function PurchaseDetailPage() {
                                                     </TableCell>
                                                     <TableCell className="text-right text-amber-700">
                                                         {(userRole === 'admin' || userRole === 'operativo') ? (
-                                                            `€ ${items.reduce((acc, item) => {
+                                                            formatCurrency(items.reduce((acc, item) => {
                                                                 const tpu = item.quantity > 0 ? transportCost / items.length / item.quantity : 0;
                                                                 return acc + (item.price + tpu) * item.quantity;
-                                                            }, 0).toFixed(2)}`
+                                                            }, 0))
                                                         ) : ''}
                                                     </TableCell>
                                                 </>
@@ -1727,13 +1728,13 @@ export default function PurchaseDetailPage() {
                                                         ) : (
                                                             <div className="flex flex-col items-end gap-0.5">
                                                                 <span className="font-mono text-xs text-slate-500">P.U.: € {item.price.toFixed(5)}</span>
-                                                                <span className="font-bold text-slate-900 dark:text-white text-xs bg-blue-50 dark:bg-blue-950/30 rounded px-1.5 py-0.5">Tot: € {(item.quantity * item.price).toFixed(2)}</span>
+                                                                <span className="font-bold text-slate-900 dark:text-white text-xs bg-blue-50 dark:bg-blue-950/30 rounded px-1.5 py-0.5">Tot: {formatCurrency(item.quantity * item.price)}</span>
                                                                 {showTransportCols && item.quantity > 0 && (() => {
                                                                     const tpu = transportCost / items.length / item.quantity;
                                                                     return (
                                                                         <>
                                                                             <span className="text-[10px] text-amber-600">Trasp./u.: € {tpu.toFixed(5)}</span>
-                                                                            <span className="text-[10px] text-amber-700 font-semibold">Tot. c/Trasp.: € {((item.price + tpu) * item.quantity).toFixed(2)}</span>
+                                                                            <span className="text-[10px] text-amber-700 font-semibold">Tot. c/Trasp.: {formatCurrency((item.price + tpu) * item.quantity)}</span>
                                                                         </>
                                                                     );
                                                                 })()}
@@ -1782,7 +1783,7 @@ export default function PurchaseDetailPage() {
                                                         <div className="flex flex-col items-end gap-0.5">
                                                             <span className="font-mono text-xs text-red-500">P.U.: € {item.returnedPrice != null ? item.returnedPrice.toFixed(5) : '-'}</span>
                                                             <span className="font-bold text-red-700 dark:text-red-400 text-xs">
-                                                                {item.returnedPrice != null && item.returnedQuantity != null ? `− € ${(item.returnedQuantity * item.returnedPrice).toFixed(2)}` : '-'}
+                                                                {item.returnedPrice != null && item.returnedQuantity != null ? `− ${formatCurrency(item.returnedQuantity * item.returnedPrice)}` : '-'}
                                                             </span>
                                                         </div>
                                                     ) : (
@@ -1798,13 +1799,13 @@ export default function PurchaseDetailPage() {
                                     <span>{isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}</span>
                                     {(userRole === 'admin' || userRole === 'operativo') ? (
                                         <div className="text-right">
-                                            <div>{`€ ${items.reduce((acc, item) => acc + (item.quantity * item.price), 0).toFixed(2)}`}</div>
+                                            <div>{formatCurrency(items.reduce((acc, item) => acc + (item.quantity * item.price), 0))}</div>
                                             {showTransportCols && (
                                                 <div className="text-xs text-amber-700 font-semibold">
-                                                    c/Trasp.: € {items.reduce((acc, item) => {
+                                                    c/Trasp.: {formatCurrency(items.reduce((acc, item) => {
                                                         const tpu = item.quantity > 0 ? transportCost / items.length / item.quantity : 0;
                                                         return acc + (item.price + tpu) * item.quantity;
-                                                    }, 0).toFixed(2)}
+                                                    }, 0))}
                                                 </div>
                                             )}
                                         </div>

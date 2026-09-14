@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip, ExternalLink } from "lucide-react"
+import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip, ExternalLink, Pencil } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
@@ -21,6 +21,7 @@ import { notify } from "@/lib/notify"
 import * as XLSX from "xlsx-js-style"
 import { useBatchUpload } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
+import { formatNumber } from "@/lib/utils/format"
 
 interface JobCostiSALProps {
     jobId: string
@@ -85,7 +86,7 @@ function Section({
     actions?: React.ReactNode
     children: React.ReactNode
 }) {
-    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+    const fmt = (n: number) => formatNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     return (
         <Card>
             <div
@@ -114,7 +115,7 @@ function Section({
 
 // ─── Worker hours cross-table ────────────────────────────────────────────────
 function WorkerHoursTable({ data }: { data: WorkerHoursSalData }) {
-    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+    const fmt = (n: number) => formatNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const allDates = [...new Set(data.workers.flatMap(w => w.days.map(d => d.date)))].sort()
     if (data.workers.length === 0) {
         return <p className="text-sm text-slate-400 text-center py-4">Nessuna presenza nel periodo.</p>
@@ -233,6 +234,12 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
     const [costSaving, setCostSaving] = useState(false)
     const [editingCostSal, setEditingCostSal] = useState<string | null>(null)
     const [editCostSalValue, setEditCostSalValue] = useState('')
+    const [editingCost, setEditingCost] = useState<SalCost | null>(null)
+    const [editCostDesc, setEditCostDesc] = useState('')
+    const [editCostAmount, setEditCostAmount] = useState('')
+    const [editCostSaving, setEditCostSaving] = useState(false)
+    const [dragOverAddCost, setDragOverAddCost] = useState(false)
+    const [dragOverRowId, setDragOverRowId] = useState<string | null>(null)
     const [uploadingCostId, setUploadingCostId] = useState<string | null>(null)
     const costDocBatchUpload = useBatchUpload()
     const addCostBatchUpload = useBatchUpload()
@@ -452,7 +459,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
     )
     const grandTotal = materialTotal + workerTotal + otherCostsTotal
 
-    const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+    const fmt = (n: number) => formatNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
     // ── Excel export ──────────────────────────────────────────────────────────
     const handleExport = (scope: 'all' | string) => {
@@ -903,13 +910,47 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
             notify.error("Errore durante l'aggiornamento del TAG")
         }
     }
+    const handleOpenEditCost = (cost: SalCost) => {
+        setEditingCost(cost)
+        setEditCostDesc(cost.description)
+        setEditCostAmount(String(cost.amount))
+    }
+    const handleSaveEditCost = async () => {
+        if (!editingCost) return
+        const desc = editCostDesc.trim()
+        const amount = parseFloat(editCostAmount.replace(',', '.'))
+        if (!desc || isNaN(amount)) return
+        try {
+            setEditCostSaving(true)
+            await salCostsApi.update(editingCost.id, desc, amount)
+            setEditingCost(null)
+            await loadData()
+            notify.success("Costo aggiornato")
+        } catch (e) {
+            console.error(e)
+            notify.error("Errore durante l'aggiornamento del costo")
+        } finally {
+            setEditCostSaving(false)
+        }
+    }
+    const handleAddCostFilesDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+        e.preventDefault()
+        setDragOverAddCost(false)
+        if (e.dataTransfer.files?.length) setNewCostFiles(Array.from(e.dataTransfer.files))
+    }
+    const handleRowDocDrop = (e: React.DragEvent<HTMLLabelElement>, costId: string, existingUrls: string[]) => {
+        e.preventDefault()
+        setDragOverRowId(null)
+        const f = e.dataTransfer.files?.[0]
+        if (f) handleUploadCostDoc(costId, existingUrls, f)
+    }
     const handleUploadCostDoc = async (costId: string, existingUrls: string[], file: File) => {
         setUploadingCostId(costId)
-        const { failedCount } = await costDocBatchUpload.run([file], async (f) => {
+        const { failedCount, statuses } = await costDocBatchUpload.run([file], async (f) => {
             const url = await salCostsApi.uploadDocument(f, jobLabel)
             await salCostsApi.updateDocumentUrls(costId, [...existingUrls, url])
         })
-        if (failedCount > 0) notify.error("Errore durante il caricamento del documento")
+        if (failedCount > 0) notify.error(statuses[0]?.error || "Errore durante il caricamento del documento")
         await loadData()
         setUploadingCostId(null)
         costDocBatchUpload.reset()
@@ -932,7 +973,36 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
     }
     const openDocument = async (url: string) => {
         if (!url.includes('/')) {
-            window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento.pdf`, '_blank')
+            const downloadUrl = `/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento.pdf`
+            // Se il documento e' un formato Office questa route risponde con un redirect
+            // all'anteprima nativa di Google Docs/Sheets/Slides: in quel caso apriamo
+            // direttamente l'URL invece di scaricare il body (che sarebbe la pagina HTML
+            // di redirect). Per tutti gli altri formati verifichiamo prima l'esito reale
+            // della chiamata, cosi' un errore mostra un messaggio leggibile invece di
+            // aprire una scheda con il JSON grezzo dell'errore.
+            const win = window.open('', '_blank')
+            try {
+                const res = await fetch(downloadUrl, { redirect: 'follow' })
+                if (res.redirected) {
+                    if (win) win.location.href = res.url
+                    else window.open(res.url, '_blank')
+                    return
+                }
+                if (!res.ok) {
+                    win?.close()
+                    const body = await res.json().catch(() => null)
+                    notify.error(body?.error || "Impossibile aprire il documento da Google Drive")
+                    return
+                }
+                const blob = await res.blob()
+                const objectUrl = URL.createObjectURL(blob)
+                if (win) win.location.href = objectUrl
+                else window.open(objectUrl, '_blank')
+            } catch (e) {
+                console.error(e)
+                win?.close()
+                notify.error("Impossibile aprire il documento: errore di connessione a Google Drive")
+            }
             return
         }
         try {
@@ -1202,7 +1272,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                                     </td>
                                                     <td className={`p-2 text-right font-mono whitespace-nowrap text-xs ${(group.totalPieces ?? 0) < 0 ? 'text-red-600' : 'text-slate-600'}`}>
                                                         {group.totalPieces !== undefined
-                                                            ? group.totalPieces.toLocaleString('it-IT', { maximumFractionDigits: 3 })
+                                                            ? formatNumber(group.totalPieces, { maximumFractionDigits: 3 })
                                                             : '—'}
                                                     </td>
                                                     <td className={`p-2 text-right font-mono font-medium ${group.totalAmount < 0 ? 'text-red-600' : 'text-slate-700 dark:text-slate-300'}`}>
@@ -1248,7 +1318,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                                         </td>
                                                         <td className={`p-2 text-right font-mono text-xs whitespace-nowrap ${(child.pieces ?? 0) < 0 ? 'text-red-500' : 'text-slate-500'}`}>
                                                             {child.pieces !== undefined
-                                                                ? `${child.pieces.toLocaleString('it-IT', { maximumFractionDigits: 3 })}${child.unit ? ' ' + child.unit : ''}`
+                                                                ? `${formatNumber(child.pieces, { maximumFractionDigits: 3 })}${child.unit ? ' ' + child.unit : ''}`
                                                                 : '—'}
                                                         </td>
                                                         <td className={`p-2 text-right font-mono text-xs ${child.amount < 0 ? 'text-red-500' : 'text-slate-600'}`}>
@@ -1276,7 +1346,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                     <tr className="border-t-2 border-slate-200 bg-slate-50 dark:bg-slate-800/50 font-semibold text-sm">
                                         <td colSpan={5} className="p-2 text-slate-600">Totale</td>
                                         <td className={`p-2 text-right font-mono ${totalPieces < 0 ? 'text-red-600' : 'text-slate-700'}`}>
-                                            {totalPieces.toLocaleString('it-IT', { maximumFractionDigits: 3 })}
+                                            {formatNumber(totalPieces, { maximumFractionDigits: 3 })}
                                         </td>
                                         <td className={`p-2 text-right font-mono ${materialTotal < 0 ? 'text-red-600' : 'text-slate-700'}`}>
                                             € {fmt(materialTotal)}
@@ -1464,7 +1534,15 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                             <tbody>
                                 {filteredCosts.map(cost => (
                                     <tr key={cost.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                                        <td className="p-2 font-medium text-slate-800 dark:text-slate-200">{cost.description}</td>
+                                        <td className="p-2 font-medium text-slate-800 dark:text-slate-200">
+                                            <button
+                                                onClick={() => handleOpenEditCost(cost)}
+                                                className="text-left hover:underline decoration-dotted"
+                                                title="Clicca per modificare"
+                                            >
+                                                {cost.description}
+                                            </button>
+                                        </td>
                                         <td className="p-2">
                                             {editingCostSal === cost.id ? (
                                                 <div className="flex items-center gap-1">
@@ -1492,7 +1570,15 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                                 </button>
                                             )}
                                         </td>
-                                        <td className="p-2 text-right font-mono font-medium">€ {fmt(cost.amount)}</td>
+                                        <td className="p-2 text-right font-mono font-medium">
+                                            <button
+                                                onClick={() => handleOpenEditCost(cost)}
+                                                className="hover:underline decoration-dotted"
+                                                title="Clicca per modificare"
+                                            >
+                                                € {fmt(cost.amount)}
+                                            </button>
+                                        </td>
                                         <td className="p-2">
                                             <div className="flex items-center gap-1 flex-wrap">
                                                 {cost.documentUrls.map((url, i) => (
@@ -1513,7 +1599,13 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                                         </button>
                                                     </div>
                                                 ))}
-                                                <label className="cursor-pointer text-slate-400 hover:text-blue-600" title="Allega documento">
+                                                <label
+                                                    className={`cursor-pointer rounded px-1 ${dragOverRowId === cost.id ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:text-blue-600'}`}
+                                                    title="Allega documento (clicca o trascina un file qui)"
+                                                    onDragOver={e => { e.preventDefault(); setDragOverRowId(cost.id) }}
+                                                    onDragLeave={() => setDragOverRowId(null)}
+                                                    onDrop={e => handleRowDocDrop(e, cost.id, cost.documentUrls)}
+                                                >
                                                     {uploadingCostId === cost.id
                                                         ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                         : <Paperclip className="h-3.5 w-3.5" />
@@ -1537,9 +1629,14 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                             )}
                                         </td>
                                         <td className="p-2">
-                                            <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-300 hover:text-red-500">
-                                                <X className="h-3.5 w-3.5" />
-                                            </button>
+                                            <div className="flex items-center gap-1.5">
+                                                <button onClick={() => handleOpenEditCost(cost)} className="text-slate-300 hover:text-blue-600" title="Modifica">
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-300 hover:text-red-500" title="Elimina">
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -1734,11 +1831,16 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Allegati (opzionale)</Label>
-                            <label className="flex items-center gap-2 cursor-pointer border border-dashed border-slate-300 rounded-md p-3 hover:border-blue-400 hover:bg-blue-50/40 transition-colors">
+                            <Label>Allegati (opzionale, puoi anche trascinare i file qui)</Label>
+                            <label
+                                className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-md p-3 transition-colors ${dragOverAddCost ? 'border-blue-400 bg-blue-50/40 dark:bg-blue-950' : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/40'}`}
+                                onDragOver={e => { e.preventDefault(); setDragOverAddCost(true) }}
+                                onDragLeave={() => setDragOverAddCost(false)}
+                                onDrop={handleAddCostFilesDrop}
+                            >
                                 <Paperclip className="h-4 w-4 text-slate-400 shrink-0" />
                                 <span className="text-sm text-slate-500">
-                                    {newCostFiles.length === 0 ? 'Clicca per allegare documenti…' : `${newCostFiles.length} file selezionati`}
+                                    {newCostFiles.length === 0 ? 'Clicca o trascina qui i documenti…' : `${newCostFiles.length} file selezionati`}
                                 </span>
                                 <input
                                     type="file"
@@ -1767,6 +1869,32 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                         <Button variant="outline" onClick={() => setIsAddCostOpen(false)}>Annulla</Button>
                         <Button onClick={handleAddCost} disabled={!newCostDesc.trim() || !newCostAmount || costSaving}>
                             {costSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modifica Costo */}
+            <Dialog open={!!editingCost} onOpenChange={open => { if (!open) setEditingCost(null) }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Modifica Costo</DialogTitle>
+                        <DialogDescription>Modifica descrizione e importo del costo.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                            <Label>Descrizione</Label>
+                            <Input placeholder="Es. Noleggio ponteggio, Smaltimento, ..." value={editCostDesc} onChange={e => setEditCostDesc(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Importo (€)</Label>
+                            <Input type="number" step="0.01" min="0" placeholder="0.00" value={editCostAmount} onChange={e => setEditCostAmount(e.target.value)} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingCost(null)}>Annulla</Button>
+                        <Button onClick={handleSaveEditCost} disabled={!editCostDesc.trim() || !editCostAmount || editCostSaving}>
+                            {editCostSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -27,6 +27,7 @@ import MoveItemsDialog from "@/components/movements/MoveItemsDialog";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 // jsPDF and autoTable are loaded dynamically on demand to reduce bundle size
 import { useAuth } from "@/components/auth-provider";
+import { formatCurrency } from "@/lib/utils/format";
 interface MovementDetailContentProps {
     initialMovement: DeliveryNote;
 }
@@ -74,10 +75,6 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     const grandTotal = useMemo(() => {
         return items.reduce((sum, item) => sum + (item.quantity * (item.price || 0)), 0);
     }, [items]);
-
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
-    };
 
     // Fetch inventory items on demand
     const handleSearchInventory = async (term: string) => {

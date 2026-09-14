@@ -28,6 +28,7 @@ import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
 import { useBatchUpload } from "@/hooks/useBatchUpload";
+import { formatCurrency } from "@/lib/utils/format";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { FieldTip } from "@/components/ui/field-tip";
 import { warehousesApi } from "@/lib/services/warehouses";
@@ -906,8 +907,7 @@ function NewPurchaseContent() {
                                                     {isOrder ? "TOTALE ORDINE" : "TOTALE BOLLA"}
                                                 </TableCell>
                                                 <TableCell className="text-right text-base dark:text-white py-3 pr-2">
-                                                    <span className="text-xs font-normal text-slate-400 mr-0.5">€</span>
-                                                    {grandTotal.toFixed(2)}
+                                                    {formatCurrency(grandTotal)}
                                                 </TableCell>
                                                 <TableCell colSpan={2} />
                                             </TableRow>

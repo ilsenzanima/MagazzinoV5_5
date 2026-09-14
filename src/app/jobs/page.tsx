@@ -3,7 +3,6 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import JobsContent from "@/components/jobs/JobsContent";
 import { Loader2 } from "lucide-react";
 import { jobsApi, Job } from "@/lib/api";
-import { notify } from "@/lib/notify";
 
 export default async function JobsPage(
   { searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
@@ -24,8 +23,10 @@ export default async function JobsPage(
     initialJobs = data;
     initialTotal = total;
   } catch (error) {
+    // notify() usa un toast client-side: non e' invocabile da un Server Component
+    // come questo (mandava in crash l'intera pagina). L'elenco vuoto risultante
+    // e' gia' gestito da JobsContent con il messaggio "Nessuna commessa trovata".
     console.error("Error loading jobs:", error);
-    notify.error("Errore nel caricamento delle commesse");
   }
 
   return (

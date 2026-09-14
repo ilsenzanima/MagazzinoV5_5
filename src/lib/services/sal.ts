@@ -256,6 +256,14 @@ export const salCostsApi = {
         if (error) throw error;
     },
 
+    update: async (id: string, description: string, amount: number): Promise<void> => {
+        const { error } = await supabase
+            .from('job_sal_costs')
+            .update({ description, amount })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
     delete: async (id: string): Promise<void> => {
         const { data: existing } = await supabase.from('job_sal_costs').select('document_urls').eq('id', id).maybeSingle();
         const { error } = await supabase.from('job_sal_costs').delete().eq('id', id);

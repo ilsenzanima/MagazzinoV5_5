@@ -18,6 +18,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useBatchUpload } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { HelpTip } from "@/components/ui/help-tip";
+import { formatCurrency } from "@/lib/utils/format";
 
 interface UnlinkedPurchase {
     id: string;
@@ -321,7 +322,7 @@ export default function NewInvoicePage() {
                                                                 {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}
                                                             </span>
                                                             <span className="font-medium text-right min-w-[80px]">
-                                                                € {(purchase.totalAmount ?? 0).toFixed(2)}
+                                                                {formatCurrency(purchase.totalAmount ?? 0)}
                                                             </span>
                                                         </label>
                                                     </TableCell>
@@ -334,8 +335,7 @@ export default function NewInvoicePage() {
                                                         TOTALE FATTURA
                                                     </TableCell>
                                                     <TableCell className="text-right text-base dark:text-white py-3">
-                                                        <span className="text-xs font-normal text-slate-400 mr-0.5">€</span>
-                                                        {(totalAmount ?? 0).toFixed(2)}
+                                                        {formatCurrency(totalAmount ?? 0)}
                                                     </TableCell>
                                                 </TableRow>
                                             )}

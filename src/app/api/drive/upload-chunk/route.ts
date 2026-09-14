@@ -42,8 +42,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ done: true, file })
         }
         const text = await res.text().catch(() => '')
+        console.error('drive/upload-chunk error', res.status, text)
         return NextResponse.json({ error: `Upload su Google Drive fallito (${res.status}): ${text}` }, { status: 502 })
     } catch (err: any) {
+        console.error('drive/upload-chunk error', err)
         return NextResponse.json({ error: err.message ?? 'Errore upload su Google Drive' }, { status: 500 })
     }
 }
