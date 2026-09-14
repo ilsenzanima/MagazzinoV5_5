@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldTip } from "@/components/ui/field-tip";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
+import { formatCurrency } from "@/lib/utils/format";
 
 // ── Inline editable price row ─────────────────────────────────────────────────
 
@@ -147,7 +148,7 @@ function ItemPriceRow({
                         {item.price != null ? `€ ${item.price.toFixed(5)}` : '—'}
                     </td>
                     <td className="py-1.5 text-right text-slate-600 dark:text-slate-400 w-24 pr-1">
-                        {item.price != null && qty ? `€ ${(item.price * qty).toFixed(2)}` : '—'}
+                        {item.price != null && qty ? formatCurrency(item.price * qty) : '—'}
                     </td>
                     {canEdit && (
                         <td className="py-1 w-10 pl-1">
@@ -289,7 +290,7 @@ function ReturnPriceRow({
                         {item.returnedPrice != null ? `€ ${item.returnedPrice.toFixed(5)}` : '—'}
                     </td>
                     <td className="py-1.5 text-right text-red-700 dark:text-red-400 w-24 pr-1 font-medium">
-                        {item.returnedPrice != null && qty ? `− € ${(item.returnedPrice * qty).toFixed(2)}` : '—'}
+                        {item.returnedPrice != null && qty ? `− ${formatCurrency(item.returnedPrice * qty)}` : '—'}
                     </td>
                     {canEdit && (
                         <td className="py-1 w-10 pl-1">
@@ -650,15 +651,15 @@ export default function InvoiceDetailPage() {
                                             <div className="flex flex-col gap-1 text-sm max-w-xs ml-auto text-right">
                                                 <div className="flex justify-between gap-8">
                                                     <span className="text-slate-500">Totale Netto</span>
-                                                    <span className="font-medium">€ {totaleNetto.toFixed(2)}</span>
+                                                    <span className="font-medium">{formatCurrency(totaleNetto)}</span>
                                                 </div>
                                                 <div className="flex justify-between gap-8">
                                                     <span className="text-slate-500">IVA 22%</span>
-                                                    <span className="font-medium">€ {iva.toFixed(2)}</span>
+                                                    <span className="font-medium">{formatCurrency(iva)}</span>
                                                 </div>
                                                 <div className="flex justify-between gap-8 border-t pt-1 mt-0.5">
                                                     <span className="font-bold text-slate-800 dark:text-white">Totale Fattura</span>
-                                                    <span className="font-bold text-lg">€ {totaleConIva.toFixed(2)}</span>
+                                                    <span className="font-bold text-lg">{formatCurrency(totaleConIva)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -751,7 +752,7 @@ export default function InvoiceDetailPage() {
                                         </td>
                                                         {canSeeAmounts && (
                                                             <td className="py-2.5 px-4 text-right">
-                                                                {p.totalAmount !== undefined ? `€ ${p.totalAmount.toFixed(2)}` : '—'}
+                                                                {p.totalAmount !== undefined ? formatCurrency(p.totalAmount) : '—'}
                                                             </td>
                                                         )}
                                                         <td className="py-2.5 px-2">
@@ -819,7 +820,7 @@ export default function InvoiceDetailPage() {
                                                                             <>
                                                                                 <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
                                                                                     <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                                    Applicato (€ {(p.transportCost ?? 0).toFixed(2)})
+                                                                                    Applicato ({formatCurrency(p.transportCost ?? 0)})
                                                                                 </span>
                                                                                 <Button
                                                                                     size="sm"
@@ -903,7 +904,7 @@ export default function InvoiceDetailPage() {
                                                     />
                                                     <span className="flex-1 text-sm font-medium">{p.deliveryNoteNumber}</span>
                                                     <span className="text-xs text-slate-500">{new Date(p.deliveryNoteDate).toLocaleDateString('it-IT')}</span>
-                                                    {canSeeAmounts && <span className="text-sm font-medium">€ {p.totalAmount.toFixed(2)}</span>}
+                                                    {canSeeAmounts && <span className="text-sm font-medium">{formatCurrency(p.totalAmount)}</span>}
                                                 </label>
                                             ))}
                                         </div>

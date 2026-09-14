@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { ArticleLot, ArticlesReportData } from '@/lib/services/reports';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { formatCurrency } from '@/lib/utils/format';
 
 export const generateArticlesReport = (data: ArticlesReportData) => {
     const doc = new jsPDF({ orientation: 'landscape' });
@@ -26,11 +27,11 @@ export const generateArticlesReport = (data: ArticlesReportData) => {
         'Marca',
         'Lotto',
         'Data Lotto',
-        'Prezzo €',
+        'Prezzo',
         'Pezzi',
         'Quantità',
         'U.M.',
-        'Valore €'
+        'Valore'
     ];
 
     // Group articles by type
@@ -68,11 +69,11 @@ export const generateArticlesReport = (data: ArticlesReportData) => {
                 article.itemBrand,
                 article.lotRef.substring(0, 15),
                 article.lotDate ? format(new Date(article.lotDate), 'dd/MM/yy') : '-',
-                article.price > 0 ? article.price.toFixed(2) : '-',
+                article.price > 0 ? formatCurrency(article.price) : '-',
                 article.pieces.toString(),
                 article.quantity.toFixed(2),
                 article.itemUnit,
-                article.totalValue > 0 ? article.totalValue.toFixed(2) : '-'
+                article.totalValue > 0 ? formatCurrency(article.totalValue) : '-'
             ]);
         });
     });
@@ -92,7 +93,7 @@ export const generateArticlesReport = (data: ArticlesReportData) => {
         totalPieces.toString(),
         totalQuantity.toFixed(2),
         '',
-        data.totalValue.toFixed(2)
+        formatCurrency(data.totalValue)
     ]);
 
     autoTable(doc, {
@@ -148,7 +149,7 @@ export const generateArticlesReport = (data: ArticlesReportData) => {
     const finalY = (doc as any).lastAutoTable.finalY || 200;
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(`VALORE TOTALE MAGAZZINO: € ${data.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 14, finalY + 10);
+    doc.text(`VALORE TOTALE MAGAZZINO: ${formatCurrency(data.totalValue)}`, 14, finalY + 10);
 
     doc.save(`report_articoli_${format(now, 'yyyyMMdd_HHmm')}.pdf`);
 };

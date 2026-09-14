@@ -34,6 +34,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/format";
 
 interface WorkerDetailContentProps {
     worker: Worker;
@@ -321,7 +322,7 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                                 ) : (
                                     <div className="flex items-center gap-3">
                                         <span className="text-lg font-bold text-slate-900 dark:text-white">
-                                            € {worker.hourlyRate.toFixed(2)}/h
+                                            {formatCurrency(worker.hourlyRate)}/h
                                         </span>
                                         <Button variant="ghost" size="icon" onClick={() => { setEditingRate(true); setRateValue(String(worker.hourlyRate)); }}>
                                             <Pencil className="h-4 w-4" />
@@ -363,7 +364,7 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                                 ) : (
                                     <div className="flex items-center gap-3">
                                         <span className="text-lg font-bold text-slate-900 dark:text-white">
-                                            € {worker.trasfertaRate.toFixed(2)}/giorno
+                                            {formatCurrency(worker.trasfertaRate)}/giorno
                                         </span>
                                         <Button variant="ghost" size="icon" onClick={() => { setEditingTrasferta(true); setTrasfertaValue(String(worker.trasfertaRate)); }}>
                                             <Pencil className="h-4 w-4" />

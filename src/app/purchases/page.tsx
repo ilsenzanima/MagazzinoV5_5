@@ -23,6 +23,7 @@ import { useViewMode } from "@/hooks/useViewMode";
 import { PageSizeSelector } from "@/components/ui/page-size-selector";
 import { usePageSize } from "@/hooks/usePageSize";
 import { HelpTip } from "@/components/ui/help-tip";
+import { formatCurrency } from "@/lib/utils/format";
 
 // ── Shared filter bar ─────────────────────────────────────────────────────────
 
@@ -232,7 +233,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                                 {(userRole === 'admin' || userRole === 'operativo') ? (
                                   <div className="font-bold text-lg text-slate-900 dark:text-white">
                                     {purchase.totalAmount !== undefined && purchase.totalAmount !== null
-                                      ? `€ ${purchase.totalAmount.toFixed(2)}` : '-'}
+                                      ? formatCurrency(purchase.totalAmount) : '-'}
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 dark:text-slate-500 italic text-sm">Riservato</span>
@@ -301,7 +302,7 @@ function PurchasesTab({ orderType }: { orderType: 'purchase' | 'order' }) {
                           <div className="flex items-center gap-2 shrink-0 ml-auto">
                             {(userRole === 'admin' || userRole === 'operativo') && (
                               <span className="font-semibold text-sm text-slate-900 dark:text-white">
-                                {purchase.totalAmount != null ? `€ ${purchase.totalAmount.toFixed(2)}` : '—'}
+                                {purchase.totalAmount != null ? formatCurrency(purchase.totalAmount) : '—'}
                               </span>
                             )}
                             {isOrder && purchase.convertedPurchaseId && (
@@ -473,7 +474,7 @@ function InvoicesTab() {
                           <div className="mb-2">
                             {(userRole === 'admin' || userRole === 'operativo') ? (
                               <div className="font-bold text-lg text-slate-900 dark:text-white">
-                                {invoice.totalAmount != null ? `€ ${Number(invoice.totalAmount).toFixed(2)}` : '—'}
+                                {invoice.totalAmount != null ? formatCurrency(Number(invoice.totalAmount)) : '—'}
                               </div>
                             ) : (
                               <span className="text-slate-400 italic text-sm">Riservato</span>
@@ -523,7 +524,7 @@ function InvoicesTab() {
                         <div className="flex items-center gap-2 ml-auto shrink-0">
                           {(userRole === 'admin' || userRole === 'operativo') && (
                             <span className="font-semibold text-sm text-slate-900 dark:text-white">
-                              {invoice.totalAmount != null ? `€ ${Number(invoice.totalAmount).toFixed(2)}` : '—'}
+                              {invoice.totalAmount != null ? formatCurrency(Number(invoice.totalAmount)) : '—'}
                             </span>
                           )}
                           {invoice.documentUrls && invoice.documentUrls.length > 0 && (

@@ -11,6 +11,7 @@ import { generateArticlesReport } from "./articles-report-generator";
 import { format } from "date-fns";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils/format";
 
 export default function ArticlesReport() {
     const [data, setData] = useState<ArticlesReportData | null>(null);
@@ -232,11 +233,11 @@ export default function ArticlesReport() {
                                     <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Articolo</th>
                                     <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Marca</th>
                                     <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Lotto</th>
-                                    <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Prezzo €</th>
+                                    <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Prezzo</th>
                                     <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Pezzi Fisici</th>
                                     <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Quantità</th>
                                     <th className="text-center p-3 font-medium text-slate-700 dark:text-slate-300">U.M.</th>
-                                    <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Valore €</th>
+                                    <th className="text-right p-3 font-medium text-slate-700 dark:text-slate-300">Valore</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -269,13 +270,13 @@ export default function ArticlesReport() {
                                                     )}
                                                 </td>
                                                 <td className="p-3 text-right dark:text-slate-300">
-                                                    {article.price > 0 ? article.price.toFixed(2) : '-'}
+                                                    {article.price > 0 ? formatCurrency(article.price) : '-'}
                                                 </td>
                                                 <td className="p-3 text-right font-medium dark:text-slate-300">{article.pieces}</td>
                                                 <td className="p-3 text-right dark:text-slate-300">{article.quantity.toFixed(2)}</td>
                                                 <td className="p-3 text-center text-sm dark:text-slate-300">{article.itemUnit}</td>
                                                 <td className="p-3 text-right font-medium dark:text-slate-300">
-                                                    {article.totalValue > 0 ? article.totalValue.toFixed(2) : '-'}
+                                                    {article.totalValue > 0 ? formatCurrency(article.totalValue) : '-'}
                                                 </td>
                                             </tr>
                                         ))}
@@ -294,7 +295,7 @@ export default function ArticlesReport() {
                                     </td>
                                     <td className="p-3"></td>
                                     <td className="p-3 text-right text-emerald-600 dark:text-emerald-400">
-                                        € {data.totalValue.toFixed(2)}
+                                        {formatCurrency(data.totalValue)}
                                     </td>
                                 </tr>
                             </tfoot>

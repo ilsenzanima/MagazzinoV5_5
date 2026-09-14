@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { reassignLotToEntries } from "@/app/inventory/[id]/actions";
 import Link from "next/link";
 import { notify } from "@/lib/notify";
+import { formatCurrency } from "@/lib/utils/format";
 
 interface LotInfo {
     id: string;
@@ -202,7 +203,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                             </TableCell>
                                             <TableCell className="text-right text-sm">
                                                 {lot.price !== undefined && lot.price !== null ? (
-                                                    <span className="font-medium">€ {lot.price.toFixed(2)}</span>
+                                                    <span className="font-medium">{formatCurrency(lot.price)}</span>
                                                 ) : (
                                                     <span className="text-slate-400 text-xs">N/D</span>
                                                 )}

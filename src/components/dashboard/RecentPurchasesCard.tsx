@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
+import { formatCurrency } from "@/lib/utils/format";
 
 interface Purchase {
   id: string;
@@ -23,12 +24,6 @@ export function RecentPurchasesCard({ data }: RecentPurchasesCardProps) {
   const { userRole } = useAuth();
   const canSeePrices = userRole === 'admin' || userRole === 'operativo';
   const purchases = data ?? [];
-
-  const formatEur = (v: number) =>
-    new Intl.NumberFormat("it-IT", {
-      style: "currency",
-      currency: "EUR",
-    }).format(v);
 
   return (
     <Card className="flex flex-col h-full">
@@ -81,7 +76,7 @@ export function RecentPurchasesCard({ data }: RecentPurchasesCardProps) {
 
                 <div className="flex flex-col items-end shrink-0 ml-2 gap-1">
                   <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                    {canSeePrices ? formatEur(purchase.totalAmount) : "—"}
+                    {canSeePrices ? formatCurrency(purchase.totalAmount) : "—"}
                   </span>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-0.5 whitespace-nowrap">
                     <Clock className="h-2.5 w-2.5" />

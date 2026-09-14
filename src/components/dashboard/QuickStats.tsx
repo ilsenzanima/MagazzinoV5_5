@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase, Truck, ShoppingCart, AlertTriangle, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
+import { formatCurrency } from "@/lib/utils/format";
 
 interface QuickStatsProps {
   activeJobsCount: number;
@@ -65,12 +66,6 @@ export function QuickStats({
 }: QuickStatsProps) {
   const { userRole } = useAuth();
   const canSeePrices = userRole === 'admin' || userRole === 'operativo';
-  const formatEur = (v: number) =>
-    new Intl.NumberFormat("it-IT", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 0,
-    }).format(v);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -99,7 +94,7 @@ export function QuickStats({
         iconBg="bg-emerald-50 dark:bg-emerald-900/30"
         label={`Acquisti — ${monthName}`}
         value={monthPurchasesCount}
-        sub={canSeePrices ? formatEur(monthPurchasesTotal) : "—"}
+        sub={canSeePrices ? formatCurrency(monthPurchasesTotal) : "—"}
       />
       <StatCard
         href="/inventory?tab=low_stock"

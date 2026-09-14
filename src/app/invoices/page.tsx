@@ -12,6 +12,7 @@ import { useState, useEffect, useRef, Suspense, useDeferredValue } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { invoicesApi, Invoice } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
+import { formatCurrency } from "@/lib/utils/format";
 
 function InvoicesContent() {
   const { userRole } = useAuth();
@@ -178,7 +179,7 @@ function InvoicesContent() {
                         {(userRole === 'admin' || userRole === 'operativo') ? (
                           <div className="font-bold text-lg text-slate-900 dark:text-white">
                             {invoice.totalAmount !== undefined && invoice.totalAmount !== null
-                              ? `€ ${Number(invoice.totalAmount).toFixed(2)}`
+                              ? formatCurrency(Number(invoice.totalAmount))
                               : '—'
                             }
                           </div>
