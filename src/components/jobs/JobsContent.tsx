@@ -96,12 +96,22 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deferredSearchTerm, filterKind, page]);
 
-  // Sync state with props when validation/refresh happens
+  // Sync state with the server-rendered props only on the very first mount.
+  // router.replace() below (used just to keep the URL in sync) also causes
+  // this Server Component's props to refresh in the background; without this
+  // guard that refresh re-ran on every page/filter change and raced the
+  // client-side loadJobs() fetch below for the same change, so whichever of
+  // the two happened to resolve last won - sometimes clobbering the correct
+  // page with stale/empty data ("si vede per un attimo e poi sparisce").
+  const didSyncInitialProps = useRef(false);
   useEffect(() => {
+    if (didSyncInitialProps.current) return;
+    didSyncInitialProps.current = true;
     setJobs(initialJobs);
     setTotalItems(initialTotal);
     setTotalPages(Math.ceil(initialTotal / limit) || 1);
-  }, [initialJobs, initialTotal, limit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load Jobs (Server Side Search & Pagination)
   useEffect(() => {
@@ -112,7 +122,15 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, deferredSearchTerm, filterClientId, pageSize, filterKind]);
 
+  // Guards against out-of-order responses: changing page/filter quickly can
+  // fire loadJobs() more than once (e.g. a filter change also resets page to
+  // 1, each triggering its own fetch) - if the older request resolves after
+  // the newer one, its result is discarded instead of overwriting the
+  // current, correct data with a stale/empty one.
+  const loadRequestId = useRef(0);
+
   const loadJobs = async () => {
+    const requestId = ++loadRequestId.current;
     try {
       setLoading(true);
       setError(null);
@@ -125,6 +143,8 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         category: filterKind === 'all' ? undefined : filterKind
       });
 
+      if (requestId !== loadRequestId.current) return;
+
       // Sort: active → suspended → completed
       data.sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
 
@@ -133,10 +153,11 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
       setTotalPages(Math.ceil(total / limit) || 1);
 
     } catch (error: any) {
+      if (requestId !== loadRequestId.current) return;
       console.error("Failed to load jobs:", error);
       setError(error.message || "Errore sconosciuto durante il caricamento commesse");
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestId.current) setLoading(false);
     }
   };
 
