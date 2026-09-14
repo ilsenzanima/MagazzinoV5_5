@@ -145,7 +145,7 @@ export const jobsApi = {
 
         let query = supabase
             .from('jobs')
-            .select('*, clients!inner(name)', { count: 'estimated' })
+            .select('*, clients!inner(name)', { count: 'exact' })
             .is('deleted_at', null);
 
         if (clientId) {
