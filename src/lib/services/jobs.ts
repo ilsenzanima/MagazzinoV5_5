@@ -201,7 +201,18 @@ export const jobsApi = {
 
         const { data, error, count } = await fetchWithTimeout(query);
 
-        if (error) throw error;
+        if (error) {
+            // PGRST103 = offset richiesto (pagina) oltre le righe disponibili per il
+            // filtro corrente, es. utente rimasto su una pagina vecchia dopo che i
+            // risultati sono diminuiti (filtro cambiato, elementi eliminati, ecc.).
+            // Non e' un vero errore applicativo: trattarlo come elenco vuoto invece
+            // di propagare l'eccezione (che in un Server Component manderebbe in
+            // crash l'intera pagina).
+            if ((error as { code?: string }).code === 'PGRST103') {
+                return { data: [], total: 0 };
+            }
+            throw error;
+        }
 
         return {
             data: data.map(mapDbToJob),
