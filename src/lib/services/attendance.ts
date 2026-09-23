@@ -229,7 +229,7 @@ export const attendanceApi = {
     getYearlyStatsByWorker: async (workerId: string, year?: number): Promise<{
         presenze: number; orePresenza: number;
         malattie: number; infortuni: number;
-        ferie: number; permessi: number;
+        oreFeriePermessi: number;
         corsi: number; visiteMediche: number;
         trasferimenti: number; assenze: number;
         oreRettifica: number; oreTotali: number;
@@ -259,7 +259,7 @@ export const attendanceApi = {
         const stats = {
             presenze: 0, orePresenza: 0,
             malattie: 0, infortuni: 0,
-            ferie: 0, permessi: 0,
+            oreFeriePermessi: 0,
             corsi: 0, visiteMediche: 0,
             trasferimenti: 0, assenze: 0,
             oreRettifica: 0, oreTotali: 0,
@@ -272,8 +272,8 @@ export const attendanceApi = {
                 case 'presence':     stats.presenze++;       stats.orePresenza += h; break;
                 case 'sick':         stats.malattie++;       break;
                 case 'injury':       stats.infortuni++;      break;
-                case 'holiday':      stats.ferie++;          break;
-                case 'permit':       stats.permessi++;       break;
+                case 'holiday':
+                case 'permit':       stats.oreFeriePermessi += h; break;
                 case 'course':       stats.corsi++;          break;
                 case 'medical_exam': stats.visiteMediche++;  break;
                 case 'transfer':     stats.trasferimenti++;  break;

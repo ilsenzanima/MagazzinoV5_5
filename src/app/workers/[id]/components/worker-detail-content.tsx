@@ -15,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
     ArrowLeft, Pencil, Trash2, HardHat, Save, Euro,
     Clock, Stethoscope, AlertTriangle, Umbrella, BookOpen,
-    CalendarOff, Building2, UserX, Activity, Loader2,
+    Building2, UserX, Activity, Loader2,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/ui/use-toast";
@@ -43,11 +43,14 @@ interface WorkerDetailContentProps {
 interface YearlyStats {
     presenze: number; orePresenza: number;
     malattie: number; infortuni: number;
-    ferie: number; permessi: number;
+    oreFeriePermessi: number;
     corsi: number; visiteMediche: number;
     trasferimenti: number; assenze: number;
     oreRettifica: number; oreTotali: number;
 }
+
+// Convenzione usata in tutta l'app (vedi AssignmentModal/LeaveRequestForm): giornata piena = 8 ore.
+const ORE_GIORNATA = 8;
 
 function StatCard({ icon: Icon, label, value, colorClass }: {
     icon: React.ComponentType<{ className?: string }>;
@@ -261,8 +264,7 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                                 <StatCard icon={Clock}         label="Ore lavorate"  value={`${(stats.orePresenza + stats.oreRettifica).toFixed(1)} h`}          colorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30" />
                                 <StatCard icon={Stethoscope}   label="Malattie"      value={`${stats.malattie} gg`}                                             colorClass="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30" />
                                 <StatCard icon={AlertTriangle} label="Infortuni"     value={`${stats.infortuni} gg`}                                            colorClass="bg-red-100 text-red-700 dark:bg-red-900/30" />
-                                <StatCard icon={Umbrella}      label="Ferie"         value={`${stats.ferie} gg`}                                               colorClass="bg-green-100 text-green-700 dark:bg-green-900/30" />
-                                <StatCard icon={CalendarOff}   label="Permessi"      value={`${stats.permessi} gg`}                                             colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/30" />
+                                <StatCard icon={Umbrella}      label="Ferie e Permessi" value={`${stats.oreFeriePermessi.toFixed(1)} h (${(stats.oreFeriePermessi / ORE_GIORNATA).toFixed(1)} gg)`} colorClass="bg-green-100 text-green-700 dark:bg-green-900/30" />
                                 <StatCard icon={BookOpen}      label="Corsi"         value={`${stats.corsi} gg`}                                               colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/30" />
                                 <StatCard icon={Building2}     label="Trasferimenti" value={`${stats.trasferimenti} gg`}                                        colorClass="bg-orange-100 text-orange-700 dark:bg-orange-900/30" />
                                 <StatCard icon={UserX}         label="Assenze"       value={`${stats.assenze} gg`}                                             colorClass="bg-slate-100 text-slate-700 dark:bg-slate-800" />
