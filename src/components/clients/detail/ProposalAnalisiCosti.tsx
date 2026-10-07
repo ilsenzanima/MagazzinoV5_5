@@ -17,7 +17,10 @@ import { generateCostAnalysisPDF } from "@/lib/pdf/cost-analysis-pdf"
 import { generateCostAnalysisExcel } from "@/lib/excel/cost-analysis-excel"
 
 interface Props {
-    proposalId: string
+    // null per le analisi che appartengono direttamente a una commessa senza offerta
+    proposalId: string | null
+    // Etichetta della commessa, usata come titolo negli export quando non c'è un'offerta
+    jobLabel?: string
     versionId: string
     versionName: string
     versionCreatedAt: string
@@ -161,7 +164,7 @@ function SummaryRow({ label, value, delta, subtotal }: { label: string; value: n
 
 const DEFAULT_PARAMS = { sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10 }
 
-export function ProposalAnalisiCosti({ proposalId, versionId, versionName, versionCreatedAt, onBack }: Props) {
+export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionName, versionCreatedAt, onBack }: Props) {
     const [rows, setRows] = useState<CostAnalysisRow[]>([])
     const [params, setParams] = useState<CostAnalysisParams>({ jobId: versionId, ...DEFAULT_PARAMS })
     const [loading, setLoading] = useState(true)
@@ -194,13 +197,14 @@ export function ProposalAnalisiCosti({ proposalId, versionId, versionName, versi
     useEffect(() => { loadRows() }, [versionId])
 
     useEffect(() => {
+        if (!proposalId) { setProposalTitle(jobLabel ?? ''); setClient(null); return }
         clientProposalsApi.getById(proposalId)
             .then(async proposal => {
                 setProposalTitle(proposal?.title ?? '')
                 if (proposal?.clientId) setClient(await clientsApi.getById(proposal.clientId))
             })
             .catch(() => { setProposalTitle(''); setClient(null) })
-    }, [proposalId])
+    }, [proposalId, jobLabel])
 
     const handleItemSearch = useCallback(async (term: string) => {
         setInvLoading(true)

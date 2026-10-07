@@ -14,6 +14,7 @@ const path = require('path');
 const MAX_BACKUPS = 12; // keep last 12 weekly backups (~3 months)
 const BUCKET = 'backups';
 
+// Tenere allineata a BACKUP_TABLES in src/lib/backup-tables.ts
 const TABLES = [
     'profiles',
     'warehouses',
@@ -23,17 +24,25 @@ const TABLES = [
     'clients',
     'client_contacts',
     'suppliers',
+    'supplier_groups',
+    'supplier_group_members',
     'supplier_compliance_documents',
     'inventory',
     'inventory_supplier_codes',
     'fictitious_item_prices',
     'jobs',
     'sites',
+    'guest_sites',
+    'guest_site_jobs',
     'job_logs',
     'job_documents',
+    'job_document_folders',
+    'job_site_document_folders',
+    'job_conformita_document_types',
+    'job_site_document_types',
     'job_inventory',
-    'job_commessa_documents',
-    'job_compliance_associations',
+    'job_tasks',
+    'job_task_assignments',
     'job_sal_names',
     'job_sal_items',
     'job_sal_costs',
@@ -43,12 +52,23 @@ const TABLES = [
     'job_cost_analysis_params',
     'job_cost_analysis_rows',
     'client_proposals',
+    'proposal_tasks',
+    'proposal_document_folders',
+    'proposal_document_types',
+    'proposal_cost_analysis_versions',
     'proposal_cost_analysis_params',
     'proposal_cost_analysis_rows',
-    'proposal_documents',
-    'proposal_compliance_associations',
+    'shared_documents',
+    'shared_site_documents',
+    'shared_supplier_offers',
+    'shared_compliance_associations',
+    'shared_cost_analysis_documents',
+    'compliance_document_types',
+    'item_compliance_associations',
+    'job_compliance_associations',
     'purchases',
     'purchase_items',
+    'purchase_compliance_associations',
     'invoices',
     'delivery_notes',
     'delivery_note_items',
@@ -62,6 +82,14 @@ const TABLES = [
     'worker_courses',
     'worker_medical_exams',
 ];
+
+// Tabelle senza "id" né "created_at": colonne con cui ordinare per paginare in modo stabile
+const ORDER_COLUMNS = {
+    job_cost_analysis_params: ['job_id'],
+    proposal_cost_analysis_params: ['version_id'],
+    supplier_group_members: ['group_id', 'supplier_id'],
+};
+const PAGE_SIZE = 1000; // limite massimo di righe per richiesta di Supabase
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
@@ -89,16 +117,33 @@ async function ensureBucket() {
 async function backupTable(tableName) {
     console.log(`  📦 Backing up ${tableName}...`);
     try {
-        const { data, error } = await supabase
-            .from(tableName)
-            .select('*')
-            .order('created_at', { ascending: true });
+        const orderColumns = ORDER_COLUMNS[tableName] || ['id'];
 
-        if (error) {
-            console.error(`  ❌ Error backing up ${tableName}:`, error.message);
-            return { tableName, count: 0, error: error.message };
+        const { count, error: countError } = await supabase
+            .from(tableName)
+            .select('*', { count: 'exact', head: true });
+        const expected = countError ? null : (count ?? 0);
+
+        const data = [];
+        for (let from = 0; ; from += PAGE_SIZE) {
+            let query = supabase.from(tableName).select('*');
+            for (const col of orderColumns) query = query.order(col, { ascending: true });
+            const { data: page, error } = await query.range(from, from + PAGE_SIZE - 1);
+            if (error) {
+                console.error(`  ❌ Error backing up ${tableName}:`, error.message);
+                return { tableName, count: 0, error: error.message };
+            }
+            data.push(...(page || []));
+            if (!page || page.length < PAGE_SIZE) break;
         }
-        return { tableName, data, count: data?.length || 0 };
+
+        // Verifica: le righe scaricate devono coincidere con quelle presenti nel database
+        if (expected !== null && data.length !== expected) {
+            const msg = `scaricate ${data.length} righe ma nel database ce ne sono ${expected}`;
+            console.error(`  ❌ ${tableName}: ${msg}`);
+            return { tableName, data, count: data.length, error: msg };
+        }
+        return { tableName, data, count: data.length };
     } catch (err) {
         console.error(`  ❌ Exception backing up ${tableName}:`, err.message);
         return { tableName, count: 0, error: err.message };

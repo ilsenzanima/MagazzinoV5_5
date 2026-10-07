@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
+import { BACKUP_TABLES, fetchAllRows } from "@/lib/backup-tables";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -38,7 +39,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-// Tables to backup/restore (in dependency order)
+// Tables to RESTORE (in dependency order). Il backup usa BACKUP_TABLES (elenco completo).
 const TABLES = [
     'profiles',
     'warehouses',
@@ -98,6 +99,9 @@ interface BackupData {
     timestamp: string;
     tables: { [key: string]: any[] };
     totalRecords: number;
+    // Presenti solo nei backup manuali: tabelle con problemi e righe attese per tabella
+    errors?: { [key: string]: string };
+    expectedCounts?: { [key: string]: number | null };
 }
 
 interface StoredBackup {
@@ -198,28 +202,30 @@ export default function BackupSettingsPage() {
             const backup: BackupData = {
                 timestamp: new Date().toISOString(),
                 tables: {},
-                totalRecords: 0
+                totalRecords: 0,
+                errors: {},
+                expectedCounts: {}
             };
 
-            for (const table of TABLES) {
+            for (const table of BACKUP_TABLES) {
                 setBackupStatus(`Backup ${table}...`);
 
-                const { data, error } = await supabase
-                    .from(table)
-                    .select('*')
-                    .order('created_at', { ascending: true });
-
-                if (error) {
-                    console.error(`Error backing up ${table}:`, error);
-                    backup.tables[table] = [];
-                } else {
-                    backup.tables[table] = data || [];
-                    backup.totalRecords += data?.length || 0;
+                // Legge tutte le righe (a pagine) e le confronta con il conteggio reale del database
+                const result = await fetchAllRows(supabase, table);
+                backup.tables[table] = result.rows;
+                backup.expectedCounts![table] = result.expected;
+                backup.totalRecords += result.rows.length;
+                if (result.error) {
+                    console.error(`Backup ${table}:`, result.error);
+                    backup.errors![table] = result.error;
                 }
             }
 
             setBackupData(backup);
-            setBackupStatus(`Backup completato! ${backup.totalRecords} record totali`);
+            const failed = Object.keys(backup.errors!);
+            setBackupStatus(failed.length === 0
+                ? `Backup completato e verificato! ${backup.totalRecords} record in ${BACKUP_TABLES.length} tabelle`
+                : `Backup scaricato ma con ${failed.length} tabelle da controllare: ${failed.join(', ')}`);
 
             // Auto-download
             downloadBackup(backup);
@@ -464,19 +470,36 @@ export default function BackupSettingsPage() {
                         </Button>
 
                         {backupData && !isBackingUp && (
-                            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                                <CheckCircle className="h-4 w-4" />
-                                <span className="text-sm">{backupStatus}</span>
-                            </div>
+                            Object.keys(backupData.errors ?? {}).length === 0 ? (
+                                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                                    <CheckCircle className="h-4 w-4" />
+                                    <span className="text-sm">{backupStatus}</span>
+                                </div>
+                            ) : (
+                                <div className="text-amber-600 dark:text-amber-400 text-sm space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                                        <span>{backupStatus}</span>
+                                    </div>
+                                    {Object.entries(backupData.errors ?? {}).map(([table, msg]) => (
+                                        <p key={table} className="text-xs pl-6">{table}: {msg}</p>
+                                    ))}
+                                </div>
+                            )
                         )}
 
                         <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                            <h4 className="font-medium text-sm mb-2">Tabelle incluse nel backup:</h4>
+                            <h4 className="font-medium text-sm mb-2">Tabelle incluse nel backup ({BACKUP_TABLES.length}):</h4>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
-                                {TABLES.map(table => (
+                                {BACKUP_TABLES.map(table => (
                                     <div key={table} className="flex items-center gap-1">
                                         <FileJson className="h-3 w-3" />
                                         {table}
+                                        {backupData && !isBackingUp && (
+                                            <span className={backupData.errors?.[table] ? 'text-amber-600' : 'text-green-600'}>
+                                                ({backupData.tables[table]?.length ?? 0})
+                                            </span>
+                                        )}
                                     </div>
                                 ))}
                             </div>
