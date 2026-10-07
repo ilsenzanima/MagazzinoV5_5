@@ -14,11 +14,15 @@ import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
 import { ProposalAnalisiCosti } from "@/components/clients/detail/ProposalAnalisiCosti"
 
+// Le versioni appartengono a un'offerta (proposalId) oppure, per le commesse
+// create senza offerta, direttamente alla commessa (jobId).
 interface Props {
-    proposalId: string
+    proposalId?: string
+    jobId?: string
+    jobLabel?: string
 }
 
-export function ProposalCostAnalysisVersions({ proposalId }: Props) {
+export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Props) {
     const [versions, setVersions] = useState<ProposalCostAnalysisVersion[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
@@ -40,12 +44,14 @@ export function ProposalCostAnalysisVersions({ proposalId }: Props) {
     const load = async () => {
         try {
             setLoading(true)
-            setVersions(await proposalCostAnalysisVersionsApi.getByProposalId(proposalId))
+            if (proposalId) setVersions(await proposalCostAnalysisVersionsApi.getByProposalId(proposalId))
+            else if (jobId) setVersions(await proposalCostAnalysisVersionsApi.getByJobId(jobId))
+            else setVersions([])
         } catch { notify.error("Errore nel caricamento delle analisi costi") }
         finally { setLoading(false) }
     }
 
-    useEffect(() => { load() }, [proposalId])
+    useEffect(() => { load() }, [proposalId, jobId])
 
     const filtered = useMemo(() => {
         const term = search.trim().toLowerCase()
@@ -58,7 +64,10 @@ export function ProposalCostAnalysisVersions({ proposalId }: Props) {
         if (!name) return
         try {
             setCreating(true)
-            const v = await proposalCostAnalysisVersionsApi.create(proposalId, name, newNote.trim() || undefined)
+            const note = newNote.trim() || undefined
+            const v = proposalId
+                ? await proposalCostAnalysisVersionsApi.create(proposalId, name, note)
+                : await proposalCostAnalysisVersionsApi.createForJob(jobId!, name, note)
             setVersions(prev => [v, ...prev])
             setCreateOpen(false)
             setNewName(""); setNewNote("")
@@ -96,7 +105,8 @@ export function ProposalCostAnalysisVersions({ proposalId }: Props) {
         const v = versions.find(v => v.id === openVersionId)
         return (
             <ProposalAnalisiCosti
-                proposalId={proposalId}
+                proposalId={proposalId ?? null}
+                jobLabel={jobLabel}
                 versionId={openVersionId}
                 versionName={v?.name ?? ""}
                 versionCreatedAt={v?.createdAt ?? ""}

@@ -6,7 +6,9 @@ const DEFAULT_PARAMS = { sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 
 
 export interface ProposalCostAnalysisVersion {
     id: string;
-    proposalId: string;
+    // Una versione appartiene a un'offerta OPPURE a una commessa (mai entrambe)
+    proposalId: string | null;
+    jobId: string | null;
     name: string;
     note: string | null;
     createdAt: string;
@@ -16,6 +18,7 @@ export interface ProposalCostAnalysisVersion {
 const mapVersion = (db: any): ProposalCostAnalysisVersion => ({
     id: db.id,
     proposalId: db.proposal_id,
+    jobId: db.job_id,
     name: db.name,
     note: db.note,
     createdAt: db.created_at,
@@ -49,6 +52,17 @@ export const proposalCostAnalysisVersionsApi = {
         return (data || []).map(mapVersion);
     },
 
+    // Versioni di una commessa creata senza offerta
+    getByJobId: async (jobId: string): Promise<ProposalCostAnalysisVersion[]> => {
+        const { data, error } = await supabase
+            .from('proposal_cost_analysis_versions')
+            .select('*')
+            .eq('job_id', jobId)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapVersion);
+    },
+
     getById: async (id: string): Promise<ProposalCostAnalysisVersion> => {
         const { data, error } = await supabase
             .from('proposal_cost_analysis_versions')
@@ -63,6 +77,16 @@ export const proposalCostAnalysisVersionsApi = {
         const { data, error } = await supabase
             .from('proposal_cost_analysis_versions')
             .insert({ proposal_id: proposalId, name, note: note || null })
+            .select()
+            .single();
+        if (error) throw error;
+        return mapVersion(data);
+    },
+
+    createForJob: async (jobId: string, name: string, note?: string): Promise<ProposalCostAnalysisVersion> => {
+        const { data, error } = await supabase
+            .from('proposal_cost_analysis_versions')
+            .insert({ job_id: jobId, name, note: note || null })
             .select()
             .single();
         if (error) throw error;
@@ -101,7 +125,7 @@ export const proposalCostAnalysisApi = {
         return (data || []).map(mapRow);
     },
 
-    add: async (proposalId: string, versionId: string, row: Omit<CostAnalysisRow, 'id' | 'jobId' | 'createdAt'>): Promise<CostAnalysisRow> => {
+    add: async (proposalId: string | null, versionId: string, row: Omit<CostAnalysisRow, 'id' | 'jobId' | 'createdAt'>): Promise<CostAnalysisRow> => {
         const { data, error } = await supabase
             .from('proposal_cost_analysis_rows')
             .insert({
@@ -158,7 +182,7 @@ export const proposalCostAnalysisApi = {
         };
     },
 
-    upsertParams: async (proposalId: string, versionId: string, p: Omit<CostAnalysisParams, 'jobId'>): Promise<void> => {
+    upsertParams: async (proposalId: string | null, versionId: string, p: Omit<CostAnalysisParams, 'jobId'>): Promise<void> => {
         const { error } = await supabase
             .from('proposal_cost_analysis_params')
             .upsert({
