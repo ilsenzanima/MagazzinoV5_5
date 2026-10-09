@@ -77,12 +77,6 @@ Legenda: `[x]` fatto · `[~]` parziale · `[ ]` da fare
 - [ ] Previsione esaurimento scorte
 - **Effort:** 2-3 giorni
 
-#### Document Scanner Avanzato
-- [ ] Rilevamento bordi automatico (OpenCV.js)
-- [ ] Multi-page scan → singolo PDF
-- [ ] OCR per estrazione dati DDT
-- **Effort:** 3-4 giorni
-
 ### Bassa Priorità
 
 #### API Esterna
@@ -102,7 +96,6 @@ Legenda: `[x]` fatto · `[~]` parziale · `[ ]` da fare
 
 ## 🧩 Altre cose in sospeso (dal codice)
 
-- [ ] **Disegno e Taglio**: la pagina `src/app/disegno-taglio/page.tsx` mostra progetti finti (`TODO: dati placeholder in attesa del backend`)
 - [ ] **Leaked password protection** di Supabase: va attivata a mano dalla dashboard (richiede il piano Pro)
 - [ ] Verifica in produzione dopo il deploy della PR #13 (analisi costi senza offerta, backup completo)
 
