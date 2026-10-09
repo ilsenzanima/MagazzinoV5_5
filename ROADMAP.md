@@ -20,7 +20,7 @@ Legenda: `[x]` fatto · `[~]` parziale · `[ ]` da fare
 ### 2. Error Handling Strutturato
 - [x] Sistema di notifiche toast centralizzato (`notify.ts`)
 - [x] Retry automatico per errori di rete transitori (`src/lib/services/utils.ts`)
-- [ ] Logging errori su servizio esterno (es. Sentry): non presente
+- [ ] Logging errori su servizio esterno (es. Sentry): non presente; da verificare piano e licenza per uso commerciale
 - **Priorità:** Media
 - **Effort:** 1 giorno
 
@@ -62,19 +62,19 @@ Legenda: `[x]` fatto · `[~]` parziale · `[ ]` da fare
 
 ### Media Priorità
 
-#### Notifiche Push
-- [~] Pagina Impostazioni > Notifiche con gli interruttori (solo grafica: non salva niente e non invia niente)
-- [ ] Avviso scorte sotto soglia minima
-- [ ] Reminder scadenze documenti
+#### Notifiche
+- [x] Campanella in sidebar (accanto al nome utente) con scorta bassa, articoli esauriti, corsi e visite mediche in scadenza
+- [x] Preferenze per utente salvate nel database (Impostazioni > Notifiche)
+- [ ] Reminder scadenze documenti (conformità, DDT)
 - [ ] Notifica nuovi acquisti registrati
-- **Effort:** 2 giorni
+- [ ] Valutare invio via email o push in un secondo momento
 
 #### Dashboard Analytics
 - [x] Dashboard con statistiche, commesse attive, movimenti e acquisti recenti, grafico presenze (recharts)
 - [x] Scadenze corsi e visite mediche dei lavoratori
-- [ ] Grafici trend consumi mensili
-- [ ] Top articoli per valore/quantità
-- [ ] Previsione esaurimento scorte
+- [x] Pagina Analisi (`/analytics`): consumi mensili, articoli più usati, previsione esaurimento scorte (per quantità)
+- [ ] Top articoli per valore (euro)
+- [ ] Consumi al netto dei resi da cantiere
 - **Effort:** 2-3 giorni
 
 ### Bassa Priorità
