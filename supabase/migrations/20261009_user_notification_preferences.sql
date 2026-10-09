@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS public.user_notification_preferences (
     out_of_stock boolean NOT NULL DEFAULT true,
     expiring_courses boolean NOT NULL DEFAULT true,
     expiring_medical_exams boolean NOT NULL DEFAULT true,
+    -- id degli avvisi già visti nella campanella: il contatore mostra solo quelli nuovi
+    seen_alert_ids text[] NOT NULL DEFAULT '{}',
     updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
 );
 

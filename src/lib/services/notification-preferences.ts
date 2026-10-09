@@ -20,6 +20,7 @@ interface PreferencesRow {
     out_of_stock: boolean;
     expiring_courses: boolean;
     expiring_medical_exams: boolean;
+    seen_alert_ids: string[] | null;
 }
 
 const mapDbToPreferences = (db: PreferencesRow): NotificationPreferences => ({
@@ -30,8 +31,8 @@ const mapDbToPreferences = (db: PreferencesRow): NotificationPreferences => ({
 });
 
 export const notificationPreferencesApi = {
-    // Preferenze dell'utente; se non ne ha mai salvate restituisce i default
-    get: async (userId: string): Promise<NotificationPreferences> => {
+    // Preferenze dell'utente e avvisi già visti; senza riga salvata restituisce i default
+    getWithSeen: async (userId: string): Promise<{ prefs: NotificationPreferences; seenAlertIds: string[] }> => {
         const { data, error } = await supabase
             .from('user_notification_preferences')
             .select('*')
@@ -39,7 +40,25 @@ export const notificationPreferencesApi = {
             .maybeSingle();
 
         if (error) throw error;
-        return data ? mapDbToPreferences(data) : DEFAULT_NOTIFICATION_PREFERENCES;
+        return {
+            prefs: data ? mapDbToPreferences(data) : DEFAULT_NOTIFICATION_PREFERENCES,
+            seenAlertIds: data?.seen_alert_ids ?? [],
+        };
+    },
+
+    // Preferenze dell'utente; se non ne ha mai salvate restituisce i default
+    get: async (userId: string): Promise<NotificationPreferences> => {
+        return (await notificationPreferencesApi.getWithSeen(userId)).prefs;
+    },
+
+    // Registra gli avvisi visti. Sostituisce l'elenco precedente con quelli attuali,
+    // così gli id di avvisi ormai risolti vengono eliminati da soli.
+    saveSeenAlertIds: async (userId: string, alertIds: string[]): Promise<void> => {
+        const { error } = await supabase
+            .from('user_notification_preferences')
+            .upsert({ user_id: userId, seen_alert_ids: alertIds }, { onConflict: 'user_id' });
+
+        if (error) throw error;
     },
 
     // Salva tutte le preferenze (crea la riga alla prima volta)

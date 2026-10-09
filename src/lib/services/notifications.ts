@@ -16,7 +16,6 @@ export interface AppAlert {
 
 // Quanti giorni prima della scadenza iniziamo ad avvisare
 const EXPIRY_WARNING_DAYS = 60;
-const MAX_STOCK_ALERTS = 50;
 
 interface CourseRow { id: string; worker_id: string; course_name: string; completion_date: string; validity_years: number }
 interface ExamRow { id: string; worker_id: string; exam_date: string; next_exam_date: string }
@@ -63,7 +62,7 @@ const getStockAlerts = async (prefs: NotificationPreferences): Promise<AppAlert[
             });
         }
     }
-    return alerts.slice(0, MAX_STOCK_ALERTS);
+    return alerts;
 };
 
 const getCourseAlerts = async (): Promise<AppAlert[]> => {
