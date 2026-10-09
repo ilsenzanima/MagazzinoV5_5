@@ -57,11 +57,23 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
       const stored = await notificationPreferencesApi
         .getWithSeen(user.id)
         .catch(() => ({ prefs: DEFAULT_NOTIFICATION_PREFERENCES, seenAlertIds: [] as string[] }));
-      const loaded = await notificationsApi.getAlerts(stored.prefs);
+      const { alerts: loaded, complete } = await notificationsApi.getAlerts(stored.prefs);
       setPrefs(stored.prefs);
       setAlerts(loaded);
+
+      // Un avviso risolto (es. articolo rifornito) esce dall'elenco dei "visti": se si ripresenta
+      // in futuro è di nuovo nuovo. Si pulisce solo con dati completi, per non cancellare per errore.
+      const currentIds = new Set(loaded.map((a) => a.id));
+      let seen = stored.seenAlertIds;
+      if (complete) {
+        const pruned = seen.filter((id) => currentIds.has(id));
+        if (pruned.length !== seen.length) {
+          notificationPreferencesApi.saveSeenAlertIds(user.id, pruned).catch(() => { /* riproverà al prossimo giro */ });
+          seen = pruned;
+        }
+      }
       // Se il pannello è aperto tutto ciò che si vede è già "visto"
-      setSeenIds(openRef.current ? new Set(loaded.map((a) => a.id)) : new Set(stored.seenAlertIds));
+      setSeenIds(openRef.current ? currentIds : new Set(seen));
       setFailed(false);
     } catch {
       setFailed(true);

@@ -142,13 +142,17 @@ const getMedicalExamAlerts = async (): Promise<AppAlert[]> => {
 
 export const notificationsApi = {
     // Calcola gli avvisi attivi in base alle preferenze dell'utente.
-    // Se una sorgente fallisce le altre vengono comunque mostrate.
-    getAlerts: async (prefs: NotificationPreferences): Promise<AppAlert[]> => {
+    // Se una sorgente fallisce le altre vengono comunque mostrate, ma `complete`
+    // è false: in quel caso l'elenco non va usato per dedurre che un avviso è risolto.
+    getAlerts: async (prefs: NotificationPreferences): Promise<{ alerts: AppAlert[]; complete: boolean }> => {
         const results = await Promise.allSettled([
             getStockAlerts(prefs),
             prefs.expiringCourses ? getCourseAlerts() : Promise.resolve([]),
             prefs.expiringMedicalExams ? getMedicalExamAlerts() : Promise.resolve([]),
         ]);
-        return results.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
+        return {
+            alerts: results.flatMap(r => (r.status === 'fulfilled' ? r.value : [])),
+            complete: results.every(r => r.status === 'fulfilled'),
+        };
     },
 };
