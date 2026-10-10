@@ -93,10 +93,11 @@ export default function NewMovementContent({
                 onValueChange={(v: any) => form.setActiveTab(v)}
                 className="w-full"
             >
-                <TabsList className="grid w-full grid-cols-5 mb-6">
+                {/* Su smartphone le 5 schede vanno su più righe (2 colonne), su tablet 3, da schermo largo 5 in fila */}
+                <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5 mb-6">
                     <TabsTrigger
                         value="exit"
-                        className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800"
+                        className="h-10 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800"
                     >
                         <ArrowUpRight className="mr-2 h-4 w-4" />
                         Uscita
@@ -107,7 +108,7 @@ export default function NewMovementContent({
                     </TabsTrigger>
                     <TabsTrigger
                         value="entry"
-                        className="data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
+                        className="h-10 data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
                     >
                         <ArrowDownRight className="mr-2 h-4 w-4" />
                         Entrata / Reso
@@ -118,7 +119,7 @@ export default function NewMovementContent({
                     </TabsTrigger>
                     <TabsTrigger
                         value="sale"
-                        className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800"
+                        className="h-10 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800"
                     >
                         <ShoppingBag className="mr-2 h-4 w-4" />
                         Vendita
@@ -129,7 +130,7 @@ export default function NewMovementContent({
                     </TabsTrigger>
                     <TabsTrigger
                         value="waste"
-                        className="data-[state=active]:bg-violet-100 data-[state=active]:text-violet-800"
+                        className="h-10 data-[state=active]:bg-violet-100 data-[state=active]:text-violet-800"
                     >
                         <Recycle className="mr-2 h-4 w-4" />
                         Eccedenze
@@ -140,7 +141,7 @@ export default function NewMovementContent({
                     </TabsTrigger>
                     <TabsTrigger
                         value="transfer"
-                        className="data-[state=active]:bg-teal-100 data-[state=active]:text-teal-800"
+                        className="h-10 col-span-2 sm:col-span-1 data-[state=active]:bg-teal-100 data-[state=active]:text-teal-800"
                     >
                         <Repeat className="mr-2 h-4 w-4" />
                         Trasferimento
