@@ -29,8 +29,8 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
 import { Switch } from "@/components/ui/switch";
-import { costAnalysisApi } from "@/lib/services/cost-analysis";
-import { buildJobPriceMap, resolveDisplayPrice } from "@/lib/utils/job-prices";
+import { loadJobPriceMap } from "@/lib/services/job-price-lookup";
+import { resolveDisplayPrice } from "@/lib/utils/job-prices";
 interface MovementDetailContentProps {
     initialMovement: DeliveryNote;
 }
@@ -80,23 +80,26 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     const [jobPrices, setJobPrices] = useState<Map<string, number>>(new Map());
     const [jobPricesLoaded, setJobPricesLoaded] = useState(false);
 
+    // Chiave stabile degli articoli del documento: i prezzi si ricalcolano se cambiano (es. in modifica)
+    const itemIdsKey = Array.from(new Set(items.map(item => item.inventoryId).filter(Boolean))).sort().join(",");
+
     useEffect(() => {
         if (!canSeePrices || !movement.jobId) return;
         let cancelled = false;
-        costAnalysisApi.getByJobId(movement.jobId)
-            .then(rows => {
+        loadJobPriceMap(movement.jobId, itemIdsKey ? itemIdsKey.split(",") : [])
+            .then(prices => {
                 if (cancelled) return;
-                setJobPrices(buildJobPriceMap(rows));
+                setJobPrices(prices);
                 setJobPricesLoaded(true);
             })
             .catch(err => console.error("Failed to load job prices", err));
         return () => { cancelled = true; };
-    }, [canSeePrices, movement.jobId]);
+    }, [canSeePrices, movement.jobId, itemIdsKey]);
 
     const priceOf = (item: DeliveryNoteItem): number => resolveDisplayPrice(item, jobPrices, showJobPrices);
     const isJobPriced = (item: DeliveryNoteItem): boolean => showJobPrices && jobPrices.has(item.inventoryId);
     // L'interruttore compare per ogni documento con una commessa; si può attivare solo se almeno
-    // un articolo del documento è nell'Analisi Costi (altrimenti non cambierebbe nulla)
+    // un articolo del documento ha un prezzo di commessa (altrimenti non cambierebbe nulla)
     const showJobPriceSwitch = canSeePrices && jobPricesLoaded;
     const hasJobPrices = canSeePrices && items.some(item => jobPrices.has(item.inventoryId));
     const itemsWithoutJobPrice = items.filter(item => !jobPrices.has(item.inventoryId)).length;
@@ -496,7 +499,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     Prezzi di commessa
                                     {!hasJobPrices && (
                                         <span className="block text-xs text-slate-500 dark:text-slate-400">
-                                            Nessun articolo di questo documento è nell&apos;Analisi Costi della commessa
+                                            Nessun prezzo di commessa disponibile per gli articoli di questo documento
                                         </span>
                                     )}
                                 </span>

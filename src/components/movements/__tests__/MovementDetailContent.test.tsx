@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom'; // tipi dei comandi toBeInTheDocument, toHaveAttribute...
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import MovementDetailContent from '../MovementDetailContent';
 import type { DeliveryNote } from '@/lib/types';
-import { costAnalysisApi } from '@/lib/services/cost-analysis';
+import { loadJobPriceMap } from '@/lib/services/job-price-lookup';
 
 let mockRole: string | null = 'admin';
 
@@ -14,9 +14,10 @@ jest.mock('next/navigation', () => ({
 }));
 // La finestra "sposta articoli" importa codice del server (next/cache): non serve a questa prova
 jest.mock('@/components/movements/MoveItemsDialog', () => ({ __esModule: true, default: () => null }));
-jest.mock('@/lib/services/cost-analysis', () => ({
-    costAnalysisApi: { getByJobId: jest.fn() },
+jest.mock('@/lib/services/job-price-lookup', () => ({
+    loadJobPriceMap: jest.fn(),
 }));
+const loadPrices = loadJobPriceMap as jest.Mock;
 
 const movement = (overrides: Partial<DeliveryNote> = {}): DeliveryNote => ({
     id: 'dn1',
@@ -34,15 +35,13 @@ const movement = (overrides: Partial<DeliveryNote> = {}): DeliveryNote => ({
     ...overrides,
 });
 
-const analysisRows = [
-    { itemId: 'a', unitPrice: 8, maxPurchasePrice: 9 },      // silicone: prezzo impostato in analisi
-    { itemId: 'b', unitPrice: null, maxPurchasePrice: null }, // viti: nessun prezzo in analisi
-];
+// Prezzi di commessa restituiti dal caricatore: silicone 8, viti nessun prezzo (restano a quello del lotto)
+const jobPrices = new Map([['a', 8]]);
 
 describe('MovementDetailContent: prezzi di acquisto / di commessa', () => {
     beforeEach(() => {
         mockRole = 'admin';
-        (costAnalysisApi.getByJobId as jest.Mock).mockReset().mockResolvedValue(analysisRows);
+        loadPrices.mockReset().mockResolvedValue(jobPrices);
     });
 
     it('di default mostra i prezzi di acquisto e permette di passare ai prezzi di commessa', async () => {
@@ -66,12 +65,9 @@ describe('MovementDetailContent: prezzi di acquisto / di commessa', () => {
         expect(screen.queryByText(/prezzo commessa/)).not.toBeInTheDocument();
     });
 
-    it('senza prezzo impostato usa il prezzo massimo d\'acquisto bloccato dalla commessa (più lotti)', async () => {
-        // le viti hanno due lotti (3 e 6): il DDT mostra il lotto, la commessa blocca il più alto
-        (costAnalysisApi.getByJobId as jest.Mock).mockResolvedValue([
-            { itemId: 'a', unitPrice: null, maxPurchasePrice: 7 },
-            { itemId: 'b', unitPrice: null, maxPurchasePrice: 6 },
-        ]);
+    it('mostra il prezzo che la commessa blocca per tutti gli articoli del documento (più lotti)', async () => {
+        // le viti hanno più lotti (3 e 6): il DDT mostra il lotto, la commessa blocca il più alto
+        loadPrices.mockResolvedValue(new Map([['a', 7], ['b', 6]]));
         render(<MovementDetailContent initialMovement={movement()} />);
         fireEvent.click(await screen.findByRole('switch'));
         // 10 x 7 + 2 x 6 = 82
@@ -79,17 +75,23 @@ describe('MovementDetailContent: prezzi di acquisto / di commessa', () => {
         expect(screen.queryByText(/senza prezzo di commessa/)).not.toBeInTheDocument();
     });
 
-    it('se la commessa non ha prezzi per questi articoli mostra l\'interruttore disattivato con la spiegazione', async () => {
-        (costAnalysisApi.getByJobId as jest.Mock).mockResolvedValue([{ itemId: 'zzz', unitPrice: 4, maxPurchasePrice: 5 }]);
+    it('chiede i prezzi per gli articoli del documento della sua commessa', async () => {
+        render(<MovementDetailContent initialMovement={movement()} />);
+        await screen.findByRole('switch');
+        expect(loadPrices).toHaveBeenCalledWith('job1', ['a', 'b']);
+    });
+
+    it('se nessun articolo ha un prezzo di commessa mostra l\'interruttore disattivato con la spiegazione', async () => {
+        loadPrices.mockResolvedValue(new Map([['zzz', 4]]));
         render(<MovementDetailContent initialMovement={movement()} />);
         const toggle = await screen.findByRole('switch');
         expect(toggle).toBeDisabled();
-        expect(screen.getByText(/Nessun articolo di questo documento è nell'Analisi Costi/)).toBeInTheDocument();
+        expect(screen.getByText(/Nessun prezzo di commessa disponibile per gli articoli di questo documento/)).toBeInTheDocument();
         expect(screen.getByText('€ 56,00')).toBeInTheDocument();
     });
 
-    it('se la commessa non ha alcuna analisi mostra l\'interruttore disattivato', async () => {
-        (costAnalysisApi.getByJobId as jest.Mock).mockResolvedValue([]);
+    it('se non c\'è alcun prezzo di commessa l\'interruttore resta disattivato', async () => {
+        loadPrices.mockResolvedValue(new Map());
         render(<MovementDetailContent initialMovement={movement()} />);
         expect(await screen.findByRole('switch')).toBeDisabled();
     });
@@ -97,14 +99,14 @@ describe('MovementDetailContent: prezzi di acquisto / di commessa', () => {
     it('non carica né mostra nulla per chi non può vedere i prezzi', async () => {
         mockRole = 'user';
         render(<MovementDetailContent initialMovement={movement()} />);
-        expect(costAnalysisApi.getByJobId).not.toHaveBeenCalled();
+        expect(loadPrices).not.toHaveBeenCalled();
         expect(screen.queryByRole('switch')).not.toBeInTheDocument();
         expect(screen.queryByText('€ 56,00')).not.toBeInTheDocument();
     });
 
     it('non carica i prezzi di commessa per un documento senza commessa', () => {
         render(<MovementDetailContent initialMovement={movement({ jobId: undefined })} />);
-        expect(costAnalysisApi.getByJobId).not.toHaveBeenCalled();
+        expect(loadPrices).not.toHaveBeenCalled();
         expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     });
 });
