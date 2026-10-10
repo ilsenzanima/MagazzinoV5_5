@@ -35,8 +35,8 @@ const movement = (overrides: Partial<DeliveryNote> = {}): DeliveryNote => ({
 });
 
 const analysisRows = [
-    { itemId: 'a', unitPrice: 8 },   // prezzo di commessa per il silicone
-    { itemId: 'b', unitPrice: null }, // viti: nessun prezzo impostato
+    { itemId: 'a', unitPrice: 8, maxPurchasePrice: 9 },      // silicone: prezzo impostato in analisi
+    { itemId: 'b', unitPrice: null, maxPurchasePrice: null }, // viti: nessun prezzo in analisi
 ];
 
 describe('MovementDetailContent: prezzi di acquisto / di commessa', () => {
@@ -66,12 +66,25 @@ describe('MovementDetailContent: prezzi di acquisto / di commessa', () => {
         expect(screen.queryByText(/prezzo commessa/)).not.toBeInTheDocument();
     });
 
+    it('senza prezzo impostato usa il prezzo massimo d\'acquisto bloccato dalla commessa (più lotti)', async () => {
+        // le viti hanno due lotti (3 e 6): il DDT mostra il lotto, la commessa blocca il più alto
+        (costAnalysisApi.getByJobId as jest.Mock).mockResolvedValue([
+            { itemId: 'a', unitPrice: null, maxPurchasePrice: 7 },
+            { itemId: 'b', unitPrice: null, maxPurchasePrice: 6 },
+        ]);
+        render(<MovementDetailContent initialMovement={movement()} />);
+        fireEvent.click(await screen.findByRole('switch'));
+        // 10 x 7 + 2 x 6 = 82
+        expect(await screen.findByText('€ 82,00')).toBeInTheDocument();
+        expect(screen.queryByText(/senza prezzo di commessa/)).not.toBeInTheDocument();
+    });
+
     it('se la commessa non ha prezzi per questi articoli mostra l\'interruttore disattivato con la spiegazione', async () => {
-        (costAnalysisApi.getByJobId as jest.Mock).mockResolvedValue([{ itemId: 'zzz', unitPrice: 4 }]);
+        (costAnalysisApi.getByJobId as jest.Mock).mockResolvedValue([{ itemId: 'zzz', unitPrice: 4, maxPurchasePrice: 5 }]);
         render(<MovementDetailContent initialMovement={movement()} />);
         const toggle = await screen.findByRole('switch');
         expect(toggle).toBeDisabled();
-        expect(screen.getByText(/Nessun prezzo impostato nell'Analisi Costi/)).toBeInTheDocument();
+        expect(screen.getByText(/Nessun articolo di questo documento è nell'Analisi Costi/)).toBeInTheDocument();
         expect(screen.getByText('€ 56,00')).toBeInTheDocument();
     });
 

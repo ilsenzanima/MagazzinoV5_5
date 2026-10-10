@@ -96,7 +96,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     const priceOf = (item: DeliveryNoteItem): number => resolveDisplayPrice(item, jobPrices, showJobPrices);
     const isJobPriced = (item: DeliveryNoteItem): boolean => showJobPrices && jobPrices.has(item.inventoryId);
     // L'interruttore compare per ogni documento con una commessa; si può attivare solo se almeno
-    // un articolo del documento ha un prezzo di commessa (altrimenti non cambierebbe nulla)
+    // un articolo del documento è nell'Analisi Costi (altrimenti non cambierebbe nulla)
     const showJobPriceSwitch = canSeePrices && jobPricesLoaded;
     const hasJobPrices = canSeePrices && items.some(item => jobPrices.has(item.inventoryId));
     const itemsWithoutJobPrice = items.filter(item => !jobPrices.has(item.inventoryId)).length;
@@ -496,7 +496,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     Prezzi di commessa
                                     {!hasJobPrices && (
                                         <span className="block text-xs text-slate-500 dark:text-slate-400">
-                                            Nessun prezzo impostato nell&apos;Analisi Costi per questi articoli
+                                            Nessun articolo di questo documento è nell&apos;Analisi Costi della commessa
                                         </span>
                                     )}
                                 </span>

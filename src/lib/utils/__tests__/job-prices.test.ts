@@ -1,14 +1,21 @@
 import { buildJobPriceMap, resolveDisplayPrice } from '../job-prices';
 
 describe('buildJobPriceMap', () => {
-    it('tiene solo le righe con articolo e prezzo impostato', () => {
+    it('usa il prezzo impostato; se manca, il prezzo massimo d\'acquisto bloccato', () => {
         const map = buildJobPriceMap([
-            { itemId: 'a', unitPrice: 12.5 },
-            { itemId: 'b', unitPrice: null },
-            { itemId: null, unitPrice: 9 },
-            { itemId: 'c', unitPrice: 0 },
+            { itemId: 'a', unitPrice: 12.5, maxPurchasePrice: 15 },  // il prezzo impostato vince
+            { itemId: 'b', unitPrice: null, maxPurchasePrice: 9 },   // solo prezzo massimo d'acquisto
+            { itemId: 'c', unitPrice: 0, maxPurchasePrice: 4 },      // zero impostato è un prezzo valido
         ]);
-        expect(Array.from(map.entries())).toEqual([['a', 12.5], ['c', 0]]);
+        expect(Array.from(map.entries())).toEqual([['a', 12.5], ['b', 9], ['c', 0]]);
+    });
+
+    it('salta le righe senza articolo o senza nessun prezzo', () => {
+        const map = buildJobPriceMap([
+            { itemId: null, unitPrice: 9, maxPurchasePrice: 9 },
+            { itemId: 'd', unitPrice: null, maxPurchasePrice: null },
+        ]);
+        expect(map.size).toBe(0);
     });
 });
 
