@@ -72,9 +72,10 @@ Legenda: `[x]` fatto · `[~]` parziale · `[ ]` da fare
 #### Dashboard Analytics
 - [x] Dashboard con statistiche, commesse attive, movimenti e acquisti recenti, grafico presenze (recharts)
 - [x] Scadenze corsi e visite mediche dei lavoratori
-- [x] Pagina Analisi (`/analytics`): consumi mensili, articoli più usati, previsione esaurimento scorte (per quantità)
-- [ ] Top articoli per valore (euro)
-- [ ] Consumi al netto dei resi da cantiere
+- [x] Pagina Analisi spostamenti (`/analytics`): per commessa, materiali andati e rientrati, quantità reale in commessa, andamento nel tempo e confronto fino a 6 commesse
+- [ ] Valore in euro dei materiali per commessa (con gestione dei permessi sui prezzi)
+- [ ] Filtro per periodo di date nell'analisi spostamenti
+- [ ] Previsione di esaurimento scorte (tolta dalla pagina Analisi, ripristinabile dalla cronologia git)
 - **Effort:** 2-3 giorni
 
 ### Bassa Priorità

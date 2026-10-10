@@ -194,7 +194,7 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           active: pathname === "/reports",
         },
         {
-          label: "Analisi",
+          label: "Analisi spostamenti",
           icon: TrendingUp,
           href: "/analytics",
           active: pathname === "/analytics",

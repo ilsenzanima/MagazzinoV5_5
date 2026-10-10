@@ -1,89 +1,135 @@
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 
-import { buildConsumptionAnalytics, buildMonthKeys } from '../analytics';
+import { analyzeJob, buildComparisonRows, buildTimeline, JobMovementRow } from '../analytics';
 
-// Data fissa per rendere i test deterministici: 15 ottobre 2026
-const NOW = new Date(2026, 9, 15, 12, 0, 0);
-
-const row = (itemId: string, quantity: number, date: Date, extra: Record<string, any> = {}) => ({
-    item_id: itemId,
-    item_code: `COD-${itemId}`,
-    item_name: `Articolo ${itemId}`,
+const mov = (type: string, code: string, quantity: number, date: Date, extra: Partial<JobMovementRow> = {}): JobMovementRow => ({
+    type,
+    item_id: `id-${code}`,
+    item_code: code,
+    item_name: `Articolo ${code}`,
+    item_model: null,
     item_unit: 'PZ',
     quantity,
+    pieces: null,
+    coefficient: null,
+    is_fictitious: false,
     date: date.toISOString(),
     ...extra,
 });
 
-describe('buildMonthKeys', () => {
-    it('restituisce 12 mesi dal più vecchio al corrente, attraversando l\'anno', () => {
-        const keys = buildMonthKeys(NOW);
-        expect(keys).toHaveLength(12);
-        expect(keys[0]).toBe('2025-11');
-        expect(keys[11]).toBe('2026-10');
+describe('analyzeJob', () => {
+    it('calcola la quantità reale in commessa: andati meno rientrati', () => {
+        const rows = [
+            mov('exit', 'VITI', -1000, new Date(2026, 0, 10)),
+            mov('exit', 'VITI', -500, new Date(2026, 0, 20)),
+            mov('entry', 'VITI', 300, new Date(2026, 1, 5)),
+        ];
+        const [viti] = analyzeJob('j1', rows).items;
+        expect(viti.sent).toBe(1500);
+        expect(viti.returned).toBe(300);
+        expect(viti.net).toBe(1200);
+        expect(viti.movements).toBe(3);
+    });
+
+    it('conta gli acquisti diretti e le vendite come merce andata in commessa', () => {
+        const rows = [
+            mov('purchase', 'A', 10, new Date(2026, 0, 1)),
+            mov('sale', 'A', -2, new Date(2026, 0, 2)),
+            mov('exit', 'A', -3, new Date(2026, 0, 3)),
+        ];
+        expect(analyzeJob('j1', rows).items[0].net).toBe(15);
+    });
+
+    it('ignora i tipi non pertinenti e i movimenti senza codice articolo', () => {
+        const rows = [
+            mov('return_to_supplier', 'A', -5, new Date(2026, 0, 1)),
+            mov('exit', 'B', -5, new Date(2026, 0, 1), { item_code: null }),
+        ];
+        const result = analyzeJob('j1', rows);
+        expect(result.items).toHaveLength(0);
+        expect(result.movementCount).toBe(0);
+        expect(result.firstDate).toBeNull();
+    });
+
+    it('tiene separati gli articoli fittizi con lo stesso codice', () => {
+        const rows = [
+            mov('exit', 'A', -1, new Date(2026, 0, 1)),
+            mov('exit', 'A', -1, new Date(2026, 0, 1), { is_fictitious: true }),
+        ];
+        expect(analyzeJob('j1', rows).items).toHaveLength(2);
+    });
+
+    it('calcola i pezzi netti dal campo pezzi o dal coefficiente', () => {
+        const rows = [
+            mov('exit', 'LASTRA', -12, new Date(2026, 0, 1), { pieces: 10, item_unit: 'MQ' }),
+            mov('entry', 'LASTRA', 2.4, new Date(2026, 0, 5), { pieces: null, coefficient: 1.2, item_unit: 'MQ' }),
+        ];
+        const [lastra] = analyzeJob('j1', rows).items;
+        expect(lastra.net).toBe(9.6);
+        expect(lastra.netPieces).toBe(8); // 10 pezzi andati - 2 rientrati
+    });
+
+    it('riporta primo e ultimo movimento e i movimenti per mese', () => {
+        const rows = [
+            mov('exit', 'A', -1, new Date(2026, 0, 10)),
+            mov('exit', 'B', -1, new Date(2026, 0, 12)),
+            mov('entry', 'A', 1, new Date(2026, 2, 3)),
+        ];
+        const result = analyzeJob('j1', rows);
+        expect(result.firstDate?.getMonth()).toBe(0);
+        expect(result.lastDate?.getMonth()).toBe(2);
+        expect(Object.values(result.monthlyActivity).sort()).toEqual([1, 2]);
     });
 });
 
-describe('buildConsumptionAnalytics', () => {
-    it('somma i consumi per mese usando il valore assoluto delle uscite', () => {
-        const rows = [
-            row('a', -5, new Date(2026, 9, 2)),
-            row('a', -3, new Date(2026, 9, 10)),
-            row('a', -4, new Date(2026, 8, 20)),
-        ];
-        const { months, items } = buildConsumptionAnalytics(rows, [], NOW);
-        const a = items.find(i => i.id === 'a')!;
-        expect(a.monthly[months.indexOf('2026-10')]).toBe(8);
-        expect(a.monthly[months.indexOf('2026-09')]).toBe(4);
+describe('buildComparisonRows', () => {
+    it('unisce gli articoli di più commesse e lascia vuoto dove non compaiono', () => {
+        const j1 = analyzeJob('j1', [mov('exit', 'A', -4, new Date(2026, 0, 1)), mov('exit', 'B', -1, new Date(2026, 0, 1))]);
+        const j2 = analyzeJob('j2', [mov('exit', 'A', -6, new Date(2026, 3, 1))]);
+        const rows = buildComparisonRows([j1, j2]);
+        expect(rows.map(r => r.code)).toEqual(['A', 'B']);
+        expect(rows[0].byJob.j1.net).toBe(4);
+        expect(rows[0].byJob.j2.net).toBe(6);
+        expect(rows[1].byJob.j2).toBeUndefined();
+    });
+});
+
+describe('buildTimeline', () => {
+    const j1 = analyzeJob('j1', [
+        mov('exit', 'A', -10, new Date(2026, 0, 10)),
+        mov('entry', 'A', 4, new Date(2026, 2, 10)),
+    ]);
+    const j2 = analyzeJob('j2', [mov('exit', 'A', -7, new Date(2026, 5, 1))]);
+
+    it('mostra la quantità cumulata di un articolo, con i rientri che la riducono', () => {
+        const points = buildTimeline([j1], 'A|0', 'calendar');
+        expect(points.map(p => p.j1)).toEqual([10, 10, 6]);
+        expect(points.map(p => p.label)).toEqual(['gen 26', 'feb 26', 'mar 26']);
     });
 
-    it('ignora i movimenti più vecchi di 12 mesi, nel futuro oltre il mese corrente e con quantità zero', () => {
-        const rows = [
-            row('a', -10, new Date(2025, 9, 31)),
-            row('b', 0, new Date(2026, 9, 1)),
-            row('c', -2, new Date(2026, 10, 3)),
-        ];
-        expect(buildConsumptionAnalytics(rows, [], NOW).items).toHaveLength(0);
+    it('in modalità calendario lascia vuoti i mesi in cui la commessa non era attiva', () => {
+        const points = buildTimeline([j1, j2], 'A|0', 'calendar');
+        expect(points).toHaveLength(6);
+        expect(points[0].j2).toBeNull();
+        expect(points[5].j2).toBe(7);
+        expect(points[5].j1).toBeNull();
     });
 
-    it('usa valori di ripiego quando mancano nome, codice o unità', () => {
-        const rows = [row('a', -1, new Date(2026, 9, 1), { item_name: null, item_code: null, item_unit: null })];
-        const [item] = buildConsumptionAnalytics(rows, [], NOW).items;
-        expect(item.name).toBe('Articolo senza nome');
-        expect(item.code).toBe('');
-        expect(item.unit).toBe('N/D');
+    it('in modalità dall\'inizio allinea le commesse sul primo mese', () => {
+        const points = buildTimeline([j1, j2], 'A|0', 'fromStart');
+        expect(points).toHaveLength(3);
+        expect(points[0].label).toBe('Mese 1');
+        expect(points[0].j1).toBe(10);
+        expect(points[0].j2).toBe(7);
+        expect(points[1].j2).toBeNull();
     });
 
-    it('segnala nella previsione gli articoli che finiscono entro 60 giorni, dal più urgente', () => {
-        // a: 90 consumati in 90 giorni = 1 al giorno, 30 in magazzino -> 30 giorni
-        // b: 90 consumati, 10 in magazzino -> 10 giorni
-        // c: 9 consumati (0,1 al giorno), 30 in magazzino -> 300 giorni, non segnalato
-        const rows = [
-            row('a', -90, new Date(2026, 8, 1)),
-            row('b', -90, new Date(2026, 8, 1)),
-            row('c', -9, new Date(2026, 8, 1)),
-        ];
-        const stock = [
-            { id: 'a', quantity: 30 },
-            { id: 'b', quantity: 10 },
-            { id: 'c', quantity: 30 },
-        ];
-        const { forecast } = buildConsumptionAnalytics(rows, stock, NOW);
-        expect(forecast.map(f => f.id)).toEqual(['b', 'a']);
-        expect(Math.round(forecast[0].daysLeft)).toBe(10);
-        expect(Math.round(forecast[1].daysLeft)).toBe(30);
+    it('senza articolo mostra il numero di movimenti per mese', () => {
+        const points = buildTimeline([j1], null, 'calendar');
+        expect(points.map(p => p.j1)).toEqual([1, 0, 1]);
     });
 
-    it('non prevede articoli già esauriti o senza consumi recenti', () => {
-        const rows = [
-            row('a', -50, new Date(2026, 8, 1)),
-            // consumo vecchio di oltre 90 giorni: conta per il grafico ma non per la previsione
-            row('b', -50, new Date(2026, 2, 1)),
-        ];
-        const stock = [
-            { id: 'a', quantity: 0 },
-            { id: 'b', quantity: 5 },
-        ];
-        expect(buildConsumptionAnalytics(rows, stock, NOW).forecast).toHaveLength(0);
+    it('restituisce un elenco vuoto se nessuna commessa ha movimenti', () => {
+        expect(buildTimeline([analyzeJob('j9', [])], null, 'calendar')).toEqual([]);
     });
 });
