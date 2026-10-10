@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom'; // tipi dei comandi toBeInTheDocument, toHaveAttribute...
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MovementDetailContent from '../MovementDetailContent';
 import type { DeliveryNote } from '@/lib/types';
