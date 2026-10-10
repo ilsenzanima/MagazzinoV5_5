@@ -78,19 +78,26 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     // Serve solo per la visualizzazione: i prezzi salvati sulle righe del documento non vengono toccati.
     const [showJobPrices, setShowJobPrices] = useState(false);
     const [jobPrices, setJobPrices] = useState<Map<string, number>>(new Map());
+    const [jobPricesLoaded, setJobPricesLoaded] = useState(false);
 
     useEffect(() => {
         if (!canSeePrices || !movement.jobId) return;
         let cancelled = false;
         costAnalysisApi.getByJobId(movement.jobId)
-            .then(rows => { if (!cancelled) setJobPrices(buildJobPriceMap(rows)); })
+            .then(rows => {
+                if (cancelled) return;
+                setJobPrices(buildJobPriceMap(rows));
+                setJobPricesLoaded(true);
+            })
             .catch(err => console.error("Failed to load job prices", err));
         return () => { cancelled = true; };
     }, [canSeePrices, movement.jobId]);
 
     const priceOf = (item: DeliveryNoteItem): number => resolveDisplayPrice(item, jobPrices, showJobPrices);
     const isJobPriced = (item: DeliveryNoteItem): boolean => showJobPrices && jobPrices.has(item.inventoryId);
-    // L'interruttore compare solo se almeno un articolo del documento ha un prezzo di commessa
+    // L'interruttore compare per ogni documento con una commessa; si può attivare solo se almeno
+    // un articolo del documento ha un prezzo di commessa (altrimenti non cambierebbe nulla)
+    const showJobPriceSwitch = canSeePrices && jobPricesLoaded;
     const hasJobPrices = canSeePrices && items.some(item => jobPrices.has(item.inventoryId));
     const itemsWithoutJobPrice = items.filter(item => !jobPrices.has(item.inventoryId)).length;
 
@@ -474,10 +481,25 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
                     <CardTitle>Articoli ({items.length})</CardTitle>
                     <div className="flex flex-wrap items-center gap-4">
-                        {hasJobPrices && (
-                            <label htmlFor="job-prices-switch" className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                                <Switch id="job-prices-switch" checked={showJobPrices} onCheckedChange={setShowJobPrices} />
-                                <span>Prezzi di commessa</span>
+                        {showJobPriceSwitch && (
+                            <label
+                                htmlFor="job-prices-switch"
+                                className={`flex items-center gap-2 text-sm select-none ${hasJobPrices ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
+                            >
+                                <Switch
+                                    id="job-prices-switch"
+                                    checked={showJobPrices && hasJobPrices}
+                                    onCheckedChange={setShowJobPrices}
+                                    disabled={!hasJobPrices}
+                                />
+                                <span>
+                                    Prezzi di commessa
+                                    {!hasJobPrices && (
+                                        <span className="block text-xs text-slate-500 dark:text-slate-400">
+                                            Nessun prezzo impostato nell&apos;Analisi Costi per questi articoli
+                                        </span>
+                                    )}
+                                </span>
                             </label>
                         )}
                         {isEditing && (

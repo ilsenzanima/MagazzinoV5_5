@@ -66,11 +66,19 @@ describe('MovementDetailContent: prezzi di acquisto / di commessa', () => {
         expect(screen.queryByText(/prezzo commessa/)).not.toBeInTheDocument();
     });
 
-    it('non mostra l\'interruttore se la commessa non ha prezzi per gli articoli del documento', async () => {
+    it('se la commessa non ha prezzi per questi articoli mostra l\'interruttore disattivato con la spiegazione', async () => {
         (costAnalysisApi.getByJobId as jest.Mock).mockResolvedValue([{ itemId: 'zzz', unitPrice: 4 }]);
         render(<MovementDetailContent initialMovement={movement()} />);
-        await waitFor(() => expect(costAnalysisApi.getByJobId).toHaveBeenCalled());
-        expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+        const toggle = await screen.findByRole('switch');
+        expect(toggle).toBeDisabled();
+        expect(screen.getByText(/Nessun prezzo impostato nell'Analisi Costi/)).toBeInTheDocument();
+        expect(screen.getByText('€ 56,00')).toBeInTheDocument();
+    });
+
+    it('se la commessa non ha alcuna analisi mostra l\'interruttore disattivato', async () => {
+        (costAnalysisApi.getByJobId as jest.Mock).mockResolvedValue([]);
+        render(<MovementDetailContent initialMovement={movement()} />);
+        expect(await screen.findByRole('switch')).toBeDisabled();
     });
 
     it('non carica né mostra nulla per chi non può vedere i prezzi', async () => {
