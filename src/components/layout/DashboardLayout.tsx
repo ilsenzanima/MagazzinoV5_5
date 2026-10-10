@@ -30,13 +30,14 @@ import {
   PackageCheck,
   GanttChartSquare,
   UserCircle,
-  ChevronRight,
+  TrendingUp,
   AlertTriangle
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
 import { useEffect, useState } from "react";
 import { MobileNavBar } from "./MobileNavBar";
+import { NotificationBell } from "./NotificationBell";
 import { inventoryApi } from "@/lib/services/inventory";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -192,6 +193,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/reports",
           active: pathname === "/reports",
         },
+        {
+          label: "Analisi spostamenti",
+          icon: TrendingUp,
+          href: "/analytics",
+          active: pathname === "/analytics",
+        },
       ]
     },
     {
@@ -270,11 +277,11 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
       </div>
 
       {user && (
-        <div className="p-2 bg-sidebar border-t border-sidebar-border">
+        <div className="p-2 bg-sidebar border-t border-sidebar-border flex items-center gap-1">
           <button
             type="button"
             onClick={() => setIsProfileOpen(true)}
-            className="w-full flex items-center space-x-3 p-2 rounded-md hover:bg-sidebar-accent/50 transition-colors text-left"
+            className="flex-1 min-w-0 flex items-center space-x-3 p-2 rounded-md hover:bg-sidebar-accent/50 transition-colors text-left"
           >
             <Avatar className="h-8 w-8">
               <AvatarImage src={`/avatars/${userRole || 'user'}.png`} />
@@ -284,8 +291,8 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
               <p className="text-sm font-medium text-sidebar-foreground truncate">{fullName || user.email}</p>
               <p className="text-xs text-sidebar-foreground/60 capitalize">{userRole || 'User'}</p>
             </div>
-            <ChevronRight className="h-4 w-4 text-sidebar-foreground/40 shrink-0" />
           </button>
+          <NotificationBell onNavigate={onLinkClick} />
         </div>
       )}
 
