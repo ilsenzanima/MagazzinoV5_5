@@ -5,7 +5,8 @@ export const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 export const sharedSentryOptions = {
     dsn: sentryDsn,
     enabled: !!sentryDsn,
-    environment: process.env.VERCEL_ENV || process.env.NODE_ENV,
+    // Distingue produzione da anteprime (NEXT_PUBLIC_VERCEL_ENV è visibile anche nel browser)
+    environment: process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.VERCEL_ENV || process.env.NODE_ENV,
     // Solo errori: nessun tracciamento delle prestazioni e nessuna registrazione delle sessioni
     tracesSampleRate: 0,
     // Non inviare dati personali degli utenti (IP, cookie, intestazioni)
