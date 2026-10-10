@@ -28,6 +28,9 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 // jsPDF and autoTable are loaded dynamically on demand to reduce bundle size
 import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
+import { Switch } from "@/components/ui/switch";
+import { costAnalysisApi } from "@/lib/services/cost-analysis";
+import { buildJobPriceMap, resolveDisplayPrice } from "@/lib/utils/job-prices";
 interface MovementDetailContentProps {
     initialMovement: DeliveryNote;
 }
@@ -71,10 +74,30 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     // Helper for role-based visibility
     const canSeePrices = userRole === 'admin' || userRole === 'operativo';
 
+    // Prezzi di commessa (Analisi Costi): interruttore tra prezzo di acquisto (default) e prezzo di commessa.
+    // Serve solo per la visualizzazione: i prezzi salvati sulle righe del documento non vengono toccati.
+    const [showJobPrices, setShowJobPrices] = useState(false);
+    const [jobPrices, setJobPrices] = useState<Map<string, number>>(new Map());
+
+    useEffect(() => {
+        if (!canSeePrices || !movement.jobId) return;
+        let cancelled = false;
+        costAnalysisApi.getByJobId(movement.jobId)
+            .then(rows => { if (!cancelled) setJobPrices(buildJobPriceMap(rows)); })
+            .catch(err => console.error("Failed to load job prices", err));
+        return () => { cancelled = true; };
+    }, [canSeePrices, movement.jobId]);
+
+    const priceOf = (item: DeliveryNoteItem): number => resolveDisplayPrice(item, jobPrices, showJobPrices);
+    const isJobPriced = (item: DeliveryNoteItem): boolean => showJobPrices && jobPrices.has(item.inventoryId);
+    // L'interruttore compare solo se almeno un articolo del documento ha un prezzo di commessa
+    const hasJobPrices = canSeePrices && items.some(item => jobPrices.has(item.inventoryId));
+    const itemsWithoutJobPrice = items.filter(item => !jobPrices.has(item.inventoryId)).length;
+
     // Calculate Grand Total
     const grandTotal = useMemo(() => {
-        return items.reduce((sum, item) => sum + (item.quantity * (item.price || 0)), 0);
-    }, [items]);
+        return items.reduce((sum, item) => sum + (item.quantity * resolveDisplayPrice(item, jobPrices, showJobPrices)), 0);
+    }, [items, jobPrices, showJobPrices]);
 
     // Fetch inventory items on demand
     const handleSearchInventory = async (term: string) => {
@@ -448,14 +471,22 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
 
             {/* Items Table */}
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
                     <CardTitle>Articoli ({items.length})</CardTitle>
-                    {isEditing && (
-                        <Button size="sm" onClick={() => setIsItemSelectorOpen(true)}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Aggiungi Articolo
-                        </Button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-4">
+                        {hasJobPrices && (
+                            <label htmlFor="job-prices-switch" className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                                <Switch id="job-prices-switch" checked={showJobPrices} onCheckedChange={setShowJobPrices} />
+                                <span>Prezzi di commessa</span>
+                            </label>
+                        )}
+                        {isEditing && (
+                            <Button size="sm" onClick={() => setIsItemSelectorOpen(true)}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Aggiungi Articolo
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {/* Desktop View: Table */}
@@ -555,10 +586,13 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                             {canSeePrices && (
                                                 <>
                                                     <TableCell className="text-right font-medium text-slate-600 dark:text-slate-400">
-                                                        {formatCurrency(item.price || 0)}
+                                                        {formatCurrency(priceOf(item))}
+                                                        {isJobPriced(item) && (
+                                                            <span className="block text-[10px] font-normal text-blue-600 dark:text-blue-400">prezzo commessa</span>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-bold text-slate-900 dark:text-slate-100">
-                                                        {formatCurrency((item.price || 0) * item.quantity)}
+                                                        {formatCurrency(priceOf(item) * item.quantity)}
                                                     </TableCell>
                                                 </>
                                             )}
@@ -656,10 +690,11 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     {canSeePrices && (
                                         <div className="flex justify-between items-center border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
                                             <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                {formatCurrency(item.price || 0)} / unità
+                                                {formatCurrency(priceOf(item))} / unità
+                                                {isJobPriced(item) && <span className="ml-1 text-blue-600 dark:text-blue-400">· prezzo commessa</span>}
                                             </div>
                                             <div className="font-bold text-slate-900 dark:text-slate-100">
-                                                {formatCurrency((item.price || 0) * item.quantity)}
+                                                {formatCurrency(priceOf(item) * item.quantity)}
                                             </div>
                                         </div>
                                     )}
@@ -671,10 +706,17 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                     {canSeePrices && items.length > 0 && (
                         <div className="mt-6 flex justify-end border-t border-slate-200 dark:border-slate-700 pt-4">
                             <div className="text-right">
-                                <span className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold mr-4">Totale Documento</span>
+                                <span className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold mr-4">
+                                    Totale Documento{showJobPrices ? " (prezzi di commessa)" : ""}
+                                </span>
                                 <span className="text-2xl font-bold text-slate-900 dark:text-white">
                                     {formatCurrency(grandTotal)}
                                 </span>
+                                {showJobPrices && itemsWithoutJobPrice > 0 && (
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                        {itemsWithoutJobPrice === 1 ? "1 articolo senza prezzo di commessa mantiene" : `${itemsWithoutJobPrice} articoli senza prezzo di commessa mantengono`} il prezzo di acquisto.
+                                    </p>
+                                )}
                             </div>
                         </div>
                     )}
