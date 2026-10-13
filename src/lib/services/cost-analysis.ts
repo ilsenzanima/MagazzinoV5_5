@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { proposalCostAnalysisApi, proposalCostAnalysisVersionsApi } from './proposal-cost-analysis';
+import { buildReferencePriceMap } from '@/lib/utils/reference-purchase-price';
 
 export interface CostAnalysisParams {
     jobId: string;
@@ -101,16 +102,11 @@ export const costAnalysisApi = {
         if (error) throw error;
     },
 
-    // Prezzo unitario più alto per un articolo su tutti gli acquisti
+    // Prezzo di riferimento di un articolo: massimo degli ultimi 6 mesi sugli acquisti veri
+    // (ordini e acquisti cancellati esclusi), altrimenti prezzo dell'ultimo acquisto
     getMaxPurchasePrice: async (itemId: string): Promise<number | null> => {
-        const { data, error } = await supabase
-            .from('purchase_items')
-            .select('price')
-            .eq('item_id', itemId)
-            .order('price', { ascending: false })
-            .limit(1);
-        if (error) throw error;
-        return data && data.length > 0 ? Number(data[0].price) : null;
+        const map = await costAnalysisApi.getMaxPurchasePrices([itemId]);
+        return map.get(itemId) ?? null;
     },
 
     getParams: async (jobId: string): Promise<CostAnalysisParams> => {
@@ -215,18 +211,23 @@ export const costAnalysisApi = {
         const { data, error } = await supabase
             .rpc('get_max_purchase_prices', { item_ids: itemIds });
         if (error) {
-            // Fallback: query manuale se la RPC non esiste
+            // Fallback: query manuale se la RPC non esiste (stessa regola della RPC)
             const { data: rows, error: e2 } = await supabase
                 .from('purchase_items')
-                .select('item_id, price')
+                .select('item_id, price, purchases!inner(order_type, delivery_note_date, created_at, deleted_at)')
                 .in('item_id', itemIds);
             if (e2) throw e2;
-            const map = new Map<string, number>();
-            for (const r of rows || []) {
-                const cur = map.get(r.item_id) ?? 0;
-                if (Number(r.price) > cur) map.set(r.item_id, Number(r.price));
-            }
-            return map;
+            return buildReferencePriceMap((rows || []).map(r => {
+                const pu = Array.isArray(r.purchases) ? r.purchases[0] : r.purchases;
+                return {
+                    itemId: r.item_id,
+                    price: Number(r.price),
+                    date: pu?.delivery_note_date ?? null,
+                    createdAt: pu?.created_at ?? null,
+                    orderType: pu?.order_type ?? null,
+                    deletedAt: pu?.deleted_at ?? null,
+                };
+            }));
         }
         const map = new Map<string, number>();
         for (const r of data || []) map.set(r.item_id, Number(r.max_price));
