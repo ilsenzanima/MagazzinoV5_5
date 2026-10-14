@@ -122,7 +122,7 @@ describe('auditPurchases', () => {
         expect(again.hasPriceAnomaly).toBe(true);
     });
 
-    it('dopo il controllo, un nuovo lotto dell'autore abituale non fa riapparire gli autori diversi', () => {
+    it('dopo il controllo, un nuovo lotto dell\'autore abituale non fa riapparire gli autori diversi', () => {
         const base = { reviewedAt: '2026-06-01T00:00:00Z' };
         const [item] = auditPurchases([
             lot({ purchaseId: 'a', price: 10, ...base }),
