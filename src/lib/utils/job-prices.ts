@@ -20,6 +20,23 @@ export const buildJobPriceMap = (rows: JobPriceRow[]): Map<string, number> => {
     return map;
 };
 
+// Un lotto («riga d'acquisto») si identifica con acquisto + articolo: le viste dei movimenti espongono
+// questi due valori, non l'id della riga d'acquisto.
+export const lotKey = (purchaseId: string | null | undefined, itemId: string | null | undefined): string =>
+    `${purchaseId ?? ''}|${itemId ?? ''}`;
+
+// Prezzo unitario di una riga di movimento nei costi di commessa: prezzo di commessa dell'articolo,
+// salvo che la riga provenga da un lotto «non calcolare» (resta al prezzo del lotto) o l'articolo
+// non abbia un prezzo di commessa (resta il prezzo del lotto).
+export const movementUnitPrice = (
+    m: { itemId: string; itemPrice?: number | null; purchaseId?: string | null },
+    jobPrices: Map<string, number>,
+    excludedLotKeys?: Set<string>
+): number => {
+    if (excludedLotKeys?.has(lotKey(m.purchaseId, m.itemId))) return m.itemPrice ?? 0;
+    return jobPrices.get(m.itemId) ?? m.itemPrice ?? 0;
+};
+
 // Prezzo da mostrare per una riga: di commessa se richiesto e disponibile, altrimenti quello di acquisto
 // Un lotto segnato «non calcolare» ha un prezzo corretto solo per i suoi pezzi: le righe prelevate da quel
 // lotto restano al prezzo del lotto, il resto dell'articolo usa il prezzo di commessa.

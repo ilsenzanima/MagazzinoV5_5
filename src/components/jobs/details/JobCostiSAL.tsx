@@ -16,6 +16,8 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
 import { salApi, salCostsApi, salNamesApi, SalItem, SalCost, WorkerHoursSalData } from "@/lib/services/sal"
 import { loadJobPriceMap } from "@/lib/services/job-price-lookup"
+import { purchaseAuditApi } from "@/lib/services/purchase-audit"
+import { movementUnitPrice } from "@/lib/utils/job-prices"
 import { createClient } from "@/lib/supabase/client"
 import { notify } from "@/lib/notify"
 import * as XLSX from "xlsx-js-style"
@@ -188,6 +190,8 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
     const [salNamesData, setSalNamesData] = useState<string[]>([])
     // Prezzo unitario di commessa per articolo (Analisi Costi), usato per valorizzare i materiali
     const [jobPriceMap, setJobPriceMap] = useState<Map<string, number>>(new Map())
+    // Lotti «non calcolare»: le righe prelevate da quei lotti restano al prezzo del lotto
+    const [excludedLotKeys, setExcludedLotKeys] = useState<Set<string>>(new Set())
     const [pricesReady, setPricesReady] = useState(false)
     const [loading, setLoading] = useState(true)
 
@@ -292,8 +296,15 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
 
     useEffect(() => {
         let cancelled = false
-        loadJobPriceMap(jobId, priceItemIdsKey ? priceItemIdsKey.split(',') : [])
-            .then(map => { if (!cancelled) setJobPriceMap(map) })
+        Promise.all([
+            loadJobPriceMap(jobId, priceItemIdsKey ? priceItemIdsKey.split(',') : []),
+            purchaseAuditApi.getExcludedLotKeys().catch(() => new Set<string>()),
+        ])
+            .then(([map, excluded]) => {
+                if (cancelled) return
+                setJobPriceMap(map)
+                setExcludedLotKeys(excluded)
+            })
             .catch(e => {
                 console.error('Failed to load job prices', e)
                 if (!cancelled) notify.error("Impossibile caricare i prezzi di commessa: i costi mostrati usano i prezzi dei lotti.")
@@ -341,7 +352,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                     description: [m.itemName, m.itemModel].filter(Boolean).join(' — ') || m.itemCode || '—',
                     pieces: sign * Math.abs(rawPieces),
                     unit: m.itemUnit,
-                    amount: sign * Math.abs(m.quantity || 0) * (jobPriceMap.get(m.itemId) ?? m.itemPrice ?? 0),
+                    amount: sign * Math.abs(m.quantity || 0) * movementUnitPrice(m, jobPriceMap, excludedLotKeys),
                     salNames: salTagMap.get(`movement:${m.id}`) || [],
                     isFictitious: m.isFictitious === true,
                     // For exit rows: provenance info from the original purchase
@@ -375,7 +386,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                 description: [m.itemName, m.itemModel].filter(Boolean).join(' — ') || m.itemCode || '—',
                 pieces: m.pieces ?? (Math.abs(m.quantity || 0) * (m.coefficient || 1)),
                 unit: m.itemUnit,
-                amount: Math.abs(m.quantity || 0) * (jobPriceMap.get(m.itemId) ?? m.itemPrice ?? 0),
+                amount: Math.abs(m.quantity || 0) * movementUnitPrice(m, jobPriceMap, excludedLotKeys),
                 salNames: salTagMap.get(`movement:${m.id}`) || [],
                 isFictitious: false,
             }))
@@ -394,7 +405,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
         })
 
         return groups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    }, [movements, purchases, salTagMap, jobPriceMap])
+    }, [movements, purchases, salTagMap, jobPriceMap, excludedLotKeys])
 
     // ── Derived: filtered groups (children filtered when TAG is active) ───────
     const filteredMaterialGroups: MaterialGroup[] = useMemo(() => {

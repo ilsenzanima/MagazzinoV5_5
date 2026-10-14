@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { AuditLot } from '@/lib/utils/purchase-price-audit';
+import { lotKey } from '@/lib/utils/job-prices';
 
 const PAGE_SIZE = 1000;
 
@@ -94,6 +95,16 @@ export const purchaseAuditApi = {
             .eq('exclude_from_reference', true);
         if (error) throw error;
         return new Set((data ?? []).map((r: any) => r.id as string));
+    },
+
+    // Tutti i lotti «non calcolare», come chiavi acquisto|articolo (vedi lotKey): sono pochi
+    getExcludedLotKeys: async (): Promise<Set<string>> => {
+        const { data, error } = await supabase
+            .from('purchase_items')
+            .select('purchase_id, item_id')
+            .eq('exclude_from_reference', true);
+        if (error) throw error;
+        return new Set((data ?? []).map((r: any) => lotKey(r.purchase_id, r.item_id)));
     },
 
     setPackQuantity: async (itemId: string, packQuantity: number | null): Promise<void> => {
