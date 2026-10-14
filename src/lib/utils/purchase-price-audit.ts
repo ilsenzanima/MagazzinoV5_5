@@ -125,7 +125,7 @@ export const auditPurchases = (
             packQuantity: itemLots[0].packQuantity,
             reviewedAt: itemLots[0].reviewedAt,
             hasPriceAnomaly: lotResults.some(l => l.isNew && l.priceAnomaly),
-            hasMultipleAuthors: hasMultipleAuthors && lotResults.some(l => l.isNew),
+            hasMultipleAuthors: lotResults.some(l => l.isNew && l.differentAuthor),
             hasPackIssue: lotResults.some(l => l.isNew && packIssueOf(l)),
         });
     }

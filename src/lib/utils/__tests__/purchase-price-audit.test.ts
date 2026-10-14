@@ -121,4 +121,22 @@ describe('auditPurchases', () => {
         ]);
         expect(again.hasPriceAnomaly).toBe(true);
     });
+
+    it('dopo il controllo, un nuovo lotto dell'autore abituale non fa riapparire gli autori diversi', () => {
+        const base = { reviewedAt: '2026-06-01T00:00:00Z' };
+        const [item] = auditPurchases([
+            lot({ purchaseId: 'a', price: 10, ...base }),
+            lot({ purchaseId: 'b', price: 10, ...base }),
+            lot({ purchaseId: 'c', price: 10, createdBy: 'u2', createdByName: 'Luca', ...base }),
+            lot({ purchaseId: 'n', price: 10, createdAt: '2026-07-01T00:00:00Z', ...base }), // nuovo, stesso autore prevalente
+        ]);
+        expect(item.hasMultipleAuthors).toBe(false);
+
+        const [again] = auditPurchases([
+            lot({ purchaseId: 'a', price: 10, ...base }),
+            lot({ purchaseId: 'b', price: 10, ...base }),
+            lot({ purchaseId: 'n', price: 10, createdBy: 'u2', createdByName: 'Luca', createdAt: '2026-07-01T00:00:00Z', ...base }),
+        ]);
+        expect(again.hasMultipleAuthors).toBe(true);
+    });
 });
