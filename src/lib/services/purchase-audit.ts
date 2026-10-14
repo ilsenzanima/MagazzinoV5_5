@@ -3,6 +3,16 @@ import type { AuditLot } from '@/lib/utils/purchase-price-audit';
 
 const PAGE_SIZE = 1000;
 
+export interface PackItem {
+    id: string;
+    name: string;
+    model: string | null;
+    brand: string | null;
+    unit: string | null;
+    code: string | null;
+    packQuantity: number | null;
+}
+
 // Righe di acquisti veri (non ordini, non cancellati) con autore e fornitore, per il controllo prezzi.
 export const purchaseAuditApi = {
     getLots: async (): Promise<AuditLot[]> => {
@@ -64,5 +74,33 @@ export const purchaseAuditApi = {
     setPackQuantity: async (itemId: string, packQuantity: number | null): Promise<void> => {
         const { error } = await supabase.from('inventory').update({ pack_quantity: packQuantity }).eq('id', itemId);
         if (error) throw error;
+    },
+
+    // Tutti gli articoli (con le loro varianti: stesso nome, modello o marca diversi) per la modifica rapida
+    getPackItems: async (): Promise<PackItem[]> => {
+        const items: PackItem[] = [];
+        for (let from = 0; ; from += PAGE_SIZE) {
+            const { data, error } = await supabase
+                .from('inventory')
+                .select('id, name, model, brand, unit, code, pack_quantity')
+                .is('deleted_at', null)
+                .order('name', { ascending: true })
+                .order('id', { ascending: true })
+                .range(from, from + PAGE_SIZE - 1);
+            if (error) throw error;
+            for (const r of (data ?? []) as any[]) {
+                items.push({
+                    id: r.id,
+                    name: r.name ?? '',
+                    model: r.model ?? null,
+                    brand: r.brand ?? null,
+                    unit: r.unit ?? null,
+                    code: r.code ?? null,
+                    packQuantity: r.pack_quantity !== null && r.pack_quantity !== undefined ? Number(r.pack_quantity) : null,
+                });
+            }
+            if (!data || data.length < PAGE_SIZE) break;
+        }
+        return items;
     },
 };
