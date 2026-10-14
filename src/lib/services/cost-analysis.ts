@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { proposalCostAnalysisApi, proposalCostAnalysisVersionsApi } from './proposal-cost-analysis';
 import { buildReferencePriceMap } from '@/lib/utils/reference-purchase-price';
+import { firstMovementDates } from '@/lib/utils/first-movement-dates';
 
 export interface CostAnalysisParams {
     jobId: string;
@@ -234,6 +235,48 @@ export const costAnalysisApi = {
         const map = new Map<string, number>();
         for (const r of data || []) map.set(r.item_id, Number(r.max_price));
         return map;
+    },
+
+    // Prezzo di riferimento «alla data» per articolo (vedi first-movement-dates): finestra di 6 mesi che
+    // termina alla data indicata; gli acquisti successivi non contano. Senza data vale oggi.
+    getReferencePricesAsOf: async (entries: { itemId: string; asOf: string }[]): Promise<Map<string, number>> => {
+        if (entries.length === 0) return new Map();
+        const { data, error } = await supabase.rpc('get_reference_prices_asof', {
+            item_ids: entries.map(e => e.itemId),
+            as_of_dates: entries.map(e => e.asOf),
+        });
+        if (error) return costAnalysisApi.getMaxPurchasePrices(entries.map(e => e.itemId));
+        const map = new Map<string, number>();
+        for (const r of data || []) map.set(r.item_id, Number(r.max_price));
+        return map;
+    },
+
+    // Data del primo movimento di ciascun articolo in una commessa
+    getFirstMovementDates: async (jobId: string, itemIds: string[]): Promise<Map<string, string>> => {
+        if (itemIds.length === 0) return new Map();
+        const { data, error } = await supabase
+            .from('stock_movements_view')
+            .select('item_id, date')
+            .eq('job_id', jobId)
+            .in('item_id', itemIds);
+        if (error) throw error;
+        return firstMovementDates((data || []).map((r: any) => ({ itemId: r.item_id, date: r.date })));
+    },
+
+    // Prezzi di riferimento di una commessa: ogni articolo alla data del suo primo movimento in quella
+    // commessa; se non ha movimenti vale la data di oggi.
+    getJobReferencePrices: async (
+        jobId: string,
+        itemIds: string[],
+        knownDates?: Map<string, string>
+    ): Promise<Map<string, number>> => {
+        const unique = Array.from(new Set(itemIds.filter(Boolean)));
+        if (unique.length === 0) return new Map();
+        const dates = knownDates ?? await costAnalysisApi.getFirstMovementDates(jobId, unique).catch(() => new Map<string, string>());
+        const today = new Date().toISOString().slice(0, 10);
+        return costAnalysisApi.getReferencePricesAsOf(
+            unique.map(itemId => ({ itemId, asOf: dates.get(itemId) ?? today }))
+        );
     },
 
     // Prezzi unitari impostati nelle analisi costi di un'offerta, per articolo.

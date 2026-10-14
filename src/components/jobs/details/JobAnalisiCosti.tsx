@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info, Upload } from "lucide-react"
+import { firstMovementDates } from '@/lib/utils/first-movement-dates'
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, effectiveUnitPrice } from "@/lib/services/cost-analysis"
 import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { inventoryApi } from "@/lib/api"
@@ -288,7 +289,11 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                     if (m.type === 'exit' || m.type === 'entry' || m.type === 'purchase') uniqueItems.set(m.itemId, m)
                 }
                 if (uniqueItems.size > 0) {
-                    const priceMap = await costAnalysisApi.getMaxPurchasePrices([...uniqueItems.keys()])
+                    // Prezzo di riferimento alla data del primo movimento dell'articolo in questa commessa
+                    const firstDates = firstMovementDates(
+                        movements.filter(m => m.type === 'exit' || m.type === 'entry' || m.type === 'purchase')
+                    )
+                    const priceMap = await costAnalysisApi.getJobReferencePrices(jobId, [...uniqueItems.keys()], firstDates)
                     let sortBase = existing.filter(r => r.type === 'inventory').length
                     const added: CostAnalysisRow[] = []
                     for (const m of [...uniqueItems.values()]) {

@@ -24,7 +24,7 @@ export const loadJobPriceMap = async (jobId: string, itemIds: string[]): Promise
         proposal?.id
             ? costAnalysisApi.getProposalPriceLookup(proposal.id).catch(() => new Map<string, number>())
             : Promise.resolve(new Map<string, number>()),
-        costAnalysisApi.getMaxPurchasePrices(notImported).catch(() => new Map<string, number>()),
+        costAnalysisApi.getJobReferencePrices(jobId, notImported).catch(() => new Map<string, number>()),
     ]);
 
     for (const id of notImported) {
