@@ -41,4 +41,10 @@ describe('resolveDisplayPrice', () => {
     it('senza nessun prezzo restituisce zero', () => {
         expect(resolveDisplayPrice({ inventoryId: 'b' }, prices, true)).toBe(0);
     });
+
+    it('una riga prelevata da un lotto non calcolare resta al prezzo del lotto', () => {
+        const excluded = new Set(['lot-x']);
+        expect(resolveDisplayPrice({ inventoryId: 'a', price: 18, purchaseItemId: 'lot-x' }, prices, true, excluded)).toBe(18);
+        expect(resolveDisplayPrice({ inventoryId: 'a', price: 10, purchaseItemId: 'lot-y' }, prices, true, excluded)).toBe(20);
+    });
 });

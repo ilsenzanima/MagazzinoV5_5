@@ -1,6 +1,8 @@
 import { auditPurchases, median, AuditLot } from '../purchase-price-audit';
 
 const lot = (over: Partial<AuditLot> & { purchaseId: string; price: number }): AuditLot => ({
+    purchaseItemId: 'pi',
+    excluded: false,
     itemId: 'promastop',
     itemName: 'Promastop-W',
     itemUnit: 'ML',
@@ -150,5 +152,19 @@ describe('auditPurchases', () => {
             lot({ purchaseId: 'd', price: 30, priceChangedAt: '2026-07-01T00:00:00Z', ...base }),
         ]);
         expect(item.hasPriceAnomaly).toBe(true);
+    });
+
+    it('i lotti non calcolare o a quantità 0 non pesano su mediana e segnalazioni ma restano visibili', () => {
+        const [item] = auditPurchases([
+            lot({ purchaseId: 'a', price: 13.38, quantity: 400 }),
+            lot({ purchaseId: 'b', price: 13.38, quantity: 400 }),
+            lot({ purchaseId: 'c', price: 13.38, quantity: 400 }),
+            lot({ purchaseId: 'x', price: 18, quantity: 10, excluded: true }),
+            lot({ purchaseId: 'z', price: 5, quantity: 0 }),
+        ]);
+        expect(item.hasPriceAnomaly).toBe(false);
+        expect(item.medianPrice).toBe(13.38);
+        expect(item.lots.find(l => l.purchaseId === 'x')?.ignored).toBe('excluded');
+        expect(item.lots.find(l => l.purchaseId === 'z')?.ignored).toBe('zero');
     });
 });

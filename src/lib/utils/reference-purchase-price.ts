@@ -5,6 +5,8 @@ export interface PurchasePriceRow {
     createdAt: string | null;  // usata se manca la data della bolla e per spareggio
     orderType: string | null;
     deletedAt: string | null;
+    quantity?: number | null;          // quantità del lotto: a 0 è un vecchio prezzo tenuto come promemoria
+    excluded?: boolean;                // «non calcolare»: fuori dal prezzo di riferimento
 }
 
 export const RECENT_PRICE_MONTHS = 6;
@@ -23,8 +25,12 @@ export const buildReferencePriceMap = (rows: PurchasePriceRow[], now: Date = new
     const recentMax = new Map<string, number>();
     const latest = new Map<string, PurchasePriceRow>();
 
-    for (const r of rows) {
-        if (r.orderType !== 'purchase' || r.deletedAt || !Number.isFinite(r.price)) continue;
+    // I lotti a quantità 0 contano solo per gli articoli che non hanno nessun altro acquisto
+    const valid = rows.filter(r => r.orderType === 'purchase' && !r.deletedAt && !r.excluded && Number.isFinite(r.price));
+    const hasStock = new Set(valid.filter(r => (r.quantity ?? 0) > 0).map(r => r.itemId));
+
+    for (const r of valid) {
+        if ((r.quantity ?? 0) <= 0 && hasStock.has(r.itemId)) continue;
         const day = dayOf(r);
         if (day >= limitDay) {
             const cur = recentMax.get(r.itemId);

@@ -21,12 +21,15 @@ export const buildJobPriceMap = (rows: JobPriceRow[]): Map<string, number> => {
 };
 
 // Prezzo da mostrare per una riga: di commessa se richiesto e disponibile, altrimenti quello di acquisto
+// Un lotto segnato «non calcolare» ha un prezzo corretto solo per i suoi pezzi: le righe prelevate da quel
+// lotto restano al prezzo del lotto, il resto dell'articolo usa il prezzo di commessa.
 export const resolveDisplayPrice = (
-    item: { inventoryId: string; price?: number },
+    item: { inventoryId: string; price?: number; purchaseItemId?: string },
     jobPrices: Map<string, number>,
-    useJobPrices: boolean
+    useJobPrices: boolean,
+    excludedLotIds?: Set<string>
 ): number => {
-    if (useJobPrices) {
+    if (useJobPrices && !(item.purchaseItemId && excludedLotIds?.has(item.purchaseItemId))) {
         const jobPrice = jobPrices.get(item.inventoryId);
         if (jobPrice !== undefined) return jobPrice;
     }

@@ -2,6 +2,7 @@
 // diverso dagli altri e gli articoli i cui acquisti sono stati inseriti da persone diverse.
 
 export interface AuditLot {
+    purchaseItemId: string;
     purchaseId: string;
     itemId: string;
     itemName: string;
@@ -17,6 +18,7 @@ export interface AuditLot {
     priceChangedAt: string | null;  // data dell'ultima modifica del prezzo della riga (ISO)
     packQuantity: number | null;    // quantità normale per confezione dell'articolo
     reviewedAt: string | null;      // articolo controllato da un admin (ISO)
+    excluded: boolean;              // «non calcolare»: fuori dal prezzo di riferimento e dai confronti
 }
 
 export interface AuditLotResult extends AuditLot {
@@ -27,6 +29,7 @@ export interface AuditLotResult extends AuditLot {
     packPriceSuspect: boolean;      // il prezzo è circa (prezzo tipico × quantità per confezione): prezzo di confezione?
     qtyNotMultiple: boolean;        // la quantità non è multipla della confezione
     isNew: boolean;                 // inserito dopo il controllo dell'articolo (o articolo mai controllato)
+    ignored: 'excluded' | 'zero' | null; // lotto fuori dai calcoli (spunta «non calcolare» o quantità 0)
 }
 
 export interface AuditItemResult {
@@ -59,12 +62,17 @@ export const auditPurchases = (
     lots: AuditLot[],
     threshold: number = DEFAULT_ANOMALY_THRESHOLD
 ): AuditItemResult[] => {
+    const ignoredReason = (lot: AuditLot): 'excluded' | 'zero' | null =>
+        lot.excluded ? 'excluded' : lot.quantity !== null && lot.quantity <= 0 ? 'zero' : null;
+
     const byItem = new Map<string, AuditLot[]>();
+    const ignoredByItem = new Map<string, AuditLot[]>();
     for (const lot of lots) {
         if (!Number.isFinite(lot.price) || lot.price <= 0) continue; // prezzi vuoti o a zero non fanno statistica
-        const list = byItem.get(lot.itemId);
+        const target = ignoredReason(lot) ? ignoredByItem : byItem;
+        const list = target.get(lot.itemId);
         if (list) list.push(lot);
-        else byItem.set(lot.itemId, [lot]);
+        else target.set(lot.itemId, [lot]);
     }
 
     const results: AuditItemResult[] = [];
@@ -107,8 +115,24 @@ export const auditPurchases = (
                 packPriceSuspect,
                 qtyNotMultiple,
                 isNew,
+                ignored: null,
             };
         });
+
+        // I lotti fuori dai calcoli si mostrano ma non pesano su mediana, scarti, autori e segnalazioni
+        for (const lot of ignoredByItem.get(itemId) ?? []) {
+            lotResults.push({
+                ...lot,
+                medianOthers: null,
+                deviation: null,
+                priceAnomaly: false,
+                differentAuthor: false,
+                packPriceSuspect: false,
+                qtyNotMultiple: false,
+                isNew: false,
+                ignored: ignoredReason(lot),
+            });
+        }
 
         lotResults.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         // Una quantità non multipla della confezione conta solo se il prezzo unitario non la giustifica

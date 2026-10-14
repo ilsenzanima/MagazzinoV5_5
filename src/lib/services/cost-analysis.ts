@@ -214,7 +214,7 @@ export const costAnalysisApi = {
             // Fallback: query manuale se la RPC non esiste (stessa regola della RPC)
             const { data: rows, error: e2 } = await supabase
                 .from('purchase_items')
-                .select('item_id, price, purchases!inner(order_type, delivery_note_date, created_at, deleted_at)')
+                .select('item_id, price, quantity, exclude_from_reference, purchases!inner(order_type, delivery_note_date, created_at, deleted_at)')
                 .in('item_id', itemIds);
             if (e2) throw e2;
             return buildReferencePriceMap((rows || []).map(r => {
@@ -226,6 +226,8 @@ export const costAnalysisApi = {
                     createdAt: pu?.created_at ?? null,
                     orderType: pu?.order_type ?? null,
                     deletedAt: pu?.deleted_at ?? null,
+                    quantity: r.quantity !== null && r.quantity !== undefined ? Number(r.quantity) : null,
+                    excluded: r.exclude_from_reference === true,
                 };
             }));
         }

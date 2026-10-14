@@ -54,4 +54,18 @@ describe('buildReferencePriceMap', () => {
         const map = buildReferencePriceMap([row({ itemId: 'a', price: 1 }), row({ itemId: 'b', price: 2 })], NOW);
         expect(Array.from(map.entries())).toEqual([['a', 1], ['b', 2]]);
     });
+
+    it('ignora i lotti non calcolare e quelli a quantità 0 se ci sono altri acquisti', () => {
+        const map = buildReferencePriceMap([
+            row({ price: 13.38, quantity: 400 }),
+            row({ price: 18, quantity: 10, excluded: true }),
+            row({ price: 99, quantity: 0 }),
+        ], NOW);
+        expect(map.get('a')).toBe(13.38);
+    });
+
+    it('un lotto a quantità 0 resta come riferimento se è l unico acquisto dell articolo', () => {
+        const map = buildReferencePriceMap([row({ price: 7, quantity: 0, date: '2022-08-01' })], NOW);
+        expect(map.get('a')).toBe(7);
+    });
 });

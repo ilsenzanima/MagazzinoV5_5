@@ -21,7 +21,7 @@ export const purchaseAuditApi = {
             const { data, error } = await supabase
                 .from('purchase_items')
                 .select(
-                    'id, item_id, purchase_id, price, price_changed_at, quantity, inventory(name, unit, pack_quantity, price_check_ok_at), ' +
+                    'id, item_id, purchase_id, price, price_changed_at, quantity, exclude_from_reference, inventory(name, unit, pack_quantity, price_check_ok_at), ' +
                     'purchases!inner(delivery_note_number, delivery_note_date, created_at, created_by, order_type, deleted_at, suppliers(name), profiles(full_name))'
                 )
                 .eq('purchases.order_type', 'purchase')
@@ -38,6 +38,8 @@ export const purchaseAuditApi = {
                 const sup = Array.isArray(pu.suppliers) ? pu.suppliers[0] : pu.suppliers;
                 const prof = Array.isArray(pu.profiles) ? pu.profiles[0] : pu.profiles;
                 lots.push({
+                    purchaseItemId: row.id,
+                    excluded: row.exclude_from_reference === true,
                     purchaseId: row.purchase_id,
                     itemId: row.item_id,
                     itemName: inv?.name ?? 'Articolo senza nome',
@@ -70,6 +72,28 @@ export const purchaseAuditApi = {
             .eq('id', itemId);
         if (error) throw error;
         return now;
+    },
+
+    // «Non calcolare»: il lotto resta valido per la sua commessa ma non entra nel prezzo di riferimento
+    setExcluded: async (purchaseItemId: string, excluded: boolean): Promise<void> => {
+        const { error } = await supabase
+            .from('purchase_items')
+            .update({ exclude_from_reference: excluded })
+            .eq('id', purchaseItemId);
+        if (error) throw error;
+    },
+
+    // Quali dei lotti indicati sono segnati «non calcolare»
+    getExcludedLotIds: async (purchaseItemIds: string[]): Promise<Set<string>> => {
+        const ids = Array.from(new Set(purchaseItemIds.filter(Boolean)));
+        if (ids.length === 0) return new Set();
+        const { data, error } = await supabase
+            .from('purchase_items')
+            .select('id')
+            .in('id', ids)
+            .eq('exclude_from_reference', true);
+        if (error) throw error;
+        return new Set((data ?? []).map((r: any) => r.id as string));
     },
 
     setPackQuantity: async (itemId: string, packQuantity: number | null): Promise<void> => {

@@ -70,6 +70,15 @@ export default function ControlloAcquistiPage() {
     const patchItem = (itemId: string, patch: Partial<AuditLot>) =>
         setLots(prev => prev.map(l => (l.itemId === itemId ? { ...l, ...patch } : l)));
 
+    const toggleExcluded = async (purchaseItemId: string, excluded: boolean) => {
+        try {
+            await purchaseAuditApi.setExcluded(purchaseItemId, excluded);
+            setLots(prev => prev.map(l => (l.purchaseItemId === purchaseItemId ? { ...l, excluded } : l)));
+        } catch (e: any) {
+            notify.error(e?.message || "Impossibile salvare l'esclusione del lotto");
+        }
+    };
+
     const toggleReviewed = async (itemId: string, reviewed: boolean) => {
         try {
             const at = await purchaseAuditApi.setReviewed(itemId, reviewed);
@@ -223,12 +232,13 @@ export default function ControlloAcquistiPage() {
                                             <th className="py-1 pr-3 text-right">Quantità</th>
                                             <th className="py-1 pr-3 text-right">Prezzo</th>
                                             <th className="py-1 pr-3 text-right">Scarto</th>
+                                            <th className="py-1 pr-3">Non calcolare</th>
                                             <th className="py-1">Note</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {item.lots.map((l, i) => (
-                                            <tr key={`${l.purchaseId}-${i}`} className={l.isNew && (l.priceAnomaly || l.packPriceSuspect) ? "bg-red-50 dark:bg-red-950/30" : ""}>
+                                            <tr key={`${l.purchaseId}-${i}`} className={l.ignored ? "opacity-60" : l.isNew && (l.priceAnomaly || l.packPriceSuspect) ? "bg-red-50 dark:bg-red-950/30" : ""}>
                                                 <td className="py-1 pr-3 whitespace-nowrap">{l.date ?? "-"}</td>
                                                 <td className="py-1 pr-3">
                                                     <Link href={`/purchases/${l.purchaseId}`} className="text-blue-600 hover:underline">
@@ -244,10 +254,19 @@ export default function ControlloAcquistiPage() {
                                                 <td className="py-1 pr-3 text-right">
                                                     {l.deviation === null ? "-" : `${l.deviation > 0 ? "+" : ""}${formatNumber(l.deviation * 100, { maximumFractionDigits: 0 })}%`}
                                                 </td>
+                                                <td className="py-1 pr-3">
+                                                    <Checkbox
+                                                        checked={l.excluded}
+                                                        onCheckedChange={v => toggleExcluded(l.purchaseItemId, v === true)}
+                                                        aria-label="Non calcolare questo lotto nel prezzo di riferimento"
+                                                    />
+                                                </td>
                                                 <td className="py-1 text-xs text-muted-foreground">
+                                                    {l.ignored === 'excluded' && "escluso dal prezzo di riferimento"}
+                                                    {l.ignored === 'zero' && "quantità 0: non conteggiato"}
                                                     {l.packPriceSuspect && "sembra il prezzo della confezione"}
                                                     {l.qtyNotMultiple && !l.packPriceSuspect && "quantità non multipla della confezione"}
-                                                    {!l.isNew && " già controllato"}
+                                                    {!l.isNew && !l.ignored && " già controllato"}
                                                 </td>
                                             </tr>
                                         ))}
