@@ -11,7 +11,7 @@ export const purchaseAuditApi = {
             const { data, error } = await supabase
                 .from('purchase_items')
                 .select(
-                    'id, item_id, purchase_id, price, inventory(name, unit), ' +
+                    'id, item_id, purchase_id, price, quantity, inventory(name, unit, pack_quantity, price_check_ok_at), ' +
                     'purchases!inner(delivery_note_number, delivery_note_date, created_at, created_by, order_type, deleted_at, suppliers(name), profiles(full_name))'
                 )
                 .eq('purchases.order_type', 'purchase')
@@ -38,10 +38,31 @@ export const purchaseAuditApi = {
                     supplierName: sup?.name ?? null,
                     createdBy: pu.created_by ?? null,
                     createdByName: prof?.full_name ?? null,
+                    quantity: row.quantity !== null && row.quantity !== undefined ? Number(row.quantity) : null,
+                    createdAt: pu.created_at ?? null,
+                    packQuantity: inv?.pack_quantity !== null && inv?.pack_quantity !== undefined ? Number(inv.pack_quantity) : null,
+                    reviewedAt: inv?.price_check_ok_at ?? null,
                 });
             }
             if (!data || data.length < PAGE_SIZE) break;
         }
         return lots;
+    },
+
+    // Segna l'articolo come controllato (i lotti già presenti non vengono più segnalati) o toglie il segno
+    setReviewed: async (itemId: string, reviewed: boolean): Promise<string | null> => {
+        const { data: { user } } = await supabase.auth.getUser();
+        const now = reviewed ? new Date().toISOString() : null;
+        const { error } = await supabase
+            .from('inventory')
+            .update({ price_check_ok_at: now, price_check_ok_by: reviewed ? user?.id ?? null : null })
+            .eq('id', itemId);
+        if (error) throw error;
+        return now;
+    },
+
+    setPackQuantity: async (itemId: string, packQuantity: number | null): Promise<void> => {
+        const { error } = await supabase.from('inventory').update({ pack_quantity: packQuantity }).eq('id', itemId);
+        if (error) throw error;
     },
 };

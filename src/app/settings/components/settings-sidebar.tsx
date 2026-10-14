@@ -10,8 +10,7 @@ import {
   Settings,
   Shield,
   Database,
-  HardDrive,
-  ClipboardCheck
+  HardDrive
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 
@@ -42,11 +41,6 @@ const sidebarNavItems = [
     icon: HardDrive,
   },
   {
-    title: "Controllo acquisti",
-    href: "/settings/purchase-check",
-    icon: ClipboardCheck,
-  },
-  {
     title: "Amministrazione",
     href: "/settings/admin",
     icon: Shield,
@@ -69,7 +63,7 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
     >
       {sidebarNavItems
         .filter(item => {
-          if (item.href === "/settings/admin" || item.href === "/settings/backup" || item.href === "/settings/purchase-check") {
+          if (item.href === "/settings/admin" || item.href === "/settings/backup") {
             // Show if effectively admin OR real admin (so they can disable simulation)
             return userRole === 'admin' || realRole === 'admin';
           }

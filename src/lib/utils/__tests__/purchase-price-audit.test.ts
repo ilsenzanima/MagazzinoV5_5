@@ -9,6 +9,10 @@ const lot = (over: Partial<AuditLot> & { purchaseId: string; price: number }): A
     supplierName: null,
     createdBy: 'u1',
     createdByName: 'Anna',
+    quantity: 18,
+    createdAt: '2026-05-01T10:00:00Z',
+    packQuantity: null,
+    reviewedAt: null,
     ...over,
 });
 
@@ -74,5 +78,47 @@ describe('auditPurchases', () => {
             lot({ purchaseId: 'b', price: NaN }),
         ]);
         expect(res).toEqual([]);
+    });
+
+    it('segnala un prezzo di confezione scritto come prezzo unitario quando è nota la quantità per confezione', () => {
+        const [item] = auditPurchases([
+            lot({ purchaseId: 'a', price: 12.1, packQuantity: 18 }),
+            lot({ purchaseId: 'b', price: 12.3, packQuantity: 18 }),
+            lot({ purchaseId: 'c', price: 11.9, packQuantity: 18 }),
+            lot({ purchaseId: 'd', price: 218.65, packQuantity: 18 }),
+        ]);
+        const d = item.lots.find(l => l.purchaseId === 'd')!;
+        expect(d.packPriceSuspect).toBe(true);
+        expect(item.hasPackIssue).toBe(true);
+    });
+
+    it('una quantità forzata non multipla della confezione, con prezzo unitario in linea, non è un problema', () => {
+        const [item] = auditPurchases([
+            lot({ purchaseId: 'a', price: 12, packQuantity: 18 }),
+            lot({ purchaseId: 'b', price: 12.2, packQuantity: 18 }),
+            lot({ purchaseId: 'c', price: 11.9, packQuantity: 18 }),
+            lot({ purchaseId: 'd', price: 12.1, quantity: 25, packQuantity: 18 }),
+        ]);
+        expect(item.lots.find(l => l.purchaseId === 'd')?.qtyNotMultiple).toBe(true);
+        expect(item.hasPackIssue).toBe(false);
+    });
+
+    it('dopo il controllo dell\'articolo restano segnalati solo i lotti inseriti dopo', () => {
+        const base = { reviewedAt: '2026-06-01T00:00:00Z' };
+        const [item] = auditPurchases([
+            lot({ purchaseId: 'a', price: 10, ...base }),
+            lot({ purchaseId: 'b', price: 10, ...base }),
+            lot({ purchaseId: 'c', price: 10, ...base }),
+            lot({ purchaseId: 'd', price: 30, ...base }),                                  // vecchio: già controllato
+        ]);
+        expect(item.hasPriceAnomaly).toBe(false);
+
+        const [again] = auditPurchases([
+            lot({ purchaseId: 'a', price: 10, ...base }),
+            lot({ purchaseId: 'b', price: 10, ...base }),
+            lot({ purchaseId: 'c', price: 10, ...base }),
+            lot({ purchaseId: 'e', price: 30, createdAt: '2026-07-01T00:00:00Z', ...base }), // nuovo
+        ]);
+        expect(again.hasPriceAnomaly).toBe(true);
     });
 });
