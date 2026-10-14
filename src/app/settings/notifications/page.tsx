@@ -36,7 +36,8 @@ function PreferenceRow({ id, title, description, checked, disabled, onChange }: 
 }
 
 export default function SettingsNotificationsPage() {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
+  const canSeeJobPrices = userRole === "admin" || userRole === "operativo";
   const [prefs, setPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -139,6 +140,27 @@ export default function SettingsNotificationsPage() {
           />
         </CardContent>
       </Card>
+
+      {canSeeJobPrices && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Prezzi Commesse</CardTitle>
+            <CardDescription>
+              Per le commesse attive: righe dell&apos;analisi costi per cui non si può risalire a un prezzo affidabile.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <PreferenceRow
+              id="jobPriceMissing"
+              title="Prezzo da definire"
+              description="Avvisami quando un articolo di una commessa non ha un prezzo affidabile e serve una decisione."
+              checked={prefs.jobPriceMissing}
+              disabled={disabled}
+              onChange={handleChange}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -31,6 +31,25 @@ export interface CostAnalysisRow {
     qtyActual: number;
     sortOrder: number;
     createdAt: string;
+    pricePending?: boolean;         // «in attesa del prezzo»: nessun avviso finché non arriva
+    pricePendingNote?: string | null;
+}
+
+// Avviso «prezzo da definire» per una riga di analisi costi di una commessa attiva
+export type JobPriceAlertReason = 'missing' | 'old' | 'after';
+
+export interface JobPriceAlert {
+    rowId: string;
+    jobId: string;
+    jobCode: string;
+    itemId: string;
+    itemName: string;
+    itemUnit: string | null;
+    asOf: string;
+    reason: JobPriceAlertReason;
+    refPrice: number | null;
+    refDate: string | null;
+    currentPrice: number | null;
 }
 
 // Se il prezzo unitario non è impostato, usa in automatico il prezzo massimo di acquisto come stima
@@ -51,6 +70,8 @@ const mapRow = (db: any): CostAnalysisRow => ({
     qtyActual: Number(db.qty_actual),
     sortOrder: db.sort_order,
     createdAt: db.created_at,
+    pricePending: db.price_pending === true,
+    pricePendingNote: db.price_pending_note ?? null,
 });
 
 export const costAnalysisApi = {
@@ -87,13 +108,15 @@ export const costAnalysisApi = {
         return mapRow(data);
     },
 
-    update: async (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'sortOrder'>>): Promise<void> => {
+    update: async (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'sortOrder' | 'pricePending' | 'pricePendingNote'>>): Promise<void> => {
         const db: any = {};
         if (fields.unitPrice !== undefined) db.unit_price = fields.unitPrice;
         if (fields.qtyEstimated !== undefined) db.qty_estimated = fields.qtyEstimated;
         if (fields.qtyActual !== undefined) db.qty_actual = fields.qtyActual;
         if (fields.itemName !== undefined) db.item_name = fields.itemName;
         if (fields.sortOrder !== undefined) db.sort_order = fields.sortOrder;
+        if (fields.pricePending !== undefined) db.price_pending = fields.pricePending;
+        if (fields.pricePendingNote !== undefined) db.price_pending_note = fields.pricePendingNote;
         const { error } = await supabase.from('job_cost_analysis_rows').update(db).eq('id', id);
         if (error) throw error;
     },
@@ -235,6 +258,28 @@ export const costAnalysisApi = {
         const map = new Map<string, number>();
         for (const r of data || []) map.set(r.item_id, Number(r.max_price));
         return map;
+    },
+
+    // Righe di commesse attive per cui non si può risalire a un prezzo affidabile (vedi get_job_price_alerts):
+    // nessun acquisto con prezzo, ultimo prezzo di oltre 18 mesi prima, o solo prezzi successivi alla data.
+    getJobPriceAlerts: async (jobId?: string): Promise<JobPriceAlert[]> => {
+        const { data, error } = await supabase.rpc('get_job_price_alerts');
+        if (error) throw error;
+        return (data || [])
+            .filter((r: any) => !jobId || r.job_id === jobId)
+            .map((r: any): JobPriceAlert => ({
+                rowId: r.row_id,
+                jobId: r.job_id,
+                jobCode: r.job_code,
+                itemId: r.item_id,
+                itemName: r.item_name,
+                itemUnit: r.item_unit ?? null,
+                asOf: r.as_of,
+                reason: r.reason,
+                refPrice: r.ref_price !== null && r.ref_price !== undefined ? Number(r.ref_price) : null,
+                refDate: r.ref_date ?? null,
+                currentPrice: r.current_price !== null && r.current_price !== undefined ? Number(r.current_price) : null,
+            }));
     },
 
     // Prezzo di riferimento «alla data» per articolo (vedi first-movement-dates): finestra di 6 mesi che

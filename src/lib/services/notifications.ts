@@ -1,8 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { addYears, differenceInCalendarDays, format } from 'date-fns';
 import { NotificationPreferences } from './notification-preferences';
+import { costAnalysisApi, JobPriceAlertReason } from './cost-analysis';
 
-export type AlertKind = 'out_of_stock' | 'low_stock' | 'course' | 'medical_exam';
+export type AlertKind = 'out_of_stock' | 'low_stock' | 'course' | 'medical_exam' | 'job_price_missing';
 
 export interface AppAlert {
     id: string;
@@ -140,15 +141,38 @@ const getMedicalExamAlerts = async (): Promise<AppAlert[]> => {
     return alerts.sort((a, b) => Number(b.critical) - Number(a.critical));
 };
 
+const JOB_PRICE_REASON: Record<JobPriceAlertReason, string> = {
+    missing: 'nessun acquisto con prezzo',
+    old: 'ultimo prezzo di oltre 18 mesi prima',
+    after: 'solo prezzi successivi alla data',
+};
+
+// Righe delle commesse attive senza un prezzo affidabile: serve una decisione di una persona
+const getJobPriceAlerts = async (): Promise<AppAlert[]> => {
+    const rows = await costAnalysisApi.getJobPriceAlerts();
+    return rows.map(r => ({
+        id: `jobprice-${r.rowId}`,
+        kind: 'job_price_missing' as const,
+        title: `${r.jobCode} · ${r.itemName}`,
+        detail: `Prezzo da definire: ${JOB_PRICE_REASON[r.reason]}`,
+        href: `/jobs/${r.jobId}?tab=analisi-costi`,
+        critical: r.reason === 'missing',
+    }));
+};
+
 export const notificationsApi = {
     // Calcola gli avvisi attivi in base alle preferenze dell'utente.
     // Se una sorgente fallisce le altre vengono comunque mostrate, ma `complete`
     // è false: in quel caso l'elenco non va usato per dedurre che un avviso è risolto.
-    getAlerts: async (prefs: NotificationPreferences): Promise<{ alerts: AppAlert[]; complete: boolean }> => {
+    getAlerts: async (
+        prefs: NotificationPreferences,
+        options: { includeJobPrices?: boolean } = {}
+    ): Promise<{ alerts: AppAlert[]; complete: boolean }> => {
         const results = await Promise.allSettled([
             getStockAlerts(prefs),
             prefs.expiringCourses ? getCourseAlerts() : Promise.resolve([]),
             prefs.expiringMedicalExams ? getMedicalExamAlerts() : Promise.resolve([]),
+            options.includeJobPrices && prefs.jobPriceMissing ? getJobPriceAlerts() : Promise.resolve([]),
         ]);
         return {
             alerts: results.flatMap(r => (r.status === 'fulfilled' ? r.value : [])),

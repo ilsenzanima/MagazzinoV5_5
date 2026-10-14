@@ -5,6 +5,7 @@ export interface NotificationPreferences {
     outOfStock: boolean;
     expiringCourses: boolean;
     expiringMedicalExams: boolean;
+    jobPriceMissing: boolean;
 }
 
 // Valori usati finché l'utente non salva nulla (la riga in tabella non esiste).
@@ -13,6 +14,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     outOfStock: true,
     expiringCourses: true,
     expiringMedicalExams: true,
+    jobPriceMissing: true,
 };
 
 interface PreferencesRow {
@@ -20,6 +22,7 @@ interface PreferencesRow {
     out_of_stock: boolean;
     expiring_courses: boolean;
     expiring_medical_exams: boolean;
+    job_price_missing?: boolean | null;
     seen_alert_ids: string[] | null;
 }
 
@@ -28,6 +31,7 @@ const mapDbToPreferences = (db: PreferencesRow): NotificationPreferences => ({
     outOfStock: db.out_of_stock,
     expiringCourses: db.expiring_courses,
     expiringMedicalExams: db.expiring_medical_exams,
+    jobPriceMissing: db.job_price_missing ?? true,
 });
 
 export const notificationPreferencesApi = {
@@ -71,6 +75,7 @@ export const notificationPreferencesApi = {
                 out_of_stock: prefs.outOfStock,
                 expiring_courses: prefs.expiringCourses,
                 expiring_medical_exams: prefs.expiringMedicalExams,
+                job_price_missing: prefs.jobPriceMissing,
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'user_id' });
 
