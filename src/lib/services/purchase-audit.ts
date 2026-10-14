@@ -21,7 +21,7 @@ export const purchaseAuditApi = {
             const { data, error } = await supabase
                 .from('purchase_items')
                 .select(
-                    'id, item_id, purchase_id, price, quantity, inventory(name, unit, pack_quantity, price_check_ok_at), ' +
+                    'id, item_id, purchase_id, price, price_changed_at, quantity, inventory(name, unit, pack_quantity, price_check_ok_at), ' +
                     'purchases!inner(delivery_note_number, delivery_note_date, created_at, created_by, order_type, deleted_at, suppliers(name), profiles(full_name))'
                 )
                 .eq('purchases.order_type', 'purchase')
@@ -50,6 +50,7 @@ export const purchaseAuditApi = {
                     createdByName: prof?.full_name ?? null,
                     quantity: row.quantity !== null && row.quantity !== undefined ? Number(row.quantity) : null,
                     createdAt: pu.created_at ?? null,
+                    priceChangedAt: row.price_changed_at ?? null,
                     packQuantity: inv?.pack_quantity !== null && inv?.pack_quantity !== undefined ? Number(inv.pack_quantity) : null,
                     reviewedAt: inv?.price_check_ok_at ?? null,
                 });

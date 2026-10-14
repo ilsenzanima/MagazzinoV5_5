@@ -14,6 +14,7 @@ export interface AuditLot {
     createdByName: string | null;
     quantity: number | null;
     createdAt: string | null;       // data di inserimento (ISO), per distinguere i lotti nuovi da quelli già controllati
+    priceChangedAt: string | null;  // data dell'ultima modifica del prezzo della riga (ISO)
     packQuantity: number | null;    // quantità normale per confezione dell'articolo
     reviewedAt: string | null;      // articolo controllato da un admin (ISO)
 }
@@ -95,7 +96,8 @@ export const auditPurchases = (
                 pack !== null && lot.quantity !== null && lot.quantity > 0 &&
                 Math.abs(lot.quantity / pack - Math.round(lot.quantity / pack)) > 1e-6;
 
-            const isNew = !lot.reviewedAt || !lot.createdAt || lot.createdAt > lot.reviewedAt;
+            const lastChange = [lot.createdAt, lot.priceChangedAt].filter((d): d is string => !!d).sort().pop() ?? null;
+            const isNew = !lot.reviewedAt || !lastChange || lastChange > lot.reviewedAt;
             return {
                 ...lot,
                 medianOthers: med,

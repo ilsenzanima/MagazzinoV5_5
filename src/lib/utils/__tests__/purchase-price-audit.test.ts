@@ -11,6 +11,7 @@ const lot = (over: Partial<AuditLot> & { purchaseId: string; price: number }): A
     createdByName: 'Anna',
     quantity: 18,
     createdAt: '2026-05-01T10:00:00Z',
+    priceChangedAt: null,
     packQuantity: null,
     reviewedAt: null,
     ...over,
@@ -138,5 +139,16 @@ describe('auditPurchases', () => {
             lot({ purchaseId: 'n', price: 10, createdBy: 'u2', createdByName: 'Luca', createdAt: '2026-07-01T00:00:00Z', ...base }),
         ]);
         expect(again.hasMultipleAuthors).toBe(true);
+    });
+
+    it('un prezzo modificato dopo il controllo fa tornare segnalato il lotto', () => {
+        const base = { reviewedAt: '2026-06-01T00:00:00Z' };
+        const [item] = auditPurchases([
+            lot({ purchaseId: 'a', price: 10, ...base }),
+            lot({ purchaseId: 'b', price: 10, ...base }),
+            lot({ purchaseId: 'c', price: 10, ...base }),
+            lot({ purchaseId: 'd', price: 30, priceChangedAt: '2026-07-01T00:00:00Z', ...base }),
+        ]);
+        expect(item.hasPriceAnomaly).toBe(true);
     });
 });
