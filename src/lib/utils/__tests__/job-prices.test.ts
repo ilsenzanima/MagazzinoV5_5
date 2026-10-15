@@ -1,4 +1,4 @@
-import { buildJobPriceMap, resolveDisplayPrice } from '../job-prices';
+import { buildJobPriceMap, resolveDisplayPrice, movementUnitPrice, lotKey } from '../job-prices';
 
 describe('buildJobPriceMap', () => {
     it('usa il prezzo impostato; se manca, il prezzo massimo d\'acquisto bloccato', () => {
@@ -40,5 +40,30 @@ describe('resolveDisplayPrice', () => {
 
     it('senza nessun prezzo restituisce zero', () => {
         expect(resolveDisplayPrice({ inventoryId: 'b' }, prices, true)).toBe(0);
+    });
+
+    it('una riga prelevata da un lotto non calcolare resta al prezzo del lotto', () => {
+        const excluded = new Set(['lot-x']);
+        expect(resolveDisplayPrice({ inventoryId: 'a', price: 18, purchaseItemId: 'lot-x' }, prices, true, excluded)).toBe(18);
+        expect(resolveDisplayPrice({ inventoryId: 'a', price: 10, purchaseItemId: 'lot-y' }, prices, true, excluded)).toBe(20);
+    });
+});
+
+describe('movementUnitPrice', () => {
+    const prices = new Map([['a', 13.38]]);
+    const excluded = new Set([lotKey('p-18', 'a')]);
+
+    it('usa il prezzo di commessa dell\'articolo', () => {
+        expect(movementUnitPrice({ itemId: 'a', itemPrice: 12, purchaseId: 'p-x' }, prices, excluded)).toBe(13.38);
+    });
+
+    it('un lotto non calcolare resta al prezzo del lotto: solo i suoi pezzi, il resto va a prezzo di commessa', () => {
+        expect(movementUnitPrice({ itemId: 'a', itemPrice: 18, purchaseId: 'p-18' }, prices, excluded)).toBe(18);
+        expect(movementUnitPrice({ itemId: 'a', itemPrice: 12.9, purchaseId: 'p-other' }, prices, excluded)).toBe(13.38);
+    });
+
+    it('senza prezzo di commessa usa il prezzo del lotto, e senza nulla zero', () => {
+        expect(movementUnitPrice({ itemId: 'b', itemPrice: 7 }, prices)).toBe(7);
+        expect(movementUnitPrice({ itemId: 'b' }, prices)).toBe(0);
     });
 });

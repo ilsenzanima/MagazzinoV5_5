@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bell, CalendarClock, HeartPulse, Loader2, PackageMinus, PackageX, Settings } from "lucide-react";
+import { AlertTriangle, Bell, CalendarClock, Euro, HeartPulse, Loader2, PackageMinus, PackageX, Settings } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
@@ -20,6 +20,7 @@ const KIND_ICON: Record<AlertKind, typeof Bell> = {
   low_stock: PackageMinus,
   course: CalendarClock,
   medical_exam: HeartPulse,
+  job_price_missing: Euro,
 };
 
 // Etichette del riepilogo, con la preferenza che le attiva
@@ -28,11 +29,13 @@ const SUMMARY: { kind: AlertKind; label: string; pref: keyof NotificationPrefere
   { kind: "low_stock", label: "Scorta bassa", pref: "lowStock" },
   { kind: "course", label: "Corsi", pref: "expiringCourses" },
   { kind: "medical_exam", label: "Visite mediche", pref: "expiringMedicalExams" },
+  { kind: "job_price_missing", label: "Prezzi commesse", pref: "jobPriceMissing" },
 ];
 
 const SECTIONS: { title: string; kinds: AlertKind[] }[] = [
   { title: "Magazzino", kinds: ["out_of_stock", "low_stock"] },
   { title: "Scadenze personale", kinds: ["course", "medical_exam"] },
+  { title: "Prezzi commesse da definire", kinds: ["job_price_missing"] },
 ];
 
 interface NotificationBellProps {
@@ -40,7 +43,9 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ onNavigate }: NotificationBellProps) {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
+  // Gli avvisi sui prezzi di commessa servono a chi gestisce le commesse
+  const canSeeJobPrices = userRole === "admin" || userRole === "operativo";
   const [alerts, setAlerts] = useState<AppAlert[]>([]);
   const [prefs, setPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
@@ -57,7 +62,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
       const stored = await notificationPreferencesApi
         .getWithSeen(user.id)
         .catch(() => ({ prefs: DEFAULT_NOTIFICATION_PREFERENCES, seenAlertIds: [] as string[] }));
-      const { alerts: loaded, complete } = await notificationsApi.getAlerts(stored.prefs);
+      const { alerts: loaded, complete } = await notificationsApi.getAlerts(stored.prefs, { includeJobPrices: canSeeJobPrices });
       setPrefs(stored.prefs);
       setAlerts(loaded);
 
@@ -80,7 +85,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, canSeeJobPrices]);
 
   useEffect(() => {
     load();
@@ -96,7 +101,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
   const unseen = useMemo(() => alerts.filter((a) => !seenIds.has(a.id)), [alerts, seenIds]);
 
   const counts = useMemo(() => {
-    const result: Record<AlertKind, number> = { out_of_stock: 0, low_stock: 0, course: 0, medical_exam: 0 };
+    const result: Record<AlertKind, number> = { out_of_stock: 0, low_stock: 0, course: 0, medical_exam: 0, job_price_missing: 0 };
     alerts.forEach((a) => { result[a.kind] += 1; });
     return result;
   }, [alerts]);

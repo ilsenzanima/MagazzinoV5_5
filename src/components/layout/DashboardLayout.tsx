@@ -31,7 +31,9 @@ import {
   GanttChartSquare,
   UserCircle,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  ScanSearch,
+  Boxes,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -226,6 +228,18 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           href: "/anomalie",
           active: pathname === "/anomalie",
           badge: anomalyCount > 0,
+        },
+        {
+          label: "Controllo Acquisti",
+          icon: ScanSearch,
+          href: "/controllo-acquisti",
+          active: pathname === "/controllo-acquisti",
+        },
+        {
+          label: "Quantità Confezioni",
+          icon: Boxes,
+          href: "/confezioni",
+          active: pathname === "/confezioni",
         },
         {
           label: "Cestino",

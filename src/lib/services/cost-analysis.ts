@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { proposalCostAnalysisApi, proposalCostAnalysisVersionsApi } from './proposal-cost-analysis';
+import { buildReferencePriceMap } from '@/lib/utils/reference-purchase-price';
+import { firstMovementDates } from '@/lib/utils/first-movement-dates';
 
 export interface CostAnalysisParams {
     jobId: string;
@@ -29,6 +31,25 @@ export interface CostAnalysisRow {
     qtyActual: number;
     sortOrder: number;
     createdAt: string;
+    pricePending?: boolean;         // «in attesa del prezzo»: nessun avviso finché non arriva
+    pricePendingNote?: string | null;
+}
+
+// Avviso «prezzo da definire» per una riga di analisi costi di una commessa attiva
+export type JobPriceAlertReason = 'missing' | 'old' | 'after';
+
+export interface JobPriceAlert {
+    rowId: string;
+    jobId: string;
+    jobCode: string;
+    itemId: string;
+    itemName: string;
+    itemUnit: string | null;
+    asOf: string;
+    reason: JobPriceAlertReason;
+    refPrice: number | null;
+    refDate: string | null;
+    currentPrice: number | null;
 }
 
 // Se il prezzo unitario non è impostato, usa in automatico il prezzo massimo di acquisto come stima
@@ -49,6 +70,8 @@ const mapRow = (db: any): CostAnalysisRow => ({
     qtyActual: Number(db.qty_actual),
     sortOrder: db.sort_order,
     createdAt: db.created_at,
+    pricePending: db.price_pending === true,
+    pricePendingNote: db.price_pending_note ?? null,
 });
 
 export const costAnalysisApi = {
@@ -85,13 +108,15 @@ export const costAnalysisApi = {
         return mapRow(data);
     },
 
-    update: async (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'sortOrder'>>): Promise<void> => {
+    update: async (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'sortOrder' | 'pricePending' | 'pricePendingNote'>>): Promise<void> => {
         const db: any = {};
         if (fields.unitPrice !== undefined) db.unit_price = fields.unitPrice;
         if (fields.qtyEstimated !== undefined) db.qty_estimated = fields.qtyEstimated;
         if (fields.qtyActual !== undefined) db.qty_actual = fields.qtyActual;
         if (fields.itemName !== undefined) db.item_name = fields.itemName;
         if (fields.sortOrder !== undefined) db.sort_order = fields.sortOrder;
+        if (fields.pricePending !== undefined) db.price_pending = fields.pricePending;
+        if (fields.pricePendingNote !== undefined) db.price_pending_note = fields.pricePendingNote;
         const { error } = await supabase.from('job_cost_analysis_rows').update(db).eq('id', id);
         if (error) throw error;
     },
@@ -101,16 +126,11 @@ export const costAnalysisApi = {
         if (error) throw error;
     },
 
-    // Prezzo unitario più alto per un articolo su tutti gli acquisti
+    // Prezzo di riferimento di un articolo: massimo degli ultimi 6 mesi sugli acquisti veri
+    // (ordini e acquisti cancellati esclusi), altrimenti prezzo dell'ultimo acquisto
     getMaxPurchasePrice: async (itemId: string): Promise<number | null> => {
-        const { data, error } = await supabase
-            .from('purchase_items')
-            .select('price')
-            .eq('item_id', itemId)
-            .order('price', { ascending: false })
-            .limit(1);
-        if (error) throw error;
-        return data && data.length > 0 ? Number(data[0].price) : null;
+        const map = await costAnalysisApi.getMaxPurchasePrices([itemId]);
+        return map.get(itemId) ?? null;
     },
 
     getParams: async (jobId: string): Promise<CostAnalysisParams> => {
@@ -215,22 +235,93 @@ export const costAnalysisApi = {
         const { data, error } = await supabase
             .rpc('get_max_purchase_prices', { item_ids: itemIds });
         if (error) {
-            // Fallback: query manuale se la RPC non esiste
+            // Fallback: query manuale se la RPC non esiste (stessa regola della RPC)
             const { data: rows, error: e2 } = await supabase
                 .from('purchase_items')
-                .select('item_id, price')
+                .select('item_id, price, quantity, exclude_from_reference, purchases!inner(order_type, delivery_note_date, created_at, deleted_at)')
                 .in('item_id', itemIds);
             if (e2) throw e2;
-            const map = new Map<string, number>();
-            for (const r of rows || []) {
-                const cur = map.get(r.item_id) ?? 0;
-                if (Number(r.price) > cur) map.set(r.item_id, Number(r.price));
-            }
-            return map;
+            return buildReferencePriceMap((rows || []).map(r => {
+                const pu = Array.isArray(r.purchases) ? r.purchases[0] : r.purchases;
+                return {
+                    itemId: r.item_id,
+                    price: Number(r.price),
+                    date: pu?.delivery_note_date ?? null,
+                    createdAt: pu?.created_at ?? null,
+                    orderType: pu?.order_type ?? null,
+                    deletedAt: pu?.deleted_at ?? null,
+                    quantity: r.quantity !== null && r.quantity !== undefined ? Number(r.quantity) : null,
+                    excluded: r.exclude_from_reference === true,
+                };
+            }));
         }
         const map = new Map<string, number>();
         for (const r of data || []) map.set(r.item_id, Number(r.max_price));
         return map;
+    },
+
+    // Righe di commesse attive per cui non si può risalire a un prezzo affidabile (vedi get_job_price_alerts):
+    // nessun acquisto con prezzo, ultimo prezzo di oltre 18 mesi prima, o solo prezzi successivi alla data.
+    getJobPriceAlerts: async (jobId?: string): Promise<JobPriceAlert[]> => {
+        const { data, error } = await supabase.rpc('get_job_price_alerts');
+        if (error) throw error;
+        return (data || [])
+            .filter((r: any) => !jobId || r.job_id === jobId)
+            .map((r: any): JobPriceAlert => ({
+                rowId: r.row_id,
+                jobId: r.job_id,
+                jobCode: r.job_code,
+                itemId: r.item_id,
+                itemName: r.item_name,
+                itemUnit: r.item_unit ?? null,
+                asOf: r.as_of,
+                reason: r.reason,
+                refPrice: r.ref_price !== null && r.ref_price !== undefined ? Number(r.ref_price) : null,
+                refDate: r.ref_date ?? null,
+                currentPrice: r.current_price !== null && r.current_price !== undefined ? Number(r.current_price) : null,
+            }));
+    },
+
+    // Prezzo di riferimento «alla data» per articolo (vedi first-movement-dates): finestra di 6 mesi che
+    // termina alla data indicata; gli acquisti successivi non contano. Senza data vale oggi.
+    getReferencePricesAsOf: async (entries: { itemId: string; asOf: string }[]): Promise<Map<string, number>> => {
+        if (entries.length === 0) return new Map();
+        const { data, error } = await supabase.rpc('get_reference_prices_asof', {
+            item_ids: entries.map(e => e.itemId),
+            as_of_dates: entries.map(e => e.asOf),
+        });
+        if (error) return costAnalysisApi.getMaxPurchasePrices(entries.map(e => e.itemId));
+        const map = new Map<string, number>();
+        for (const r of data || []) map.set(r.item_id, Number(r.max_price));
+        return map;
+    },
+
+    // Data del primo movimento di ciascun articolo in una commessa
+    getFirstMovementDates: async (jobId: string, itemIds: string[]): Promise<Map<string, string>> => {
+        if (itemIds.length === 0) return new Map();
+        const { data, error } = await supabase
+            .from('stock_movements_view')
+            .select('item_id, date')
+            .eq('job_id', jobId)
+            .in('item_id', itemIds);
+        if (error) throw error;
+        return firstMovementDates((data || []).map((r: any) => ({ itemId: r.item_id, date: r.date })));
+    },
+
+    // Prezzi di riferimento di una commessa: ogni articolo alla data del suo primo movimento in quella
+    // commessa; se non ha movimenti vale la data di oggi.
+    getJobReferencePrices: async (
+        jobId: string,
+        itemIds: string[],
+        knownDates?: Map<string, string>
+    ): Promise<Map<string, number>> => {
+        const unique = Array.from(new Set(itemIds.filter(Boolean)));
+        if (unique.length === 0) return new Map();
+        const dates = knownDates ?? await costAnalysisApi.getFirstMovementDates(jobId, unique).catch(() => new Map<string, string>());
+        const today = new Date().toISOString().slice(0, 10);
+        return costAnalysisApi.getReferencePricesAsOf(
+            unique.map(itemId => ({ itemId, asOf: dates.get(itemId) ?? today }))
+        );
     },
 
     // Prezzi unitari impostati nelle analisi costi di un'offerta, per articolo.

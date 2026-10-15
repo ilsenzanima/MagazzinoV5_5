@@ -30,6 +30,7 @@ import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
 import { Switch } from "@/components/ui/switch";
 import { loadJobPriceMap } from "@/lib/services/job-price-lookup";
+import { purchaseAuditApi } from "@/lib/services/purchase-audit";
 import { resolveDisplayPrice } from "@/lib/utils/job-prices";
 interface MovementDetailContentProps {
     initialMovement: DeliveryNote;
@@ -96,8 +97,21 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
         return () => { cancelled = true; };
     }, [canSeePrices, movement.jobId, itemIdsKey]);
 
-    const priceOf = (item: DeliveryNoteItem): number => resolveDisplayPrice(item, jobPrices, showJobPrices);
-    const isJobPriced = (item: DeliveryNoteItem): boolean => showJobPrices && jobPrices.has(item.inventoryId);
+    // Lotti segnati «non calcolare»: restano al prezzo del lotto anche con i prezzi di commessa
+    const [excludedLots, setExcludedLots] = useState<Set<string>>(new Set());
+    const lotIdsKey = Array.from(new Set(items.map(item => item.purchaseItemId).filter((id): id is string => !!id))).sort().join(",");
+    useEffect(() => {
+        if (!canSeePrices || !lotIdsKey) return;
+        let cancelled = false;
+        purchaseAuditApi.getExcludedLotIds(lotIdsKey.split(","))
+            .then(ids => { if (!cancelled) setExcludedLots(ids); })
+            .catch(err => console.error("Failed to load excluded lots", err));
+        return () => { cancelled = true; };
+    }, [canSeePrices, lotIdsKey]);
+
+    const priceOf = (item: DeliveryNoteItem): number => resolveDisplayPrice(item, jobPrices, showJobPrices, excludedLots);
+    const isJobPriced = (item: DeliveryNoteItem): boolean =>
+        showJobPrices && jobPrices.has(item.inventoryId) && !(item.purchaseItemId && excludedLots.has(item.purchaseItemId));
     // L'interruttore compare per ogni documento con una commessa; si può attivare solo se almeno
     // un articolo del documento ha un prezzo di commessa (altrimenti non cambierebbe nulla)
     const showJobPriceSwitch = canSeePrices && jobPricesLoaded;

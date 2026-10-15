@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,8 +55,11 @@ function groupOfTab(tab: string): TabGroupKey {
 export default function JobDetailsPage() {
     const { id } = useParams<{ id: string }>();
     const { userRole } = useAuth();
-    const [activeTab, setActiveTab] = useState("overview");
-    const [activeGroup, setActiveGroup] = useState<TabGroupKey>(groupOfTab("overview"));
+    // ?tab=analisi-costi apre direttamente quella scheda (usato dai link degli avvisi)
+    const requestedTab = useSearchParams().get("tab");
+    const initialTab = requestedTab && TAB_GROUPS.some(g => g.tabs.includes(requestedTab)) ? requestedTab : "overview";
+    const [activeTab, setActiveTab] = useState(initialTab);
+    const [activeGroup, setActiveGroup] = useState<TabGroupKey>(groupOfTab(initialTab));
     const [job, setJob] = useState<Job | null>(null);
     const [movements, setMovements] = useState<Movement[]>([]);
     const [totalCost, setTotalCost] = useState(0);

@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info, Upload } from "lucide-react"
-import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, effectiveUnitPrice } from "@/lib/services/cost-analysis"
+import { firstMovementDates } from '@/lib/utils/first-movement-dates'
+import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, JobPriceAlert, effectiveUnitPrice } from "@/lib/services/cost-analysis"
 import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { inventoryApi } from "@/lib/api"
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
@@ -80,9 +81,16 @@ function InlineTextEdit({ value, onSave, placeholder }: { value: string; onSave:
 }
 
 // ── Tabella materiali ─────────────────────────────────────────────────────────
-function MaterialTable({ rows, onUpdate, onDelete }: {
+const ALERT_REASON_TEXT: Record<JobPriceAlert['reason'], string> = {
+    missing: 'Nessun acquisto con prezzo: impossibile risalire a un prezzo',
+    old: 'L\'ultimo prezzo noto è di oltre 18 mesi prima',
+    after: 'Esistono solo prezzi successivi alla data di riferimento',
+}
+
+function MaterialTable({ rows, alerts, onUpdate, onDelete }: {
     rows: CostAnalysisRow[]
-    onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void
+    alerts: Map<string, JobPriceAlert>
+    onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'pricePending' | 'pricePendingNote'>>) => void
     onDelete: (id: string) => void
 }) {
     const [pendingDelete, setPendingDelete] = useState<string | null>(null)
@@ -108,11 +116,44 @@ function MaterialTable({ rows, onUpdate, onDelete }: {
                         const totEst = (price ?? 0) * row.qtyEstimated
                         const unitPfx = row.itemUnit ? `€/${row.itemUnit}` : '€'
                         const label = row.itemModel ? `${row.itemName} (${row.itemModel})` : row.itemName
-                        const stripe = idx % 2 === 1 ? 'bg-slate-50/80 dark:bg-slate-800/30' : ''
+                        const alert = alerts.get(row.id)
+                        const stripe = alert ? 'bg-amber-50 dark:bg-amber-950/30' : idx % 2 === 1 ? 'bg-slate-50/80 dark:bg-slate-800/30' : ''
                         return (
                             <tr key={row.id} className={`border-b border-slate-100 dark:border-slate-800 ${stripe}`}>
                                 <td className="p-2 text-slate-800 dark:text-slate-200 text-sm leading-snug">
                                     {label}
+                                    {alert && (
+                                        <div className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                                            <span className="font-medium">Prezzo da definire.</span> {ALERT_REASON_TEXT[alert.reason]}
+                                            {alert.refPrice !== null && ` (ultimo noto € ${fmt(alert.refPrice)}${alert.refDate ? ` del ${alert.refDate}` : ''})`}.
+                                            <span className="ml-2 inline-flex gap-2">
+                                                {alert.refPrice !== null && (
+                                                    <button className="underline hover:no-underline"
+                                                        onClick={() => onUpdate(row.id, { unitPrice: alert.refPrice })}>
+                                                        Usa € {fmt(alert.refPrice)}
+                                                    </button>
+                                                )}
+                                                <button className="underline hover:no-underline"
+                                                    onClick={() => {
+                                                        const note = window.prompt('In attesa del prezzo: nota facoltativa (es. fornitore, ordine)') ?? null
+                                                        if (note === null) return
+                                                        onUpdate(row.id, { pricePending: true, pricePendingNote: note.trim() || null })
+                                                    }}>
+                                                    In attesa del prezzo
+                                                </button>
+                                            </span>
+                                        </div>
+                                    )}
+                                    {row.pricePending && row.unitPrice === null && (
+                                        <div className="mt-1 text-xs text-slate-500">
+                                            <Badge variant="outline" className="mr-1 text-[10px]">In attesa del prezzo</Badge>
+                                            {row.pricePendingNote}
+                                            <button className="ml-2 underline hover:no-underline"
+                                                onClick={() => onUpdate(row.id, { pricePending: false, pricePendingNote: null })}>
+                                                Rimuovi
+                                            </button>
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="p-2 text-right whitespace-nowrap">
                                     {row.maxPurchasePrice !== null ? (
@@ -255,6 +296,8 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
     const autoImported = useRef(false)
     const proposalPriceMapRef = useRef<Map<string, number>>(new Map())
 
+    const [alerts, setAlerts] = useState<JobPriceAlert[]>([])
+    const alertsByRow = useMemo(() => new Map(alerts.map(a => [a.rowId, a])), [alerts])
     const [proposalId, setProposalId] = useState<string | null>(null)
     const [subTab, setSubTab] = useState<'prezzi' | 'offerta' | 'terzi'>('prezzi')
 
@@ -271,6 +314,7 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
             ])
             setRows(existing)
             setParams(paramsData)
+            costAnalysisApi.getJobPriceAlerts(jobId).then(setAlerts).catch(() => { /* non bloccante */ })
 
             if (!autoImported.current) {
                 autoImported.current = true
@@ -288,7 +332,11 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                     if (m.type === 'exit' || m.type === 'entry' || m.type === 'purchase') uniqueItems.set(m.itemId, m)
                 }
                 if (uniqueItems.size > 0) {
-                    const priceMap = await costAnalysisApi.getMaxPurchasePrices([...uniqueItems.keys()])
+                    // Prezzo di riferimento alla data del primo movimento dell'articolo in questa commessa
+                    const firstDates = firstMovementDates(
+                        movements.filter(m => m.type === 'exit' || m.type === 'entry' || m.type === 'purchase')
+                    )
+                    const priceMap = await costAnalysisApi.getJobReferencePrices(jobId, [...uniqueItems.keys()], firstDates)
                     let sortBase = existing.filter(r => r.type === 'inventory').length
                     const added: CostAnalysisRow[] = []
                     for (const m of [...uniqueItems.values()]) {
@@ -354,8 +402,12 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
     }
 
     // ── Aggiorna riga ─────────────────────────────────────────────────────────
-    const handleUpdate = async (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName'>>) => {
+    const handleUpdate = async (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'pricePending' | 'pricePendingNote'>>) => {
         setRows(prev => prev.map(r => r.id === id ? { ...r, ...fields } : r))
+        // Con un prezzo impostato o «in attesa» l'avviso della riga non serve più
+        if (fields.unitPrice != null || fields.pricePending === true) {
+            setAlerts(prev => prev.filter(a => a.rowId !== id))
+        }
         try { await costAnalysisApi.update(id, fields) }
         catch { notify.error("Errore durante il salvataggio"); await loadRows() }
     }
@@ -435,7 +487,7 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                             Nessun materiale. Usa "Aggiungi articolo" per aggiungerne uno manualmente.
                         </p>
                     ) : (
-                        <MaterialTable rows={inventoryRows} onUpdate={handleUpdate} onDelete={handleDelete} />
+                        <MaterialTable rows={inventoryRows} alerts={alertsByRow} onUpdate={handleUpdate} onDelete={handleDelete} />
                     )}
                 </CardContent>
             </Card>
