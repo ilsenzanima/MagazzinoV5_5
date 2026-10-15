@@ -32,6 +32,17 @@ export async function GET(req: NextRequest) {
     if ("error" in auth) return auth.error
     const { admin } = auth
 
+    // GET /api/backups?status=1 -> esito dell'ultima esecuzione del backup automatico (_last_run.json)
+    if (req.nextUrl.searchParams.get("status")) {
+        const { data: blob, error } = await admin.storage.from(BUCKET).download("_last_run.json")
+        if (error || !blob) return NextResponse.json({ lastRun: null })
+        try {
+            return NextResponse.json({ lastRun: JSON.parse(await blob.text()) })
+        } catch {
+            return NextResponse.json({ lastRun: null })
+        }
+    }
+
     const folder = req.nextUrl.searchParams.get("folder")
 
     if (folder) {

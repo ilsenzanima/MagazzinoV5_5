@@ -32,6 +32,7 @@ export interface InventoryItem {
     supplierCode?: string;
     realQuantity?: number | null;
     model?: string;
+    packQuantity?: number | null; // quantità normale per confezione, nell'unità dell'articolo
 }
 
 export interface Brand {

@@ -7,7 +7,7 @@ const ImageCropper = dynamic(
   { ssr: false, loading: () => null }
 );
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,8 +33,14 @@ export interface InventoryFormData {
     minStock: string;
     unit: string;
     coefficient: string;
+    packQuantity: string;
     description: string;
     image: string;
+}
+
+// Permette alla procedura guidata di creare l'articolo con gli stessi controlli del pulsante normale
+export interface InventoryItemFormHandle {
+    submitWith: (overrides: Partial<InventoryFormData>, imageFile?: File | null) => Promise<boolean>;
 }
 
 interface InventoryItemFormProps {
@@ -44,16 +50,18 @@ interface InventoryItemFormProps {
     onSubmit: (data: InventoryFormData, imageFile: File | null) => Promise<void>;
     onCancel: () => void;
     isSubmitting?: boolean;
+    presetImageFile?: File | null;
 }
 
-export function InventoryItemForm({
+export const InventoryItemForm = forwardRef<InventoryItemFormHandle, InventoryItemFormProps>(function InventoryItemForm({
     mode,
     initialData,
     initialCode,
     onSubmit,
     onCancel,
-    isSubmitting = false
-}: InventoryItemFormProps) {
+    isSubmitting = false,
+    presetImageFile
+}, ref) {
     // Reference data
     const [brands, setBrands] = useState<Brand[]>([]);
     const [types, setTypes] = useState<ItemType[]>([]);
@@ -71,6 +79,7 @@ export function InventoryItemForm({
         minStock: initialData?.minStock || "0",
         unit: initialData?.unit || "PZ",
         coefficient: initialData?.coefficient || "1.0",
+        packQuantity: initialData?.packQuantity || "",
         description: initialData?.description || "",
         image: initialData?.image || ""
     });
@@ -124,6 +133,7 @@ export function InventoryItemForm({
                 minStock: initialData.minStock || "0",
                 unit: initialData.unit || "PZ",
                 coefficient: initialData.coefficient || "1.0",
+                packQuantity: initialData.packQuantity || "",
                 description: initialData.description || "",
                 image: initialData.image || ""
             });
@@ -132,6 +142,14 @@ export function InventoryItemForm({
             }
         }
     }, [initialData]);
+
+    // Foto scelta nella procedura guidata
+    useEffect(() => {
+        if (presetImageFile) {
+            setImageFile(presetImageFile);
+            setPreviewImage(URL.createObjectURL(presetImageFile));
+        }
+    }, [presetImageFile]);
 
     const [isCropperOpen, setIsCropperOpen] = useState(false);
     const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
@@ -161,35 +179,48 @@ export function InventoryItemForm({
 
     const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
 
-    const handleSubmit = async () => {
-        if (!isFormValid) return;
+    // Crea (o salva) l'articolo; `overrides` e `file` permettono alla procedura guidata di inviare i propri dati.
+    // Restituisce true se l'invio è andato a buon fine.
+    const runSubmit = async (overrides: Partial<InventoryFormData> = {}, file: File | null = imageFile): Promise<boolean> => {
+        const data = { ...formData, ...overrides };
+        if (!(data.name && data.brand && data.type)) return false;
 
         // Check duplicates
         setIsCheckingDuplicate(true);
         try {
             if (mode === 'create') {
                 const isDuplicate = await inventoryApi.checkDuplicate({
-                    name: formData.name,
-                    brand: formData.brand,
-                    type: formData.type,
-                    model: formData.model
+                    name: data.name,
+                    brand: data.brand,
+                    type: data.type,
+                    model: data.model
                 });
 
                 if (isDuplicate) {
                     notify.warning("Articolo già presente! Specificare la variante per differenziarlo.");
-                    setIsCheckingDuplicate(false);
-                    return;
+                    return false;
                 }
             }
 
-            await onSubmit({ ...formData, code }, imageFile);
+            await onSubmit({ ...data, code: overrides.code ?? code }, file);
+            return true;
         } catch (error) {
             console.error("Error checking duplicate or submitting", error);
             notify.error("Si è verificato un errore durante il salvataggio.");
+            return false;
         } finally {
             setIsCheckingDuplicate(false);
         }
     };
+
+    const handleSubmit = async () => {
+        if (!isFormValid) return;
+        await runSubmit();
+    };
+
+    useImperativeHandle(ref, () => ({
+        submitWith: (overrides, file) => runSubmit(overrides, file === undefined ? imageFile : file),
+    }));
 
     const isFormValid = formData.name && formData.brand && formData.type;
 
@@ -408,6 +439,26 @@ export function InventoryItemForm({
                         </div>
 
                         <div className="space-y-2">
+                            <Label htmlFor="packQuantity" className="flex items-center">
+                                Quantità per confezione <span className="ml-1 font-normal text-slate-500">(facoltativa)</span>
+                                <FieldTip text="Quante unità ci sono normalmente in una scatola o confezione (es. 18 ML). Serve a segnalare acquisti con prezzo o quantità che non tornano." />
+                            </Label>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    id="packQuantity"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    className="w-40"
+                                    placeholder="Es. 18"
+                                    value={formData.packQuantity}
+                                    onChange={(e) => setFormData({ ...formData, packQuantity: e.target.value })}
+                                />
+                                <span className="text-sm text-slate-500">{formData.unit}</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="description">Descrizione</Label>
                             <Textarea
                                 id="description"
@@ -445,4 +496,4 @@ export function InventoryItemForm({
             </div>
         </div>
     );
-}
+});

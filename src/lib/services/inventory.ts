@@ -66,7 +66,8 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     realPieces: dbItem.pieces,  // Real physical pieces count
     supplierCode: dbItem.supplier_code,
     realQuantity: dbItem.real_quantity,
-    model: dbItem.model
+    model: dbItem.model,
+    packQuantity: dbItem.pack_quantity !== null && dbItem.pack_quantity !== undefined ? Number(dbItem.pack_quantity) : null
 });
 
 export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
@@ -88,6 +89,7 @@ export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
     if (item.supplierCode !== undefined) dbItem.supplier_code = item.supplierCode;
     if (item.realQuantity !== undefined) dbItem.real_quantity = item.realQuantity;
     if (item.model !== undefined) dbItem.model = item.model;
+    if (item.packQuantity !== undefined) dbItem.pack_quantity = item.packQuantity;
 
     return dbItem;
 };

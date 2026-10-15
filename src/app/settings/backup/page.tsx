@@ -93,6 +93,7 @@ const TABLES = [
     'leave_requests',
     'worker_courses',
     'worker_medical_exams',
+    'user_notification_preferences',
 ];
 
 interface BackupData {

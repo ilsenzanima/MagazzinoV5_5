@@ -69,6 +69,7 @@ export const BACKUP_TABLES = [
     'leave_requests',
     'worker_courses',
     'worker_medical_exams',
+    'user_notification_preferences',
 ] as const
 
 // Colonne con cui ordinare per paginare in modo stabile.
