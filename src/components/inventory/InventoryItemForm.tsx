@@ -41,6 +41,8 @@ export interface InventoryFormData {
 // Permette alla procedura guidata di creare l'articolo con gli stessi controlli del pulsante normale
 export interface InventoryItemFormHandle {
     submitWith: (overrides: Partial<InventoryFormData>, imageFile?: File | null) => Promise<boolean>;
+    // Valori attuali dei campi (anche quelli modificati a mano), per riaprire la procedura guidata senza perderli
+    getValues: () => { data: Omit<InventoryFormData, 'code'>; imageFile: File | null };
 }
 
 interface InventoryItemFormProps {
@@ -220,6 +222,7 @@ export const InventoryItemForm = forwardRef<InventoryItemFormHandle, InventoryIt
 
     useImperativeHandle(ref, () => ({
         submitWith: (overrides, file) => runSubmit(overrides, file === undefined ? imageFile : file),
+        getValues: () => ({ data: formData, imageFile }),
     }));
 
     const isFormValid = formData.name && formData.brand && formData.type;

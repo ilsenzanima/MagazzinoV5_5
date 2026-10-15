@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2, Plus, Search, Upload, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,14 @@ export const draftFromItem = (item: InventoryItem): WizardDraft => ({
 
 const STEPS = ["Tipo di articolo", "Informazioni", "Classificazione", "Unità e confezione"];
 
+// Permette alla pagina di riallineare la procedura guidata ai valori attuali della scheda
+export interface NewItemWizardHandle {
+    syncFrom: (values: {
+        name: string; model: string; description: string; brand: string; type: string; unit: string;
+        supplierCode: string; minStock: string; coefficient: string; packQuantity: string; image: string;
+    }, imageFile: File | null) => void;
+}
+
 interface NewItemWizardProps {
     open: boolean;
     onClose: () => void;                              // chiude il modale e si continua a mano
@@ -80,7 +88,10 @@ interface NewItemWizardProps {
     onCreate: (draft: WizardDraft) => Promise<boolean>;
 }
 
-export function NewItemWizard({ open, onClose, initialDraft, startStep = 0, onChange, onCreate }: NewItemWizardProps) {
+export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>(function NewItemWizard(
+    { open, onClose, initialDraft, startStep = 0, onChange, onCreate },
+    ref
+) {
     const [step, setStep] = useState(startStep);
     const [draft, setDraft] = useState<WizardDraft>(initialDraft ?? EMPTY_DRAFT);
     const [choice, setChoice] = useState<"new" | "copy" | null>(initialDraft?.baseItemId ? "copy" : null);
@@ -108,6 +119,32 @@ export function NewItemWizard({ open, onClose, initialDraft, startStep = 0, onCh
     const [previewUrl, setPreviewUrl] = useState("");
 
     const patch = (p: Partial<WizardDraft>) => setDraft(prev => ({ ...prev, ...p }));
+
+    // Alla riapertura i dati della scheda (anche modificati a mano) tornano nella procedura guidata
+    useImperativeHandle(ref, () => ({
+        syncFrom: (v, file) => {
+            const minStockNumber = parseFloat((v.minStock || "0").replace(",", "."));
+            setDraft(prev => ({
+                ...prev,
+                name: v.name,
+                model: v.model,
+                description: v.description,
+                brand: v.brand,
+                type: v.type,
+                unit: v.unit || prev.unit,
+                hasSupplierCode: !!v.supplierCode,
+                supplierCode: v.supplierCode,
+                wantsMinStock: minStockNumber > 0,
+                minStock: minStockNumber > 0 ? v.minStock : "0",
+                coefficient: v.coefficient,
+                packQuantity: v.packQuantity,
+                imageUrl: v.image || prev.imageUrl,
+                imageFile: file ?? prev.imageFile,
+                wantsImage: prev.wantsImage || !!file,
+            }));
+            setBrandQuery(v.brand);
+        },
+    }));
 
     // La scheda sotto il modale si aggiorna a ogni modifica
     const onChangeRef = useRef(onChange);
@@ -548,4 +585,4 @@ export function NewItemWizard({ open, onClose, initialDraft, startStep = 0, onCh
             </Dialog>
         </>
     );
-}
+});
