@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bell, CalendarClock, Euro, HeartPulse, Loader2, PackageMinus, PackageX, Settings } from "lucide-react";
+import { AlertTriangle, Bell, CalendarClock, Euro, HardDrive, HeartPulse, Loader2, PackageMinus, PackageX, Settings } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
@@ -21,21 +21,24 @@ const KIND_ICON: Record<AlertKind, typeof Bell> = {
   course: CalendarClock,
   medical_exam: HeartPulse,
   job_price_missing: Euro,
+  backup: HardDrive,
 };
 
 // Etichette del riepilogo, con la preferenza che le attiva
-const SUMMARY: { kind: AlertKind; label: string; pref: keyof NotificationPreferences }[] = [
+const SUMMARY: { kind: AlertKind; label: string; pref?: keyof NotificationPreferences }[] = [
   { kind: "out_of_stock", label: "Esauriti", pref: "outOfStock" },
   { kind: "low_stock", label: "Scorta bassa", pref: "lowStock" },
   { kind: "course", label: "Corsi", pref: "expiringCourses" },
   { kind: "medical_exam", label: "Visite mediche", pref: "expiringMedicalExams" },
   { kind: "job_price_missing", label: "Prezzi commesse", pref: "jobPriceMissing" },
+  { kind: "backup", label: "Backup" },
 ];
 
 const SECTIONS: { title: string; kinds: AlertKind[] }[] = [
   { title: "Magazzino", kinds: ["out_of_stock", "low_stock"] },
   { title: "Scadenze personale", kinds: ["course", "medical_exam"] },
   { title: "Prezzi commesse da definire", kinds: ["job_price_missing"] },
+  { title: "Backup", kinds: ["backup"] },
 ];
 
 interface NotificationBellProps {
@@ -62,7 +65,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
       const stored = await notificationPreferencesApi
         .getWithSeen(user.id)
         .catch(() => ({ prefs: DEFAULT_NOTIFICATION_PREFERENCES, seenAlertIds: [] as string[] }));
-      const { alerts: loaded, complete } = await notificationsApi.getAlerts(stored.prefs, { includeJobPrices: canSeeJobPrices });
+      const { alerts: loaded, complete } = await notificationsApi.getAlerts(stored.prefs, { includeJobPrices: canSeeJobPrices, includeBackup: userRole === "admin" });
       setPrefs(stored.prefs);
       setAlerts(loaded);
 
@@ -85,7 +88,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
     } finally {
       setLoading(false);
     }
-  }, [user, canSeeJobPrices]);
+  }, [user, canSeeJobPrices, userRole]);
 
   useEffect(() => {
     load();
@@ -101,7 +104,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
   const unseen = useMemo(() => alerts.filter((a) => !seenIds.has(a.id)), [alerts, seenIds]);
 
   const counts = useMemo(() => {
-    const result: Record<AlertKind, number> = { out_of_stock: 0, low_stock: 0, course: 0, medical_exam: 0, job_price_missing: 0 };
+    const result: Record<AlertKind, number> = { out_of_stock: 0, low_stock: 0, course: 0, medical_exam: 0, job_price_missing: 0, backup: 0 };
     alerts.forEach((a) => { result[a.kind] += 1; });
     return result;
   }, [alerts]);
@@ -173,7 +176,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
         {/* Riepilogo: mostra tutti i tipi di avviso controllati, anche quelli a zero */}
         {!loading && !failed && (
           <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b">
-            {SUMMARY.filter((s) => prefs[s.pref]).map((s) => (
+            {SUMMARY.filter((s) => !s.pref || prefs[s.pref]).map((s) => (
               <span
                 key={s.kind}
                 className={cn(
@@ -184,7 +187,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
                 {s.label}: {counts[s.kind]}
               </span>
             ))}
-            {SUMMARY.every((s) => !prefs[s.pref]) && (
+            {SUMMARY.every((s) => s.pref && !prefs[s.pref]) && (
               <span className="text-xs text-muted-foreground">Tutti gli avvisi sono disattivati nelle impostazioni.</span>
             )}
           </div>

@@ -21,6 +21,7 @@ export default async function NewMovementPage() {
     const { data: inventoryData } = await supabase
         .from('inventory')
         .select('*')
+        .is('deleted_at', null) // gli admin vedono anche gli eliminati: non vanno proposti
         .order('code', { ascending: true })
         .limit(50);
 

@@ -81,6 +81,7 @@ const TABLES = [
     'leave_requests',
     'worker_courses',
     'worker_medical_exams',
+    'user_notification_preferences',
 ];
 
 // Tabelle senza "id" né "created_at": colonne con cui ordinare per paginare in modo stabile
@@ -208,12 +209,24 @@ async function main() {
         }
     }
 
+    const failed = results.filter(r => r.error);
     const summary = {
         timestamp: new Date().toISOString(),
+        ok: failed.length === 0,
         tables: results.map(r => ({ name: r.tableName, records: r.count, error: r.error })),
         totalRecords,
     };
     await uploadFile(`${timestamp}/_summary.json`, JSON.stringify(summary, null, 2));
+
+    // Esito dell'ultima esecuzione: lo legge l'app per avvisare gli admin (campanella)
+    await writeLastRun({
+        ok: summary.ok,
+        timestamp: summary.timestamp,
+        folder: timestamp,
+        tables: results.length,
+        totalRecords,
+        failedTables: failed.map(r => ({ name: r.tableName, error: r.error })),
+    });
 
     console.log('\n🧹 Cleaning old backups...');
     await cleanOldBackups(timestamp);
@@ -226,9 +239,25 @@ async function main() {
     }
     console.log(`\n   Total: ${totalRecords} records`);
     console.log(`   Location: Supabase Storage → ${BUCKET}/${timestamp}`);
+
+    // Con tabelle non salvate correttamente l'esecuzione risulta fallita (GitHub avvisa via email)
+    if (failed.length > 0) {
+        console.error(`\n❌ ${failed.length} tabelle non salvate correttamente`);
+        process.exit(1);
+    }
 }
 
-main().catch(err => {
+async function writeLastRun(record) {
+    try {
+        await uploadFile('_last_run.json', JSON.stringify(record, null, 2));
+    } catch (err) {
+        console.warn('  ⚠️  Could not write _last_run.json:', err.message);
+    }
+}
+
+main().catch(async err => {
     console.error('💥 Backup failed:', err.message);
+    // Segnala il fallimento anche all'app, se possibile
+    await writeLastRun({ ok: false, timestamp: new Date().toISOString(), error: err.message });
     process.exit(1);
 });

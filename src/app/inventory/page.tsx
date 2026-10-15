@@ -21,6 +21,7 @@ export default async function InventoryPage() {
   const { data: dbItems, error, count } = await supabase
     .from('inventory')
     .select('*', { count: 'estimated' })
+    .is('deleted_at', null) // gli admin vedono anche gli eliminati: non vanno nell'elenco
     .order('name')
     .range(0, 11); // 0 to 11 is 12 items
 

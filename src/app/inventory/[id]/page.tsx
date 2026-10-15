@@ -275,6 +275,7 @@ export default function InventoryDetailPage() {
         minStock: item.minStock,
         unit: item.unit,
         coefficient: item.coefficient,
+        packQuantity: item.packQuantity ?? null,
         description: item.description
       });
       setCoefficientInput(item.coefficient != null ? String(item.coefficient) : "1");
@@ -1040,6 +1041,35 @@ export default function InventoryDetailPage() {
                       <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="packQuantity" className="flex items-center">
+                    Quantità per confezione
+                    <FieldTip text="Quante unità ci sono normalmente in una scatola o confezione (es. 18 ML). Serve a segnalare acquisti con prezzo o quantità che non tornano." />
+                  </Label>
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="packQuantity"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-40"
+                        placeholder="Es. 18"
+                        value={editForm.packQuantity ?? ""}
+                        onChange={(e) => {
+                          const parsed = parseFloat(e.target.value);
+                          setEditForm({ ...editForm, packQuantity: isNaN(parsed) || parsed <= 0 ? null : parsed });
+                        }}
+                      />
+                      <span className="text-sm text-slate-500">{item.unit}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-700 dark:text-slate-200">
+                      {item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : "Non indicata"}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

@@ -3,7 +3,7 @@ import { addYears, differenceInCalendarDays, format } from 'date-fns';
 import { NotificationPreferences } from './notification-preferences';
 import { costAnalysisApi, JobPriceAlertReason } from './cost-analysis';
 
-export type AlertKind = 'out_of_stock' | 'low_stock' | 'course' | 'medical_exam' | 'job_price_missing';
+export type AlertKind = 'out_of_stock' | 'low_stock' | 'course' | 'medical_exam' | 'job_price_missing' | 'backup';
 
 export interface AppAlert {
     id: string;
@@ -162,19 +162,71 @@ const getJobPriceAlerts = async (): Promise<AppAlert[]> => {
     }));
 };
 
+interface BackupLastRun {
+    ok: boolean;
+    timestamp: string;
+    folder?: string;
+    tables?: number;
+    totalRecords?: number;
+    failedTables?: { name: string; error: string }[];
+    error?: string;
+}
+
+// Giorni oltre i quali un backup settimanale si considera mancato
+const BACKUP_MAX_AGE_DAYS = 8;
+
+// Esito dell'ultimo backup automatico (solo admin): riuscito, fallito, oppure non eseguito da troppo tempo
+const getBackupAlerts = async (): Promise<AppAlert[]> => {
+    const res = await fetch('/api/backups?status=1', { cache: 'no-store' });
+    if (!res.ok) return [];
+    const { lastRun } = (await res.json()) as { lastRun: BackupLastRun | null };
+    if (!lastRun) return [];
+
+    const when = new Date(lastRun.timestamp);
+    const day = format(when, 'dd/MM/yyyy');
+    const ageDays = differenceInCalendarDays(new Date(), when);
+    const href = '/settings/backup';
+
+    if (!lastRun.ok) {
+        const detail = lastRun.failedTables?.length
+            ? `${lastRun.failedTables.length} tabelle non salvate (${lastRun.failedTables.slice(0, 3).map(t => t.name).join(', ')})`
+            : lastRun.error || 'errore sconosciuto';
+        return [{ id: `backup-failed-${lastRun.timestamp}`, kind: 'backup', title: `Backup fallito del ${day}`, detail, href, critical: true }];
+    }
+    if (ageDays > BACKUP_MAX_AGE_DAYS) {
+        return [{
+            id: `backup-old-${lastRun.timestamp}`,
+            kind: 'backup',
+            title: 'Backup non eseguito',
+            detail: `Nessun backup negli ultimi ${BACKUP_MAX_AGE_DAYS} giorni (ultimo: ${day})`,
+            href,
+            critical: true,
+        }];
+    }
+    return [{
+        id: `backup-ok-${lastRun.timestamp}`,
+        kind: 'backup',
+        title: `Backup del ${day} completato`,
+        detail: `${lastRun.tables ?? '?'} tabelle, ${lastRun.totalRecords ?? '?'} record salvati`,
+        href,
+        critical: false,
+    }];
+};
+
 export const notificationsApi = {
     // Calcola gli avvisi attivi in base alle preferenze dell'utente.
     // Se una sorgente fallisce le altre vengono comunque mostrate, ma `complete`
     // è false: in quel caso l'elenco non va usato per dedurre che un avviso è risolto.
     getAlerts: async (
         prefs: NotificationPreferences,
-        options: { includeJobPrices?: boolean } = {}
+        options: { includeJobPrices?: boolean; includeBackup?: boolean } = {}
     ): Promise<{ alerts: AppAlert[]; complete: boolean }> => {
         const results = await Promise.allSettled([
             getStockAlerts(prefs),
             prefs.expiringCourses ? getCourseAlerts() : Promise.resolve([]),
             prefs.expiringMedicalExams ? getMedicalExamAlerts() : Promise.resolve([]),
             options.includeJobPrices && prefs.jobPriceMissing ? getJobPriceAlerts() : Promise.resolve([]),
+            options.includeBackup ? getBackupAlerts() : Promise.resolve([]),
         ]);
         return {
             alerts: results.flatMap(r => (r.status === 'fulfilled' ? r.value : [])),
