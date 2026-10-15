@@ -54,7 +54,7 @@ function NewInventoryItemContent() {
             brand: item.brand,
             type: item.type,
             supplierCode: item.supplierCode || "",
-            minStock: item.minStock.toString(),
+            minStock: "0", // un articolo nuovo parte senza scorta minima, anche se copiato da un altro
             unit: item.unit,
             coefficient: item.coefficient.toString(),
             description: item.description || "",

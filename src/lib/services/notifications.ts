@@ -33,7 +33,7 @@ const getStockAlerts = async (prefs: NotificationPreferences): Promise<AppAlert[
     // Solo articoli con una scorta minima impostata: gli altri non sono "tracciati"
     const { data, error } = await supabase
         .from('inventory')
-        .select('id, code, name, quantity, min_stock, unit')
+        .select('id, code, name, quantity, min_stock, unit, verified_at')
         .is('deleted_at', null)
         .gt('min_stock', 0)
         .order('name', { ascending: true })
@@ -43,6 +43,8 @@ const getStockAlerts = async (prefs: NotificationPreferences): Promise<AppAlert[
 
     const alerts: AppAlert[] = [];
     for (const item of data || []) {
+        // Un articolo appena creato (non ancora verificato in Controllo Articoli) non è «esaurito»: non ha ancora storia
+        if (!item.verified_at) continue;
         const quantity = Number(item.quantity) || 0;
         const minStock = Number(item.min_stock) || 0;
         const label = `${item.code ? item.code + ' · ' : ''}${item.name}`;
