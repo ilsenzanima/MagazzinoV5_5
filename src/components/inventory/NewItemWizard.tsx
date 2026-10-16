@@ -16,7 +16,8 @@ import { brandsApi, itemTypesApi, unitsApi, inventoryApi, Brand, ItemType, Unit 
 import type { InventoryItem } from "@/lib/types";
 import {
     VariantField, VariantTemplate, VariantValues,
-    cleanValues, composeVariant, defaultValues, isFieldVisible, missingRequiredFields, packQuantityFrom,
+    SUBTYPE_KEY, cleanValues, coefficientFrom, composeVariant, defaultValues, effectiveSection, hasSubtypes,
+    isFieldVisible, missingRequiredFields, packQuantityFrom,
 } from "@/lib/utils/variant-template";
 
 const ImageCropper = dynamic(
@@ -171,11 +172,18 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     const [cropSrc, setCropSrc] = useState<string | null>(null);
     const [previewUrl, setPreviewUrl] = useState("");
 
+    // Il coefficiente si propone dalle misure finché non lo si modifica a mano
+    const [coefficientTouched, setCoefficientTouched] = useState(false);
+
     const patch = (p: Partial<WizardDraft>) => setDraft(prev => ({ ...prev, ...p }));
+
+    const draftRef = useRef(draft);
+    draftRef.current = draft;
 
     // Alla riapertura i dati della scheda (anche modificati a mano) tornano nella procedura guidata
     useImperativeHandle(ref, () => ({
         syncFrom: (v, file) => {
+            if (v.coefficient !== draftRef.current.coefficient) setCoefficientTouched(true);
             const minStockNumber = parseFloat((v.minStock || "0").replace(",", "."));
             setDraft(prev => ({
                 ...prev,
@@ -234,8 +242,10 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                 if (cancelled) return;
                 const map: Record<string, Set<string>> = {};
                 for (const attrs of rows) {
+                    const sub = attrs[SUBTYPE_KEY] ?? "";
                     for (const [k, v] of Object.entries(attrs)) {
-                        (map[k] ??= new Set()).add(String(v));
+                        if (k === SUBTYPE_KEY) continue;
+                        (map[`${sub}|${k}`] ??= new Set()).add(String(v));
                     }
                 }
                 setUsedValues(Object.fromEntries(Object.entries(map).map(([k, s]) => [k, Array.from(s).sort()])));
@@ -254,6 +264,20 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                 const pack = packQuantityFrom(template, attrs);
                 if (pack) next.packQuantity = pack;
             }
+            return next;
+        });
+    };
+
+    // Scelta del sottotipo (es. Componente): decide quali campi chiedere
+    const setSubtype = (key: string) => {
+        setDraft(prev => {
+            const sub = template?.subtypes?.find(s => s.key === key);
+            const prevSub = template?.subtypes?.find(s => s.key === prev.variantAttributes[SUBTYPE_KEY]);
+            const attrs = defaultValues(template, key);
+            const next: WizardDraft = { ...prev, variantAttributes: attrs };
+            if (!prev.customModel) next.model = composeVariant(template, attrs);
+            // Nome proposto dal sottotipo, solo se vuoto o ancora quello proposto prima
+            if (sub?.suggestedName && (!prev.name.trim() || prev.name === prevSub?.suggestedName)) next.name = sub.suggestedName;
             return next;
         });
     };
@@ -324,6 +348,13 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     const packNum = draft.packQuantity.trim() === "" ? null : parseFloat(draft.packQuantity.replace(",", "."));
     const minStockNum = parseFloat(draft.minStock.replace(",", "."));
     const missingMask = useMask ? missingRequiredFields(template, draft.variantAttributes) : [];
+
+    const suggestedCoefficient = useMask ? coefficientFrom(template, draft.variantAttributes, draft.unit) : null;
+    useEffect(() => {
+        if (coefficientTouched || suggestedCoefficient === null) return;
+        if (String(suggestedCoefficient) !== draft.coefficient) patch({ coefficient: String(suggestedCoefficient) });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [suggestedCoefficient, coefficientTouched]);
 
     const stepErrors: string[][] = [
         choice === null ? ["Scegli se l'articolo è nuovo o simile a uno esistente"]
@@ -403,7 +434,9 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     };
 
     const unitLabel = draft.unit || "unità";
-    const visibleFields = template ? template.fields.filter(f => isFieldVisible(f, draft.variantAttributes)) : [];
+    const section = effectiveSection(template, draft.variantAttributes);
+    const visibleFields = section ? section.fields.filter(f => isFieldVisible(f, draft.variantAttributes)) : [];
+    const currentSub = draft.variantAttributes[SUBTYPE_KEY] ?? "";
 
     return (
         <>
@@ -544,12 +577,23 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                                 <Pencil className="mr-1 h-3 w-3" /> Scrivi a mano
                                             </Button>
                                         </div>
+                                        {hasSubtypes(template) && (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">{template?.subtypeLabel || "Sottotipo"} *</Label>
+                                                <Select value={currentSub} onValueChange={setSubtype}>
+                                                    <SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {template!.subtypes!.map(s => <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             {visibleFields.map(f => (
                                                 <TemplateFieldInput key={f.key} field={f}
                                                     value={draft.variantAttributes[f.key] ?? ""}
                                                     onChange={v => setAttribute(f.key, v)}
-                                                    suggestions={Array.from(new Set([...(f.options ?? []), ...(usedValues[f.key] ?? [])]))} />
+                                                    suggestions={Array.from(new Set([...(f.options ?? []), ...(usedValues[`${currentSub}|${f.key}`] ?? [])]))} />
                                             ))}
                                         </div>
                                         <div className="rounded bg-slate-50 p-2 text-sm dark:bg-slate-800/40">
@@ -694,9 +738,12 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                     <Label htmlFor="w-coeff">Coefficiente di moltiplicazione</Label>
                                     <div className="flex items-center gap-2">
                                         <Input id="w-coeff" autoFocus className="w-32" type="number" min="0.01" step="0.01"
-                                            value={draft.coefficient} onChange={e => patch({ coefficient: e.target.value })} />
+                                            value={draft.coefficient} onChange={e => { setCoefficientTouched(true); patch({ coefficient: e.target.value }); }} />
                                         <span className="text-sm text-slate-500">{unitLabel} per pezzo fisico</span>
                                     </div>
+                                    {suggestedCoefficient !== null && !coefficientTouched && (
+                                        <p className="text-[11px] text-emerald-700">Calcolato dalle misure della variante: puoi modificarlo.</p>
+                                    )}
                                     <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800/40 dark:text-slate-300">
                                         Il coefficiente converte l&apos;unità di magazzino (<b>{unitLabel}</b>) nei pezzi fisici.
                                         Esempio: una lastra di cartongesso 2500x1200 mm vale 3 mq; se in magazzino conti i mq,

@@ -1,6 +1,6 @@
 import {
     composeVariant, missingRequiredFields, defaultValues, cleanValues, packQuantityFrom,
-    formatNumberValue, keyFromLabel, VariantTemplate,
+    formatNumberValue, keyFromLabel, VariantTemplate, coefficientFrom, SUBTYPE_KEY,
 } from '../variant-template';
 
 const guide: VariantTemplate = {
@@ -97,3 +97,58 @@ describe('numeri e valori', () => {
         expect(keyFromLabel('Spessore')).toBe('spessore');
     });
 });
+
+describe('sottotipi e coefficiente', () => {
+    const porte: VariantTemplate = {
+        version: 2, pattern: '', fields: [], subtypeLabel: 'Componente',
+        subtypes: [
+            { key: 'maniglione', label: 'Maniglione', pattern: '{modello} [per porta {larghezza} mm]', fields: [
+                { key: 'modello', label: 'Modello', kind: 'choice', required: true },
+                { key: 'larghezza', label: 'Larghezza', kind: 'number' },
+            ] },
+            { key: 'chiudiporta', label: 'Chiudiporta', pattern: '{modello} {finitura}', fields: [
+                { key: 'modello', label: 'Modello', kind: 'choice', required: true },
+                { key: 'finitura', label: 'Finitura', kind: 'choice' },
+            ] },
+        ],
+    };
+
+    it('senza sottotipo scelto chiede prima il sottotipo', () => {
+        expect(composeVariant(porte, { modello: 'CP1' })).toBe('');
+        const missing = missingRequiredFields(porte, {});
+        expect(missing.map(f => f.key)).toEqual([SUBTYPE_KEY]);
+        expect(missing[0].label).toBe('Componente');
+    });
+
+    it('usa campi e modello del sottotipo scelto', () => {
+        expect(composeVariant(porte, { [SUBTYPE_KEY]: 'maniglione', modello: 'SLASH SL BM', larghezza: '1340' }))
+            .toBe('SLASH SL BM per porta 1340 mm');
+        expect(composeVariant(porte, { [SUBTYPE_KEY]: 'chiudiporta', modello: 'CP1', finitura: 'argento' }))
+            .toBe('CP1 argento');
+    });
+
+    it('i valori salvati includono il sottotipo e solo i campi di quel sottotipo', () => {
+        expect(cleanValues(porte, { [SUBTYPE_KEY]: 'chiudiporta', modello: 'CP1', larghezza: '99', finitura: ' argento ' }))
+            .toEqual({ [SUBTYPE_KEY]: 'chiudiporta', modello: 'CP1', finitura: 'argento' });
+        expect(defaultValues(porte, 'maniglione')).toEqual({ [SUBTYPE_KEY]: 'maniglione' });
+    });
+
+    it('coefficiente: area per le lastre in MQ, lunghezza in metri per i profili in ML', () => {
+        const lastre: VariantTemplate = {
+            version: 2, pattern: '', fields: [],
+            coefficient: { kind: 'area', widthKey: 'l', lengthKey: 'h', whenUnit: 'MQ' },
+        };
+        expect(coefficientFrom(lastre, { l: '1200', h: '2500' }, 'MQ')).toBe(3);
+        expect(coefficientFrom(lastre, { l: '1200', h: '3000' }, 'mq')).toBe(3.6);
+        expect(coefficientFrom(lastre, { l: '1200', h: '3000' }, 'PZ')).toBeNull();
+        expect(coefficientFrom(lastre, { l: '1200' }, 'MQ')).toBeNull();
+
+        const guide: VariantTemplate = {
+            version: 2, pattern: '', fields: [],
+            coefficient: { kind: 'length', lengthKey: 'lunghezza', whenUnit: 'ML' },
+        };
+        expect(coefficientFrom(guide, { lunghezza: '4000' }, 'ML')).toBe(4);
+        expect(coefficientFrom(guide, { lunghezza: '2800' }, 'ML')).toBe(2.8);
+    });
+});
+
