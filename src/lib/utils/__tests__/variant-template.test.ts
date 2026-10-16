@@ -1,6 +1,6 @@
 import {
     composeVariant, missingRequiredFields, defaultValues, cleanValues, packQuantityFrom,
-    formatNumberValue, keyFromLabel, VariantTemplate, coefficientFrom, SUBTYPE_KEY,
+    formatNumberValue, keyFromLabel, VariantTemplate, coefficientFrom, SUBTYPE_KEY, suggestedPackQuantity,
 } from '../variant-template';
 
 const guide: VariantTemplate = {
@@ -152,3 +152,38 @@ describe('sottotipi e coefficiente', () => {
     });
 });
 
+describe('quantità per confezione suggerita', () => {
+    const lana: VariantTemplate = {
+        version: 2, pattern: '', fields: [],
+        subtypes: [{
+            key: 'pannello', label: 'Pannello', pattern: '{spessore}x{larghezza}x{lunghezza}',
+            packFromSheets: { sheetsKey: 'fogli', widthKey: 'larghezza', lengthKey: 'lunghezza' },
+            fields: [
+                { key: 'spessore', label: 'Sp', kind: 'number' },
+                { key: 'larghezza', label: 'L', kind: 'number' },
+                { key: 'lunghezza', label: 'H', kind: 'number' },
+                { key: 'fogli', label: 'Fogli', kind: 'number', hideFromVariant: true },
+            ],
+        }],
+    };
+    const v = { [SUBTYPE_KEY]: 'pannello', spessore: '50', larghezza: '600', lunghezza: '1200', fogli: '10' };
+
+    it('con MQ i fogli diventano m² (10 fogli da 0,72 m² = 7,2), con PZ restano pezzi', () => {
+        expect(suggestedPackQuantity(lana, v, 'MQ')).toBe(7.2);
+        expect(suggestedPackQuantity(lana, v, 'PZ')).toBe(10);
+        expect(suggestedPackQuantity(lana, v, 'KG')).toBeNull();
+        expect(suggestedPackQuantity(lana, { ...v, fogli: '' }, 'MQ')).toBeNull();
+    });
+
+    it('il peso è anche la confezione solo con l\'unità prevista', () => {
+        const stucco: VariantTemplate = {
+            version: 2, pattern: '{contenitore} [{peso} KG]',
+            fields: [
+                { key: 'contenitore', label: 'Contenitore', kind: 'choice' },
+                { key: 'peso', label: 'Peso', kind: 'number', fillsPackQuantity: true, packWhenUnit: 'KG' },
+            ],
+        };
+        expect(suggestedPackQuantity(stucco, { peso: '25' }, 'KG')).toBe(25);
+        expect(suggestedPackQuantity(stucco, { peso: '25' }, 'PZ')).toBeNull();
+    });
+});

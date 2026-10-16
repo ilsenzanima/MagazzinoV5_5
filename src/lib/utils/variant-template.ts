@@ -20,6 +20,8 @@ export interface VariantField {
     hideWhenDefault?: boolean;                      // il valore standard non compare nella variante
     hint?: string;
     fillsPackQuantity?: boolean;                    // il valore è anche la quantità per confezione
+    packWhenUnit?: string;                          // ...ma solo con questa unità dell'articolo (es. KG)
+    hideFromVariant?: boolean;                      // dato strutturato: non compare nel testo della variante
 }
 
 // Coefficiente suggerito dalle misure: area (lastre in MQ) o lunghezza in metri (profili in ML)
@@ -30,12 +32,20 @@ export interface VariantCoefficientRule {
     whenUnit: string;                               // si applica solo con questa unità (MQ, ML)
 }
 
+// Confezione calcolata dai fogli: con unità MQ sono i m² (fogli × area del foglio), con PZ i fogli stessi
+export interface VariantPackRule {
+    sheetsKey: string;
+    widthKey: string;
+    lengthKey: string;
+}
+
 export interface VariantSection {
     // Es. "{larghezza}x{ala}x{lunghezza} [sp.{spessore}]": i gruppi tra [ ] compaiono solo se tutti
     // i campi al loro interno sono compilati.
     pattern: string;
     fields: VariantField[];
     coefficient?: VariantCoefficientRule;
+    packFromSheets?: VariantPackRule;
 }
 
 export interface VariantSubtype extends VariantSection {
@@ -184,6 +194,35 @@ export const coefficientFrom = (
     const width = toNumber(rule.widthKey ? values[rule.widthKey] : undefined);
     if (width === null) return null;
     return Math.round((width * length / 1_000_000) * 10000) / 10000;
+};
+
+// Quantità per confezione suggerita dalla scheda e dall'unità scelta: dai fogli per confezione
+// (m² con MQ, pezzi con PZ) oppure dal campo che coincide con la confezione (es. peso in KG)
+export const suggestedPackQuantity = (
+    template: VariantTemplate | null | undefined,
+    values: VariantValues,
+    unit: string
+): number | null => {
+    const section = effectiveSection(template, values);
+    if (!section) return null;
+    const u = unit.trim().toLowerCase();
+
+    const rule = section.packFromSheets;
+    if (rule) {
+        const sheets = toNumber(values[rule.sheetsKey]);
+        if (sheets !== null) {
+            if (u === 'pz') return sheets;
+            if (u === 'mq') {
+                const w = toNumber(values[rule.widthKey]);
+                const l = toNumber(values[rule.lengthKey]);
+                if (w !== null && l !== null) return Math.round((sheets * w * l / 1_000_000) * 10000) / 10000;
+            }
+        }
+    }
+
+    const field = section.fields.find(f => f.fillsPackQuantity && (!f.packWhenUnit || f.packWhenUnit.toLowerCase() === u));
+    if (field && isFieldVisible(field, values)) return toNumber(values[field.key]);
+    return null;
 };
 
 // Chiave a partire dall'etichetta (per l'editor delle schede)

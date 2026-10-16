@@ -88,3 +88,30 @@ WHERE name = 'Profilati';
 
 -- Correzione dati: marca scritta come testo "NULL"
 UPDATE public.inventory SET brand = 'MULTI' WHERE code = 'PRO-NUL-113' AND brand = 'NULL';
+
+-- Lana: pannelli e rotoli (con confezione da fogli) oppure "Altro" per pezzi particolari o su misura
+UPDATE public.item_types SET variant_template = '{"version":2,"pattern":"","fields":[],"subtypeLabel":"Formato","subtypes":[
+ {"key":"pannello","label":"Pannello o rotolo","pattern":"{spessore}x{larghezza}x{lunghezza} [{densita} kg/m³] {rivestimento} {altro}","coefficient":{"kind":"area","widthKey":"larghezza","lengthKey":"lunghezza","whenUnit":"MQ"},"packFromSheets":{"sheetsKey":"fogli","widthKey":"larghezza","lengthKey":"lunghezza"},"fields":[
+  {"key":"spessore","label":"Spessore","kind":"number","unit":"mm","required":true},
+  {"key":"larghezza","label":"Larghezza (lato corto)","kind":"number","unit":"mm","required":true},
+  {"key":"lunghezza","label":"Lunghezza","kind":"number","unit":"mm","required":true,"hint":"Rotoli: lunghezza vistosamente maggiore (4,5 / 6 / 12 m), conteggiati a pezzo"},
+  {"key":"densita","label":"Densità","kind":"number","unit":"kg/m³"},
+  {"key":"rivestimento","label":"Rivestimento","kind":"choice","options":["alluminio","rete metallica","velo di vetro"],"open":true},
+  {"key":"fogli","label":"Fogli per confezione","kind":"number","hideFromVariant":true,"hint":"Con unità MQ i mq per confezione si calcolano dalle misure; con PZ è il numero di pezzi"},
+  {"key":"altro","label":"Altro","kind":"text"}]},
+ {"key":"altro","label":"Altro (pezzi particolari o su misura)","pattern":"{descrizione}","fields":[
+  {"key":"descrizione","label":"Descrizione","kind":"text","required":true}]}]}'::jsonb
+WHERE name = 'Lana';
+
+UPDATE public.item_types SET variant_template = '{"version":2,"pattern":"{tipo} {colore} {formato} {altro}","fields":[
+ {"key":"tipo","label":"Tipo","kind":"choice","options":["acetico","acrilico","intumescente","poliuretanico","resistente"],"open":true},
+ {"key":"colore","label":"Colore","kind":"choice","options":["trasparente","bianco","grigio"],"open":true},
+ {"key":"formato","label":"Formato","kind":"choice","options":["cartuccia","tubetto","barattolo","altro"],"open":true},
+ {"key":"altro","label":"Altro","kind":"text"}]}'::jsonb
+WHERE name = 'Silicone';
+
+UPDATE public.item_types SET variant_template = '{"version":2,"pattern":"{contenitore} [{peso} KG] {altro}","fields":[
+ {"key":"contenitore","label":"Contenitore","kind":"choice","options":["sacco","secchio","cartuccia","barattolo"],"open":true},
+ {"key":"peso","label":"Peso","kind":"number","unit":"KG","fillsPackQuantity":true,"packWhenUnit":"KG","hint":"Con unità KG è anche la quantità per confezione"},
+ {"key":"altro","label":"Altro","kind":"text"}]}'::jsonb
+WHERE name = 'Stucco e Colle';

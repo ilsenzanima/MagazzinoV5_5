@@ -17,7 +17,7 @@ import type { InventoryItem } from "@/lib/types";
 import {
     VariantField, VariantTemplate, VariantValues,
     SUBTYPE_KEY, cleanValues, coefficientFrom, composeVariant, defaultValues, effectiveSection, hasSubtypes,
-    isFieldVisible, missingRequiredFields, packQuantityFrom,
+    isFieldVisible, missingRequiredFields, suggestedPackQuantity,
 } from "@/lib/utils/variant-template";
 
 const ImageCropper = dynamic(
@@ -174,6 +174,7 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
 
     // Il coefficiente si propone dalle misure finché non lo si modifica a mano
     const [coefficientTouched, setCoefficientTouched] = useState(false);
+    const [packTouched, setPackTouched] = useState(false);
 
     const patch = (p: Partial<WizardDraft>) => setDraft(prev => ({ ...prev, ...p }));
 
@@ -184,6 +185,7 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     useImperativeHandle(ref, () => ({
         syncFrom: (v, file) => {
             if (v.coefficient !== draftRef.current.coefficient) setCoefficientTouched(true);
+            if (v.packQuantity !== draftRef.current.packQuantity) setPackTouched(true);
             const minStockNumber = parseFloat((v.minStock || "0").replace(",", "."));
             setDraft(prev => ({
                 ...prev,
@@ -261,8 +263,6 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
             const next: WizardDraft = { ...prev, variantAttributes: attrs };
             if (template && !prev.customModel) {
                 next.model = composeVariant(template, attrs);
-                const pack = packQuantityFrom(template, attrs);
-                if (pack) next.packQuantity = pack;
             }
             return next;
         });
@@ -348,6 +348,13 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     const packNum = draft.packQuantity.trim() === "" ? null : parseFloat(draft.packQuantity.replace(",", "."));
     const minStockNum = parseFloat(draft.minStock.replace(",", "."));
     const missingMask = useMask ? missingRequiredFields(template, draft.variantAttributes) : [];
+
+    const suggestedPack = useMask ? suggestedPackQuantity(template, draft.variantAttributes, draft.unit) : null;
+    useEffect(() => {
+        if (packTouched || suggestedPack === null) return;
+        if (String(suggestedPack) !== draft.packQuantity) patch({ packQuantity: String(suggestedPack) });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [suggestedPack, packTouched]);
 
     const suggestedCoefficient = useMask ? coefficientFrom(template, draft.variantAttributes, draft.unit) : null;
     useEffect(() => {
@@ -756,13 +763,16 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                     <Label htmlFor="w-pack">Quantità per confezione <span className="font-normal text-slate-500">(facoltativa)</span></Label>
                                     <div className="flex items-center gap-2">
                                         <Input id="w-pack" className="w-32" type="number" min="0" step="0.01" placeholder="Es. 18"
-                                            value={draft.packQuantity} onChange={e => patch({ packQuantity: e.target.value })} />
+                                            value={draft.packQuantity} onChange={e => { setPackTouched(true); patch({ packQuantity: e.target.value }); }} />
                                         <span className="text-sm text-slate-500">{unitLabel} in una confezione</span>
                                     </div>
                                     <p className="text-[11px] text-slate-500">
                                         Quante {unitLabel} ci sono normalmente in una scatola o confezione. Aiuta a segnalare acquisti
                                         con prezzo o quantità che non tornano.
                                     </p>
+                                    {suggestedPack !== null && !packTouched && (
+                                        <p className="text-[11px] text-emerald-700">Calcolata dalla scheda della variante: puoi modificarla.</p>
+                                    )}
                                 </div>
 
                                 <div className="rounded-md border p-3 text-xs text-slate-600 dark:text-slate-300">

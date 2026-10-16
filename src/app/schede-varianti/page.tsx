@@ -89,15 +89,15 @@ export default function SchedeVariantiPage() {
     // ── Sottotipi ───────────────────────────────────────────────────────────
     const toggleSubtypes = (on: boolean) => {
         if (on) {
-            const first: VariantSubtype = { key: "sottotipo_1", label: "Sottotipo 1", pattern: template.pattern, fields: template.fields, coefficient: template.coefficient };
-            update({ ...template, pattern: "", fields: [], coefficient: undefined, subtypeLabel: template.subtypeLabel ?? "Tipo", subtypes: [first] });
+            const first: VariantSubtype = { key: "sottotipo_1", label: "Sottotipo 1", pattern: template.pattern, fields: template.fields, coefficient: template.coefficient, packFromSheets: template.packFromSheets };
+            update({ ...template, pattern: "", fields: [], coefficient: undefined, packFromSheets: undefined, subtypeLabel: template.subtypeLabel ?? "Tipo", subtypes: [first] });
             setSubIndex(0);
         } else {
             if (template.subtypes && template.subtypes.length > 1 &&
                 !confirm("Disattivando i sottotipi resta solo il primo. Continuare?")) return;
             const first = template.subtypes?.[0];
             const { subtypes: _s, subtypeLabel: _l, ...rest } = template;
-            update({ ...rest, pattern: first?.pattern ?? "", fields: first?.fields ?? [], coefficient: first?.coefficient });
+            update({ ...rest, pattern: first?.pattern ?? "", fields: first?.fields ?? [], coefficient: first?.coefficient, packFromSheets: first?.packFromSheets });
         }
     };
     const updateSub = (patch: Partial<VariantSubtype>) =>
@@ -139,7 +139,7 @@ export default function SchedeVariantiPage() {
             if (s.fields.some(f => !f.label.trim())) list.push(`${name}: ogni campo ha bisogno di un nome`);
             const tokens = Array.from(s.pattern.matchAll(/\{([a-zA-Z0-9_]+)\}/g)).map(m => m[1]);
             for (const t of tokens) if (!keys.includes(t)) list.push(`${name}: il modello usa {${t}}, che non è un campo`);
-            for (const f of s.fields) if (!tokens.includes(f.key)) list.push(`${name}: il campo "${f.label}" non compare nel modello`);
+            for (const f of s.fields) if (!f.hideFromVariant && !tokens.includes(f.key)) list.push(`${name}: il campo "${f.label}" non compare nel modello`);
             if (s.coefficient && !keys.includes(s.coefficient.lengthKey)) list.push(`${name}: il coefficiente usa un campo che non esiste`);
         }
         return list;
@@ -387,6 +387,12 @@ export default function SchedeVariantiPage() {
                                                 )}
                                                 <label className="flex items-center gap-2"><Checkbox checked={!!f.hideWhenDefault} onCheckedChange={v => updateField(i, { hideWhenDefault: v === true })} />Non mostrare il valore standard</label>
                                                 <label className="flex items-center gap-2"><Checkbox checked={!!f.fillsPackQuantity} onCheckedChange={v => updateField(i, { fillsPackQuantity: v === true })} />È anche la quantità per confezione</label>
+                                                <label className="flex items-center gap-2"><Checkbox checked={!!f.hideFromVariant} onCheckedChange={v => updateField(i, { hideFromVariant: v === true })} />Solo dato: non compare nella variante</label>
+                                                {f.fillsPackQuantity && (
+                                                    <label className="flex items-center gap-2">solo con unità
+                                                        <Input className="h-8 w-20" placeholder="KG" value={f.packWhenUnit ?? ""} onChange={e => updateField(i, { packWhenUnit: e.target.value || undefined })} />
+                                                    </label>
+                                                )}
                                             </div>
 
                                             <div className="grid gap-3 sm:grid-cols-3">
