@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { notify } from "@/lib/notify";
 import { brandsApi, itemTypesApi, unitsApi, inventoryApi, Brand, ItemType, Unit } from "@/lib/api";
 import type { InventoryItem } from "@/lib/types";
+import type { DuplicateCandidate } from "@/lib/services/inventory";
 import {
     VariantField, VariantTemplate, VariantValues,
     SUBTYPE_KEY, cleanValues, coefficientFrom, composeVariant, defaultValues, effectiveSection, hasSubtypes,
@@ -357,6 +358,20 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     const isVariant = !!draft.baseItemId;
     const composed = useMask ? composeVariant(template, draft.variantAttributes) : draft.model;
     const modelSameAsBase = isVariant && composed.trim().toLowerCase() === draft.baseModel.trim().toLowerCase();
+
+    // Articolo già esistente con lo stesso nome e la stessa variante: si suggerisce di usare quello
+    const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
+    useEffect(() => {
+        if (draft.name.trim().length < 2 || !composed.trim()) { setDuplicates([]); return; }
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            inventoryApi.findDuplicates(draft.name, composed)
+                .then(list => { if (!cancelled) setDuplicates(list); })
+                .catch(() => { /* non bloccante */ });
+        }, 400);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [draft.name, composed]);
+
     const coefficientNum = parseFloat(draft.coefficient.replace(",", "."));
     const packNum = draft.packQuantity.trim() === "" ? null : parseFloat(draft.packQuantity.replace(",", "."));
     const minStockNum = parseFloat(draft.minStock.replace(",", "."));
@@ -651,6 +666,31 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                         {isVariant && draft.baseModel && (
                                             <p className="text-[11px] text-slate-500">L&apos;originale ha: {draft.baseModel}</p>
                                         )}
+                                    </div>
+                                )}
+
+                                {duplicates.length > 0 && (
+                                    <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/30">
+                                        <p className="font-medium text-amber-900 dark:text-amber-200">
+                                            {duplicates.length === 1 ? "Esiste già un articolo uguale" : "Esistono già articoli uguali"}
+                                        </p>
+                                        <p className="text-xs text-amber-800 dark:text-amber-300">
+                                            Stesso nome e stessa variante: di solito conviene usare quello già creato. Se è un articolo diverso
+                                            (per esempio un&apos;altra marca) puoi proseguire.
+                                        </p>
+                                        <ul className="space-y-1">
+                                            {duplicates.map(d => (
+                                                <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-white/70 p-2 dark:bg-slate-900/40">
+                                                    <span>
+                                                        <span className="font-mono text-xs">{d.code}</span> — {d.name}{d.model ? ` — ${d.model}` : ""}
+                                                        <span className="text-xs text-slate-500">{d.brand ? ` · ${d.brand}` : ""} · giacenza {d.quantity}</span>
+                                                    </span>
+                                                    <Button asChild variant="outline" size="sm">
+                                                        <a href={`/inventory/${d.id}`} target="_blank" rel="noopener noreferrer">Apri questo articolo</a>
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
                                 )}
 

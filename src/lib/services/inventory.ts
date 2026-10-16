@@ -137,6 +137,14 @@ export const inventorySupplierCodesApi = {
     }
 };
 
+export interface DuplicateCandidate {
+    id: string; code: string; name: string; model: string; brand: string; quantity: number;
+}
+
+// Nome o variante confrontati senza maiuscole e con gli spazi ridotti
+const normalizeForCompare = (value: string | null | undefined): string =>
+    String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
 export const inventoryApi = {
     // Fetch all items
     getAll: async () => {
@@ -208,6 +216,28 @@ export const inventoryApi = {
 
         if (error) throw error;
         return data as boolean;
+    },
+
+    // Articoli già presenti con lo stesso nome e la stessa variante (senza distinguere maiuscole e spazi in più)
+    findDuplicates: async (name: string, model: string, excludeId?: string): Promise<DuplicateCandidate[]> => {
+        const cleanName = normalizeForCompare(name);
+        const cleanModel = normalizeForCompare(model);
+        if (cleanName.length < 2 || !cleanModel) return [];
+        const pattern = `%${name.trim().replace(/[%_\\]/g, '\\$&')}%`;
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('id, code, name, model, brand, quantity')
+            .ilike('name', pattern)
+            .is('deleted_at', null)
+            .limit(100);
+        if (error) throw error;
+        return (data ?? [])
+            .filter((r: any) => r.id !== excludeId
+                && normalizeForCompare(r.name) === cleanName
+                && normalizeForCompare(r.model) === cleanModel)
+            .map((r: any) => ({
+                id: r.id, code: r.code, name: r.name, model: r.model ?? '', brand: r.brand ?? '', quantity: Number(r.quantity ?? 0),
+            }));
     },
 
     // Varianti già usate per articoli con lo stesso nome (suggerimenti quando la variante è a testo libero)
