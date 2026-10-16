@@ -221,6 +221,19 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
             .catch(() => notify.error("Errore nel caricamento di marche, tipologie e unità"));
     }, []);
 
+    // Varianti già usate per lo stesso nome: suggerimenti per il testo libero
+    const [modelSuggestions, setModelSuggestions] = useState<string[]>([]);
+    useEffect(() => {
+        if (draft.name.trim().length < 2) { setModelSuggestions([]); return; }
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            inventoryApi.getModelsByName(draft.name)
+                .then(list => { if (!cancelled) setModelSuggestions(list); })
+                .catch(() => { /* non bloccante */ });
+        }, 400);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [draft.name]);
+
     // Scheda della tipologia scelta (se esiste)
     const template: VariantTemplate | null = useMemo(
         () => types.find(t => t.name === draft.type)?.variantTemplate ?? null,
@@ -625,7 +638,16 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                             )}
                                         </div>
                                         <Input id="w-model" placeholder="Es. 12,5 mm, 200x120, grigio..." value={draft.model}
+                                            list="dl-model-suggestions"
                                             onChange={e => patch({ model: e.target.value })} />
+                                        <datalist id="dl-model-suggestions">
+                                            {modelSuggestions.map(m => <option key={m} value={m} />)}
+                                        </datalist>
+                                        {modelSuggestions.length > 0 && (
+                                            <p className="text-[11px] text-slate-500">
+                                                Varianti già usate per questo nome: {modelSuggestions.slice(0, 6).join(" · ")}
+                                            </p>
+                                        )}
                                         {isVariant && draft.baseModel && (
                                             <p className="text-[11px] text-slate-500">L&apos;originale ha: {draft.baseModel}</p>
                                         )}

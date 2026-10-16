@@ -210,6 +210,21 @@ export const inventoryApi = {
         return data as boolean;
     },
 
+    // Varianti già usate per articoli con lo stesso nome (suggerimenti quando la variante è a testo libero)
+    getModelsByName: async (name: string): Promise<string[]> => {
+        const clean = name.trim();
+        if (clean.length < 2) return [];
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('model')
+            .ilike('name', clean)
+            .is('deleted_at', null)
+            .not('model', 'is', null)
+            .limit(50);
+        if (error) throw error;
+        return Array.from(new Set((data ?? []).map((r: any) => String(r.model).trim()).filter(Boolean))).sort();
+    },
+
     // Valori già inseriti nelle schede degli articoli di una tipologia (suggerimenti per le liste aperte)
     getVariantAttributesByType: async (typeName: string): Promise<Record<string, string>[]> => {
         const { data, error } = await supabase

@@ -41,7 +41,8 @@ export interface VariantPackRule {
 
 export interface VariantSection {
     // Es. "{larghezza}x{ala}x{lunghezza} [sp.{spessore}]": i gruppi tra [ ] compaiono solo se tutti
-    // i campi al loro interno sono compilati.
+    // i campi al loro interno sono compilati. Con [A|B] si usa la prima alternativa completa
+    // (es. "[{diametro}x{lunghezza}|{lunghezza} mm]").
     pattern: string;
     fields: VariantField[];
     coefficient?: VariantCoefficientRule;
@@ -99,7 +100,9 @@ const renderField = (field: VariantField | undefined, values: VariantValues): st
     const raw = (values[field.key] ?? '').trim();
     if (raw === '') return '';
     if (field.hideWhenDefault && field.default !== undefined && raw === field.default) return '';
-    return field.kind === 'number' ? formatNumberValue(raw) : raw;
+    if (field.kind === 'number') return formatNumberValue(raw);
+    // Anche nei testi un numero decimale usa la virgola (es. 6.3 -> 6,3)
+    return /^\d+\.\d+$/.test(raw) ? raw.replace('.', ',') : raw;
 };
 
 export const composeVariant = (template: VariantTemplate | null | undefined, values: VariantValues): string => {
@@ -116,10 +119,13 @@ export const composeVariant = (template: VariantTemplate | null | undefined, val
         return { out, allFilled };
     };
 
-    // 1. gruppi facoltativi [ ... ]
+    // 1. gruppi facoltativi [ ... ], con eventuali alternative separate da |
     const withGroups = section.pattern.replace(/\[([^\]]*)\]/g, (_, inner: string) => {
-        const { out, allFilled } = render(inner);
-        return allFilled ? out : '';
+        for (const alternative of inner.split('|')) {
+            const { out, allFilled } = render(alternative);
+            if (allFilled) return out;
+        }
+        return '';
     });
     // 2. campi singoli, poi spazi in eccesso
     return render(withGroups).out.replace(/\s+/g, ' ').trim();

@@ -187,3 +187,26 @@ describe('quantità per confezione suggerita', () => {
         expect(suggestedPackQuantity(stucco, { peso: '25' }, 'PZ')).toBeNull();
     });
 });
+
+describe('alternative e decimali nei testi', () => {
+    const viti: VariantTemplate = {
+        version: 2,
+        pattern: '[{diametro}x{lunghezza}|{lunghezza} mm] {testa}',
+        fields: [
+            { key: 'diametro', label: 'Diametro', kind: 'text' },
+            { key: 'lunghezza', label: 'Lunghezza', kind: 'number' },
+            { key: 'testa', label: 'Testa', kind: 'choice' },
+        ],
+    };
+
+    it('usa la prima alternativa completa', () => {
+        expect(composeVariant(viti, { diametro: '6.3', lunghezza: '140', testa: 'testa esagonale' })).toBe('6,3x140 testa esagonale');
+        expect(composeVariant(viti, { lunghezza: '100' })).toBe('100 mm');
+        expect(composeVariant(viti, { diametro: 'M8', lunghezza: '20' })).toBe('M8x20');
+    });
+
+    it('nessuna alternativa completa: il gruppo sparisce', () => {
+        expect(composeVariant(viti, { testa: 'testa bombata' })).toBe('testa bombata');
+    });
+});
+
