@@ -34,6 +34,7 @@ import {
   AlertTriangle,
   ScanSearch,
   Boxes,
+  ListChecks,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -234,6 +235,12 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
           icon: ScanSearch,
           href: "/controllo-acquisti",
           active: pathname === "/controllo-acquisti",
+        },
+        {
+          label: "Schede Varianti",
+          icon: ListChecks,
+          href: "/schede-varianti",
+          active: pathname === "/schede-varianti",
         },
         {
           label: "Quantità Confezioni",

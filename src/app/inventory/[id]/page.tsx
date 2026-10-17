@@ -65,6 +65,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
 import { ItemConformita } from "@/components/inventory/ItemConformita";
 import { FieldTip } from "@/components/ui/field-tip";
+import { DuplicateItemsNotice } from "@/components/inventory/DuplicateItemsNotice";
 import { HelpTip } from "@/components/ui/help-tip";
 import dynamic from "next/dynamic";
 import { loadNotesService } from "@/lib/services/load-notes";
@@ -948,6 +949,9 @@ export default function InventoryDetailPage() {
                     />
                   ) : (
                     <Input id="model" value={item.model || ""} readOnly className="bg-slate-50 dark:bg-muted" placeholder="-" />
+                  )}
+                  {isEditing && (
+                    <DuplicateItemsNotice name={editForm.name || ""} model={editForm.model || ""} excludeId={item.id} />
                   )}
                 </div>
 

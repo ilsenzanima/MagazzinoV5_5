@@ -26,6 +26,7 @@ const draftToFormData = (d: WizardDraft): Partial<InventoryFormData> => ({
   packQuantity: d.packQuantity,
   description: d.description,
   image: d.imageUrl,
+  variantAttributes: d.customModel ? {} : d.variantAttributes,
 });
 
 function NewInventoryItemContent() {
@@ -141,6 +142,8 @@ function NewInventoryItemContent() {
         packQuantity: data.packQuantity && data.packQuantity.trim() !== "" ? parseFloat(data.packQuantity.replace(",", ".")) : null,
         description: data.description,
         image: imageUrl,
+        variantAttributes:
+          data.variantAttributes && Object.keys(data.variantAttributes).length > 0 ? data.variantAttributes : null,
       };
 
       const created = await inventoryApi.create(newItem);

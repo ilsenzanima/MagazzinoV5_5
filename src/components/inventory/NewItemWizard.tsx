@@ -1,8 +1,8 @@
 "use client"
 
 import dynamic from "next/dynamic";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Loader2, Plus, Search, Upload, X } from "lucide-react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Pencil, Plus, Search, Upload, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { notify } from "@/lib/notify";
 import { brandsApi, itemTypesApi, unitsApi, inventoryApi, Brand, ItemType, Unit } from "@/lib/api";
 import type { InventoryItem } from "@/lib/types";
+import { DuplicateItemsNotice } from "@/components/inventory/DuplicateItemsNotice";
+import {
+    VariantField, VariantTemplate, VariantValues,
+    SUBTYPE_KEY, cleanValues, coefficientFrom, composeVariant, defaultValues, effectiveSection, hasSubtypes,
+    isFieldVisible, missingRequiredFields, suggestedPackQuantity,
+} from "@/lib/utils/variant-template";
 
 const ImageCropper = dynamic(
     () => import("@/components/ui/image-cropper").then((m) => ({ default: m.ImageCropper })),
@@ -26,6 +32,8 @@ export interface WizardDraft {
     baseModel: string;             // modello dell'originale: la variante deve essere diversa
     name: string;
     model: string;
+    variantAttributes: VariantValues; // valori della scheda della tipologia (se presente)
+    customModel: boolean;          // variante scritta a mano invece che dalla scheda
     description: string;
     wantsImage: boolean;
     imageFile: File | null;
@@ -43,7 +51,7 @@ export interface WizardDraft {
 
 export const EMPTY_DRAFT: WizardDraft = {
     baseItemId: null, baseModel: "",
-    name: "", model: "", description: "",
+    name: "", model: "", variantAttributes: {}, customModel: false, description: "",
     wantsImage: false, imageFile: null, imageUrl: "",
     hasSupplierCode: false, supplierCode: "",
     brand: "", type: "", unit: "PZ",
@@ -58,6 +66,7 @@ export const draftFromItem = (item: InventoryItem): WizardDraft => ({
     baseModel: item.model || "",
     name: item.name,
     model: "",                                   // la variante va indicata per distinguerla
+    variantAttributes: {},                       // i valori della scheda vanno indicati di nuovo
     description: item.description || "",
     imageUrl: item.image || "",
     hasSupplierCode: !!item.supplierCode,
@@ -69,7 +78,7 @@ export const draftFromItem = (item: InventoryItem): WizardDraft => ({
     packQuantity: item.packQuantity != null ? String(item.packQuantity) : "",
 });
 
-const STEPS = ["Tipo di articolo", "Informazioni", "Classificazione", "Unità e confezione"];
+const STEPS = ["Tipo di articolo", "Informazioni", "Marca e scorte", "Unità e confezione"];
 
 // Permette alla pagina di riallineare la procedura guidata ai valori attuali della scheda
 export interface NewItemWizardHandle {
@@ -86,6 +95,52 @@ interface NewItemWizardProps {
     startStep?: number;
     onChange: (draft: WizardDraft) => void;           // la scheda sotto si riempie man mano
     onCreate: (draft: WizardDraft) => Promise<boolean>;
+}
+
+// Campo della scheda della tipologia
+function TemplateFieldInput({ field, value, onChange, suggestions }: {
+    field: VariantField;
+    value: string;
+    onChange: (v: string) => void;
+    suggestions: string[];
+}) {
+    const listId = `dl-${field.key}`;
+    return (
+        <div className="space-y-1">
+            <Label className="text-xs">
+                {field.label}{field.required ? " *" : ""}
+            </Label>
+            <div className="flex items-center gap-2">
+                {field.kind === "choice" && !field.open ? (
+                    <Select value={value} onValueChange={onChange}>
+                        <SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger>
+                        <SelectContent>
+                            {(field.options ?? []).map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                ) : (
+                    <>
+                        <Input
+                            type={field.kind === "number" ? "number" : "text"}
+                            step={field.kind === "number" ? "any" : undefined}
+                            min={field.kind === "number" ? "0" : undefined}
+                            value={value}
+                            list={field.kind === "choice" ? listId : undefined}
+                            placeholder={field.kind === "choice" ? "Scegli o scrivi..." : undefined}
+                            onChange={e => onChange(e.target.value)}
+                        />
+                        {field.kind === "choice" && (
+                            <datalist id={listId}>
+                                {suggestions.map(o => <option key={o} value={o} />)}
+                            </datalist>
+                        )}
+                    </>
+                )}
+                {field.unit && <span className="text-sm text-slate-500">{field.unit}</span>}
+            </div>
+            {field.hint && <p className="text-[11px] text-slate-500">{field.hint}</p>}
+        </div>
+    );
 }
 
 export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>(function NewItemWizard(
@@ -118,16 +173,27 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     const [cropSrc, setCropSrc] = useState<string | null>(null);
     const [previewUrl, setPreviewUrl] = useState("");
 
+    // Il coefficiente si propone dalle misure finché non lo si modifica a mano
+    const [coefficientTouched, setCoefficientTouched] = useState(false);
+    const [packTouched, setPackTouched] = useState(false);
+
     const patch = (p: Partial<WizardDraft>) => setDraft(prev => ({ ...prev, ...p }));
+
+    const draftRef = useRef(draft);
+    draftRef.current = draft;
 
     // Alla riapertura i dati della scheda (anche modificati a mano) tornano nella procedura guidata
     useImperativeHandle(ref, () => ({
         syncFrom: (v, file) => {
+            if (v.coefficient !== draftRef.current.coefficient) setCoefficientTouched(true);
+            if (v.packQuantity !== draftRef.current.packQuantity) setPackTouched(true);
             const minStockNumber = parseFloat((v.minStock || "0").replace(",", "."));
             setDraft(prev => ({
                 ...prev,
                 name: v.name,
                 model: v.model,
+                // se la variante è stata scritta a mano non corrisponde più ai campi della scheda
+                customModel: prev.customModel || v.model !== prev.model,
                 description: v.description,
                 brand: v.brand,
                 type: v.type,
@@ -149,13 +215,101 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     // La scheda sotto il modale si aggiorna a ogni modifica
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
-    useEffect(() => { onChangeRef.current(draft); }, [draft]);
 
     useEffect(() => {
         Promise.all([brandsApi.getAll(), itemTypesApi.getAll(), unitsApi.getAll()])
             .then(([b, t, u]) => { setBrands(b); setTypes(t); setUnits(u); })
             .catch(() => notify.error("Errore nel caricamento di marche, tipologie e unità"));
     }, []);
+
+    // Varianti già usate per lo stesso nome: suggerimenti per il testo libero
+    const [modelSuggestions, setModelSuggestions] = useState<string[]>([]);
+    useEffect(() => {
+        if (draft.name.trim().length < 2) { setModelSuggestions([]); return; }
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            inventoryApi.getModelsByName(draft.name)
+                .then(list => { if (!cancelled) setModelSuggestions(list); })
+                .catch(() => { /* non bloccante */ });
+        }, 400);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [draft.name]);
+
+    // Scheda della tipologia scelta (se esiste)
+    const template: VariantTemplate | null = useMemo(
+        () => types.find(t => t.name === draft.type)?.variantTemplate ?? null,
+        [types, draft.type]
+    );
+    const useMask = !!template && !draft.customModel;
+
+    // Alla scheda sotto vanno solo i valori dei campi visibili e compilati
+    useEffect(() => {
+        const attrs = draft.customModel ? {} : cleanValues(template, draft.variantAttributes);
+        onChangeRef.current({ ...draft, variantAttributes: attrs });
+    }, [draft, template]);
+
+    // Valori già usati per la stessa tipologia: arricchiscono le liste aperte
+    const [usedValues, setUsedValues] = useState<Record<string, string[]>>({});
+    useEffect(() => {
+        if (!template || !draft.type) { setUsedValues({}); return; }
+        let cancelled = false;
+        inventoryApi.getVariantAttributesByType(draft.type)
+            .then(rows => {
+                if (cancelled) return;
+                const map: Record<string, Set<string>> = {};
+                for (const attrs of rows) {
+                    const sub = attrs[SUBTYPE_KEY] ?? "";
+                    for (const [k, v] of Object.entries(attrs)) {
+                        if (k === SUBTYPE_KEY) continue;
+                        (map[`${sub}|${k}`] ??= new Set()).add(String(v));
+                    }
+                }
+                setUsedValues(Object.fromEntries(Object.entries(map).map(([k, s]) => [k, Array.from(s).sort()])));
+            })
+            .catch(() => { /* non bloccante */ });
+        return () => { cancelled = true; };
+    }, [template, draft.type]);
+
+    // Cambio di una voce della scheda: ricompone la variante e, se previsto, la quantità per confezione
+    const setAttribute = (key: string, value: string) => {
+        setDraft(prev => {
+            const attrs = { ...prev.variantAttributes, [key]: value };
+            const next: WizardDraft = { ...prev, variantAttributes: attrs };
+            if (template && !prev.customModel) {
+                next.model = composeVariant(template, attrs);
+            }
+            return next;
+        });
+    };
+
+    // Scelta del sottotipo (es. Componente): decide quali campi chiedere
+    const setSubtype = (key: string) => {
+        setDraft(prev => {
+            const sub = template?.subtypes?.find(s => s.key === key);
+            const prevSub = template?.subtypes?.find(s => s.key === prev.variantAttributes[SUBTYPE_KEY]);
+            const attrs = defaultValues(template, key);
+            const next: WizardDraft = { ...prev, variantAttributes: attrs };
+            if (!prev.customModel) next.model = composeVariant(template, attrs);
+            // Nome proposto dal sottotipo, solo se vuoto o ancora quello proposto prima
+            if (sub?.suggestedName && (!prev.name.trim() || prev.name === prevSub?.suggestedName)) next.name = sub.suggestedName;
+            return next;
+        });
+    };
+
+    // Cambio di tipologia: i valori della scheda precedente non valgono più
+    const changeType = (typeName: string) => {
+        const newTemplate = types.find(t => t.name === typeName)?.variantTemplate ?? null;
+        setDraft(prev => {
+            const prevTemplate = types.find(t => t.name === prev.type)?.variantTemplate ?? null;
+            const attrs = defaultValues(newTemplate);
+            // Con una scheda la variante si ricompone; passando a una tipologia senza scheda si svuota
+            // solo se arrivava dalla scheda precedente (una variante scritta a mano resta)
+            const model = newTemplate
+                ? composeVariant(newTemplate, attrs)
+                : prevTemplate && !prev.customModel ? "" : prev.model;
+            return { ...prev, type: typeName, variantAttributes: attrs, customModel: false, model };
+        });
+    };
 
     // Ricerca articoli simili (con una piccola attesa mentre si scrive)
     useEffect(() => {
@@ -178,7 +332,11 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
         try {
             const full = await inventoryApi.getById(item.id);
             if (!full) throw new Error("not found");
-            setDraft(prev => ({ ...draftFromItem(full as InventoryItem), imageFile: prev.imageFile }));
+            const fresh = draftFromItem(full as InventoryItem);
+            const tpl = types.find(t => t.name === fresh.type)?.variantTemplate ?? null;
+            // I valori della scheda dell'originale sono un buon punto di partenza: si cambia ciò che distingue la variante
+            const attrs = { ...defaultValues(tpl), ...((full as InventoryItem).variantAttributes ?? {}) };
+            setDraft(prev => ({ ...fresh, variantAttributes: tpl ? attrs : {}, imageFile: prev.imageFile }));
             setBrandQuery(full.brand || "");
             setBaseLabel([full.name, full.model].filter(Boolean).join(" — "));
             setResults([]);
@@ -198,23 +356,41 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
 
     // ── Validazione per pagina ──────────────────────────────────────────────
     const isVariant = !!draft.baseItemId;
-    const modelSameAsBase = isVariant && draft.model.trim().toLowerCase() === draft.baseModel.trim().toLowerCase();
+    const composed = useMask ? composeVariant(template, draft.variantAttributes) : draft.model;
+    const modelSameAsBase = isVariant && composed.trim().toLowerCase() === draft.baseModel.trim().toLowerCase();
+
     const coefficientNum = parseFloat(draft.coefficient.replace(",", "."));
     const packNum = draft.packQuantity.trim() === "" ? null : parseFloat(draft.packQuantity.replace(",", "."));
     const minStockNum = parseFloat(draft.minStock.replace(",", "."));
+    const missingMask = useMask ? missingRequiredFields(template, draft.variantAttributes) : [];
+
+    const suggestedPack = useMask ? suggestedPackQuantity(template, draft.variantAttributes, draft.unit) : null;
+    useEffect(() => {
+        if (packTouched || suggestedPack === null) return;
+        if (String(suggestedPack) !== draft.packQuantity) patch({ packQuantity: String(suggestedPack) });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [suggestedPack, packTouched]);
+
+    const suggestedCoefficient = useMask ? coefficientFrom(template, draft.variantAttributes, draft.unit) : null;
+    useEffect(() => {
+        if (coefficientTouched || suggestedCoefficient === null) return;
+        if (String(suggestedCoefficient) !== draft.coefficient) patch({ coefficient: String(suggestedCoefficient) });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [suggestedCoefficient, coefficientTouched]);
 
     const stepErrors: string[][] = [
         choice === null ? ["Scegli se l'articolo è nuovo o simile a uno esistente"]
             : choice === "copy" && !draft.baseItemId ? ["Cerca e seleziona l'articolo da copiare"] : [],
         [
+            ...(draft.type ? [] : ["Seleziona la tipologia"]),
             ...(draft.name.trim() ? [] : ["Il nome del prodotto è obbligatorio"]),
-            ...(isVariant && !draft.model.trim() ? ["Indica la variante / modello per distinguerlo dall'originale"] : []),
+            ...missingMask.map(f => `Compila "${f.label}"`),
+            ...(isVariant && !composed.trim() ? ["Indica la variante / modello per distinguerlo dall'originale"] : []),
             ...(modelSameAsBase ? ["La variante deve essere diversa da quella dell'articolo copiato"] : []),
             ...(draft.hasSupplierCode && !draft.supplierCode.trim() ? ["Inserisci il codice del fornitore o togli la spunta"] : []),
         ],
         [
             ...(draft.brand.trim() ? [] : ["Seleziona o aggiungi una marca"]),
-            ...(draft.type ? [] : ["Seleziona la tipologia"]),
             ...(draft.unit ? [] : ["Seleziona l'unità di misura"]),
             ...(draft.wantsMinStock && !(minStockNum > 0) ? ["Indica la quantità della scorta minima (maggiore di 0)"] : []),
         ],
@@ -269,13 +445,20 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     const create = async () => {
         setCreating(true);
         try {
-            await onCreate(draft);
+            await onCreate({
+                ...draft,
+                model: composed,
+                variantAttributes: draft.customModel ? {} : cleanValues(template, draft.variantAttributes),
+            });
         } finally {
             setCreating(false);
         }
     };
 
     const unitLabel = draft.unit || "unità";
+    const section = effectiveSection(template, draft.variantAttributes);
+    const visibleFields = section ? section.fields.filter(f => isFieldVisible(f, draft.variantAttributes)) : [];
+    const currentSub = draft.variantAttributes[SUBTYPE_KEY] ?? "";
 
     return (
         <>
@@ -375,28 +558,106 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                             </div>
                         )}
 
-                        {/* ── Pagina 2: informazioni ── */}
+                        {/* ── Pagina 2: tipologia, informazioni e variante ── */}
                         {step === 1 && (
                             <div className="space-y-4">
                                 {isVariant && (
                                     <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
-                                        Variante di <b>{baseLabel || draft.name}</b>: i dati sono precompilati, indica la variante / modello per distinguerla.
+                                        Variante di <b>{baseLabel || draft.name}</b>: i dati sono precompilati, indica ciò che la distingue.
                                     </div>
                                 )}
+
+                                <div className="space-y-2">
+                                    <Label>Tipologia *</Label>
+                                    <Select value={draft.type} onValueChange={changeType}>
+                                        <SelectTrigger><SelectValue placeholder="Seleziona tipologia" /></SelectTrigger>
+                                        <SelectContent>
+                                            {types.map(t => (
+                                                <SelectItem key={t.id} value={t.name}>
+                                                    {t.name}{t.variantTemplate ? " ✓" : ""}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[11px] text-slate-500">
+                                        Le tipologie con ✓ hanno una scheda guidata per la variante.
+                                    </p>
+                                </div>
+
                                 <div className="space-y-2">
                                     <Label htmlFor="w-name">Nome prodotto *</Label>
-                                    <Input id="w-name" autoFocus value={draft.name} onChange={e => patch({ name: e.target.value })} />
+                                    <Input id="w-name" value={draft.name} onChange={e => patch({ name: e.target.value })} />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="w-model">
-                                        Variante / modello / dimensioni{isVariant ? " *" : ""}
-                                    </Label>
-                                    <Input id="w-model" placeholder="Es. 12,5 mm, 200x120, grigio..." value={draft.model}
-                                        onChange={e => patch({ model: e.target.value })} />
-                                    {isVariant && draft.baseModel && (
-                                        <p className="text-[11px] text-slate-500">L&apos;originale ha: {draft.baseModel}</p>
-                                    )}
-                                </div>
+
+                                {/* Variante: scheda guidata oppure testo libero */}
+                                {useMask ? (
+                                    <div className="space-y-3 rounded-md border p-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium">Variante / modello</span>
+                                            <Button variant="ghost" size="sm"
+                                                onClick={() => patch({ customModel: true })}>
+                                                <Pencil className="mr-1 h-3 w-3" /> Scrivi a mano
+                                            </Button>
+                                        </div>
+                                        {hasSubtypes(template) && (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">{template?.subtypeLabel || "Sottotipo"} *</Label>
+                                                <Select value={currentSub} onValueChange={setSubtype}>
+                                                    <SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {template!.subtypes!.map(s => <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            {visibleFields.map(f => (
+                                                <TemplateFieldInput key={f.key} field={f}
+                                                    value={draft.variantAttributes[f.key] ?? ""}
+                                                    onChange={v => setAttribute(f.key, v)}
+                                                    suggestions={Array.from(new Set([...(f.options ?? []), ...(usedValues[`${currentSub}|${f.key}`] ?? [])]))} />
+                                            ))}
+                                        </div>
+                                        <div className="rounded bg-slate-50 p-2 text-sm dark:bg-slate-800/40">
+                                            <span className="text-xs text-slate-500">Variante risultante: </span>
+                                            <span className="font-medium">{composed || "—"}</span>
+                                        </div>
+                                        {isVariant && draft.baseModel && (
+                                            <p className="text-[11px] text-slate-500">L&apos;originale ha: {draft.baseModel}</p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="w-model">Variante / modello / dimensioni{isVariant ? " *" : ""}</Label>
+                                            {template && draft.customModel && (
+                                                <Button variant="ghost" size="sm" onClick={() => {
+                                                    const attrs = { ...defaultValues(template), ...draft.variantAttributes };
+                                                    patch({ customModel: false, variantAttributes: attrs, model: composeVariant(template, attrs) });
+                                                }}>
+                                                    Usa la scheda guidata
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <Input id="w-model" placeholder="Es. 12,5 mm, 200x120, grigio..." value={draft.model}
+                                            list="dl-model-suggestions"
+                                            onChange={e => patch({ model: e.target.value })} />
+                                        <datalist id="dl-model-suggestions">
+                                            {modelSuggestions.map(m => <option key={m} value={m} />)}
+                                        </datalist>
+                                        {modelSuggestions.length > 0 && (
+                                            <p className="text-[11px] text-slate-500">
+                                                Varianti già usate per questo nome: {modelSuggestions.slice(0, 6).join(" · ")}
+                                            </p>
+                                        )}
+                                        {isVariant && draft.baseModel && (
+                                            <p className="text-[11px] text-slate-500">L&apos;originale ha: {draft.baseModel}</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <DuplicateItemsNotice name={draft.name} model={composed} />
+
                                 <div className="space-y-2">
                                     <Label htmlFor="w-desc">Descrizione</Label>
                                     <Textarea id="w-desc" className="min-h-[90px]" value={draft.description}
@@ -442,7 +703,7 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                             </div>
                         )}
 
-                        {/* ── Pagina 3: classificazione ── */}
+                        {/* ── Pagina 3: marca, unità e scorta minima ── */}
                         {step === 2 && (
                             <div className="space-y-4">
                                 <div className="space-y-2">
@@ -474,25 +735,14 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                     {draft.brand && <p className="text-[11px] text-slate-500">Marca selezionata: <b>{draft.brand}</b></p>}
                                 </div>
 
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label>Tipologia *</Label>
-                                        <Select value={draft.type} onValueChange={v => patch({ type: v })}>
-                                            <SelectTrigger><SelectValue placeholder="Seleziona tipologia" /></SelectTrigger>
-                                            <SelectContent>
-                                                {types.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Unità di misura *</Label>
-                                        <Select value={draft.unit} onValueChange={v => patch({ unit: v })}>
-                                            <SelectTrigger><SelectValue placeholder="Seleziona unità" /></SelectTrigger>
-                                            <SelectContent>
-                                                {units.map(u => <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                <div className="space-y-2">
+                                    <Label>Unità di misura *</Label>
+                                    <Select value={draft.unit} onValueChange={v => patch({ unit: v })}>
+                                        <SelectTrigger><SelectValue placeholder="Seleziona unità" /></SelectTrigger>
+                                        <SelectContent>
+                                            {units.map(u => <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 <div className="space-y-2 rounded-md border p-3">
@@ -521,9 +771,12 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                     <Label htmlFor="w-coeff">Coefficiente di moltiplicazione</Label>
                                     <div className="flex items-center gap-2">
                                         <Input id="w-coeff" autoFocus className="w-32" type="number" min="0.01" step="0.01"
-                                            value={draft.coefficient} onChange={e => patch({ coefficient: e.target.value })} />
+                                            value={draft.coefficient} onChange={e => { setCoefficientTouched(true); patch({ coefficient: e.target.value }); }} />
                                         <span className="text-sm text-slate-500">{unitLabel} per pezzo fisico</span>
                                     </div>
+                                    {suggestedCoefficient !== null && !coefficientTouched && (
+                                        <p className="text-[11px] text-emerald-700">Calcolato dalle misure della variante: puoi modificarlo.</p>
+                                    )}
                                     <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800/40 dark:text-slate-300">
                                         Il coefficiente converte l&apos;unità di magazzino (<b>{unitLabel}</b>) nei pezzi fisici.
                                         Esempio: una lastra di cartongesso 2500x1200 mm vale 3 mq; se in magazzino conti i mq,
@@ -536,18 +789,21 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                     <Label htmlFor="w-pack">Quantità per confezione <span className="font-normal text-slate-500">(facoltativa)</span></Label>
                                     <div className="flex items-center gap-2">
                                         <Input id="w-pack" className="w-32" type="number" min="0" step="0.01" placeholder="Es. 18"
-                                            value={draft.packQuantity} onChange={e => patch({ packQuantity: e.target.value })} />
+                                            value={draft.packQuantity} onChange={e => { setPackTouched(true); patch({ packQuantity: e.target.value }); }} />
                                         <span className="text-sm text-slate-500">{unitLabel} in una confezione</span>
                                     </div>
                                     <p className="text-[11px] text-slate-500">
                                         Quante {unitLabel} ci sono normalmente in una scatola o confezione. Aiuta a segnalare acquisti
                                         con prezzo o quantità che non tornano.
                                     </p>
+                                    {suggestedPack !== null && !packTouched && (
+                                        <p className="text-[11px] text-emerald-700">Calcolata dalla scheda della variante: puoi modificarla.</p>
+                                    )}
                                 </div>
 
                                 <div className="rounded-md border p-3 text-xs text-slate-600 dark:text-slate-300">
                                     <div className="mb-1 font-medium text-slate-800 dark:text-slate-100">Riepilogo</div>
-                                    <div>{draft.name}{draft.model ? ` — ${draft.model}` : ""}</div>
+                                    <div>{draft.name}{composed ? ` — ${composed}` : ""}</div>
                                     <div className="mt-1 flex flex-wrap gap-1">
                                         {draft.brand && <Badge variant="outline">{draft.brand}</Badge>}
                                         {draft.type && <Badge variant="outline">{draft.type}</Badge>}

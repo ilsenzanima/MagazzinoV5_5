@@ -67,7 +67,8 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     supplierCode: dbItem.supplier_code,
     realQuantity: dbItem.real_quantity,
     model: dbItem.model,
-    packQuantity: dbItem.pack_quantity !== null && dbItem.pack_quantity !== undefined ? Number(dbItem.pack_quantity) : null
+    packQuantity: dbItem.pack_quantity !== null && dbItem.pack_quantity !== undefined ? Number(dbItem.pack_quantity) : null,
+    variantAttributes: dbItem.variant_attributes ?? null
 });
 
 export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
@@ -90,6 +91,7 @@ export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
     if (item.realQuantity !== undefined) dbItem.real_quantity = item.realQuantity;
     if (item.model !== undefined) dbItem.model = item.model;
     if (item.packQuantity !== undefined) dbItem.pack_quantity = item.packQuantity;
+    if (item.variantAttributes !== undefined) dbItem.variant_attributes = item.variantAttributes;
 
     return dbItem;
 };
@@ -134,6 +136,14 @@ export const inventorySupplierCodesApi = {
         if (error) throw error;
     }
 };
+
+export interface DuplicateCandidate {
+    id: string; code: string; name: string; model: string; brand: string; quantity: number;
+}
+
+// Nome o variante confrontati senza maiuscole e con gli spazi ridotti
+const normalizeForCompare = (value: string | null | undefined): string =>
+    String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 export const inventoryApi = {
     // Fetch all items
@@ -206,6 +216,56 @@ export const inventoryApi = {
 
         if (error) throw error;
         return data as boolean;
+    },
+
+    // Articoli già presenti con lo stesso nome e la stessa variante (senza distinguere maiuscole e spazi in più)
+    findDuplicates: async (name: string, model: string, excludeId?: string): Promise<DuplicateCandidate[]> => {
+        const cleanName = normalizeForCompare(name);
+        const cleanModel = normalizeForCompare(model);
+        if (cleanName.length < 2 || !cleanModel) return [];
+        const pattern = `%${name.trim().replace(/[%_\\]/g, '\\$&')}%`;
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('id, code, name, model, brand, quantity')
+            .ilike('name', pattern)
+            .is('deleted_at', null)
+            .limit(100);
+        if (error) throw error;
+        return (data ?? [])
+            .filter((r: any) => r.id !== excludeId
+                && normalizeForCompare(r.name) === cleanName
+                && normalizeForCompare(r.model) === cleanModel)
+            .map((r: any) => ({
+                id: r.id, code: r.code, name: r.name, model: r.model ?? '', brand: r.brand ?? '', quantity: Number(r.quantity ?? 0),
+            }));
+    },
+
+    // Varianti già usate per articoli con lo stesso nome (suggerimenti quando la variante è a testo libero)
+    getModelsByName: async (name: string): Promise<string[]> => {
+        const clean = name.trim();
+        if (clean.length < 2) return [];
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('model')
+            .ilike('name', clean)
+            .is('deleted_at', null)
+            .not('model', 'is', null)
+            .limit(50);
+        if (error) throw error;
+        return Array.from(new Set((data ?? []).map((r: any) => String(r.model).trim()).filter(Boolean))).sort();
+    },
+
+    // Valori già inseriti nelle schede degli articoli di una tipologia (suggerimenti per le liste aperte)
+    getVariantAttributesByType: async (typeName: string): Promise<Record<string, string>[]> => {
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('variant_attributes')
+            .eq('category', typeName)
+            .is('deleted_at', null)
+            .not('variant_attributes', 'is', null)
+            .limit(1000);
+        if (error) throw error;
+        return (data ?? []).map((r: any) => r.variant_attributes as Record<string, string>);
     },
 
     // Get single item
@@ -710,8 +770,14 @@ export const itemTypesApi = {
         return data.map((t: any) => ({
             id: t.id,
             name: t.name,
-            imageUrl: t.image_url
+            imageUrl: t.image_url,
+            variantTemplate: t.variant_template ?? null
         })) as ItemType[];
+    },
+    // Salva (o toglie, con null) la scheda guidata di una tipologia: solo admin
+    updateTemplate: async (id: string, template: unknown | null) => {
+        const { error } = await supabase.from('item_types').update({ variant_template: template }).eq('id', id);
+        if (error) throw error;
     },
     create: async (name: string) => {
         const { data, error } = await supabase.from('item_types').insert({ name }).select().single();

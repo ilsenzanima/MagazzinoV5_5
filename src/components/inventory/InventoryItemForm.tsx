@@ -36,6 +36,7 @@ export interface InventoryFormData {
     packQuantity: string;
     description: string;
     image: string;
+    variantAttributes?: Record<string, string>; // valori della scheda della tipologia (procedura guidata)
 }
 
 // Permette alla procedura guidata di creare l'articolo con gli stessi controlli del pulsante normale
@@ -83,7 +84,8 @@ export const InventoryItemForm = forwardRef<InventoryItemFormHandle, InventoryIt
         coefficient: initialData?.coefficient || "1.0",
         packQuantity: initialData?.packQuantity || "",
         description: initialData?.description || "",
-        image: initialData?.image || ""
+        image: initialData?.image || "",
+        variantAttributes: initialData?.variantAttributes
     });
 
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -137,7 +139,8 @@ export const InventoryItemForm = forwardRef<InventoryItemFormHandle, InventoryIt
                 coefficient: initialData.coefficient || "1.0",
                 packQuantity: initialData.packQuantity || "",
                 description: initialData.description || "",
-                image: initialData.image || ""
+                image: initialData.image || "",
+                variantAttributes: initialData.variantAttributes
             });
             if (initialData.image) {
                 setPreviewImage(initialData.image);

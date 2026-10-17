@@ -1,3 +1,4 @@
+import type { VariantTemplate } from '@/lib/utils/variant-template';
 // Core Entities Definitions
 
 // Auth & Users
@@ -33,6 +34,7 @@ export interface InventoryItem {
     realQuantity?: number | null;
     model?: string;
     packQuantity?: number | null; // quantità normale per confezione, nell'unità dell'articolo
+    variantAttributes?: Record<string, string> | null; // valori strutturati della scheda della tipologia
 }
 
 export interface Brand {
@@ -44,6 +46,7 @@ export interface ItemType {
     id: string;
     name: string;
     imageUrl?: string;
+    variantTemplate?: VariantTemplate | null; // scheda guidata per la variante degli articoli di questa tipologia
 }
 
 export interface Unit {
