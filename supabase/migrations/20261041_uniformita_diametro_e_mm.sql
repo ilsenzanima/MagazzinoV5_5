@@ -1,7 +1,7 @@
 -- Uniformità: il diametro si scrive sempre con il simbolo "ø" (Collare e Coppella usavano la parola "Diametro")
 -- e le misure in mm hanno lo spazio prima dell'unità (eseguita in produzione, approvata).
 --  * schede Collare e Coppella: "[ø {diametro}] ..." al posto di "[Diametro {diametro}] ..."
---  * 14 varianti aggiornate (9 Collare, 5 Coppella) + ART-00140 "75 mm" e LAN-AFS-457 "... 600 mm"
+--  * 13 varianti aggiornate (8 Collare, 5 Coppella) + ART-00140 "75 mm" e LAN-AFS-457 "... 600 mm"
 --  * ripristino:
 --      UPDATE public.inventory i SET model = l.old_model, variant_attributes = l.old_attributes
 --      FROM public.variant_cleanup_log_uniformita_20261041 l WHERE i.id = l.id;
