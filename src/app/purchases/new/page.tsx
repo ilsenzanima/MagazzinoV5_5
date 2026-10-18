@@ -33,6 +33,7 @@ import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { FieldTip } from "@/components/ui/field-tip";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
+import { NewItemDialog } from "@/components/inventory/NewItemDialog";
 
 interface PurchaseLine {
     tempId: string;
@@ -133,6 +134,9 @@ function NewPurchaseContent() {
 
     // Dialog States
     const [openItemSelectorForRowId, setOpenItemSelectorForRowId] = useState<string | null>(null);
+    // Creazione di un articolo mancante direttamente dalla riga
+    const [newItemForRowId, setNewItemForRowId] = useState<string | null>(null);
+    const [newItemSearchTerm, setNewItemSearchTerm] = useState("");
     const [openJobSelectorForRowId, setOpenJobSelectorForRowId] = useState<string | null>(null);
     const [isHeaderJobSelectorOpen, setIsHeaderJobSelectorOpen] = useState(false);
     const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
@@ -297,9 +301,22 @@ function NewPurchaseContent() {
 
     const handleItemSelect = (item: InventoryItem) => {
         if (!openItemSelectorForRowId) return;
+        applyItemToRow(openItemSelectorForRowId, item);
+        setOpenItemSelectorForRowId(null);
+    };
+
+    // Articolo appena creato dalla procedura guidata: va sulla riga che l'ha richiesto
+    const handleItemCreated = (item: InventoryItem) => {
+        const rowId = newItemForRowId;
+        setNewItemForRowId(null);
+        setOpenItemSelectorForRowId(null);
+        if (rowId) applyItemToRow(rowId, item);
+    };
+
+    const applyItemToRow = (rowId: string, item: InventoryItem) => {
         setLines(prev => {
             const updated = prev.map(line => {
-                if (line.tempId !== openItemSelectorForRowId) return line;
+                if (line.tempId !== rowId) return line;
                 return {
                     ...line,
                     itemId: item.id,
@@ -322,7 +339,6 @@ function NewPurchaseContent() {
             });
             return ensureTrailingEmpty(updated);
         });
-        setOpenItemSelectorForRowId(null);
     };
 
     // ── Job selection (per row) ───────────────────────────────────────────────
@@ -937,6 +953,23 @@ function NewPurchaseContent() {
                 items={inventory}
                 onSearch={handleItemSearch}
                 loading={itemsLoading}
+                onCreateNew={(term) => {
+                    setNewItemSearchTerm(term);
+                    setNewItemForRowId(openItemSelectorForRowId);
+                    setOpenItemSelectorForRowId(null);
+                }}
+            />
+
+            {/* Creazione guidata di un materiale mancante */}
+            <NewItemDialog
+                open={!!newItemForRowId}
+                initialName={newItemSearchTerm}
+                onClose={() => {
+                    // Annullando si torna alla ricerca sulla stessa riga
+                    setOpenItemSelectorForRowId(newItemForRowId);
+                    setNewItemForRowId(null);
+                }}
+                onCreated={handleItemCreated}
             />
 
             {/* Job Selector Dialog (per row) */}

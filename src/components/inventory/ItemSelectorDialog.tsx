@@ -20,9 +20,11 @@ interface ItemSelectorDialogProps {
   items: InventoryItem[];
   onSearch?: (term: string) => void;
   loading?: boolean;
+  // Se presente compare «Non trovo il materiale» e riceve il testo cercato
+  onCreateNew?: (searchTerm: string) => void;
 }
 
-export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpenChange, onSelect, items, onSearch, loading }: ItemSelectorDialogProps) {
+export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpenChange, onSelect, items, onSearch, loading, onCreateNew }: ItemSelectorDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
@@ -78,6 +80,15 @@ export const ItemSelectorDialog = memo(function ItemSelectorDialog({ open, onOpe
             autoFocus
           />
         </div>
+
+        {onCreateNew && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed p-2 text-sm">
+            <span className="text-slate-500 dark:text-slate-400">Il materiale non c&apos;è nell&apos;elenco?</span>
+            <Button size="sm" variant="outline" onClick={() => onCreateNew(searchTerm)}>
+              <Plus className="mr-1 h-4 w-4" /> Non trovo il materiale: crealo
+            </Button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-auto border rounded-md">
           <Table>
