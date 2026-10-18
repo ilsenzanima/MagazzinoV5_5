@@ -82,6 +82,14 @@ export function NewItemDialog({ open, onClose, onCreated, initialName }: NewItem
         <NewItemWizard
             open
             closeLabel="Annulla"
+            onUseExisting={async (id) => {
+                try {
+                    const existing = await inventoryApi.getById(id);
+                    if (existing) onCreated(existing as InventoryItem);
+                } catch {
+                    notify.error("Impossibile caricare l'articolo selezionato");
+                }
+            }}
             initialDraft={initialName?.trim() ? { ...EMPTY_DRAFT, name: initialName.trim() } : undefined}
             onClose={() => { if (!busy) onClose(); }}
             onCreate={async (draft) => {

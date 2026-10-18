@@ -95,6 +95,7 @@ interface NewItemWizardProps {
     startStep?: number;
     onChange?: (draft: WizardDraft) => void;          // la scheda sotto si riempie man mano (solo nella pagina «Nuovo articolo»)
     closeLabel?: string;                              // testo del pulsante che chiude il modale
+    onUseExisting?: (itemId: string) => void;         // un articolo uguale esiste già: lo si usa al posto di crearne un altro
     onCreate: (draft: WizardDraft) => Promise<boolean>;
 }
 
@@ -145,7 +146,7 @@ function TemplateFieldInput({ field, value, onChange, suggestions }: {
 }
 
 export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>(function NewItemWizard(
-    { open, onClose, initialDraft, startStep = 0, onChange, onCreate, closeLabel = "Chiudi e continua a mano" },
+    { open, onClose, initialDraft, startStep = 0, onChange, onCreate, closeLabel = "Chiudi e continua a mano", onUseExisting },
     ref
 ) {
     const [step, setStep] = useState(startStep);
@@ -657,7 +658,7 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                     </div>
                                 )}
 
-                                <DuplicateItemsNotice name={draft.name} model={composed} />
+                                <DuplicateItemsNotice name={draft.name} model={composed} onUse={onUseExisting} />
 
                                 <div className="space-y-2">
                                     <Label htmlFor="w-desc">Descrizione</Label>

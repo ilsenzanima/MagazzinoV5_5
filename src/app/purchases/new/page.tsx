@@ -25,7 +25,6 @@ import {
     Job
 } from "@/lib/api";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
-import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
 import { useBatchUpload } from "@/hooks/useBatchUpload";
 import { formatCurrency } from "@/lib/utils/format";
@@ -33,7 +32,7 @@ import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { FieldTip } from "@/components/ui/field-tip";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
-import { NewItemDialog } from "@/components/inventory/NewItemDialog";
+import { PurchaseLineDialog, PurchaseLineResult } from "@/components/purchases/PurchaseLineDialog";
 
 interface PurchaseLine {
     tempId: string;
@@ -134,9 +133,8 @@ function NewPurchaseContent() {
 
     // Dialog States
     const [openItemSelectorForRowId, setOpenItemSelectorForRowId] = useState<string | null>(null);
-    // Creazione di un articolo mancante direttamente dalla riga
-    const [newItemForRowId, setNewItemForRowId] = useState<string | null>(null);
-    const [newItemSearchTerm, setNewItemSearchTerm] = useState("");
+    // Dopo «Aggiungi e continua» il modale si riapre da solo sulla riga vuota successiva
+    const [continueAfterAdd, setContinueAfterAdd] = useState(false);
     const [openJobSelectorForRowId, setOpenJobSelectorForRowId] = useState<string | null>(null);
     const [isHeaderJobSelectorOpen, setIsHeaderJobSelectorOpen] = useState(false);
     const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
@@ -299,21 +297,25 @@ function NewPurchaseContent() {
         setOpenItemSelectorForRowId(rowId);
     };
 
-    const handleItemSelect = (item: InventoryItem) => {
+    // Riga confermata dal modale (materiale, quantità e prezzo)
+    const handleLineConfirm = ({ item, amounts }: PurchaseLineResult, next: boolean) => {
         if (!openItemSelectorForRowId) return;
-        applyItemToRow(openItemSelectorForRowId, item);
+        applyItemToRow(openItemSelectorForRowId, item, amounts);
         setOpenItemSelectorForRowId(null);
+        if (next) setContinueAfterAdd(true);
     };
 
-    // Articolo appena creato dalla procedura guidata: va sulla riga che l'ha richiesto
-    const handleItemCreated = (item: InventoryItem) => {
-        const rowId = newItemForRowId;
-        setNewItemForRowId(null);
-        setOpenItemSelectorForRowId(null);
-        if (rowId) applyItemToRow(rowId, item);
-    };
+    // Con «Aggiungi e continua» riparte la procedura sull'ultima riga, che è sempre vuota
+    useEffect(() => {
+        if (!continueAfterAdd) return;
+        const last = lines[lines.length - 1];
+        if (last && !last.itemId) {
+            setContinueAfterAdd(false);
+            setOpenItemSelectorForRowId(last.tempId);
+        }
+    }, [continueAfterAdd, lines]);
 
-    const applyItemToRow = (rowId: string, item: InventoryItem) => {
+    const applyItemToRow = (rowId: string, item: InventoryItem, amounts?: { pieces: string; quantity: string; price: string; total: string }) => {
         setLines(prev => {
             const updated = prev.map(line => {
                 if (line.tempId !== rowId) return line;
@@ -328,10 +330,10 @@ function NewPurchaseContent() {
                     itemCode: item.code,
                     coefficient: item.coefficient ? Number(item.coefficient) : 1,
                     unit: item.unit || 'PZ',
-                    pieces: "",
-                    quantity: "",
-                    price: "0",
-                    total: "0",
+                    pieces: amounts?.pieces ?? "",
+                    quantity: amounts?.quantity ?? "",
+                    price: amounts?.price ?? "0",
+                    total: amounts?.total ?? "0",
                     isJob: !!formData.jobId,
                     jobId: formData.jobId || undefined,
                     jobCode: selectedHeaderJob?.code,
@@ -946,30 +948,15 @@ function NewPurchaseContent() {
             </div>
 
             {/* Item Selector Dialog */}
-            <ItemSelectorDialog
+            {/* Aggiunta di una riga in due pagine: materiale, poi quantità e prezzo */}
+            <PurchaseLineDialog
                 open={!!openItemSelectorForRowId}
-                onOpenChange={(open) => { if (!open) setOpenItemSelectorForRowId(null); }}
-                onSelect={handleItemSelect}
+                onClose={() => setOpenItemSelectorForRowId(null)}
+                asOfDate={formData.deliveryNoteDate || new Date().toISOString().slice(0, 10)}
                 items={inventory}
                 onSearch={handleItemSearch}
                 loading={itemsLoading}
-                onCreateNew={(term) => {
-                    setNewItemSearchTerm(term);
-                    setNewItemForRowId(openItemSelectorForRowId);
-                    setOpenItemSelectorForRowId(null);
-                }}
-            />
-
-            {/* Creazione guidata di un materiale mancante */}
-            <NewItemDialog
-                open={!!newItemForRowId}
-                initialName={newItemSearchTerm}
-                onClose={() => {
-                    // Annullando si torna alla ricerca sulla stessa riga
-                    setOpenItemSelectorForRowId(newItemForRowId);
-                    setNewItemForRowId(null);
-                }}
-                onCreated={handleItemCreated}
+                onConfirm={handleLineConfirm}
             />
 
             {/* Job Selector Dialog (per row) */}
