@@ -29,12 +29,14 @@ interface PurchaseLineDialogProps {
     loading: boolean;
     // `next` = true: dopo l'inserimento si passa subito alla riga successiva
     onConfirm: (result: PurchaseLineResult, next: boolean) => void;
+    // Riga già inserita da correggere: si apre direttamente la pagina 2 con i suoi dati
+    editing?: { itemId: string; amounts: LineAmounts } | null;
 }
 
 const EMPTY_AMOUNTS: LineAmounts = { pieces: "", quantity: "", price: "0", total: "0" };
 
 // Inserimento di una riga in due pagine: 1) materiale, 2) quantità e prezzo
-export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, loading, onConfirm }: PurchaseLineDialogProps) {
+export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, loading, onConfirm, editing }: PurchaseLineDialogProps) {
     const [step, setStep] = useState<1 | 2>(1);
     const [item, setItem] = useState<InventoryItem | null>(null);
     const [amounts, setAmounts] = useState<LineAmounts>(EMPTY_AMOUNTS);
@@ -42,15 +44,32 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
     const [reference, setReference] = useState<number | null | undefined>(undefined); // undefined = in caricamento
     const [creatingTerm, setCreatingTerm] = useState<string | null>(null);
 
-    // Ogni apertura riparte dalla scelta del materiale
+    const loadReference = (itemId: string) => {
+        setReference(undefined);
+        costAnalysisApi.getReferencePricesAsOf([{ itemId, asOf: asOfDate }])
+            .then(map => setReference(map.get(itemId) ?? null))
+            .catch(() => setReference(null));
+    };
+
+    // Ogni apertura riparte dalla scelta del materiale; per una riga già inserita, dalla pagina 2 con i suoi dati
     useEffect(() => {
         if (!open) return;
-        setStep(1);
         setItem(null);
-        setAmounts(EMPTY_AMOUNTS);
         setPacksInput("");
         setReference(undefined);
         setCreatingTerm(null);
+        if (editing) {
+            setStep(2);
+            setAmounts(editing.amounts);
+            let cancelled = false;
+            inventoryApi.getById(editing.itemId)
+                .then(full => { if (!cancelled && full) { setItem(full as InventoryItem); loadReference(editing.itemId); } })
+                .catch(() => { if (!cancelled) setStep(1); });
+            return () => { cancelled = true; };
+        }
+        setStep(1);
+        setAmounts(EMPTY_AMOUNTS);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
     const coefficient = item?.coefficient && item.coefficient > 0 ? Number(item.coefficient) : 1;
@@ -61,15 +80,12 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
         setItem(picked);
         setAmounts(EMPTY_AMOUNTS);
         setPacksInput("");
-        setReference(undefined);
         setStep(2);
         // L'elenco di ricerca non porta la quantità per confezione: si completa l'articolo dalla sua scheda
         inventoryApi.getById(picked.id)
             .then(full => { if (full) setItem(prev => (prev && prev.id === picked.id ? { ...prev, ...(full as InventoryItem) } : prev)); })
             .catch(() => { /* non bloccante */ });
-        costAnalysisApi.getReferencePricesAsOf([{ itemId: picked.id, asOf: asOfDate }])
-            .then(map => setReference(map.get(picked.id) ?? null))
-            .catch(() => setReference(null));
+        loadReference(picked.id);
     };
 
     const quantityNum = parseFloat(amounts.quantity);
@@ -105,7 +121,7 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
                     <DialogHeader>
                         <DialogTitle>Aggiungi materiale</DialogTitle>
                         <DialogDescription>
-                            Passo {step} di 2: {step === 1 ? "scegli il materiale" : "quantità e prezzo"}
+                            Passo {step} di 2: {step === 1 ? "scegli il materiale" : editing ? "correggi quantità e prezzo" : "quantità e prezzo"}
                         </DialogDescription>
                         <div className="mt-2 flex gap-1">
                             {[1, 2].map(i => (
@@ -124,6 +140,12 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
                                 loading={loading}
                                 onCreateNew={(term) => setCreatingTerm(term)}
                             />
+                        </div>
+                    )}
+
+                    {step === 2 && !item && (
+                        <div className="flex flex-1 items-center justify-center py-10 text-slate-500">
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carico il materiale...
                         </div>
                     )}
 
@@ -236,11 +258,13 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
                         )}
                         {step === 2 && (
                             <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" disabled={!canAdd} onClick={() => confirm(true)}>
-                                    <Plus className="mr-1 h-4 w-4" /> Aggiungi e continua
-                                </Button>
+                                {!editing && (
+                                    <Button variant="outline" disabled={!canAdd} onClick={() => confirm(true)}>
+                                        <Plus className="mr-1 h-4 w-4" /> Aggiungi e continua
+                                    </Button>
+                                )}
                                 <Button className="bg-blue-600 hover:bg-blue-700" disabled={!canAdd} onClick={() => confirm(false)}>
-                                    <Check className="mr-1 h-4 w-4" /> Aggiungi
+                                    <Check className="mr-1 h-4 w-4" /> {editing ? "Salva modifiche" : "Aggiungi"}
                                 </Button>
                             </div>
                         )}

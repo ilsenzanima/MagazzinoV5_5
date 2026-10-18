@@ -218,6 +218,20 @@ export const inventoryApi = {
         return data as boolean;
     },
 
+    // Quantità per confezione di più articoli (per le righe di un acquisto già composte, es. da ordini)
+    getPackQuantities: async (ids: string[]): Promise<Map<string, number>> => {
+        const map = new Map<string, number>();
+        if (ids.length === 0) return map;
+        const { data, error } = await supabase.from('inventory').select('id, pack_quantity').in('id', ids);
+        if (error) throw error;
+        for (const r of data ?? []) {
+            if (r.pack_quantity !== null && r.pack_quantity !== undefined && Number(r.pack_quantity) > 0) {
+                map.set(r.id, Number(r.pack_quantity));
+            }
+        }
+        return map;
+    },
+
     // Articoli già presenti con lo stesso nome e la stessa variante (senza distinguere maiuscole e spazi in più)
     findDuplicates: async (name: string, model: string, excludeId?: string): Promise<DuplicateCandidate[]> => {
         const cleanName = normalizeForCompare(name);
