@@ -25,7 +25,6 @@ import {
     Job
 } from "@/lib/api";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
-import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { useAuth } from "@/components/auth-provider";
 import { useBatchUpload } from "@/hooks/useBatchUpload";
 import { formatCurrency } from "@/lib/utils/format";
@@ -33,6 +32,8 @@ import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { FieldTip } from "@/components/ui/field-tip";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
+import { PurchaseLineDialog, PurchaseLineResult } from "@/components/purchases/PurchaseLineDialog";
+import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 interface PurchaseLine {
     tempId: string;
@@ -133,6 +134,8 @@ function NewPurchaseContent() {
 
     // Dialog States
     const [openItemSelectorForRowId, setOpenItemSelectorForRowId] = useState<string | null>(null);
+    // Dopo «Aggiungi e continua» il modale si riapre da solo sulla riga vuota successiva
+    const [continueAfterAdd, setContinueAfterAdd] = useState(false);
     const [openJobSelectorForRowId, setOpenJobSelectorForRowId] = useState<string | null>(null);
     const [isHeaderJobSelectorOpen, setIsHeaderJobSelectorOpen] = useState(false);
     const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
@@ -295,11 +298,28 @@ function NewPurchaseContent() {
         setOpenItemSelectorForRowId(rowId);
     };
 
-    const handleItemSelect = (item: InventoryItem) => {
+    // Riga confermata dal modale (materiale, quantità e prezzo)
+    const handleLineConfirm = ({ item, amounts }: PurchaseLineResult, next: boolean) => {
         if (!openItemSelectorForRowId) return;
+        applyItemToRow(openItemSelectorForRowId, item, amounts);
+        setOpenItemSelectorForRowId(null);
+        if (next) setContinueAfterAdd(true);
+    };
+
+    // Con «Aggiungi e continua» riparte la procedura sull'ultima riga, che è sempre vuota
+    useEffect(() => {
+        if (!continueAfterAdd) return;
+        const last = lines[lines.length - 1];
+        if (last && !last.itemId) {
+            setContinueAfterAdd(false);
+            setOpenItemSelectorForRowId(last.tempId);
+        }
+    }, [continueAfterAdd, lines]);
+
+    const applyItemToRow = (rowId: string, item: InventoryItem, amounts?: { pieces: string; quantity: string; price: string; total: string }) => {
         setLines(prev => {
             const updated = prev.map(line => {
-                if (line.tempId !== openItemSelectorForRowId) return line;
+                if (line.tempId !== rowId) return line;
                 return {
                     ...line,
                     itemId: item.id,
@@ -311,10 +331,10 @@ function NewPurchaseContent() {
                     itemCode: item.code,
                     coefficient: item.coefficient ? Number(item.coefficient) : 1,
                     unit: item.unit || 'PZ',
-                    pieces: "",
-                    quantity: "",
-                    price: "0",
-                    total: "0",
+                    pieces: amounts?.pieces ?? "",
+                    quantity: amounts?.quantity ?? "",
+                    price: amounts?.price ?? "0",
+                    total: amounts?.total ?? "0",
                     isJob: !!formData.jobId,
                     jobId: formData.jobId || undefined,
                     jobCode: selectedHeaderJob?.code,
@@ -322,7 +342,6 @@ function NewPurchaseContent() {
             });
             return ensureTrailingEmpty(updated);
         });
-        setOpenItemSelectorForRowId(null);
     };
 
     // ── Job selection (per row) ───────────────────────────────────────────────
@@ -522,6 +541,7 @@ function NewPurchaseContent() {
 
     return (
         <DashboardLayout>
+          <BlockBrowserBack />
             <div className="max-w-5xl mx-auto pb-10">
                 <div className="mb-6">
                     <Link href={fromOrderIds.length > 0 ? "/purchases?tab=ordini" : isOrder ? "/purchases?tab=ordini" : "/purchases"} className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
@@ -930,13 +950,15 @@ function NewPurchaseContent() {
             </div>
 
             {/* Item Selector Dialog */}
-            <ItemSelectorDialog
+            {/* Aggiunta di una riga in due pagine: materiale, poi quantità e prezzo */}
+            <PurchaseLineDialog
                 open={!!openItemSelectorForRowId}
-                onOpenChange={(open) => { if (!open) setOpenItemSelectorForRowId(null); }}
-                onSelect={handleItemSelect}
+                onClose={() => setOpenItemSelectorForRowId(null)}
+                asOfDate={formData.deliveryNoteDate || new Date().toISOString().slice(0, 10)}
                 items={inventory}
                 onSearch={handleItemSearch}
                 loading={itemsLoading}
+                onConfirm={handleLineConfirm}
             />
 
             {/* Job Selector Dialog (per row) */}

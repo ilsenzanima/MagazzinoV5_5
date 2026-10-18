@@ -19,6 +19,7 @@ import { useBatchUpload } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { HelpTip } from "@/components/ui/help-tip";
 import { formatCurrency } from "@/lib/utils/format";
+import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 interface UnlinkedPurchase {
     id: string;
@@ -163,6 +164,7 @@ export default function NewInvoicePage() {
 
     return (
         <DashboardLayout>
+          <BlockBrowserBack />
             <div className="max-w-4xl mx-auto pb-10">
                 <div className="mb-6">
                     <Link href="/purchases?tab=fatture" className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">

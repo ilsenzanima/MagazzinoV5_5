@@ -93,7 +93,9 @@ interface NewItemWizardProps {
     onClose: () => void;                              // chiude il modale e si continua a mano
     initialDraft?: WizardDraft;                       // es. variante da «Crea variante»
     startStep?: number;
-    onChange: (draft: WizardDraft) => void;           // la scheda sotto si riempie man mano
+    onChange?: (draft: WizardDraft) => void;          // la scheda sotto si riempie man mano (solo nella pagina «Nuovo articolo»)
+    closeLabel?: string;                              // testo del pulsante che chiude il modale
+    onUseExisting?: (itemId: string) => void;         // un articolo uguale esiste già: lo si usa al posto di crearne un altro
     onCreate: (draft: WizardDraft) => Promise<boolean>;
 }
 
@@ -144,7 +146,7 @@ function TemplateFieldInput({ field, value, onChange, suggestions }: {
 }
 
 export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>(function NewItemWizard(
-    { open, onClose, initialDraft, startStep = 0, onChange, onCreate },
+    { open, onClose, initialDraft, startStep = 0, onChange, onCreate, closeLabel = "Chiudi e continua a mano", onUseExisting },
     ref
 ) {
     const [step, setStep] = useState(startStep);
@@ -245,7 +247,7 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
     // Alla scheda sotto vanno solo i valori dei campi visibili e compilati
     useEffect(() => {
         const attrs = draft.customModel ? {} : cleanValues(template, draft.variantAttributes);
-        onChangeRef.current({ ...draft, variantAttributes: attrs });
+        onChangeRef.current?.({ ...draft, variantAttributes: attrs });
     }, [draft, template]);
 
     // Valori già usati per la stessa tipologia: arricchiscono le liste aperte
@@ -483,7 +485,7 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                             </div>
                             <Button variant="outline" size="sm" onClick={onClose} className="shrink-0">
                                 <X className="mr-1 h-4 w-4" />
-                                Chiudi e continua a mano
+                                {closeLabel}
                             </Button>
                         </div>
                         <div className="mt-2 flex gap-1">
@@ -656,7 +658,7 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                     </div>
                                 )}
 
-                                <DuplicateItemsNotice name={draft.name} model={composed} />
+                                <DuplicateItemsNotice name={draft.name} model={composed} onUse={onUseExisting} />
 
                                 <div className="space-y-2">
                                     <Label htmlFor="w-desc">Descrizione</Label>
