@@ -18,6 +18,7 @@ import { JobCategory } from "@/lib/types";
 import { JobCategorySelector } from "@/components/jobs/JobCategorySelector";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
+import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 const EMPTY_QUICK_CLIENT_FORM = {
   name: "", street: "", streetNumber: "", postalCode: "", city: "", province: "",
@@ -231,6 +232,7 @@ function NewJobForm() {
 
   return (
     <DashboardLayout>
+      <BlockBrowserBack />
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
           <Link href="/jobs" className="flex items-center text-slate-500 hover:text-slate-900 mb-2">

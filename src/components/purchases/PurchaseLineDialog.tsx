@@ -10,6 +10,7 @@ import type { InventoryItem } from "@/lib/types";
 import { ItemSearchPanel } from "@/components/inventory/ItemSearchPanel";
 import { NewItemDialog } from "@/components/inventory/NewItemDialog";
 import { costAnalysisApi } from "@/lib/services/cost-analysis";
+import { inventoryApi } from "@/lib/api";
 import {
     LineAmounts, applyPacks, applyPieces, applyPrice, applyQuantity, applyTotal, checkPrice, packsFromQuantity,
 } from "@/lib/utils/purchase-line";
@@ -62,6 +63,10 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
         setPacksInput("");
         setReference(undefined);
         setStep(2);
+        // L'elenco di ricerca non porta la quantità per confezione: si completa l'articolo dalla sua scheda
+        inventoryApi.getById(picked.id)
+            .then(full => { if (full) setItem(prev => (prev && prev.id === picked.id ? { ...prev, ...(full as InventoryItem) } : prev)); })
+            .catch(() => { /* non bloccante */ });
         costAnalysisApi.getReferencePricesAsOf([{ itemId: picked.id, asOf: asOfDate }])
             .then(map => setReference(map.get(picked.id) ?? null))
             .catch(() => setReference(null));
@@ -90,7 +95,13 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
     return (
         <>
             <Dialog open={open && creatingTerm === null} onOpenChange={(v) => { if (!v) onClose(); }}>
-                <DialogContent className="flex h-[100dvh] max-w-none flex-col rounded-none sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-lg">
+                <DialogContent
+                    // Come la creazione guidata dell'articolo: si chiude solo con i pulsanti a schermo, non con un clic fuori
+                    onInteractOutside={(e) => e.preventDefault()}
+                    onEscapeKeyDown={(e) => e.preventDefault()}
+                    onPointerDownOutside={(e) => e.preventDefault()}
+                    className="flex h-[100dvh] max-w-none flex-col rounded-none sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-lg"
+                >
                     <DialogHeader>
                         <DialogTitle>Aggiungi materiale</DialogTitle>
                         <DialogDescription>

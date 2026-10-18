@@ -4,6 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import NewMovementContent from '@/components/movements/NewMovementContent';
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
+import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 function NewMovementSkeleton() {
     return (
@@ -39,6 +40,7 @@ export default async function NewMovementPage() {
 
     return (
         <DashboardLayout>
+            <BlockBrowserBack />
             <Suspense fallback={<NewMovementSkeleton />}>
                 <NewMovementContent 
                     initialInventory={initialInventory} 

@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { InventoryItemForm, InventoryFormData, InventoryItemFormHandle } from "@/components/inventory/InventoryItemForm";
 import { NewItemWizard, NewItemWizardHandle, WizardDraft, draftFromItem } from "@/components/inventory/NewItemWizard";
+import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 // Dati della procedura guidata -> campi della scheda
 const draftToFormData = (d: WizardDraft): Partial<InventoryFormData> => ({
@@ -172,6 +173,7 @@ function NewInventoryItemContent() {
 
   return (
     <DashboardLayout>
+      <BlockBrowserBack />
       <div className="max-w-3xl mx-auto space-y-6 pb-20">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

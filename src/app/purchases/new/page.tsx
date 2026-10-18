@@ -33,6 +33,7 @@ import { FieldTip } from "@/components/ui/field-tip";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
 import { PurchaseLineDialog, PurchaseLineResult } from "@/components/purchases/PurchaseLineDialog";
+import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 interface PurchaseLine {
     tempId: string;
@@ -540,6 +541,7 @@ function NewPurchaseContent() {
 
     return (
         <DashboardLayout>
+          <BlockBrowserBack />
             <div className="max-w-5xl mx-auto pb-10">
                 <div className="mb-6">
                     <Link href={fromOrderIds.length > 0 ? "/purchases?tab=ordini" : isOrder ? "/purchases?tab=ordini" : "/purchases"} className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">

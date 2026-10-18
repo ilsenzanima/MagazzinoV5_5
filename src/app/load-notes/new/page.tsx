@@ -17,6 +17,7 @@ import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { inventoryApi, jobsApi, InventoryItem, Job } from "@/lib/api";
 import { FieldTip } from "@/components/ui/field-tip";
+import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 interface NoteLine {
     tempId: string;
@@ -236,6 +237,7 @@ export default function NewLoadNotePage() {
 
     return (
         <DashboardLayout>
+          <BlockBrowserBack />
             <div className="max-w-4xl mx-auto pb-10 overflow-hidden">
                 <div className="mb-6">
                     <Link href="/load-notes" className="flex items-center text-muted-foreground hover:text-foreground mb-2">

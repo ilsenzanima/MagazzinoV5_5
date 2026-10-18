@@ -5,6 +5,7 @@ import NewMovementContent from '@/components/movements/NewMovementContent';
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
+import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 function EditMovementSkeleton() {
     return (
@@ -75,6 +76,7 @@ export default async function EditMovementPage({ params }: { params: Promise<{ i
 
     return (
         <DashboardLayout>
+            <BlockBrowserBack />
             <Suspense fallback={<EditMovementSkeleton />}>
                 <NewMovementContent
                     initialNote={initialNote}
