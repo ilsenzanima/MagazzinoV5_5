@@ -78,6 +78,7 @@ const ORDER_COLUMNS: Record<string, string[]> = {
     job_cost_analysis_params: ['job_id'],
     proposal_cost_analysis_params: ['version_id'],
     supplier_group_members: ['group_id', 'supplier_id'],
+    user_notification_preferences: ['user_id'],
 }
 
 // Supabase restituisce al massimo 1000 righe per richiesta

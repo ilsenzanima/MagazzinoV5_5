@@ -89,6 +89,7 @@ const ORDER_COLUMNS = {
     job_cost_analysis_params: ['job_id'],
     proposal_cost_analysis_params: ['version_id'],
     supplier_group_members: ['group_id', 'supplier_id'],
+    user_notification_preferences: ['user_id'],
 };
 const PAGE_SIZE = 1000; // limite massimo di righe per richiesta di Supabase
 
