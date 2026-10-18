@@ -171,7 +171,19 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
                                 </div>
                             </div>
 
-                            {/* Confronto con il prezzo di riferimento */}
+                            {/* Riferimento a confezione: stessa quantità e stesso prezzo letti «a confezione» */}
+            {packQuantity && (
+                <div className="rounded-md border border-dashed p-3 text-sm">
+                    <p className="font-medium">Confezione: {packQuantity} {unit}</p>
+                    <ul className="mt-1 space-y-0.5 text-slate-600 dark:text-slate-300">
+                        {packsShown !== "" && <li>Stai inserendo {packsShown} confezioni = {amounts.quantity || 0} {unit}</li>}
+                        {reference ? <li>Riferimento: € {(reference * packQuantity).toFixed(2)} a confezione (€ {reference.toFixed(4)} per {unit})</li> : null}
+                        {priceNum > 0 && <li>Con questo prezzo: € {(priceNum * packQuantity).toFixed(2)} a confezione</li>}
+                    </ul>
+                </div>
+            )}
+
+            {/* Confronto con il prezzo di riferimento */}
                             <div className="rounded-md border p-3 text-sm">
                                 {reference === undefined ? (
                                     <p className="flex items-center gap-2 text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Cerco il prezzo di riferimento...</p>

@@ -109,6 +109,11 @@ export function ItemSearchPanel({ active, onSelect, items, onSearch, loading, on
                   <TableCell className="font-medium">
                     {item.name}
                     {item.model && <span className="text-slate-400 dark:text-slate-500 font-normal"> ({item.model})</span>}
+                    {item.packQuantity ? (
+                      <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                        confezione: {item.packQuantity} {item.unit}
+                      </div>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-xs text-slate-500 dark:text-slate-400">{item.brand}</TableCell>
                   <TableCell className="text-center">
