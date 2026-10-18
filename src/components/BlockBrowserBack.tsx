@@ -23,8 +23,18 @@ export function BlockBrowserBack() {
             }
         };
 
+        // Aggiornamento della pagina o chiusura della scheda: il browser chiede conferma prima di perdere i dati
+        const onBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = "";
+        };
+
         window.addEventListener("popstate", onPopState);
-        return () => window.removeEventListener("popstate", onPopState);
+        window.addEventListener("beforeunload", onBeforeUnload);
+        return () => {
+            window.removeEventListener("popstate", onPopState);
+            window.removeEventListener("beforeunload", onBeforeUnload);
+        };
     }, []);
 
     return null;
