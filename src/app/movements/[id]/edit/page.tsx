@@ -56,6 +56,7 @@ export default async function EditMovementPage({ params }: { params: Promise<{ i
         .from('jobs')
         .select('*, clients(*)')
         .eq('status', 'active')
+        .order('on_site', { ascending: false })
         .order('code', { ascending: false })
         .limit(50);
 

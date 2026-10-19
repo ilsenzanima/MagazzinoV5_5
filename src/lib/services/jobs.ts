@@ -26,6 +26,7 @@ export const mapDbToJob = (db: any): Job => ({
     cup: db.cup,
     estimatedCost: db.estimated_cost ?? null,
     category: db.job_category || 'fornitura_posa',
+    onSite: db.on_site ?? false,
 });
 
 const mapJobToDb = (job: Partial<Job>) => {
@@ -44,6 +45,7 @@ const mapJobToDb = (job: Partial<Job>) => {
     if ('estimatedCost' in job) dbJob.estimated_cost = job.estimatedCost ?? null;
     if (job.createdAt !== undefined) dbJob.created_at = job.createdAt;
     if (job.category !== undefined) dbJob.job_category = job.category;
+    if (job.onSite !== undefined) dbJob.on_site = job.onSite;
 
     // Handle nullable fields - only include when explicitly passed
     if ('endDate' in job) {
@@ -134,6 +136,7 @@ export const jobsApi = {
                 .select('*, clients(*)')
                 .is('deleted_at', null)
                 .order('status_sort_order', { ascending: true })
+                .order('on_site', { ascending: false })
                 .order('created_at', { ascending: false })
         );
         if (error) throw error;
@@ -196,6 +199,7 @@ export const jobsApi = {
         query = query.select('*, clients(*)');
         query = query
             .order('status_sort_order', { ascending: true })
+                .order('on_site', { ascending: false })
             .order('created_at', { ascending: false })
             .range(from, to);
 
@@ -230,6 +234,7 @@ export const jobsApi = {
                     .eq('client_id', clientId)
                     .is('deleted_at', null)
                     .order('status_sort_order', { ascending: true })
+                .order('on_site', { ascending: false })
                     .order('created_at', { ascending: false })
             );
 
