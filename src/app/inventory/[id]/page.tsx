@@ -69,6 +69,7 @@ import { DuplicateItemsNotice } from "@/components/inventory/DuplicateItemsNotic
 import { HelpTip } from "@/components/ui/help-tip";
 import dynamic from "next/dynamic";
 import { loadNotesService } from "@/lib/services/load-notes";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 const ImageCropper = dynamic(
   () => import("@/components/ui/image-cropper").then((m) => ({ default: m.ImageCropper })),
   { ssr: false, loading: () => null }
@@ -820,19 +821,13 @@ export default function InventoryDetailPage() {
                   <div className="space-y-2">
                     <Label htmlFor="brand">Marca</Label>
                     {isEditing ? (
-                      <Select
-                        value={editForm.brand}
+                      <SearchableSelect
+                        options={brands.map((b) => ({ value: b.name, label: b.name }))}
+                        value={editForm.brand ?? ""}
                         onValueChange={(val) => setEditForm({ ...editForm, brand: val })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleziona marca" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {brands.map((b) => (
-                            <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Seleziona marca"
+                        searchPlaceholder="Scrivi per cercare marca..."
+                      />
                     ) : (
                       <Input id="brand" value={item.brand} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
@@ -889,19 +884,13 @@ export default function InventoryDetailPage() {
                             />
                           </div>
                           <div className="w-1/3 space-y-1">
-                            <Select
+                            <SearchableSelect
+                              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
                               value={newSupplierCode.supplierId}
                               onValueChange={(val) => setNewSupplierCode({ ...newSupplierCode, supplierId: val })}
-                            >
-                              <SelectTrigger className="h-8 text-sm">
-                                <SelectValue placeholder="Fornitore" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {suppliers.map(s => (
-                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              placeholder="Fornitore"
+                              searchPlaceholder="Scrivi per cercare fornitore..."
+                            />
                           </div>
                           <Button size="sm" onClick={handleAddSupplierCode} disabled={!newSupplierCode.code} className="h-8">
                             <Plus className="h-4 w-4" />
@@ -959,19 +948,13 @@ export default function InventoryDetailPage() {
                   <div className="space-y-2">
                     <Label htmlFor="type">Tipologia</Label>
                     {isEditing ? (
-                      <Select
-                        value={editForm.type}
+                      <SearchableSelect
+                        options={types.map((t) => ({ value: t.name, label: t.name }))}
+                        value={editForm.type ?? ""}
                         onValueChange={(val) => setEditForm({ ...editForm, type: val })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleziona tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {types.map((t) => (
-                            <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Seleziona tipo"
+                        searchPlaceholder="Scrivi per cercare tipologia..."
+                      />
                     ) : (
                       <Input id="type" value={item.type} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
@@ -999,19 +982,13 @@ export default function InventoryDetailPage() {
                   <div className="space-y-2">
                     <Label htmlFor="unit">Unità di Misura</Label>
                     {isEditing ? (
-                      <Select
-                        value={editForm.unit}
+                      <SearchableSelect
+                        options={units.map((u) => ({ value: u.name, label: u.name }))}
+                        value={editForm.unit ?? ""}
                         onValueChange={(val) => setEditForm({ ...editForm, unit: val })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleziona unità" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {units.map((u) => (
-                            <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Seleziona unità"
+                        searchPlaceholder="Scrivi per cercare unità..."
+                      />
                     ) : (
                       <Input id="unit" value={item.unit} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}

@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FieldTip } from "@/components/ui/field-tip";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { formatCurrency } from "@/lib/utils/format";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 // ── Inline editable price row ─────────────────────────────────────────────────
 
@@ -609,12 +610,13 @@ export default function InvoiceDetailPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label>Fornitore</Label>
-                                        <Select value={editData.supplierId} onValueChange={v => setEditData(d => ({ ...d, supplierId: v }))}>
-                                            <SelectTrigger><SelectValue placeholder="Seleziona Fornitore" /></SelectTrigger>
-                                            <SelectContent>
-                                                {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
+                                        <SearchableSelect
+                                          options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                                          value={editData.supplierId}
+                                          onValueChange={v => setEditData(d => ({ ...d, supplierId: v }))}
+                                          placeholder="Seleziona Fornitore"
+                                          searchPlaceholder="Scrivi per cercare fornitore..."
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Numero Fattura *</Label>

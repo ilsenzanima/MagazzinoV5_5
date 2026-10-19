@@ -36,6 +36,7 @@ import { PurchaseLineDialog, PurchaseLineResult } from "@/components/purchases/P
 import { applyPacks, checkPrice, packsFromQuantity } from "@/lib/utils/purchase-line";
 import { costAnalysisApi } from "@/lib/services/cost-analysis";
 import { BlockBrowserBack } from "@/components/BlockBrowserBack";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface PurchaseLine {
     tempId: string;
@@ -629,19 +630,13 @@ function NewPurchaseContent() {
                         <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="supplier">Fornitore *</Label>
-                                <Select
-                                    value={formData.supplierId}
-                                    onValueChange={(v) => setFormData({ ...formData, supplierId: v })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleziona Fornitore" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {suppliers.map((s) => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SearchableSelect
+                                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                                  value={formData.supplierId}
+                                  onValueChange={(v) => setFormData({ ...formData, supplierId: v })}
+                                  placeholder="Seleziona Fornitore"
+                                  searchPlaceholder="Scrivi per cercare fornitore..."
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="bolla">{isOrder ? "Numero Ordine *" : "Numero Bolla *"}</Label>

@@ -1,4 +1,4 @@
-import { normalizeCompanyName, vatDigits, clientMatchReason, sameAddress } from '../client-match';
+import { normalizeCompanyName, vatDigits, clientMatchReason, sameAddress, sameFreeTextAddress } from '../client-match';
 
 describe('confronto committenti', () => {
     it('toglie forma giuridica, punteggiatura e accenti', () => {
@@ -49,5 +49,14 @@ describe('indirizzo', () => {
             { name: 'Alfa Srl', street: 'Via Roma', streetNumber: '10', city: 'Milano' },
             { name: 'Beta Spa', street: 'Via Roma', streetNumber: '10', city: 'Milano' }
         )).toBe('stesso-indirizzo');
+    });
+});
+
+describe('indirizzo in un solo campo', () => {
+    it('uguale ignorando maiuscole, punteggiatura e via/viale', () => {
+        expect(sameFreeTextAddress('Via Roma 10, 00100 Roma (RM)', 'VIA ROMA 10 00100 ROMA RM')).toBe(true);
+        expect(sameFreeTextAddress('Via Roma 10, 00100 Roma', 'Viale Roma 12, 00100 Roma')).toBe(false);
+        expect(sameFreeTextAddress('Roma', 'Roma')).toBe(false);
+        expect(sameFreeTextAddress('', undefined)).toBe(false);
     });
 });

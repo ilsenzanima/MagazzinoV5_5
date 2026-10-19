@@ -15,6 +15,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 
 import { useAuth } from "@/components/auth-provider";
 import { BlockBrowserBack } from "@/components/BlockBrowserBack";
+import { DuplicateSuppliersNotice } from "@/components/suppliers/DuplicateSuppliersNotice";
 export default function NewSupplierPage() {
   const router = useRouter();
   const { userRole } = useAuth();
@@ -87,6 +88,8 @@ export default function NewSupplierPage() {
                   placeholder="Inserisci il nome dell'azienda o del fornitore"
                 />
               </div>
+
+              <DuplicateSuppliersNotice name={formData.name} vatNumber={formData.vatNumber} address={formData.address} />
 
               <div className="space-y-2">
                 <Label htmlFor="address">Indirizzo Sede</Label>
