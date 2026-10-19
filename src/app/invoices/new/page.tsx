@@ -20,6 +20,7 @@ import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { HelpTip } from "@/components/ui/help-tip";
 import { formatCurrency } from "@/lib/utils/format";
 import { BlockBrowserBack } from "@/components/BlockBrowserBack";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface UnlinkedPurchase {
     id: string;
@@ -183,20 +184,14 @@ export default function NewInvoicePage() {
                         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label>Fornitore *</Label>
-                                <Select
-                                    value={formData.supplierId}
-                                    onValueChange={(v) => setFormData({ ...formData, supplierId: v })}
-                                    disabled={suppliersLoading}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={suppliersLoading ? "Caricamento..." : "Seleziona Fornitore"} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {suppliers.map((s) => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SearchableSelect
+                                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                                  value={formData.supplierId}
+                                  onValueChange={(v) => setFormData({ ...formData, supplierId: v })}
+                                  placeholder={suppliersLoading ? "Caricamento..." : "Seleziona Fornitore"}
+                                  searchPlaceholder="Scrivi per cercare fornitore..."
+                                  disabled={suppliersLoading}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label>Numero Fattura *</Label>

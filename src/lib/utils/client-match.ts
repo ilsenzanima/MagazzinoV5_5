@@ -65,6 +65,14 @@ export function sameAddress(a: ClientAddress, b: ClientAddress): boolean {
     return (!!cityA && cityA === cityB) || (!!capA && capA === capB);
 }
 
+// Indirizzo scritto in un unico campo di testo (es. i fornitori): uguale ignorando maiuscole, punteggiatura e «via/viale»
+export function sameFreeTextAddress(a: string | null | undefined, b: string | null | undefined): boolean {
+    const normalize = (text: string | null | undefined) =>
+        plain(text).split(' ').filter(t => t && !STREET_PREFIXES.has(t)).join(' ');
+    const left = normalize(a);
+    return left.length >= 8 && left === normalize(b);
+}
+
 export type ClientMatchReason = 'stessa-partita-iva' | 'stesso-nome' | 'stesso-indirizzo' | 'nome-simile';
 
 export function clientMatchReason(

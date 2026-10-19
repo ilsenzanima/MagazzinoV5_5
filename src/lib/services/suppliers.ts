@@ -1,6 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import { Supplier } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload } from './utils';
+import { clientMatchReason, ClientMatchReason, normalizeCompanyName, sameFreeTextAddress, vatDigits } from '@/lib/utils/client-match';
+
+export interface SupplierDuplicate {
+    id: string; name: string; vatNumber: string; address: string; reason: ClientMatchReason;
+}
 
 export const mapDbToSupplier = (db: any): Supplier => ({
     id: db.id,
@@ -21,6 +26,42 @@ export const mapSupplierToDb = (supplier: Partial<Supplier>) => ({
 });
 
 export const suppliersApi = {
+    // Fornitori già presenti con la stessa partita IVA, un nome uguale/simile o lo stesso indirizzo (non eliminati)
+    findDuplicates: async (name: string, vatNumber?: string, address?: string): Promise<SupplierDuplicate[]> => {
+        const normalized = normalizeCompanyName(name);
+        const vat = vatDigits(vatNumber);
+        const columns = 'id, name, vat_number, address';
+        const queries: PromiseLike<any>[] = [];
+        if (normalized.length >= 3) {
+            const firstToken = normalized.split(' ')[0].replace(/[%_,()]/g, '');
+            if (firstToken.length >= 3) {
+                queries.push(supabase.from('suppliers').select(columns).is('deleted_at', null).ilike('name', `%${firstToken}%`).limit(50));
+            }
+        }
+        if (vat.length >= 8) {
+            queries.push(supabase.from('suppliers').select(columns).is('deleted_at', null).ilike('vat_number', `%${vat}%`).limit(20));
+        }
+        const addressWord = (address ?? '').split(/\s+/).map(w => w.replace(/[^\p{L}\p{N}]/gu, '')).sort((a, b) => b.length - a.length)[0] ?? '';
+        if (addressWord.length >= 5) {
+            queries.push(supabase.from('suppliers').select(columns).is('deleted_at', null).ilike('address', `%${addressWord}%`).limit(50));
+        }
+        if (queries.length === 0) return [];
+        const results = await Promise.all(queries);
+        const rows = new Map<string, any>();
+        for (const r of results) {
+            if (r.error) throw r.error;
+            for (const row of r.data ?? []) rows.set(row.id, row);
+        }
+        const out: SupplierDuplicate[] = [];
+        rows.forEach(row => {
+            let reason = clientMatchReason({ name: row.name, vatNumber: row.vat_number }, { name, vatNumber });
+            if (!reason && sameFreeTextAddress(row.address, address)) reason = 'stesso-indirizzo';
+            if (reason) out.push({ id: row.id, name: row.name, vatNumber: row.vat_number ?? '', address: row.address ?? '', reason });
+        });
+        const rank: Record<ClientMatchReason, number> = { 'stessa-partita-iva': 0, 'stesso-nome': 1, 'stesso-indirizzo': 2, 'nome-simile': 3 };
+        return out.sort((a, b) => rank[a.reason] - rank[b.reason]);
+    },
+
     getAll: async () => {
         const { data, error } = await fetchWithTimeout(
             supabase

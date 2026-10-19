@@ -42,6 +42,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ShieldCheck } from "lucide-react";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export default function PurchaseDetailPage() {
     const { userRole } = useAuth();
@@ -901,16 +902,13 @@ export default function PurchaseDetailPage() {
                             <div>
                                 <Label className="text-slate-500">Fornitore</Label>
                                 {isEditingHeader ? (
-                                    <Select value={editSupplierId} onValueChange={setEditSupplierId}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleziona fornitore..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {suppliers.map(s => (
-                                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <SearchableSelect
+                                      options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                                      value={editSupplierId}
+                                      onValueChange={setEditSupplierId}
+                                      placeholder="Seleziona fornitore..."
+                                      searchPlaceholder="Scrivi per cercare fornitore..."
+                                    />
                                 ) : (
                                     <div className="font-medium text-lg">{purchase.supplierName}</div>
                                 )}

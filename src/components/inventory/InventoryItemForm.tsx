@@ -23,6 +23,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { FieldTip } from "@/components/ui/field-tip";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 export interface InventoryFormData {
     code: string;
     name: string;
@@ -322,19 +323,13 @@ export const InventoryItemForm = forwardRef<InventoryItemFormHandle, InventoryIt
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="brand">Marca</Label>
-                                <Select
-                                    value={formData.brand}
-                                    onValueChange={(val) => setFormData({ ...formData, brand: val })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={loadingData ? "Caricamento..." : "Seleziona Marca"} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {brands.map((brand) => (
-                                            <SelectItem key={brand.id} value={brand.name}>{brand.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SearchableSelect
+                                  options={brands.map((brand) => ({ value: brand.name, label: brand.name }))}
+                                  value={formData.brand}
+                                  onValueChange={(val) => setFormData({ ...formData, brand: val })}
+                                  placeholder={loadingData ? "Caricamento..." : "Seleziona Marca"}
+                                  searchPlaceholder="Scrivi per cercare marca..."
+                                />
                             </div>
                         </div>
 
@@ -378,19 +373,13 @@ export const InventoryItemForm = forwardRef<InventoryItemFormHandle, InventoryIt
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="type">Tipologia</Label>
-                                <Select
-                                    value={formData.type}
-                                    onValueChange={(val) => setFormData({ ...formData, type: val })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={loadingData ? "Caricamento..." : "Seleziona Tipologia"} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {types.map((type) => (
-                                            <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SearchableSelect
+                                  options={types.map((type) => ({ value: type.name, label: type.name }))}
+                                  value={formData.type}
+                                  onValueChange={(val) => setFormData({ ...formData, type: val })}
+                                  placeholder={loadingData ? "Caricamento..." : "Seleziona Tipologia"}
+                                  searchPlaceholder="Scrivi per cercare tipologia..."
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="minStock" className="flex items-center">
@@ -411,19 +400,13 @@ export const InventoryItemForm = forwardRef<InventoryItemFormHandle, InventoryIt
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="unit">Unità di Misura</Label>
-                                <Select
-                                    value={formData.unit}
-                                    onValueChange={(val) => setFormData({ ...formData, unit: val })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={loadingData ? "Caricamento..." : "U.M."} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {units.map((u) => (
-                                            <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SearchableSelect
+                                  options={units.map((u) => ({ value: u.name, label: u.name }))}
+                                  value={formData.unit}
+                                  onValueChange={(val) => setFormData({ ...formData, unit: val })}
+                                  placeholder={loadingData ? "Caricamento..." : "U.M."}
+                                  searchPlaceholder="Scrivi per cercare unità..."
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="coefficient" className="flex items-center">
