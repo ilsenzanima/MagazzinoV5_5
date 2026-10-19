@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import { loadNotesService } from "@/lib/services/load-notes";
-import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
+import { NoteLineDialog, NoteLineResult } from "@/components/load-notes/NoteLineDialog";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { inventoryApi, jobsApi, InventoryItem, Job } from "@/lib/api";
 import { FieldTip } from "@/components/ui/field-tip";
@@ -71,6 +71,7 @@ export default function NewLoadNotePage() {
     const [isJobSelectorOpen, setIsJobSelectorOpen] = useState(false);
     const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
     const [openItemSelectorForRowId, setOpenItemSelectorForRowId] = useState<string | null>(null);
+    const [continueAfterAdd, setContinueAfterAdd] = useState(false);
 
     const isValid = selectedJob || notes.trim().length > 0;
 
@@ -126,7 +127,8 @@ export default function NewLoadNotePage() {
         setIsItemSelectorOpen(true);
     };
 
-    const handleItemSelect = (item: InventoryItem) => {
+    // Riga confermata dal modale (materiale, pezzi e quantità)
+    const handleLineConfirm = ({ item, pieces, quantity }: NoteLineResult, next: boolean) => {
         if (!openItemSelectorForRowId) return;
         setLines(prev => {
             const updated = prev.map(line => {
@@ -139,15 +141,27 @@ export default function NewLoadNotePage() {
                     itemCode: item.code,
                     coefficient: item.coefficient ? Number(item.coefficient) : 1,
                     unit: item.unit || 'PZ',
-                    pieces: "",
-                    quantity: "",
+                    pieces,
+                    quantity,
                 };
             });
             return ensureTrailingEmpty(updated);
         });
         setOpenItemSelectorForRowId(null);
         setIsItemSelectorOpen(false);
+        if (next) setContinueAfterAdd(true);
     };
+
+    // Con «Aggiungi e continua» il modale si riapre sulla riga vuota successiva
+    useEffect(() => {
+        if (!continueAfterAdd) return;
+        const last = lines[lines.length - 1];
+        if (last && !last.itemId) {
+            setContinueAfterAdd(false);
+            setOpenItemSelectorForRowId(last.tempId);
+            setIsItemSelectorOpen(true);
+        }
+    }, [continueAfterAdd, lines]);
 
     const handleJobSelect = (job: Job) => {
         setSelectedJob(job);
@@ -446,13 +460,13 @@ export default function NewLoadNotePage() {
                 </div>
             </div>
 
-            <ItemSelectorDialog
+            <NoteLineDialog
                 open={isItemSelectorOpen}
-                onOpenChange={setIsItemSelectorOpen}
-                onSelect={handleItemSelect}
+                onClose={() => { setIsItemSelectorOpen(false); setOpenItemSelectorForRowId(null); }}
                 items={inventory}
                 onSearch={handleItemSearch}
                 loading={itemsLoading}
+                onConfirm={handleLineConfirm}
             />
 
             <JobSelectorDialog
