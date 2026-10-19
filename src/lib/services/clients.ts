@@ -1,6 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import { Client } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload } from './utils';
+import { clientMatchReason, ClientMatchReason, normalizeCompanyName, vatDigits } from '@/lib/utils/client-match';
+
+export interface ClientDuplicate {
+    id: string; name: string; vatNumber: string; city: string; reason: ClientMatchReason;
+}
 
 const mapDbToClient = (db: any): Client => {
     return {
@@ -36,6 +41,38 @@ const mapClientToDb = (client: Partial<Client>) => ({
 });
 
 export const clientsApi = {
+    // Committenti già presenti con la stessa partita IVA o una ragione sociale uguale/simile (non eliminati)
+    findDuplicates: async (name: string, vatNumber?: string): Promise<ClientDuplicate[]> => {
+        const normalized = normalizeCompanyName(name);
+        const vat = vatDigits(vatNumber);
+        const queries: PromiseLike<any>[] = [];
+        if (normalized.length >= 3) {
+            const firstToken = normalized.split(' ')[0].replace(/[%_,()]/g, '');
+            if (firstToken.length >= 3) {
+                queries.push(supabase.from('clients').select('id, name, vat_number, city').is('deleted_at', null)
+                    .ilike('name', `%${firstToken}%`).limit(50));
+            }
+        }
+        if (vat.length >= 8) {
+            queries.push(supabase.from('clients').select('id, name, vat_number, city').is('deleted_at', null)
+                .ilike('vat_number', `%${vat}%`).limit(20));
+        }
+        if (queries.length === 0) return [];
+        const results = await Promise.all(queries);
+        const rows = new Map<string, any>();
+        for (const r of results) {
+            if (r.error) throw r.error;
+            for (const row of r.data ?? []) rows.set(row.id, row);
+        }
+        const out: ClientDuplicate[] = [];
+        rows.forEach(row => {
+            const reason = clientMatchReason({ name: row.name, vatNumber: row.vat_number }, { name, vatNumber });
+            if (reason) out.push({ id: row.id, name: row.name, vatNumber: row.vat_number ?? '', city: row.city ?? '', reason });
+        });
+        const rank: Record<ClientMatchReason, number> = { 'stessa-partita-iva': 0, 'stesso-nome': 1, 'nome-simile': 2 };
+        return out.sort((a, b) => rank[a.reason] - rank[b.reason]);
+    },
+
     getAll: async () => {
         const { data, error } = await fetchWithTimeout(
             supabase

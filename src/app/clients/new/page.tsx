@@ -13,6 +13,7 @@ import { clientsApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { BlockBrowserBack } from "@/components/BlockBrowserBack";
+import { DuplicateClientsNotice } from "@/components/clients/DuplicateClientsNotice";
 export default function NewClientPage() {
   const { userRole } = useAuth();
   const router = useRouter();
@@ -89,6 +90,8 @@ export default function NewClientPage() {
                   placeholder="Inserisci il nome dell'azienda o del cliente"
                 />
               </div>
+
+              <DuplicateClientsNotice name={formData.name} vatNumber={formData.vatNumber} />
 
               {/* Indirizzo - Priorità alta come richiesto */}
               <div className="space-y-4 border-t border-b py-4 border-slate-100">
