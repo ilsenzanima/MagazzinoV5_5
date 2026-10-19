@@ -142,7 +142,6 @@ function NewPurchaseContent() {
     // Prezzi di riferimento e confezioni degli articoli in tabella (servono agli avvisi sul prezzo e al campo «Conf.»)
     const [referencePrices, setReferencePrices] = useState<Map<string, number>>(new Map());
     const [attemptedSave, setAttemptedSave] = useState(false);
-    const [openJobSelectorForRowId, setOpenJobSelectorForRowId] = useState<string | null>(null);
     const [isHeaderJobSelectorOpen, setIsHeaderJobSelectorOpen] = useState(false);
     const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
     const [isHeaderJob, setIsHeaderJob] = useState(false);
@@ -227,9 +226,9 @@ function NewPurchaseContent() {
                             price: item.price != null ? String(item.price) : "0",
                             total: item.price != null && item.quantity != null
                                 ? (item.price * item.quantity).toFixed(2) : "0",
-                            isJob: !!item.jobId,
-                            jobId: item.jobId ?? undefined,
-                            jobCode: item.jobCode ?? undefined,
+                            isJob: !!item.jobId && item.jobId !== headerJobId,
+                            jobId: item.jobId && item.jobId !== headerJobId ? item.jobId : undefined,
+                            jobCode: item.jobId && item.jobId !== headerJobId ? (item.jobCode ?? undefined) : undefined,
                             transportApplied: item.transportApplied ?? false,
                             transportUnitCost: item.transportUnitCost ?? 0,
                         }))
@@ -406,12 +405,9 @@ function NewPurchaseContent() {
                     quantity: amounts?.quantity ?? "",
                     price: amounts?.price ?? "0",
                     total: amounts?.total ?? "0",
-                    // Correggendo una riga già inserita magazzino/commessa restano quelli della riga
-                    ...(keepDestination ? {} : {
-                        isJob: !!formData.jobId,
-                        jobId: formData.jobId || undefined,
-                        jobCode: selectedHeaderJob?.code,
-                    }),
+                    // La destinazione si decide in testata: le righe la seguono sempre.
+                    // Correggendo una riga già inserita resta quella che aveva (es. riga convertita da un ordine).
+                    ...(keepDestination ? {} : { isJob: false, jobId: undefined, jobCode: undefined }),
                 };
             });
             return ensureTrailingEmpty(updated);
@@ -419,25 +415,6 @@ function NewPurchaseContent() {
     };
 
     // ── Job selection (per row) ───────────────────────────────────────────────
-
-    const openJobSelector = (rowId: string) => {
-        setOpenJobSelectorForRowId(rowId);
-    };
-
-    const clearLineJob = (tempId: string) => {
-        setLines(prev => prev.map(line =>
-            line.tempId !== tempId ? line : { ...line, isJob: false, jobId: undefined, jobCode: undefined }
-        ));
-    };
-
-    const handleJobSelect = (job: Job) => {
-        if (!openJobSelectorForRowId) return;
-        setLines(prev => prev.map(line =>
-            line.tempId !== openJobSelectorForRowId ? line :
-                { ...line, isJob: true, jobId: job.id, jobCode: job.code }
-        ));
-        setOpenJobSelectorForRowId(null);
-    };
 
     // ── Header job selection ──────────────────────────────────────────────────
 
@@ -688,9 +665,9 @@ function NewPurchaseContent() {
                                 <div className="flex items-center justify-between">
                                     <Label className="flex items-center">
                                         {isHeaderJob ? "Commessa (Generale)" : "Magazzino (Generale)"}
-                                        <FieldTip text="Si applica come default a tutte le righe che non hanno un magazzino o una commessa propri. Puoi comunque cambiarlo riga per riga." />
+                                        <FieldTip text="Dove arriva il materiale si decide qui, una volta sola: tutte le righe dell'acquisto vanno in questo magazzino o in questa commessa. Per spostarlo dopo si usa una movimentazione interna." />
                                     </Label>
-                                    {warehouses.length > 1 && (
+                                    {(
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <span className={`text-[10px] ${!isHeaderJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>Magazzino</span>
                                             <Switch
@@ -821,7 +798,6 @@ function NewPurchaseContent() {
                                                     <FieldTip text="Se conosci il totale della riga (es. dalla bolla del fornitore) è preferibile inserirlo qui invece del Prezzo Unitario: il sistema ricalcola da solo il prezzo unitario corretto, tenendo conto del coefficiente usato per questo materiale." />
                                                 </span>
                                             </TableHead>
-                                            <TableHead className="w-[140px] text-center">Magazzino / Commessa</TableHead>
                                             <TableHead className="w-[44px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -864,6 +840,9 @@ function NewPurchaseContent() {
                                                                         <span className="text-[10px] text-muted-foreground">× {line.packQuantity} {line.unit}</span>
                                                                     </div>
                                                                 ) : null}
+                                                                {line.jobId && line.jobId !== formData.jobId && (
+                                                                    <div className="pt-0.5 text-[10px] font-medium text-blue-600">Commessa {line.jobCode}</div>
+                                                                )}
                                                             </div>
                                                         ) : (
                                                             <div className="flex items-center gap-2 text-muted-foreground py-1">
@@ -967,59 +946,6 @@ function NewPurchaseContent() {
                                                         </div>
                                                     </TableCell>
 
-                                                    {/* Magazzino / Commessa */}
-                                                    <TableCell className="py-2 px-1 text-center">
-                                                        {line.itemId && (
-                                                            <div className="flex flex-col items-center gap-1">
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className={`text-[9px] ${!line.isJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>
-                                                                        Magazzino
-                                                                    </span>
-                                                                    <Switch
-                                                                        checked={line.isJob}
-                                                                        onCheckedChange={(checked) =>
-                                                                            checked ? openJobSelector(line.tempId) : clearLineJob(line.tempId)
-                                                                        }
-                                                                        className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
-                                                                    />
-                                                                    <span className={`text-[9px] ${line.isJob ? "text-blue-700 font-semibold" : "text-slate-400"}`}>
-                                                                        Commessa
-                                                                    </span>
-                                                                </div>
-                                                                {line.isJob && line.jobCode ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => openJobSelector(line.tempId)}
-                                                                        className="text-blue-600 font-medium text-xs truncate max-w-[120px] hover:underline"
-                                                                        title={line.jobCode}
-                                                                    >
-                                                                        {line.jobCode}
-                                                                    </button>
-                                                                ) : !line.isJob && warehouses.length > 1 ? (
-                                                                    <Select
-                                                                        value={line.warehouseId || formData.warehouseId || primaryWarehouseId}
-                                                                        onValueChange={(v) => setLines(prev => prev.map(l =>
-                                                                            l.tempId === line.tempId ? { ...l, warehouseId: v } : l
-                                                                        ))}
-                                                                    >
-                                                                        <SelectTrigger
-                                                                            className={`h-7 w-full min-w-[100px] max-w-[130px] text-xs ${line.warehouseId && line.warehouseId !== (formData.warehouseId || primaryWarehouseId) ? "text-cyan-700 font-medium border-cyan-300" : ""}`}
-                                                                        >
-                                                                            <SelectValue />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            {warehouses.map(w => (
-                                                                                <SelectItem key={w.id} value={w.id} className="text-xs">
-                                                                                    {w.name}{w.isPrimary ? " (principale)" : ""}
-                                                                                </SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                ) : null}
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-
                                                     {/* Elimina */}
                                                     <TableCell className="py-2 px-1">
                                                         <Button
@@ -1049,7 +975,7 @@ function NewPurchaseContent() {
                                                 <TableCell className="text-right text-base dark:text-white py-3 pr-2">
                                                     {formatCurrency(grandTotal)}
                                                 </TableCell>
-                                                <TableCell colSpan={2} />
+                                                <TableCell colSpan={1} />
                                             </TableRow>
                                         )}
                                     </TableBody>
@@ -1080,16 +1006,6 @@ function NewPurchaseContent() {
                 loading={itemsLoading}
                 onConfirm={handleLineConfirm}
                 editing={editingForDialog}
-            />
-
-            {/* Job Selector Dialog (per row) */}
-            <JobSelectorDialog
-                open={!!openJobSelectorForRowId}
-                onOpenChange={(open) => { if (!open) setOpenJobSelectorForRowId(null); }}
-                onSelect={handleJobSelect}
-                jobs={jobs}
-                onSearch={handleJobSearch}
-                loading={jobsLoading}
             />
 
             {/* Header Job Selector Dialog */}
