@@ -21,6 +21,7 @@ export default async function AttendancePage() {
             .select('*, clients(name, street, city)')
             .eq('status', 'active')
             .is('deleted_at', null)
+            .order('on_site', { ascending: false })
             .order('code')
     ]);
 

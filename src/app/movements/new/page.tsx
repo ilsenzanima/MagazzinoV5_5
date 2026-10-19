@@ -33,6 +33,7 @@ export default async function NewMovementPage() {
         .from('jobs')
         .select('*, clients(*)')
         .eq('status', 'active')
+        .order('on_site', { ascending: false })
         .order('code', { ascending: false })
         .limit(50);
 

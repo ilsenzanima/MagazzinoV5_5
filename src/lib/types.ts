@@ -129,6 +129,8 @@ export interface Job {
     cup?: string;
     estimatedCost?: number | null;
     category: JobCategory;
+    // In cantiere: commessa dove gli operai stanno lavorando, mostrata per prima nelle ricerche
+    onSite?: boolean;
 }
 
 // Fornitura e posa: commessa completa (materiali + manodopera).

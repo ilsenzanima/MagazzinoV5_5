@@ -21,6 +21,7 @@ import { useViewMode } from "@/hooks/useViewMode";
 import { PageSizeSelector } from "@/components/ui/page-size-selector";
 import { usePageSize } from "@/hooks/usePageSize";
 import { Badge } from "@/components/ui/badge";
+import { JobOnSiteToggle } from "@/components/jobs/JobOnSiteToggle";
 import Link from "next/link";
 import { Job, jobsApi } from "@/lib/api";
 import { JobCategory, JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
@@ -34,6 +35,10 @@ interface JobsContentProps {
 }
 
 const STATUS_ORDER: Record<string, number> = { active: 0, suspended: 1, completed: 2 };
+
+// Stato (attive, sospese, concluse), poi in cantiere per prime
+const compareJobs = (a: Job, b: Job) =>
+  ((STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3)) || (Number(!!b.onSite) - Number(!!a.onSite));
 
 const STATUS_CONFIG = {
   active:    { label: 'Attiva',     active: 'bg-green-500 hover:bg-green-600 text-white border-green-500',    inactive: 'border border-green-300 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20' },
@@ -146,7 +151,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
       if (requestId !== loadRequestId.current) return;
 
       // Sort: active → suspended → completed
-      data.sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
+      data.sort(compareJobs);
 
       setJobs(data);
       setTotalItems(total);
@@ -168,7 +173,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
       await jobsApi.update(job.id, { status: newStatus });
       setJobs(prev => {
         const updated = prev.map(j => j.id === job.id ? { ...j, status: newStatus } : j);
-        updated.sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
+        updated.sort(compareJobs);
         return updated;
       });
     } catch (err: any) {
@@ -178,10 +183,23 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     }
   };
 
+  const handleOnSiteToggle = async (job: Job) => {
+    const next = !job.onSite;
+    setUpdatingStatus(job.id);
+    try {
+      await jobsApi.update(job.id, { onSite: next });
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, onSite: next } : j));
+    } catch (err: any) {
+      notify.error(err?.message || "Errore durante l'aggiornamento della commessa");
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
   const canEdit = userRole === 'admin' || userRole === 'operativo';
 
   // Sort initial jobs too
-  const sortedJobs = [...jobs].sort((a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3));
+  const sortedJobs = [...jobs].sort(compareJobs);
 
   return (
     <>
@@ -268,6 +286,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 truncate">
                       {job.name}
                     </span>
+                    {job.status === 'active' && (
+                      <JobOnSiteToggle onSite={!!job.onSite} canEdit={canEdit} disabled={updatingStatus === job.id} onToggle={() => handleOnSiteToggle(job)} />
+                    )}
                     <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
                       {JOB_CATEGORY_LABELS[job.category]}
                     </Badge>
@@ -320,9 +341,14 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                         <CardTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-white break-words" title={job.name}>{job.name}</CardTitle>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
                       </div>
-                      <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
-                        {JOB_CATEGORY_LABELS[job.category]}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {job.status === 'active' && (
+                          <JobOnSiteToggle onSite={!!job.onSite} canEdit={canEdit} disabled={updatingStatus === job.id} onToggle={() => handleOnSiteToggle(job)} />
+                        )}
+                        <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
+                          {JOB_CATEGORY_LABELS[job.category]}
+                        </Badge>
+                      </div>
                     </div>
 
                     {/* Status buttons */}

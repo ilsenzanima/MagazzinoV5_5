@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Job } from "@/lib/api";
-import { Search, Briefcase, Check, Loader2 } from "lucide-react";
+import { Search, Briefcase, Check, Loader2, HardHat } from "lucide-react";
 import { useState, useMemo, useDeferredValue, memo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 
@@ -103,7 +103,9 @@ export const JobSelectorDialog = memo(function JobSelectorDialog({ open, onOpenC
               ) : (
                 filteredJobs.map((job) => (
                   <TableRow key={job.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => onSelect(job)}>
-                    <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{job.code}</TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                      {job.onSite && <HardHat className="mr-1 inline h-3.5 w-3.5 text-amber-500" aria-label="In cantiere" />}{job.code}
+                    </TableCell>
                     <TableCell className="font-medium">{job.name}</TableCell>
                     <TableCell className="text-sm text-slate-500">{job.description || '-'}</TableCell>
                     <TableCell className="text-sm text-slate-600 dark:text-slate-400">{job.clientName || '-'}</TableCell>
