@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Job } from "@/lib/types";
 import type { MovementLine } from "@/hooks/useMovementForm";
 import { inventoryApi } from "@/lib/services/inventory";
-import { parseQuantityExpression } from "@/lib/utils/quantity-expression";
 import { planLotSplit } from "@/lib/utils/lot-split";
 
 type MovementTab = "entry" | "exit" | "sale" | "waste" | "transfer";
@@ -36,12 +35,14 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export function MovementLineDialog({
     open, onClose, line, activeTab, selectedJob, jobBatchAvailability, onLineChange, onSplit, onBack, onNext,
 }: MovementLineDialogProps) {
-    const [expression, setExpression] = useState("");
+    const [packsInput, setPacksInput] = useState("");   // confezioni intere
+    const [extraInput, setExtraInput] = useState("");     // pezzi in più (o in meno, con il segno meno)
     const [packQuantity, setPackQuantity] = useState<number | null>(null);
 
     const itemId = line?.itemId;
     useEffect(() => {
-        setExpression("");
+        setPacksInput("");
+        setExtraInput("");
         setPackQuantity(null);
         if (!open || !itemId) return;
         let cancelled = false;
@@ -56,11 +57,6 @@ export function MovementLineDialog({
     const isTransfer = activeTab === "transfer";
     const coefficient = line?.coefficient && line.coefficient > 0 ? line.coefficient : 1;
     const unit = line?.itemUnit || "PZ";
-
-    const parsed = useMemo(
-        () => (expression.trim() ? parseQuantityExpression(expression, { packQuantity, coefficient, unit }) : null),
-        [expression, packQuantity, coefficient, unit]
-    );
 
     // Lotti da cui si può prelevare / rendere. Per il reso da cantiere: anche i lotti fittizi dello stesso articolo.
     const lots = useMemo(() => {
@@ -98,11 +94,21 @@ export function MovementLineDialog({
         ? planLotSplit(quantity, lots.filter(l => !l.isFictitious || isReturnFromJob).map(l => ({ id: l.id, remaining: l.remaining })), line.purchaseItemId)
         : null;
 
-    const applyExpression = (text: string) => {
-        setExpression(text);
-        const result = parseQuantityExpression(text, { packQuantity, coefficient, unit });
-        if (result.ok && result.quantity !== undefined) onLineChange(line.tempId, "quantity", String(result.quantity));
+    // Confezioni e pezzi di rettifica: la quantità è confezioni x quantità per confezione + pezzi x coefficiente
+    const applyPackFields = (packsText: string, extraText: string) => {
+        setPacksInput(packsText);
+        setExtraInput(extraText);
+        const packs = parseFloat(packsText.replace(",", "."));
+        const extra = parseFloat(extraText.replace(",", "."));
+        if (isNaN(packs) && isNaN(extra)) { onLineChange(line.tempId, "quantity", ""); return; }
+        const total = (isNaN(packs) ? 0 : packs) * (packQuantity ?? 0) + (isNaN(extra) ? 0 : extra) * coefficient;
+        onLineChange(line.tempId, "quantity", total > 0 ? String(round2(total)) : "");
     };
+    const packsNumber = parseFloat(packsInput.replace(",", "."));
+    const extraNumber = parseFloat(extraInput.replace(",", "."));
+    const packBreakdown = packQuantity && (packsInput !== "" || extraInput !== "")
+        ? `${isNaN(packsNumber) ? 0 : packsNumber} conf × ${packQuantity} ${unit}${isNaN(extraNumber) || extraNumber === 0 ? "" : ` ${extraNumber < 0 ? "−" : "+"} ${Math.abs(extraNumber)} pz × ${coefficient} ${unit}`}`
+        : "";
 
     const applySplit = () => {
         if (!plan) return;
@@ -204,34 +210,46 @@ export function MovementLineDialog({
                                 </div>
                             )}
 
-                            {/* Calcolatrice + campi */}
-                            <div className="space-y-1">
-                                <Label htmlFor="ml-calc">Quantità</Label>
-                                <Input id="ml-calc" autoFocus placeholder={packQuantity ? "Es. 2 conf + 3 pz" : "Es. 12 pz"}
-                                    value={expression} onChange={e => applyExpression(e.target.value)} />
-                                <p className="text-[11px] text-slate-500">
-                                    {packQuantity ? `1 confezione = ${packQuantity} ${unit}. ` : ""}
-                                    {coefficient !== 1 ? `1 pezzo = ${coefficient} ${unit}. ` : ""}
-                                    Puoi sommare e sottrarre (es. «3 conf - 1 pz»); senza unità sono pezzi.
-                                </p>
-                                {parsed && !parsed.ok && parsed.error && <p className="text-xs text-red-600">{parsed.error}</p>}
-                                {parsed?.ok && (
-                                    <p className="text-xs text-slate-600 dark:text-slate-300">
-                                        {parsed.parts?.join("  ")} → <span className="font-medium">{parsed.quantity} {unit}</span>
+                            {/* Confezioni + pezzi di rettifica (solo per gli articoli con la confezione) */}
+                            {packQuantity ? (
+                                <div className="space-y-1 rounded-md border border-dashed p-3">
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="ml-packs">Confezioni</Label>
+                                            <Input id="ml-packs" type="number" inputMode="decimal" min="0" step="1" autoFocus
+                                                value={packsInput} onChange={e => applyPackFields(e.target.value, extraInput)} placeholder="0" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="ml-extra">Pezzi in più o in meno</Label>
+                                            <Input id="ml-extra" type="number" inputMode="decimal" step="1"
+                                                value={extraInput} onChange={e => applyPackFields(packsInput, e.target.value)} placeholder="es. 3 oppure -1" />
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500">
+                                        1 confezione = {packQuantity} {unit}{coefficient !== 1 ? `; 1 pezzo = ${coefficient} ${unit}` : ""}.
+                                        Per «2 scatole + 3 pezzi» scrivi 2 e 3; per «3 scatole meno 1 pezzo» scrivi 3 e -1.
                                     </p>
-                                )}
-                            </div>
+                                    {packBreakdown && (
+                                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                                            {packBreakdown} → <span className="font-medium">{quantity > 0 ? `${quantity} ${unit}` : "—"}</span>
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                coefficient !== 1 && <p className="text-[11px] text-slate-500">1 pezzo = {coefficient} {unit}.</p>
+                            )}
 
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="space-y-1">
                                     <Label htmlFor="ml-pieces">Pezzi</Label>
                                     <Input id="ml-pieces" type="number" inputMode="decimal" min="0" step="0.01"
-                                        value={line.pieces} onChange={e => { setExpression(""); onLineChange(line.tempId, "pieces", e.target.value); }} placeholder="0" />
+                                        value={line.pieces} onChange={e => { setPacksInput(""); setExtraInput(""); onLineChange(line.tempId, "pieces", e.target.value); }} placeholder="0"
+                                        autoFocus={!packQuantity} />
                                 </div>
                                 <div className="space-y-1 rounded-md bg-blue-50 p-1 dark:bg-blue-950/30">
                                     <Label htmlFor="ml-qty" className="px-1">Quantità ({unit})</Label>
                                     <Input id="ml-qty" type="number" inputMode="decimal" min="0" step="0.01"
-                                        value={line.quantity} onChange={e => { setExpression(""); onLineChange(line.tempId, "quantity", e.target.value); }} placeholder="0.00" />
+                                        value={line.quantity} onChange={e => { setPacksInput(""); setExtraInput(""); onLineChange(line.tempId, "quantity", e.target.value); }} placeholder="0.00" />
                                     {packsText !== null && (
                                         <p className="px-1 text-[11px] text-slate-500">
                                             = {packsText} confezioni{Number.isInteger(packsText) ? "" : " (una è aperta)"}
