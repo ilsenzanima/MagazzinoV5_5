@@ -10,9 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Save, Trash2, Loader2, Search, X, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Save, Trash2, Loader2, Search, X, Upload } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     suppliersApi,
@@ -33,6 +33,8 @@ import { FieldTip } from "@/components/ui/field-tip";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
 import { PurchaseLineDialog, PurchaseLineResult } from "@/components/purchases/PurchaseLineDialog";
+import { applyPacks, checkPrice, packsFromQuantity } from "@/lib/utils/purchase-line";
+import { costAnalysisApi } from "@/lib/services/cost-analysis";
 import { BlockBrowserBack } from "@/components/BlockBrowserBack";
 
 interface PurchaseLine {
@@ -44,6 +46,7 @@ interface PurchaseLine {
     itemCategory?: string;
     itemDescription?: string;
     itemCode?: string;
+    packQuantity?: number | null;   // quantità per confezione dell'articolo (aiuto per confezioni e prezzo)
     pieces: string;
     quantity: string;
     coefficient: number;
@@ -136,7 +139,9 @@ function NewPurchaseContent() {
     const [openItemSelectorForRowId, setOpenItemSelectorForRowId] = useState<string | null>(null);
     // Dopo «Aggiungi e continua» il modale si riapre da solo sulla riga vuota successiva
     const [continueAfterAdd, setContinueAfterAdd] = useState(false);
-    const [openJobSelectorForRowId, setOpenJobSelectorForRowId] = useState<string | null>(null);
+    // Prezzi di riferimento e confezioni degli articoli in tabella (servono agli avvisi sul prezzo e al campo «Conf.»)
+    const [referencePrices, setReferencePrices] = useState<Map<string, number>>(new Map());
+    const [attemptedSave, setAttemptedSave] = useState(false);
     const [isHeaderJobSelectorOpen, setIsHeaderJobSelectorOpen] = useState(false);
     const [selectedHeaderJob, setSelectedHeaderJob] = useState<Job | null>(null);
     const [isHeaderJob, setIsHeaderJob] = useState(false);
@@ -221,9 +226,9 @@ function NewPurchaseContent() {
                             price: item.price != null ? String(item.price) : "0",
                             total: item.price != null && item.quantity != null
                                 ? (item.price * item.quantity).toFixed(2) : "0",
-                            isJob: !!item.jobId,
-                            jobId: item.jobId ?? undefined,
-                            jobCode: item.jobCode ?? undefined,
+                            isJob: !!item.jobId && item.jobId !== headerJobId,
+                            jobId: item.jobId && item.jobId !== headerJobId ? item.jobId : undefined,
+                            jobCode: item.jobId && item.jobId !== headerJobId ? (item.jobCode ?? undefined) : undefined,
                             transportApplied: item.transportApplied ?? false,
                             transportUnitCost: item.transportUnitCost ?? 0,
                         }))
@@ -292,16 +297,80 @@ function NewPurchaseContent() {
         }
     }, []);
 
+    // Prezzi di riferimento alla data della bolla: servono all'avviso sul prezzo di ogni riga
+    const referenceDate = formData.deliveryNoteDate || new Date().toISOString().slice(0, 10);
+    const requestedReferences = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        requestedReferences.current = new Set();
+        setReferencePrices(new Map());
+    }, [referenceDate]);
+    useEffect(() => {
+        const ids = Array.from(new Set(lines.map(l => l.itemId).filter(Boolean)))
+            .filter(id => !requestedReferences.current.has(id));
+        if (ids.length === 0) return;
+        ids.forEach(id => requestedReferences.current.add(id));
+        costAnalysisApi.getReferencePricesAsOf(ids.map(itemId => ({ itemId, asOf: referenceDate })))
+            .then(map => setReferencePrices(prev => new Map([...prev, ...map])))
+            .catch(() => { /* l'avviso sul prezzo è un aiuto, non blocca */ });
+    }, [lines, referenceDate]);
+
+    // Quantità per confezione delle righe composte altrove (es. convertite da ordini)
+    useEffect(() => {
+        const missing = Array.from(new Set(lines.filter(l => l.itemId && l.packQuantity === undefined).map(l => l.itemId)));
+        if (missing.length === 0) return;
+        inventoryApi.getPackQuantities(missing)
+            .then(map => setLines(prev => prev.map(l =>
+                l.itemId && l.packQuantity === undefined ? { ...l, packQuantity: map.get(l.itemId) ?? null } : l)))
+            .catch(() => setLines(prev => prev.map(l => (l.itemId && l.packQuantity === undefined ? { ...l, packQuantity: null } : l))));
+    }, [lines]);
+
+    // Invio: passa al campo successivo; dopo l'ultimo campo alla riga seguente (se è vuota apre la ricerca del materiale)
+    const FIELD_ORDER = ["packs", "pieces", "quantity", "price", "total"];
+    const focusField = (rowId: string, fromIndex: number): boolean => {
+        for (let i = fromIndex; i < FIELD_ORDER.length; i++) {
+            const el = document.querySelector<HTMLInputElement>(`[data-line="${rowId}"][data-field="${FIELD_ORDER[i]}"]`);
+            if (el && !el.disabled) { el.focus(); el.select?.(); return true; }
+        }
+        return false;
+    };
+    const handleCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, tempId: string, field: string) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (focusField(tempId, FIELD_ORDER.indexOf(field) + 1)) return;
+        const rowIdx = lines.findIndex(l => l.tempId === tempId);
+        const next = lines[rowIdx + 1];
+        if (!next) return;
+        if (next.itemId) focusField(next.tempId, 0);
+        else openItemSelector(next.tempId);
+    };
+
+    const handleLinePacksChange = (tempId: string, packsStr: string) => {
+        setLines(prev => prev.map(line => {
+            if (line.tempId !== tempId || !line.packQuantity) return line;
+            const next = applyPacks(
+                { pieces: line.pieces, quantity: line.quantity, price: line.price, total: line.total },
+                line.coefficient, line.packQuantity, packsStr
+            );
+            return { ...line, ...next };
+        }));
+    };
+
     // ── Item selection (per row) ──────────────────────────────────────────────
 
     const openItemSelector = (rowId: string) => {
         setOpenItemSelectorForRowId(rowId);
     };
 
+    // Riga già compilata: il modale si apre sulla pagina 2 per correggerla
+    const editingLine = openItemSelectorForRowId ? lines.find(l => l.tempId === openItemSelectorForRowId) : undefined;
+    const editingForDialog = editingLine?.itemId
+        ? { itemId: editingLine.itemId, amounts: { pieces: editingLine.pieces, quantity: editingLine.quantity, price: editingLine.price, total: editingLine.total } }
+        : null;
+
     // Riga confermata dal modale (materiale, quantità e prezzo)
     const handleLineConfirm = ({ item, amounts }: PurchaseLineResult, next: boolean) => {
         if (!openItemSelectorForRowId) return;
-        applyItemToRow(openItemSelectorForRowId, item, amounts);
+        applyItemToRow(openItemSelectorForRowId, item, amounts, !!editingLine?.itemId);
         setOpenItemSelectorForRowId(null);
         if (next) setContinueAfterAdd(true);
     };
@@ -316,7 +385,7 @@ function NewPurchaseContent() {
         }
     }, [continueAfterAdd, lines]);
 
-    const applyItemToRow = (rowId: string, item: InventoryItem, amounts?: { pieces: string; quantity: string; price: string; total: string }) => {
+    const applyItemToRow = (rowId: string, item: InventoryItem, amounts?: { pieces: string; quantity: string; price: string; total: string }, keepDestination = false) => {
         setLines(prev => {
             const updated = prev.map(line => {
                 if (line.tempId !== rowId) return line;
@@ -329,15 +398,16 @@ function NewPurchaseContent() {
                     itemCategory: item.type,
                     itemDescription: item.description,
                     itemCode: item.code,
+                    packQuantity: item.packQuantity && item.packQuantity > 0 ? Number(item.packQuantity) : null,
                     coefficient: item.coefficient ? Number(item.coefficient) : 1,
                     unit: item.unit || 'PZ',
                     pieces: amounts?.pieces ?? "",
                     quantity: amounts?.quantity ?? "",
                     price: amounts?.price ?? "0",
                     total: amounts?.total ?? "0",
-                    isJob: !!formData.jobId,
-                    jobId: formData.jobId || undefined,
-                    jobCode: selectedHeaderJob?.code,
+                    // La destinazione si decide in testata: le righe la seguono sempre.
+                    // Correggendo una riga già inserita resta quella che aveva (es. riga convertita da un ordine).
+                    ...(keepDestination ? {} : { isJob: false, jobId: undefined, jobCode: undefined }),
                 };
             });
             return ensureTrailingEmpty(updated);
@@ -345,25 +415,6 @@ function NewPurchaseContent() {
     };
 
     // ── Job selection (per row) ───────────────────────────────────────────────
-
-    const openJobSelector = (rowId: string) => {
-        setOpenJobSelectorForRowId(rowId);
-    };
-
-    const clearLineJob = (tempId: string) => {
-        setLines(prev => prev.map(line =>
-            line.tempId !== tempId ? line : { ...line, isJob: false, jobId: undefined, jobCode: undefined }
-        ));
-    };
-
-    const handleJobSelect = (job: Job) => {
-        if (!openJobSelectorForRowId) return;
-        setLines(prev => prev.map(line =>
-            line.tempId !== openJobSelectorForRowId ? line :
-                { ...line, isJob: true, jobId: job.id, jobCode: job.code }
-        ));
-        setOpenJobSelectorForRowId(null);
-    };
 
     // ── Header job selection ──────────────────────────────────────────────────
 
@@ -449,7 +500,17 @@ function NewPurchaseContent() {
             return;
         }
 
-        const validLines = lines.filter(l => l.itemId && l.quantity && l.price);
+        // Una riga con il materiale ma senza quantità non va persa in silenzio: si evidenzia.
+        // Il prezzo invece può mancare (arriva con la fattura e si aggiunge dopo).
+        const missingQuantity = lines.filter(l => l.itemId && !(parseFloat(l.quantity) > 0));
+        if (missingQuantity.length > 0) {
+            setAttemptedSave(true);
+            notify.warning(`Manca la quantità in ${missingQuantity.length} ${missingQuantity.length === 1 ? "riga evidenziata" : "righe evidenziate"}`);
+            document.querySelector(`[data-line="${missingQuantity[0].tempId}"][data-field="quantity"]`)?.scrollIntoView({ block: "center" });
+            return;
+        }
+
+        const validLines = lines.filter(l => l.itemId && parseFloat(l.quantity) > 0);
         if (validLines.length === 0) {
             notify.warning(isOrder ? "Inserisci almeno un materiale nell'ordine" : "Inserisci almeno una riga nell'acquisto");
             return;
@@ -489,7 +550,7 @@ function NewPurchaseContent() {
                     quantity: qty,
                     pieces: !isNaN(pieces) ? pieces : (line.coefficient === 1 ? qty : undefined),
                     coefficient: line.coefficient,
-                    price: parseFloat(line.price),
+                    price: parseFloat(line.price) || 0,
                     // Se la commessa della riga e' la stessa dell'intestazione, lasciamo il
                     // job_id della riga vuoto (segue l'intestazione via COALESCE lato trigger):
                     // così, rimuovendo poi la commessa dall'intestazione, il materiale torna
@@ -604,9 +665,9 @@ function NewPurchaseContent() {
                                 <div className="flex items-center justify-between">
                                     <Label className="flex items-center">
                                         {isHeaderJob ? "Commessa (Generale)" : "Magazzino (Generale)"}
-                                        <FieldTip text="Si applica come default a tutte le righe che non hanno un magazzino o una commessa propri. Puoi comunque cambiarlo riga per riga." />
+                                        <FieldTip text="Dove arriva il materiale si decide qui, una volta sola: tutte le righe dell'acquisto vanno in questo magazzino o in questa commessa. Per spostarlo dopo si usa una movimentazione interna." />
                                     </Label>
-                                    {warehouses.length > 1 && (
+                                    {(
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <span className={`text-[10px] ${!isHeaderJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>Magazzino</span>
                                             <Switch
@@ -737,13 +798,17 @@ function NewPurchaseContent() {
                                                     <FieldTip text="Se conosci il totale della riga (es. dalla bolla del fornitore) è preferibile inserirlo qui invece del Prezzo Unitario: il sistema ricalcola da solo il prezzo unitario corretto, tenendo conto del coefficiente usato per questo materiale." />
                                                 </span>
                                             </TableHead>
-                                            <TableHead className="w-[140px] text-center">Magazzino / Commessa</TableHead>
                                             <TableHead className="w-[44px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {lines.map((line, index) => {
                                             const isLast = index === lines.length - 1;
+                                            const missingQty = attemptedSave && !!line.itemId && !(parseFloat(line.quantity) > 0);
+                                            const priceCheck = line.itemId
+                                                ? checkPrice({ price: parseFloat(line.price), reference: referencePrices.get(line.itemId), packQuantity: line.packQuantity, unit: line.unit })
+                                                : null;
+                                            const packsShown = line.packQuantity ? (packsFromQuantity(line.quantity, line.packQuantity)?.toString() ?? "") : "";
                                             return (
                                                 <TableRow key={line.tempId} className="group">
                                                     {/* Materiale */}
@@ -760,6 +825,23 @@ function NewPurchaseContent() {
                                                                 )}
                                                                 {line.itemCategory && line.itemBrand && (
                                                                     <div className="text-xs text-slate-400 leading-none">{line.itemCategory} · {line.itemBrand}</div>
+                                                                )}
+                                                                {line.packQuantity ? (
+                                                                    <div className="flex items-center gap-1 pt-1" onClick={e => e.stopPropagation()}>
+                                                                        <span className="text-[10px] text-muted-foreground">Conf.</span>
+                                                                        <Input
+                                                                            type="number" inputMode="decimal" min="0" step="1"
+                                                                            value={packsShown}
+                                                                            onChange={e => handleLinePacksChange(line.tempId, e.target.value)}
+                                                                            data-line={line.tempId} data-field="packs"
+                                                                            onKeyDown={e => handleCellKeyDown(e, line.tempId, "packs")}
+                                                                            placeholder="0" className="h-7 w-16 px-1 text-center text-xs"
+                                                                        />
+                                                                        <span className="text-[10px] text-muted-foreground">× {line.packQuantity} {line.unit}</span>
+                                                                    </div>
+                                                                ) : null}
+                                                                {line.jobId && line.jobId !== formData.jobId && (
+                                                                    <div className="pt-0.5 text-[10px] font-medium text-blue-600">Commessa {line.jobCode}</div>
                                                                 )}
                                                             </div>
                                                         ) : (
@@ -779,6 +861,8 @@ function NewPurchaseContent() {
                                                             step="0.01"
                                                             value={line.pieces}
                                                             onChange={e => handleLinePiecesChange(line.tempId, e.target.value)}
+                                                            data-line={line.tempId} data-field="pieces"
+                                                            onKeyDown={e => handleCellKeyDown(e, line.tempId, "pieces")}
                                                             placeholder="0"
                                                             className="h-9 text-center px-1"
                                                             disabled={!line.itemId}
@@ -793,7 +877,7 @@ function NewPurchaseContent() {
                                                     </TableCell>
 
                                                     {/* Quantità */}
-                                                    <TableCell className="py-2 px-1 bg-blue-50 dark:bg-blue-950/30">
+                                                    <TableCell className={`py-2 px-1 bg-blue-50 dark:bg-blue-950/30 ${missingQty ? "ring-2 ring-inset ring-red-400" : ""}`}>
                                                         <div className="flex items-center gap-1">
                                                             <Input
                                                                 type="number"
@@ -802,6 +886,8 @@ function NewPurchaseContent() {
                                                                 step="0.01"
                                                                 value={line.quantity}
                                                                 onChange={e => handleLineQuantityChange(line.tempId, e.target.value)}
+                                                                data-line={line.tempId} data-field="quantity"
+                                                                onKeyDown={e => handleCellKeyDown(e, line.tempId, "quantity")}
                                                                 placeholder="0.00"
                                                                 className="h-9 text-center px-1"
                                                                 disabled={!line.itemId}
@@ -821,11 +907,22 @@ function NewPurchaseContent() {
                                                                 step="0.00001"
                                                                 value={line.price}
                                                                 onChange={e => handleLinePriceChange(line.tempId, e.target.value)}
+                                                                data-line={line.tempId} data-field="price"
+                                                                onKeyDown={e => handleCellKeyDown(e, line.tempId, "price")}
                                                                 placeholder="0"
                                                                 className="h-9 text-right px-1 w-24"
                                                                 disabled={!line.itemId}
                                                             />
                                                         </div>
+                                                        {priceCheck && (priceCheck.kind === "higher" || priceCheck.kind === "lower" || priceCheck.kind === "pack") && (
+                                                            <div
+                                                                className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-amber-700 dark:text-amber-300"
+                                                                title={priceCheck.message}
+                                                            >
+                                                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                                                {priceCheck.kind === "pack" ? "prezzo a confezione?" : priceCheck.kind === "higher" ? "sopra il riferimento" : "sotto il riferimento"}
+                                                            </div>
+                                                        )}
                                                     </TableCell>
 
                                                     {/* Totale Riga */}
@@ -839,65 +936,14 @@ function NewPurchaseContent() {
                                                                 step="0.01"
                                                                 value={line.total}
                                                                 onChange={e => handleLineTotalChange(line.tempId, e.target.value)}
+                                                                data-line={line.tempId} data-field="total"
+                                                                onKeyDown={e => handleCellKeyDown(e, line.tempId, "total")}
                                                                 onBlur={() => handleLineTotalBlur(line.tempId)}
                                                                 placeholder="0.00"
                                                                 className="h-9 text-right px-1 w-24"
                                                                 disabled={!line.itemId}
                                                             />
                                                         </div>
-                                                    </TableCell>
-
-                                                    {/* Magazzino / Commessa */}
-                                                    <TableCell className="py-2 px-1 text-center">
-                                                        {line.itemId && (
-                                                            <div className="flex flex-col items-center gap-1">
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className={`text-[9px] ${!line.isJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>
-                                                                        Magazzino
-                                                                    </span>
-                                                                    <Switch
-                                                                        checked={line.isJob}
-                                                                        onCheckedChange={(checked) =>
-                                                                            checked ? openJobSelector(line.tempId) : clearLineJob(line.tempId)
-                                                                        }
-                                                                        className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
-                                                                    />
-                                                                    <span className={`text-[9px] ${line.isJob ? "text-blue-700 font-semibold" : "text-slate-400"}`}>
-                                                                        Commessa
-                                                                    </span>
-                                                                </div>
-                                                                {line.isJob && line.jobCode ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => openJobSelector(line.tempId)}
-                                                                        className="text-blue-600 font-medium text-xs truncate max-w-[120px] hover:underline"
-                                                                        title={line.jobCode}
-                                                                    >
-                                                                        {line.jobCode}
-                                                                    </button>
-                                                                ) : !line.isJob && warehouses.length > 1 ? (
-                                                                    <Select
-                                                                        value={line.warehouseId || formData.warehouseId || primaryWarehouseId}
-                                                                        onValueChange={(v) => setLines(prev => prev.map(l =>
-                                                                            l.tempId === line.tempId ? { ...l, warehouseId: v } : l
-                                                                        ))}
-                                                                    >
-                                                                        <SelectTrigger
-                                                                            className={`h-7 w-full min-w-[100px] max-w-[130px] text-xs ${line.warehouseId && line.warehouseId !== (formData.warehouseId || primaryWarehouseId) ? "text-cyan-700 font-medium border-cyan-300" : ""}`}
-                                                                        >
-                                                                            <SelectValue />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            {warehouses.map(w => (
-                                                                                <SelectItem key={w.id} value={w.id} className="text-xs">
-                                                                                    {w.name}{w.isPrimary ? " (principale)" : ""}
-                                                                                </SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                ) : null}
-                                                            </div>
-                                                        )}
                                                     </TableCell>
 
                                                     {/* Elimina */}
@@ -929,7 +975,7 @@ function NewPurchaseContent() {
                                                 <TableCell className="text-right text-base dark:text-white py-3 pr-2">
                                                     {formatCurrency(grandTotal)}
                                                 </TableCell>
-                                                <TableCell colSpan={2} />
+                                                <TableCell colSpan={1} />
                                             </TableRow>
                                         )}
                                     </TableBody>
@@ -959,16 +1005,7 @@ function NewPurchaseContent() {
                 onSearch={handleItemSearch}
                 loading={itemsLoading}
                 onConfirm={handleLineConfirm}
-            />
-
-            {/* Job Selector Dialog (per row) */}
-            <JobSelectorDialog
-                open={!!openJobSelectorForRowId}
-                onOpenChange={(open) => { if (!open) setOpenJobSelectorForRowId(null); }}
-                onSelect={handleJobSelect}
-                jobs={jobs}
-                onSearch={handleJobSearch}
-                loading={jobsLoading}
+                editing={editingForDialog}
             />
 
             {/* Header Job Selector Dialog */}
