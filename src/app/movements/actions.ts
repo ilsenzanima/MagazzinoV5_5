@@ -48,6 +48,14 @@ export async function createMovement(data: MovementData, lines: MovementLine[]):
     return { success: false, error: 'Errore connessione database: ' + e.message }
   }
 
+  // La destinazione serve sempre, tranne per la vendita: altrimenti il movimento squilibra il magazzino
+  if ((data.type === 'entry' || data.type === 'exit' || data.type === 'waste') && !data.jobId) {
+    return { success: false, error: 'Seleziona la commessa di destinazione: solo la vendita può farne a meno' }
+  }
+  if (data.type === 'transfer' && (!data.fromWarehouseId || !data.toWarehouseId)) {
+    return { success: false, error: 'Indica il magazzino di partenza e quello di destinazione' }
+  }
+
   // 0. Verify user is authenticated
   let user;
   try {

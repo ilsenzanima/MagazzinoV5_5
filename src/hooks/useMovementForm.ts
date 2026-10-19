@@ -747,6 +747,26 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         });
     }, []);
 
+    // Divide una riga su più lotti: la prima parte resta sulla riga, le altre diventano righe nuove subito sotto
+    const handleInlineLineSplit = useCallback((rowId: string, patches: Partial<MovementLine>[]) => {
+        setLines((prev) => {
+            const rowIndex = prev.findIndex((l) => l.tempId === rowId);
+            if (rowIndex === -1 || patches.length === 0) return prev;
+            const row = prev[rowIndex];
+            const [first, ...others] = patches;
+            const rows: MovementLine[] = [
+                { ...row, ...first },
+                ...others.map((patch) => ({
+                    ...row,
+                    ...patch,
+                    id: undefined,
+                    tempId: Math.random().toString(36).substr(2, 9),
+                })),
+            ];
+            return ensureTrailingEmpty([...prev.slice(0, rowIndex), ...rows, ...prev.slice(rowIndex + 1)]);
+        });
+    }, []);
+
     const handlePurchaseItemsImport = useCallback(
         (items: PurchaseItemToImport[]) => {
             const tab = activeTab;
@@ -785,6 +805,19 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     const handleSubmit = async () => {
         if (!numberPart) {
             notify.warning("Inserisci il numero del documento");
+            return;
+        }
+
+        // La destinazione serve sempre, tranne per la vendita (che può non avere una commessa):
+        // senza, il movimento sposta merce senza dire dove e squilibra il magazzino.
+        // I vecchi movimenti salvati senza commessa restano modificabili.
+        const destinationRequired = !isEditing || !!initialNote?.jobId;
+        if (destinationRequired && (activeTab === "entry" || activeTab === "exit" || activeTab === "waste") && !selectedJob) {
+            notify.warning("Seleziona la commessa di destinazione: senza non si può salvare questo movimento (solo la vendita può farne a meno)");
+            return;
+        }
+        if (activeTab === "transfer" && (!fromWarehouseId || !toWarehouseId)) {
+            notify.warning("Indica il magazzino di partenza e quello di destinazione");
             return;
         }
 
@@ -970,6 +1003,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         handleInlineLineChange,
         handleInlineLineRemove,
         handleInlineLineDuplicate,
+        handleInlineLineSplit,
         handlePurchaseItemsImport,
         handleSubmit,
     };

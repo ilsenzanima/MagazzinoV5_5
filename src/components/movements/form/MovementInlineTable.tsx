@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { MovementLine, PurchaseItemToImport } from "@/hooks/useMovementForm";
 import { InventoryItem, Job } from "@/lib/types";
 import { MovementMaterialDialog } from "./MovementMaterialDialog";
+import { MovementLineDialog } from "./MovementLineDialog";
 import { FieldTip } from "@/components/ui/field-tip";
 
 interface MovementInlineTableProps {
@@ -49,6 +50,7 @@ interface MovementInlineTableProps {
     onLineChange: (rowId: string, field: string, value: any) => void;
     onRemove: (rowId: string) => void;
     onDuplicate: (rowId: string) => void;
+    onSplit: (rowId: string, patches: Partial<MovementLine>[]) => void;
     onPurchaseItemsImport: (items: PurchaseItemToImport[]) => void;
 }
 
@@ -65,15 +67,34 @@ export function MovementInlineTable({
     onLineChange,
     onRemove,
     onDuplicate,
+    onSplit,
     onPurchaseItemsImport,
 }: MovementInlineTableProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [activeRowId, setActiveRowId] = useState<string>("");
 
+    // Pagina 2 (lotto e quantità) per la riga appena scelta
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [detailRowId, setDetailRowId] = useState<string>("");
+
     const openDialogForRow = (rowId: string) => {
         setActiveRowId(rowId);
         setDialogOpen(true);
     };
+
+    const openDetailForRow = (rowId: string) => {
+        setDetailRowId(rowId);
+        setDetailOpen(true);
+    };
+
+    // «Aggiungi e continua»: si riparte dalla scelta del materiale sulla prima riga vuota
+    const continueWithNextRow = () => {
+        setDetailOpen(false);
+        const nextEmpty = lines.find((l) => !l.itemId);
+        if (nextEmpty) openDialogForRow(nextEmpty.tempId);
+    };
+
+    const needsDestination = (activeTab === "entry" || activeTab === "exit" || activeTab === "waste") && !selectedJob;
 
     const isEntryWithJob = activeTab === "entry" && !!selectedJob;
     const showLotto = activeTab === "exit" || activeTab === "sale" || activeTab === "entry" || activeTab === "transfer";
@@ -94,6 +115,11 @@ export function MovementInlineTable({
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0 sm:px-6 sm:pb-6">
+                    {needsDestination && (
+                        <p className="mx-4 mb-2 rounded bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200 sm:mx-0">
+                            Seleziona la commessa di destinazione: senza non si può salvare questo movimento (solo la vendita può farne a meno).
+                        </p>
+                    )}
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
@@ -450,9 +476,22 @@ export function MovementInlineTable({
                 inventory={inventory}
                 itemsLoading={itemsLoading}
                 onItemSearch={onItemSearch}
-                onItemSelect={onItemSelect}
-                onReturnBatchSelect={onReturnBatchSelect}
+                onItemSelect={(rowId, item, prefill) => { onItemSelect(rowId, item, prefill); openDetailForRow(rowId); }}
+                onReturnBatchSelect={(rowId, batch, prefill) => { onReturnBatchSelect(rowId, batch, prefill); openDetailForRow(rowId); }}
                 onPurchaseItemsImport={onPurchaseItemsImport}
+            />
+
+            <MovementLineDialog
+                open={detailOpen}
+                onClose={() => setDetailOpen(false)}
+                line={lines.find((l) => l.tempId === detailRowId)}
+                activeTab={activeTab}
+                selectedJob={selectedJob}
+                jobBatchAvailability={jobBatchAvailability}
+                onLineChange={onLineChange}
+                onSplit={onSplit}
+                onBack={() => { setDetailOpen(false); openDialogForRow(detailRowId); }}
+                onNext={continueWithNextRow}
             />
         </>
     );
