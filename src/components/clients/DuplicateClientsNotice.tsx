@@ -8,28 +8,34 @@ import type { ClientDuplicate } from "@/lib/services/clients";
 const REASONS: Record<ClientDuplicate["reason"], string> = {
     "stessa-partita-iva": "stessa partita IVA",
     "stesso-nome": "stesso nome",
+    "stesso-indirizzo": "stesso indirizzo",
     "nome-simile": "nome simile",
 };
 
 interface DuplicateClientsNoticeProps {
     name: string;
     vatNumber: string;
+    street?: string;
+    streetNumber?: string;
+    postalCode?: string;
+    city?: string;
 }
 
 // Avviso (non bloccante) se esiste già un committente con la stessa partita IVA o un nome uguale/simile
-export function DuplicateClientsNotice({ name, vatNumber }: DuplicateClientsNoticeProps) {
+export function DuplicateClientsNotice({ name, vatNumber, street = "", streetNumber = "", postalCode = "", city = "" }: DuplicateClientsNoticeProps) {
     const [duplicates, setDuplicates] = useState<ClientDuplicate[]>([]);
 
     useEffect(() => {
-        if (name.trim().length < 3 && vatNumber.replace(/\D/g, "").length < 8) { setDuplicates([]); return; }
+        const hasAddress = street.trim().length >= 4 && /\d/.test(streetNumber);
+        if (name.trim().length < 3 && vatNumber.replace(/\D/g, "").length < 8 && !hasAddress) { setDuplicates([]); return; }
         let cancelled = false;
         const timer = setTimeout(() => {
-            clientsApi.findDuplicates(name, vatNumber)
+            clientsApi.findDuplicates(name, vatNumber, { street, streetNumber, postalCode, city })
                 .then(list => { if (!cancelled) setDuplicates(list); })
                 .catch(() => { /* non bloccante */ });
         }, 400);
         return () => { cancelled = true; clearTimeout(timer); };
-    }, [name, vatNumber]);
+    }, [name, vatNumber, street, streetNumber, postalCode, city]);
 
     if (duplicates.length === 0) return null;
 
@@ -47,7 +53,7 @@ export function DuplicateClientsNotice({ name, vatNumber }: DuplicateClientsNoti
                         <span>
                             <span className="font-medium">{d.name}</span>
                             <span className="text-xs text-slate-500">
-                                {d.vatNumber ? ` · P.IVA ${d.vatNumber}` : ""}{d.city ? ` · ${d.city}` : ""} · {REASONS[d.reason]}
+                                {d.vatNumber ? ` · P.IVA ${d.vatNumber}` : ""}{d.address ? ` · ${d.address}` : d.city ? ` · ${d.city}` : ""} · {REASONS[d.reason]}
                             </span>
                         </span>
                         <Button asChild variant="outline" size="sm">

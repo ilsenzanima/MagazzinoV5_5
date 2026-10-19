@@ -91,7 +91,14 @@ export default function NewClientPage() {
                 />
               </div>
 
-              <DuplicateClientsNotice name={formData.name} vatNumber={formData.vatNumber} />
+              <DuplicateClientsNotice
+                name={formData.name}
+                vatNumber={formData.vatNumber}
+                street={formData.street}
+                streetNumber={formData.streetNumber}
+                postalCode={formData.postalCode}
+                city={formData.city}
+              />
 
               {/* Indirizzo - Priorità alta come richiesto */}
               <div className="space-y-4 border-t border-b py-4 border-slate-100">
