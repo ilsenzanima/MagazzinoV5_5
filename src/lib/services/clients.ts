@@ -1,6 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import { Client } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload } from './utils';
+import { clientMatchReason, ClientMatchReason, normalizeCompanyName, normalizeStreet, civicNumber, ClientAddress, vatDigits } from '@/lib/utils/client-match';
+
+export interface ClientDuplicate {
+    id: string; name: string; vatNumber: string; city: string; address: string; reason: ClientMatchReason;
+}
 
 const mapDbToClient = (db: any): Client => {
     return {
@@ -35,7 +40,53 @@ const mapClientToDb = (client: Partial<Client>) => ({
     notes: (client as any).notes ?? undefined,
 });
 
+const COLUMNS = 'id, name, vat_number, city, street, street_number, postal_code';
+
 export const clientsApi = {
+    // Committenti già presenti con la stessa partita IVA o una ragione sociale uguale/simile (non eliminati)
+    findDuplicates: async (name: string, vatNumber?: string, address: ClientAddress = {}): Promise<ClientDuplicate[]> => {
+        const normalized = normalizeCompanyName(name);
+        const vat = vatDigits(vatNumber);
+        const queries: PromiseLike<any>[] = [];
+        if (normalized.length >= 3) {
+            const firstToken = normalized.split(' ')[0].replace(/[%_,()]/g, '');
+            if (firstToken.length >= 3) {
+                queries.push(supabase.from('clients').select(COLUMNS).is('deleted_at', null)
+                    .ilike('name', `%${firstToken}%`).limit(50));
+            }
+        }
+        if (vat.length >= 8) {
+            queries.push(supabase.from('clients').select(COLUMNS).is('deleted_at', null)
+                .ilike('vat_number', `%${vat}%`).limit(20));
+        }
+        // Stesso indirizzo: via (parola più lunga) e civico
+        const streetWords = normalizeStreet(address.street).split(' ').filter(Boolean).sort((a, b) => b.length - a.length);
+        if (streetWords[0] && streetWords[0].length >= 4 && civicNumber(address.streetNumber)) {
+            queries.push(supabase.from('clients').select(COLUMNS).is('deleted_at', null)
+                .ilike('street', `%${streetWords[0].replace(/[%_,()]/g, '')}%`).limit(50));
+        }
+        if (queries.length === 0) return [];
+        const results = await Promise.all(queries);
+        const rows = new Map<string, any>();
+        for (const r of results) {
+            if (r.error) throw r.error;
+            for (const row of r.data ?? []) rows.set(row.id, row);
+        }
+        const out: ClientDuplicate[] = [];
+        rows.forEach(row => {
+            const reason = clientMatchReason(
+                { name: row.name, vatNumber: row.vat_number, street: row.street, streetNumber: row.street_number, postalCode: row.postal_code, city: row.city },
+                { name, vatNumber, ...address }
+            );
+            if (reason) {
+                const where = [[row.street, row.street_number].filter(Boolean).join(' '), row.city].filter(Boolean).join(', ');
+                out.push({ id: row.id, name: row.name, vatNumber: row.vat_number ?? '', city: row.city ?? '', address: where, reason });
+            }
+        });
+        const rank: Record<ClientMatchReason, number> = { 'stessa-partita-iva': 0, 'stesso-nome': 1, 'stesso-indirizzo': 2, 'nome-simile': 3 };
+        return out.sort((a, b) => rank[a.reason] - rank[b.reason]);
+    },
+
     getAll: async () => {
         const { data, error } = await fetchWithTimeout(
             supabase

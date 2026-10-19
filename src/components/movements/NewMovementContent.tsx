@@ -197,6 +197,7 @@ export default function NewMovementContent({
                         onLineChange={form.handleInlineLineChange}
                         onRemove={form.handleInlineLineRemove}
                         onDuplicate={form.handleInlineLineDuplicate}
+                        onSplit={form.handleInlineLineSplit}
                         onPurchaseItemsImport={form.handlePurchaseItemsImport}
                     />
 
