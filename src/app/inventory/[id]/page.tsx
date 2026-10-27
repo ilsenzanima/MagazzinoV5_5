@@ -63,7 +63,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
-import { ItemConformita } from "@/components/inventory/ItemConformita";
+import { ItemStats } from "@/components/inventory/ItemStats";
 import { FieldTip } from "@/components/ui/field-tip";
 import { DuplicateItemsNotice } from "@/components/inventory/DuplicateItemsNotice";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -119,6 +119,7 @@ export default function InventoryDetailPage() {
   // Lots State
   const [lotsData, setLotsData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("lots");
+  const [showCodes, setShowCodes] = useState(false);
 
   // Pending notes for this item
   const [pendingQty, setPendingQty] = useState<{ uscita: number; reso: number }>({ uscita: 0, reso: 0 });
@@ -717,6 +718,8 @@ export default function InventoryDetailPage() {
           )}
         </div>
 
+        {isEditing ? (
+          <>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
           {/* Foto e codici */}
           <div className="space-y-6">
@@ -985,8 +988,69 @@ export default function InventoryDetailPage() {
                     )
                   )}
                 </div>
-                {/* Additional Supplier Codes */}
-                {!isEditing && (
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrizione</Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="description"
+                      value={editForm.description || ""}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      className="min-h-[100px]"
+                    />
+                  ) : (
+                    <Textarea
+                      id="description"
+                      value={item.description}
+                      readOnly
+                      className="min-h-[100px] bg-slate-50 dark:bg-muted"
+                    />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+          </>
+        ) : (
+          <Card>
+            <CardContent className="p-4">
+              <div className="grid gap-4 md:grid-cols-[96px_minmax(0,1fr)]">
+                <div className="h-24 w-24 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+                  <img
+                    src={item.image || "/placeholder.svg"}
+                    alt={item.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+                  />
+                </div>
+                <div className="min-w-0 space-y-4">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
+                    {([
+                      ["Marca", item.brand],
+                      ["Tipologia", item.type],
+                      ["Unità di misura", item.unit],
+                      ["Confezione", item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit}` : null],
+                      ["Scorta minima", item.minStock != null ? String(item.minStock) : null],
+                      ["Coeff. moltiplicazione", item.coefficient !== 1 ? String(item.coefficient) : null],
+                      ["Modello / variante", item.model],
+                      ["Codice fornitore", item.supplierCode],
+                      ["Codice articolo", item.code],
+                    ] as [string, string | null | undefined][]).filter(([, v]) => v).map(([label, value]) => (
+                      <div key={label} className="min-w-0">
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500">{label}</p>
+                        <p className="truncate text-sm text-slate-900 dark:text-slate-100" title={value ?? undefined}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {item.description && (
+                    <div>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500">Descrizione</p>
+                      <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{item.description}</p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
                   <div className="space-y-2">
                     <Label>Altri Codici Fornitore</Label>
                     <div className="space-y-2">
@@ -1029,55 +1093,50 @@ export default function InventoryDetailPage() {
                       )}
                     </div>
                   </div>
-                )}
+                  </div>
                 </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setShowCodes(true)}>
+                  <QrCode className="mr-2 h-4 w-4" /> QR e codice a barre
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descrizione</Label>
-                  {isEditing ? (
-                    <Textarea
-                      id="description"
-                      value={editForm.description || ""}
-                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                      className="min-h-[100px]"
-                    />
-                  ) : (
-                    <Textarea
-                      id="description"
-                      value={item.description}
-                      readOnly
-                      className="min-h-[100px] bg-slate-50 dark:bg-muted"
-                    />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <Dialog open={showCodes} onOpenChange={setShowCodes}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Codice identificativo</DialogTitle>
+              <DialogDescription>{item.code}</DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-4 py-2">
+              <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={160} /></div>
+              <div className="max-w-full overflow-hidden rounded border bg-white p-2 dark:border-slate-700"><Barcode value={item.code} width={1.5} height={50} fontSize={12} /></div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
             {/* Tabs: Lotti / Storico Movimenti */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="lots">
+              <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+                <TabsTrigger value="lots" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
                   Lotti
                   <HelpTip
                     title="Lotti"
                     description="Lo stock è tracciato per lotto d'acquisto con logica FIFO: si consuma prima il lotto più vecchio. Se una quantità non risulta assegnata a nessun lotto, puoi riassegnarla da qui."
                   />
                 </TabsTrigger>
-                <TabsTrigger value="movements">
+                <TabsTrigger value="movements" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
                   Storico Movimenti
                   <HelpTip
                     title="Storico Movimenti"
                     description="Ogni riga è un movimento di magazzino: Carico/Entrata aumentano lo stock, Scarico/Uscita/Vendita/Reso al Fornitore lo diminuiscono. Un movimento 'Fittizio' è registrato per pareggiare i conti senza spostare merce reale."
                   />
                 </TabsTrigger>
-                <TabsTrigger value="conformita">
-                  Certificazione
-                  <HelpTip
-                    title="Certificazione"
-                    description="Le certificazioni qui collegate sono solo scorciatoie ai documenti già presenti nella libreria conformità: associarle o rimuoverle non crea né elimina alcun documento."
-                  />
+                <TabsTrigger value="stats" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
+                  Statistiche
                 </TabsTrigger>
               </TabsList>
 
@@ -1238,8 +1297,8 @@ export default function InventoryDetailPage() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="conformita" className="mt-4">
-                <ItemConformita itemId={id} />
+              <TabsContent value="stats" className="mt-4">
+                <ItemStats itemId={id} unit={item.unit} movements={movements} showPrices={userRole === 'admin' || userRole === 'operativo'} />
               </TabsContent>
             </Tabs>
 
