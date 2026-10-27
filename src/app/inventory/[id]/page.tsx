@@ -64,6 +64,8 @@ import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
 import { ItemStats } from "@/components/inventory/ItemStats";
+import { PageControls, paginate } from "@/components/ui/page-controls";
+import { supabase } from "@/lib/supabase";
 import { FieldTip } from "@/components/ui/field-tip";
 import { DuplicateItemsNotice } from "@/components/inventory/DuplicateItemsNotice";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -120,6 +122,8 @@ export default function InventoryDetailPage() {
   const [lotsData, setLotsData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("lots");
   const [showCodes, setShowCodes] = useState(false);
+  const [movementsPage, setMovementsPage] = useState(1);
+  const [jobUsage, setJobUsage] = useState<{ jobs: number; quantity: number } | null>(null);
 
   // Pending notes for this item
   const [pendingQty, setPendingQty] = useState<{ uscita: number; reso: number }>({ uscita: 0, reso: 0 });
@@ -176,7 +180,8 @@ export default function InventoryDetailPage() {
         // Unblock UI immediately after item is loaded
         setLoading(false);
 
-        // Calculate Stock Value from Batches
+        // Valore stock: parte in parallelo al resto, senza bloccare la pagina
+        void (async () => {
         try {
           const batches = await inventoryApi.getAvailableBatches(id);
           let val = 0;
@@ -204,6 +209,7 @@ export default function InventoryDetailPage() {
           console.error("Error calculating stock value", e);
           setIsStockValueComplete(false);
         }
+        })();
 
       } catch (err: any) {
         console.error("Error loading item:", err);
@@ -213,8 +219,11 @@ export default function InventoryDetailPage() {
       // 2. Load History & Jobs & Aux Data (Non-critical)
       try {
         // Load history first as it is displayed immediately
-        const movementsData = await inventoryApi.getHistory(id);
-        setMovements(movementsData);
+        inventoryApi.getHistory(id).then(data => { setMovements(data); setMovementsPage(1); }).catch(console.error);
+
+        // Commesse in cui l'articolo si trova adesso
+        supabase.from("job_inventory").select("quantity").eq("item_id", id).gt("quantity", 0)
+          .then(({ data }) => setJobUsage({ jobs: (data || []).length, quantity: (data || []).reduce((s, r) => s + Number(r.quantity || 0), 0) }));
 
         // Load lots data
         loadLots();
@@ -556,6 +565,10 @@ export default function InventoryDetailPage() {
   };
 
   const status = getStatus(item.quantity, item.minStock);
+  // Ultimo acquisto con prezzo, dai lotti già caricati
+  const lastPurchase = ((lotsData?.lots || []) as { price?: number; date: string }[])
+    .filter(l => l.price != null && l.price > 0)
+    .reduce<{ price: number; date: string } | null>((best, l) => (!best || new Date(l.date) > new Date(best.date) ? { price: l.price as number, date: l.date } : best), null);
 
   return (
     <>
@@ -629,6 +642,13 @@ export default function InventoryDetailPage() {
                   ? `${calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true }) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} pezzi fisici`
                   : `1 ${item.unit} = 1 pezzo`}
               </div>
+              {jobUsage && (
+                <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+                  {jobUsage.jobs > 0
+                    ? `In ${jobUsage.jobs} ${jobUsage.jobs === 1 ? 'commessa' : 'commesse'} (${jobUsage.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit})`
+                    : 'In nessuna commessa'}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -661,6 +681,11 @@ export default function InventoryDetailPage() {
                     {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', useGrouping: true })}
                   </div>
                 </div>
+                {lastPurchase && (
+                  <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+                    Ultimo acquisto: <span className="font-medium">{lastPurchase.price.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}/{item.unit}</span> del {new Date(lastPurchase.date).toLocaleDateString('it-IT')}
+                  </div>
+                )}
                 {!isStockValueComplete && (
                   <div className="flex items-center justify-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -1187,7 +1212,7 @@ export default function InventoryDetailPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          movements.map((move) => {
+                          paginate(movements, movementsPage).map((move) => {
                             const isPositive = move.quantity > 0;
                             let typeLabel: string = move.type;
                             let typeColor: string = "bg-slate-500";
@@ -1293,6 +1318,7 @@ export default function InventoryDetailPage() {
                         )}
                       </TableBody>
                     </Table>
+                    <PageControls page={movementsPage} total={movements.length} onPageChange={setMovementsPage} />
                   </CardContent>
                 </Card>
               </TabsContent>
