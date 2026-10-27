@@ -792,7 +792,7 @@ export default function InventoryDetailPage() {
                 <CardTitle>Dettagli Articolo</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="space-y-2">
                     <Label htmlFor="code" className="flex items-center">
                       Codice Articolo
@@ -815,8 +815,158 @@ export default function InventoryDetailPage() {
                       <Input id="brand" value={item.brand} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Tipologia</Label>
+                    {isEditing ? (
+                      <SearchableSelect
+                        options={types.map((t) => ({ value: t.name, label: t.name }))}
+                        value={editForm.type ?? ""}
+                        onValueChange={(val) => setEditForm({ ...editForm, type: val })}
+                        placeholder="Seleziona tipo"
+                        searchPlaceholder="Scrivi per cercare tipologia..."
+                      />
+                    ) : (
+                      <Input id="type" value={item.type} readOnly className="bg-slate-50 dark:bg-muted" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit">Unità di Misura</Label>
+                    {isEditing ? (
+                      <SearchableSelect
+                        options={units.map((u) => ({ value: u.name, label: u.name }))}
+                        value={editForm.unit ?? ""}
+                        onValueChange={(val) => setEditForm({ ...editForm, unit: val })}
+                        placeholder="Seleziona unità"
+                        searchPlaceholder="Scrivi per cercare unità..."
+                      />
+                    ) : (
+                      <Input id="unit" value={item.unit} readOnly className="bg-slate-50 dark:bg-muted" />
+                    )}
+                  </div>
                 </div>
 
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="minStock" className="flex items-center">
+                      Scorta Minima
+                      <FieldTip text={'Sotto questa soglia l\'articolo compare nel filtro "Basse Scorte". Se lasci 0, l\'avviso non scatta mai.'} />
+                    </Label>
+                    {isEditing ? (
+                      <Input
+                        id="minStock"
+                        type="number"
+                        step="0.01"
+                        value={editForm.minStock || 0}
+                        onChange={(e) => setEditForm({ ...editForm, minStock: parseFloat(e.target.value) })}
+                      />
+                    ) : (
+                      <Input id="minStock" type="number" step="0.01" value={item.minStock} readOnly className="bg-slate-50 dark:bg-muted" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="coefficient" className="flex items-center">
+                      Coeff. Moltiplicazione
+                      <FieldTip text="Converte l'unità di stock in pezzi fisici. Es: una lastra di cartongesso 2500x1200mm equivale a 3 mq; se in stock tieni 1 pezzo (la lastra), il coefficiente è 3." />
+                    </Label>
+                    {isEditing ? (
+                      <div className="space-y-1">
+                        <Input
+                          id="coefficient"
+                          type="number"
+                          step="0.01"
+                          value={coefficientInput}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setCoefficientInput(raw);
+                            const parsed = parseFloat(raw);
+                            setEditForm({ ...editForm, coefficient: isNaN(parsed) ? undefined : parsed });
+                          }}
+                          disabled={userRole !== 'admin'}
+                          className={userRole !== 'admin' ? "bg-slate-100 dark:bg-muted" : ""}
+                        />
+                        {userRole !== 'admin' && (
+                          <p className="text-[10px] text-red-400 dark:text-red-500">Modificabile solo da Admin</p>
+                        )}
+                      </div>
+                    ) : (
+                      <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50 dark:bg-muted" />
+                    )}
+                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="packQuantity" className="flex items-center">
+                    Quantità per confezione
+                    <FieldTip text="Quante unità ci sono normalmente in una scatola o confezione (es. 18 ML). Serve a segnalare acquisti con prezzo o quantità che non tornano." />
+                  </Label>
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="packQuantity"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-40"
+                        placeholder="Es. 18"
+                        value={editForm.packQuantity ?? ""}
+                        onChange={(e) => {
+                          const parsed = parseFloat(e.target.value);
+                          setEditForm({ ...editForm, packQuantity: isNaN(parsed) || parsed <= 0 ? null : parsed });
+                        }}
+                      />
+                      <span className="text-sm text-slate-500">{item.unit}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-700 dark:text-slate-200">
+                      {item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : "Non indicata"}
+                    </p>
+                  )}
+                </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nome Prodotto</Label>
+                  {isEditing ? (
+                    <Input
+                      id="name"
+                      value={editForm.name || ""}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    />
+                  ) : (
+                    <Input id="name" value={item.name} readOnly className="bg-slate-50 dark:bg-muted" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="model" className="flex items-center">
+                      Modello / Variante
+                      <FieldTip text="Distingue varianti dello stesso prodotto (es. colore, misura, diametro). Usa 'Crea Variante' per clonare questo articolo cambiando solo questo campo." />
+                    </Label>
+                    {!isEditing && (
+                      <Link href={`/inventory/new?cloneId=${item.id}`} title="Crea variante da questo articolo">
+                        <Button variant="ghost" size="sm" className="h-6 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2">
+                          <Copy className="h-3 w-3 mr-1" />
+                          Crea Variante
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                  {isEditing ? (
+                    <Input
+                      id="model"
+                      placeholder="Es. 10mm, DN 50..."
+                      value={editForm.model || ""}
+                      onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
+                    />
+                  ) : (
+                    <Input id="model" value={item.model || ""} readOnly className="bg-slate-50 dark:bg-muted" placeholder="-" />
+                  )}
+                  {isEditing && (
+                    <DuplicateItemsNotice name={editForm.name || ""} model={editForm.model || ""} excludeId={item.id} />
+                  )}
+                </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="supplierCode" className="flex items-center">
                     Codice Fornitore Principale
@@ -837,10 +987,9 @@ export default function InventoryDetailPage() {
                     )
                   )}
                 </div>
-
                 {/* Additional Supplier Codes */}
                 {!isEditing && (
-                  <div className="space-y-2 pt-2 border-t dark:border-slate-700">
+                  <div className="space-y-2">
                     <Label>Altri Codici Fornitore</Label>
                     <div className="space-y-2">
                       {supplierCodes.map(code => (
@@ -883,157 +1032,6 @@ export default function InventoryDetailPage() {
                     </div>
                   </div>
                 )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome Prodotto</Label>
-                  {isEditing ? (
-                    <Input
-                      id="name"
-                      value={editForm.name || ""}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    />
-                  ) : (
-                    <Input id="name" value={item.name} readOnly className="bg-slate-50 dark:bg-muted" />
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="model" className="flex items-center">
-                      Modello / Variante
-                      <FieldTip text="Distingue varianti dello stesso prodotto (es. colore, misura, diametro). Usa 'Crea Variante' per clonare questo articolo cambiando solo questo campo." />
-                    </Label>
-                    {!isEditing && (
-                      <Link href={`/inventory/new?cloneId=${item.id}`} title="Crea variante da questo articolo">
-                        <Button variant="ghost" size="sm" className="h-6 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2">
-                          <Copy className="h-3 w-3 mr-1" />
-                          Crea Variante
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                  {isEditing ? (
-                    <Input
-                      id="model"
-                      placeholder="Es. 10mm, DN 50..."
-                      value={editForm.model || ""}
-                      onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
-                    />
-                  ) : (
-                    <Input id="model" value={item.model || ""} readOnly className="bg-slate-50 dark:bg-muted" placeholder="-" />
-                  )}
-                  {isEditing && (
-                    <DuplicateItemsNotice name={editForm.name || ""} model={editForm.model || ""} excludeId={item.id} />
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Tipologia</Label>
-                    {isEditing ? (
-                      <SearchableSelect
-                        options={types.map((t) => ({ value: t.name, label: t.name }))}
-                        value={editForm.type ?? ""}
-                        onValueChange={(val) => setEditForm({ ...editForm, type: val })}
-                        placeholder="Seleziona tipo"
-                        searchPlaceholder="Scrivi per cercare tipologia..."
-                      />
-                    ) : (
-                      <Input id="type" value={item.type} readOnly className="bg-slate-50 dark:bg-muted" />
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="minStock" className="flex items-center">
-                      Scorta Minima
-                      <FieldTip text={'Sotto questa soglia l\'articolo compare nel filtro "Basse Scorte". Se lasci 0, l\'avviso non scatta mai.'} />
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="minStock"
-                        type="number"
-                        step="0.01"
-                        value={editForm.minStock || 0}
-                        onChange={(e) => setEditForm({ ...editForm, minStock: parseFloat(e.target.value) })}
-                      />
-                    ) : (
-                      <Input id="minStock" type="number" step="0.01" value={item.minStock} readOnly className="bg-slate-50 dark:bg-muted" />
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="unit">Unità di Misura</Label>
-                    {isEditing ? (
-                      <SearchableSelect
-                        options={units.map((u) => ({ value: u.name, label: u.name }))}
-                        value={editForm.unit ?? ""}
-                        onValueChange={(val) => setEditForm({ ...editForm, unit: val })}
-                        placeholder="Seleziona unità"
-                        searchPlaceholder="Scrivi per cercare unità..."
-                      />
-                    ) : (
-                      <Input id="unit" value={item.unit} readOnly className="bg-slate-50 dark:bg-muted" />
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="coefficient" className="flex items-center">
-                      Coeff. Moltiplicazione
-                      <FieldTip text="Converte l'unità di stock in pezzi fisici. Es: una lastra di cartongesso 2500x1200mm equivale a 3 mq; se in stock tieni 1 pezzo (la lastra), il coefficiente è 3." />
-                    </Label>
-                    {isEditing ? (
-                      <div className="space-y-1">
-                        <Input
-                          id="coefficient"
-                          type="number"
-                          step="0.01"
-                          value={coefficientInput}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            setCoefficientInput(raw);
-                            const parsed = parseFloat(raw);
-                            setEditForm({ ...editForm, coefficient: isNaN(parsed) ? undefined : parsed });
-                          }}
-                          disabled={userRole !== 'admin'}
-                          className={userRole !== 'admin' ? "bg-slate-100 dark:bg-muted" : ""}
-                        />
-                        {userRole !== 'admin' && (
-                          <p className="text-[10px] text-red-400 dark:text-red-500">Modificabile solo da Admin</p>
-                        )}
-                      </div>
-                    ) : (
-                      <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50 dark:bg-muted" />
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="packQuantity" className="flex items-center">
-                    Quantità per confezione
-                    <FieldTip text="Quante unità ci sono normalmente in una scatola o confezione (es. 18 ML). Serve a segnalare acquisti con prezzo o quantità che non tornano." />
-                  </Label>
-                  {isEditing ? (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="packQuantity"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="w-40"
-                        placeholder="Es. 18"
-                        value={editForm.packQuantity ?? ""}
-                        onChange={(e) => {
-                          const parsed = parseFloat(e.target.value);
-                          setEditForm({ ...editForm, packQuantity: isNaN(parsed) || parsed <= 0 ? null : parsed });
-                        }}
-                      />
-                      <span className="text-sm text-slate-500">{item.unit}</span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-700 dark:text-slate-200">
-                      {item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : "Non indicata"}
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-2">
