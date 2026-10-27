@@ -723,7 +723,7 @@ export default function InventoryDetailPage() {
             <Card>
               <CardContent className="space-y-4 p-4">
                 {/* Image Section */}
-                <div className="aspect-square relative rounded-md overflow-hidden bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center group">
+                <div className="aspect-square relative mx-auto w-full max-w-[260px] rounded-md overflow-hidden bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center group">
                   <img
                     src={item.image || "/placeholder.svg"}
                     alt={item.name}
@@ -768,16 +768,14 @@ export default function InventoryDetailPage() {
                 </div>
 
                 {/* QR Code & Barcode */}
-                <div className="pt-4 border-t dark:border-slate-700 flex flex-col items-center gap-4">
-                  <div className="w-full">
-                    <Label className="mb-2 block text-center">Codice Identificativo</Label>
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700">
-                        <QRCode value={item.code} size={128} />
-                      </div>
-                      <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700 overflow-hidden max-w-full">
-                        <Barcode value={item.code} width={1.5} height={50} fontSize={12} />
-                      </div>
+                <div className="flex flex-col items-center gap-2 border-t pt-3 dark:border-slate-700">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Codice identificativo</Label>
+                  <div className="flex w-full items-center justify-center gap-3">
+                    <div className="shrink-0 rounded border bg-white p-1.5 dark:border-slate-700 dark:bg-card">
+                      <QRCode value={item.code} size={88} />
+                    </div>
+                    <div className="min-w-0 overflow-hidden rounded border bg-white p-1.5 dark:border-slate-700 dark:bg-card">
+                      <Barcode value={item.code} width={1} height={44} fontSize={10} margin={0} />
                     </div>
                   </div>
                 </div>
