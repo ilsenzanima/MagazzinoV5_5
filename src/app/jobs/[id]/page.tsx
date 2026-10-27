@@ -509,7 +509,7 @@ export default function JobDetailsPage() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto space-y-6 pb-20 print:p-0 print:max-w-none overflow-x-hidden">
+            <div className="max-w-[1700px] mx-auto space-y-6 pb-20 print:p-0 print:max-w-none overflow-x-hidden">
 
                 {/* Header Navigation - Hidden in print */}
                 <div className="flex items-center justify-between gap-2 print:hidden">

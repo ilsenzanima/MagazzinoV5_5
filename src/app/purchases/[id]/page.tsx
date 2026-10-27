@@ -832,7 +832,7 @@ export default function PurchaseDetailPage() {
     return (
         <>
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto pb-10">
+            <div className="max-w-[1700px] mx-auto pb-10">
                 <div className="mb-6">
                     <Link href={isOrder ? "/purchases?tab=ordini" : "/purchases"} className="flex items-center text-slate-500 hover:text-slate-900 mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
