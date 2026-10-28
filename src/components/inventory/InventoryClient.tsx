@@ -20,6 +20,7 @@ import {
   ArrowDown,
   ArrowUpDown
 } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -211,6 +212,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     setSearchTerm("");
   };
 
+  const anyFilterActive = (selectedBrand !== "all" || selectedType !== "all") || selectedWarehouse !== "all" || activeTab !== "all";
   const activeFiltersCount = (selectedBrand !== "all" ? 1 : 0) + (selectedType !== "all" ? 1 : 0);
 
   // Solo le sedi fisiche di stoccaggio (principale + operativa) diventano tab:
@@ -354,9 +356,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+        {anyFilterActive && (
+          <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={() => { setSelectedBrand("all"); setSelectedType("all"); setSelectedWarehouse("all"); setActiveTab("all"); setPage(1); }}>
+            Azzera filtri
+          </Button>
+        )}
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant={activeFiltersCount > 0 ? "secondary" : "outline"} size="icon" className="shrink-0 relative" aria-label="Filtra">
+            <Button variant={activeFiltersCount > 0 ? "secondary" : "outline"} size="icon" className="shrink-0 relative md:hidden" aria-label="Filtra">
               <Filter className={`h-5 w-5 ${activeFiltersCount > 0 ? "text-blue-600" : "text-slate-600 dark:text-slate-400"}`} />
               {activeFiltersCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] grid place-items-center h-4 w-4 rounded-full">
@@ -485,17 +492,41 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       {sortKey === "model" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </button>
                   </TableHead>
-                  <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    <button type="button" onClick={() => toggleSort("brand")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
-                      Marca
-                      {sortKey === "brand" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
-                    </button>
+                  <TableHead className="w-40 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <SearchableSelect
+                          options={[{ value: "all", label: "Tutte le marche" }, ...brands.map((b) => ({ value: b.name, label: b.name }))]}
+                          value={selectedBrand === "all" ? "" : selectedBrand}
+                          onValueChange={(v) => { setSelectedBrand(v); setPage(1); }}
+                          placeholder="Marca"
+                          searchPlaceholder="Scrivi per cercare marca..."
+                          className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"
+                          contentClassName="min-w-[14rem]"
+                        />
+                      </div>
+                      <button type="button" aria-label="Ordina" onClick={() => toggleSort("brand")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                        {sortKey === "brand" ? (sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />) : <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />}
+                      </button>
+                    </div>
                   </TableHead>
-                  <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    <button type="button" onClick={() => toggleSort("type")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
-                      Tipologia
-                      {sortKey === "type" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
-                    </button>
+                  <TableHead className="w-44 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <SearchableSelect
+                          options={[{ value: "all", label: "Tutte le tipologie" }, ...itemTypes.map((t) => ({ value: t.name, label: t.name }))]}
+                          value={selectedType === "all" ? "" : selectedType}
+                          onValueChange={(v) => { setSelectedType(v); setPage(1); }}
+                          placeholder="Tipologia"
+                          searchPlaceholder="Scrivi per cercare tipologia..."
+                          className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"
+                          contentClassName="min-w-[14rem]"
+                        />
+                      </div>
+                      <button type="button" aria-label="Ordina" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                        {sortKey === "type" ? (sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />) : <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />}
+                      </button>
+                    </div>
                   </TableHead>
                   <TableHead className="w-44 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     {stockWarehouses.length > 1 ? (
@@ -508,11 +539,24 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </Select>
                     ) : "Magazzino"}
                   </TableHead>
-                  <TableHead className="w-32 text-right border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    <button type="button" onClick={() => toggleSort("quantity")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
-                      Giacenza
-                      {sortKey === "quantity" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
-                    </button>
+                  <TableHead className="w-44 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <Select value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }}>
+                          <SelectTrigger aria-label="Filtra la giacenza" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                            <SelectValue>{activeTab === "low_stock" ? "Da riordinare" : activeTab === "out_of_stock" ? "Esauriti" : "Giacenza"}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tutte le giacenze</SelectItem>
+                            <SelectItem value="low_stock">Da riordinare</SelectItem>
+                            <SelectItem value="out_of_stock">Esauriti</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <button type="button" aria-label="Ordina" onClick={() => toggleSort("quantity")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                        {sortKey === "quantity" ? (sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />) : <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />}
+                      </button>
+                    </div>
                   </TableHead>
                   <TableHead className="w-24 text-right border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <button type="button" onClick={() => toggleSort("min_stock")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
@@ -520,23 +564,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       {sortKey === "min_stock" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </button>
                   </TableHead>
-                  <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    <Select value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }}>
-                      <SelectTrigger aria-label="Filtra per riordino" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"><SelectValue placeholder="Riordino" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tutti</SelectItem>
-                        <SelectItem value="low_stock">Da riordinare</SelectItem>
-                        <SelectItem value="out_of_stock">Esauriti</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableHead>
                   <TableHead className="w-32 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Da processare</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                    <TableCell colSpan={10} className="py-10 text-center text-slate-400 dark:text-slate-500">
                       <Package className="mx-auto mb-2 h-12 w-12 opacity-20" />
                       <p>Nessun articolo trovato</p>
                     </TableCell>
@@ -567,7 +601,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           return where.map(w => (
                             <div key={w.warehouseId} className="flex justify-between gap-2">
                               <span className="truncate">{warehouseName(w.warehouseId)}</span>
-                              <span className="shrink-0 text-slate-400">{w.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</span>
+                              {where.length > 1 && (
+                                <span className="shrink-0 text-slate-400">{w.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</span>
+                              )}
                             </div>
                           ));
                         })()}
@@ -579,15 +615,6 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                         )}
                       </TableCell>
                       <TableCell className="border-r py-2 text-right text-sm text-slate-500">{item.minStock ? item.minStock.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300">—</span>}</TableCell>
-                      <TableCell className="border-r py-2 text-xs">
-                        {item.quantity <= 0 ? (
-                          <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-600">Esaurito</span>
-                        ) : item.quantity <= item.minStock ? (
-                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-600">Da riordinare</span>
-                        ) : (
-                          <span className="text-slate-400">OK</span>
-                        )}
-                      </TableCell>
                       <TableCell className="py-2 text-right text-xs">
                         {pending && pending.uscita > 0 && (
                           <div className="text-amber-600">↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} uscita</div>
