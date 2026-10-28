@@ -35,6 +35,8 @@ import {
   ScanSearch,
   Boxes,
   ListChecks,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -42,12 +44,15 @@ import { useEffect, useState } from "react";
 import { MobileNavBar } from "./MobileNavBar";
 import { NotificationBell } from "./NotificationBell";
 import { inventoryApi } from "@/lib/services/inventory";
+import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   onLinkClick?: () => void;
+  collapsed?: boolean;              // solo icone (PC)
+  onToggleCollapsed?: () => void;   // se presente compare il pulsante per ridurre o espandere
 }
 
-export function Sidebar({ className, onLinkClick }: SidebarProps) {
+export function Sidebar({ className, onLinkClick, collapsed = false, onToggleCollapsed }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut, userRole, fullName } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -261,12 +266,30 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
   return (
     <div className={cn("pb-12 h-full bg-sidebar text-sidebar-foreground flex flex-col", className)}>
       <div className="space-y-4 py-4 flex-1 overflow-y-auto">
-        <div className="px-3 py-2">
-          <div className="mb-6 px-4">
-            <div className="inline-flex bg-white rounded-lg px-3 py-2 shadow-sm">
-              <Image src="/logo_header.png" alt="OPI Firesafe" width={160} height={35} className="h-7 w-auto" priority />
+        <div className={cn("py-2", collapsed ? "px-2" : "px-3")}>
+          {collapsed ? (
+            <div className="mb-4 flex flex-col items-center gap-2">
+              <div className="rounded-lg bg-white p-1 shadow-sm">
+                <Image src="/icons/icon-192x192.png" alt="OPI Firesafe" width={32} height={32} className="h-8 w-8" priority />
+              </div>
+              {onToggleCollapsed && (
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent" onClick={onToggleCollapsed} title="Espandi il menu" aria-label="Espandi il menu">
+                  <PanelLeftOpen className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="mb-6 flex items-center justify-between gap-2 px-4">
+              <div className="inline-flex bg-white rounded-lg px-3 py-2 shadow-sm">
+                <Image src="/logo_header.png" alt="OPI Firesafe" width={160} height={35} className="h-7 w-auto" priority />
+              </div>
+              {onToggleCollapsed && (
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent" onClick={onToggleCollapsed} title="Riduci il menu a sole icone" aria-label="Riduci il menu a sole icone">
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
 
           <div className="space-y-4">
             {routeGroups.map((group, groupIndex) => (
@@ -275,15 +298,18 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
                   <Link key={route.href} href={route.href} onClick={onLinkClick} prefetch={false}>
                     <Button
                       variant={route.active ? "secondary" : "ghost"}
+                      title={collapsed ? route.label : undefined}
+                      aria-label={route.label}
                       className={cn(
-                        "w-full justify-start",
+                        "relative w-full",
+                        collapsed ? "justify-center px-0" : "justify-start",
                         route.active ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent" : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                       )}
                     >
-                      <route.icon className="mr-2 h-4 w-4" />
-                      {route.label}
+                      <route.icon className={cn("h-4 w-4", !collapsed && "mr-2")} />
+                      {!collapsed && route.label}
                       {'badge' in route && route.badge && (
-                        <span className="ml-2 h-2 w-2 rounded-full bg-red-500 shrink-0" title="Nuovi elementi da controllare" />
+                        <span className={cn("h-2 w-2 rounded-full bg-red-500 shrink-0", collapsed ? "absolute right-2 top-2" : "ml-2")} title="Nuovi elementi da controllare" />
                       )}
                     </Button>
                   </Link>
@@ -298,20 +324,23 @@ export function Sidebar({ className, onLinkClick }: SidebarProps) {
       </div>
 
       {user && (
-        <div className="p-2 bg-sidebar border-t border-sidebar-border flex items-center gap-1">
+        <div className={cn("p-2 bg-sidebar border-t border-sidebar-border flex gap-1", collapsed ? "flex-col items-center" : "items-center")}>
           <button
             type="button"
             onClick={() => setIsProfileOpen(true)}
-            className="flex-1 min-w-0 flex items-center space-x-3 p-2 rounded-md hover:bg-sidebar-accent/50 transition-colors text-left"
+            title={collapsed ? (fullName || user.email || "Profilo") : undefined}
+            className={cn("min-w-0 flex items-center rounded-md hover:bg-sidebar-accent/50 transition-colors text-left", collapsed ? "justify-center p-1" : "flex-1 space-x-3 p-2")}
           >
             <Avatar className="h-8 w-8">
               <AvatarImage src={`/avatars/${userRole || 'user'}.png`} />
               <AvatarFallback>{(fullName || user.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div className="overflow-hidden flex-1">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">{fullName || user.email}</p>
-              <p className="text-xs text-sidebar-foreground/60 capitalize">{userRole || 'User'}</p>
-            </div>
+            {!collapsed && (
+              <div className="overflow-hidden flex-1">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">{fullName || user.email}</p>
+                <p className="text-xs text-sidebar-foreground/60 capitalize">{userRole || 'User'}</p>
+              </div>
+            )}
           </button>
           <NotificationBell onNavigate={onLinkClick} />
         </div>
@@ -362,6 +391,7 @@ export default function DashboardLayout({
   const { session, loading, userRole, realRole, simulatedRole, setSimulatedRole } = useAuth();
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [collapsed, toggleCollapsed] = useSidebarCollapsed();
 
   useEffect(() => {
     if (!loading && !session) {
@@ -403,15 +433,17 @@ export default function DashboardLayout({
 
       {/* Sidebar Desktop */}
       <div className={cn(
-        "hidden lg:flex h-screen w-64 flex-col fixed left-0 border-r border-sidebar-border z-50 transition-all",
+        "hidden lg:flex h-screen flex-col fixed left-0 border-r border-sidebar-border z-50 transition-all",
+        collapsed ? "w-16" : "w-64",
         simulatedRole ? "top-10 h-[calc(100vh-40px)]" : "top-0"
       )}>
-        <Sidebar />
+        <Sidebar collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
       </div>
 
       {/* Main Content */}
       <div className={cn(
-        "flex-1 lg:pl-64 flex flex-col min-h-screen transition-all pb-24 lg:pb-0 min-w-0", // min-w-0 prevents flex expansion
+        "flex-1 flex flex-col min-h-screen transition-all pb-24 lg:pb-0 min-w-0", // min-w-0 prevents flex expansion
+        collapsed ? "lg:pl-16" : "lg:pl-64",
         simulatedRole ? "pt-10" : ""
       )}>
 
