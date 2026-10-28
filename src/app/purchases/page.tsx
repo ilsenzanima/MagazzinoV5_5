@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Search, Loader2, FileText, Calendar, User, AlertTriangle,
+  Loader2, FileText, Calendar, User, AlertTriangle,
   Paperclip, Package, PackageX, Receipt, ClipboardList, ArrowRightLeft, Undo2,
   ArrowUp, ArrowDown, ArrowUpDown
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
+import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -226,40 +227,36 @@ function PurchasesPageContent() {
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Acquisti</h1>
-          {canSeeAmounts && (
-            <div className="flex gap-1.5 md:hidden">
-              <Link href="/purchases/new"><Button size="sm" className="bg-blue-600 hover:bg-blue-700">Acquisto</Button></Link>
-              <Link href="/purchases/new?type=order"><Button size="sm" variant="outline">Ordine</Button></Link>
-              <Link href="/invoices/new"><Button size="sm" variant="outline">Fattura</Button></Link>
+      <ListPageHeader
+        title="Gestione Acquisti"
+        actions={canSeeAmounts && (
+          <div className="flex gap-1.5 md:hidden">
+            <Link href="/purchases/new"><Button size="sm" className="bg-blue-600 hover:bg-blue-700">Acquisto</Button></Link>
+            <Link href="/purchases/new?type=order"><Button size="sm" variant="outline">Ordine</Button></Link>
+            <Link href="/invoices/new"><Button size="sm" variant="outline">Fattura</Button></Link>
+          </div>
+        )}
+        search={{ id: "purchases-search", label: "Cerca documenti", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca per numero, fornitore, commessa, articolo... (virgola = OR)" }}
+        searchActions={
+          <>
+            <div className="hidden items-center gap-2 md:flex">
+              <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Dal</span>
+              <Input type="date" aria-label="Dal" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
+              <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Al</span>
+              <Input type="date" aria-label="Al" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
             </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-            <Input
-              placeholder="Cerca per numero, fornitore, commessa, articolo... usa la virgola per OR"
-              className="border-none bg-slate-100 pl-9 dark:bg-muted"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Dal</span>
-            <Input type="date" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Al</span>
-            <Input type="date" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
             {anyFilterActive && (
-              <Button variant="outline" size="sm" onClick={resetFilters} className="shrink-0">Azzera filtri</Button>
+              <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+                Azzera filtri
+              </Button>
             )}
-          </div>
-        </div>
-
-        {/* Telefono: tipo e fornitore in due menu sulla stessa riga */}
+          </>
+        }
+      >
+        {/* Telefono: date, tipo e fornitore */}
         <div className="grid grid-cols-2 gap-2 md:hidden">
+          <Input type="date" aria-label="Dal" className="border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
+          <Input type="date" aria-label="Al" className="border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
           <Select value={kind} onValueChange={changeKind}>
             <SelectTrigger aria-label="Tipo"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
@@ -277,7 +274,7 @@ function PurchasesPageContent() {
             searchPlaceholder="Scrivi per cercare fornitore..."
           />
         </div>
-      </div>
+      </ListPageHeader>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
