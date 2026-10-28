@@ -212,7 +212,7 @@ function ClientsPageContent() {
           <Button onClick={loadClients} variant="outline">Riprova</Button>
         </div>
       ) : (
-        <div className={`flex gap-3 ${loading ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
+        <div className={`${loading ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
           <div className="min-w-0 flex-1">
             {/* Tabella: da tablet in su */}
             <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
@@ -302,24 +302,6 @@ function ClientsPageContent() {
               totalItems={totalItems}
               itemLabel="committenti"
             />
-          </div>
-
-          {/* Lettere: solo da PC, a lato della tabella */}
-          <div className="sticky top-40 hidden h-fit shrink-0 flex-col gap-0.5 self-start md:flex">
-            {activeLetter && (
-              <button onClick={() => setActiveLetter(null)} className="mb-1 h-5 w-7 rounded text-[10px] font-semibold text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20" title="Rimuovi filtro">✕</button>
-            )}
-            {ALPHABET.map(letter => (
-              <button
-                key={letter}
-                onClick={() => handleLetterClick(letter)}
-                className={`h-6 w-7 rounded text-xs font-semibold transition-colors ${
-                  activeLetter === letter ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-blue-600 dark:text-slate-400 dark:hover:bg-slate-800'
-                }`}
-              >
-                {letter}
-              </button>
-            ))}
           </div>
         </div>
       )}
