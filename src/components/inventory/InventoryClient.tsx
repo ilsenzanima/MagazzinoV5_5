@@ -15,8 +15,12 @@ import {
   ChevronLeft,
   Package,
   ScanLine,
-  Loader2
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from "lucide-react";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // Articoli per pagina: fisso, uguale per tutti
@@ -65,21 +69,21 @@ interface InventoryClientProps {
   initialTypes: ItemType[];
 }
 
-function InventoryItemImage({ item, typeInfo }: { item: InventoryItem; typeInfo?: ItemType }) {
+function InventoryItemImage({ item, typeInfo, thumb }: { item: InventoryItem; typeInfo?: ItemType; thumb?: boolean }) {
   const [imgError, setImgError] = useState(false);
   const hasCustomImage = !!item.image && !imgError;
   const hasTypeImage = !!typeInfo?.imageUrl;
   const imageUrl = hasCustomImage ? item.image! : (typeInfo?.imageUrl || "/placeholder.svg");
   const objectFitClass = (hasCustomImage || (!imgError && hasTypeImage))
-    ? "object-cover group-hover:scale-105"
-    : "object-contain p-8 opacity-50";
+    ? (thumb ? "object-cover" : "object-cover group-hover:scale-105")
+    : (thumb ? "object-contain p-1.5 opacity-50" : "object-contain p-8 opacity-50");
 
   return (
     <Image
       src={imageUrl}
       alt={item.name}
       fill
-      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+      sizes={thumb ? "40px" : "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"}
       className={`transition-transform duration-300 ${objectFitClass} ${item.quantity === 0 ? "grayscale opacity-80" : ""}`}
       onError={() => setImgError(true)}
     />
@@ -96,6 +100,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const initialType = searchParams.get("type") || "all";
   const initialWarehouse = searchParams.get("wh") || "all";
   const initialPage = Number(searchParams.get("page")) || 1;
+  const initialSort = searchParams.get("sort") || "name";
+  const initialDir: "asc" | "desc" = searchParams.get("dir") === "desc" ? "desc" : "asc";
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
@@ -111,6 +117,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(false); // Initial loading is false because we have props
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<string>(initialSort);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(initialDir);
+  const [stockMap, setStockMap] = useState<Map<string, { warehouseId: string; quantity: number }[]>>(new Map());
   const [pendingMap, setPendingMap] = useState<Map<string, { uscita: number; reso: number }>>(new Map());
 
   // Pagination state
@@ -140,9 +149,11 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     if (selectedType !== "all") params.set("type", selectedType);
     if (selectedWarehouse !== "all") params.set("wh", selectedWarehouse);
     if (page !== 1) params.set("page", String(page));
+    if (sortKey !== "name") params.set("sort", sortKey);
+    if (sortDir !== "asc") params.set("dir", sortDir);
     const query = params.toString();
     router.replace(query ? `/inventory?${query}` : "/inventory", { scroll: false });
-  }, [activeTab, debouncedSearchTerm, selectedBrand, selectedType, selectedWarehouse, page, router]);
+  }, [activeTab, debouncedSearchTerm, selectedBrand, selectedType, selectedWarehouse, page, sortKey, sortDir, router]);
 
   // Load warehouses for the location tabs
   useEffect(() => {
@@ -160,6 +171,23 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   useEffect(() => {
     brandsApi.getAll().then(setBrands).catch(console.error);
   }, []);
+
+  // In quali magazzini si trova ogni articolo della pagina
+  useEffect(() => {
+    let cancelled = false;
+    inventoryApi.getStockByWarehouse(items.map(i => i.id))
+      .then(map => { if (!cancelled) setStockMap(map); })
+      .catch(console.error);
+    return () => { cancelled = true; };
+  }, [items]);
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+    setPage(1);
+  };
+
+  const warehouseName = (id: string) => warehouses.find(w => w.id === id)?.name ?? "";
 
   // Load pending notes and build per-item map
   useEffect(() => {
@@ -194,13 +222,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   useEffect(() => {
     // Skip first load if parameters match initial props
     // This prevents double fetching on mount
-    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && items === initialItems) {
+    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && sortKey === "name" && sortDir === "asc" && items === initialItems) {
       return;
     }
 
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, selectedWarehouse]);
+  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, selectedWarehouse, sortKey, sortDir]);
 
   const loadItems = async () => {
     try {
@@ -215,7 +243,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         tab: activeTab,
         brand: selectedBrand !== "all" ? selectedBrand : undefined,
         type: selectedType !== "all" ? selectedType : undefined,
-        warehouseId: selectedWarehouse !== "all" ? selectedWarehouse : undefined
+        warehouseId: selectedWarehouse !== "all" ? selectedWarehouse : undefined,
+        sort: sortKey,
+        dir: sortDir
       });
       setItems(paginatedItems);
       setTotalItems(total);
@@ -298,7 +328,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             {(userRole === 'admin' || userRole === 'operativo') && (
-              <Link href="/inventory/new" className="w-full sm:w-auto">
+              <Link href="/inventory/new" className="w-full sm:w-auto md:hidden">
                 <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Nuovo Articolo
@@ -390,35 +420,26 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
           </Button>
         </div>
 
-        {/* Tabs Magazzino: solo le sedi fisiche di stoccaggio (principale + operativa),
-            escludendo eventuali altre voci anagrafiche (es. sede legale) che non
-            sono destinazioni reali di merce. */}
-        {stockWarehouses.length > 1 && (
-          <Tabs
-            value={selectedWarehouse}
-            onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}
-            className="w-full"
-          >
-            <TabsList
-              className="grid w-full bg-slate-100 dark:bg-muted"
-              style={{ gridTemplateColumns: `repeat(${stockWarehouses.length + 1}, minmax(0, 1fr))` }}
-            >
-              <TabsTrigger value="all">Tutti</TabsTrigger>
-              {stockWarehouses.map((w) => (
-                <TabsTrigger key={w.id} value={w.id} className="truncate" title={w.name}>{w.name}</TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        )}
-
-        {/* Tabs */}
-        <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-100 dark:bg-muted">
-            <TabsTrigger value="all">Tutti</TabsTrigger>
-            <TabsTrigger value="low_stock" className="data-[state=active]:text-amber-600">Basse Scorte</TabsTrigger>
-            <TabsTrigger value="out_of_stock" className="data-[state=active]:text-red-600">Esauriti</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Telefono: magazzino e scorte in due menu sulla stessa riga */}
+        <div className="grid grid-cols-2 gap-2 md:hidden">
+          {stockWarehouses.length > 1 ? (
+            <Select value={selectedWarehouse} onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}>
+              <SelectTrigger aria-label="Magazzino"><SelectValue placeholder="Magazzino" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti i magazzini</SelectItem>
+                {stockWarehouses.map((w) => (<SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>))}
+              </SelectContent>
+            </Select>
+          ) : <div />}
+          <Select value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }}>
+            <SelectTrigger aria-label="Scorte"><SelectValue placeholder="Scorte" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutte le scorte</SelectItem>
+              <SelectItem value="low_stock">Basse scorte</SelectItem>
+              <SelectItem value="out_of_stock">Esauriti</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Lista Articoli */}
@@ -445,20 +466,77 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
             <Table className="border-collapse">
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
-                  <TableHead className="w-28 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Codice</TableHead>
-                  <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Nome</TableHead>
-                  <TableHead className="w-48 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Modello / variante</TableHead>
-                  <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Marca</TableHead>
-                  <TableHead className="w-40 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Tipologia</TableHead>
-                  <TableHead className="w-36 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Giacenza</TableHead>
-                  <TableHead className="w-24 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Scorta min.</TableHead>
+                  <TableHead className="w-14 border-r" />
+                  <TableHead className="w-28 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("code")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Codice
+                      {sortKey === "code" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className=" border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("name")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Nome
+                      {sortKey === "name" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-44 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("model")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Modello / variante
+                      {sortKey === "model" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("brand")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Marca
+                      {sortKey === "brand" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("type")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Tipologia
+                      {sortKey === "type" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-44 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    {stockWarehouses.length > 1 ? (
+                      <Select value={selectedWarehouse} onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}>
+                        <SelectTrigger aria-label="Filtra per magazzino" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"><SelectValue placeholder="Magazzino" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti i magazzini</SelectItem>
+                          {stockWarehouses.map((w) => (<SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                    ) : "Magazzino"}
+                  </TableHead>
+                  <TableHead className="w-32 text-right border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("quantity")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Giacenza
+                      {sortKey === "quantity" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-24 text-right border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("min_stock")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Scorta min.
+                      {sortKey === "min_stock" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <Select value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }}>
+                      <SelectTrigger aria-label="Filtra per riordino" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"><SelectValue placeholder="Riordino" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tutti</SelectItem>
+                        <SelectItem value="low_stock">Da riordinare</SelectItem>
+                        <SelectItem value="out_of_stock">Esauriti</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableHead>
                   <TableHead className="w-32 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Da processare</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                    <TableCell colSpan={11} className="py-10 text-center text-slate-400 dark:text-slate-500">
                       <Package className="mx-auto mb-2 h-12 w-12 opacity-20" />
                       <p>Nessun articolo trovato</p>
                     </TableCell>
@@ -470,6 +548,11 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                   const pending = pendingMap?.get(item.id);
                   return (
                     <TableRow key={item.id} className="cursor-pointer" onClick={() => router.push(`/inventory/${item.id}`)}>
+                      <TableCell className="border-r py-1.5">
+                        <div className="relative h-10 w-10 overflow-hidden rounded border bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                          <InventoryItemImage item={item} typeInfo={itemTypes.find(t => t.name === item.type)} thumb />
+                        </div>
+                      </TableCell>
                       <TableCell className="border-r py-2 font-mono text-xs text-slate-500">{item.code}</TableCell>
                       <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">
                         <Link href={`/inventory/${item.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">{item.name}</Link>
@@ -477,6 +560,18 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.model || <span className="text-slate-300">—</span>}</TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.brand}</TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.type}</TableCell>
+                      <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">
+                        {(() => {
+                          const where = stockMap.get(item.id) || [];
+                          if (where.length === 0) return <span className="text-slate-300">—</span>;
+                          return where.map(w => (
+                            <div key={w.warehouseId} className="flex justify-between gap-2">
+                              <span className="truncate">{warehouseName(w.warehouseId)}</span>
+                              <span className="shrink-0 text-slate-400">{w.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</span>
+                            </div>
+                          ));
+                        })()}
+                      </TableCell>
                       <TableCell className={`border-r py-2 text-right text-sm font-semibold ${qtyColor}`}>
                         {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} {item.unit}
                         {item.coefficient !== 1 && (
@@ -484,6 +579,15 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                         )}
                       </TableCell>
                       <TableCell className="border-r py-2 text-right text-sm text-slate-500">{item.minStock ? item.minStock.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300">—</span>}</TableCell>
+                      <TableCell className="border-r py-2 text-xs">
+                        {item.quantity <= 0 ? (
+                          <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-600">Esaurito</span>
+                        ) : item.quantity <= item.minStock ? (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-600">Da riordinare</span>
+                        ) : (
+                          <span className="text-slate-400">OK</span>
+                        )}
+                      </TableCell>
                       <TableCell className="py-2 text-right text-xs">
                         {pending && pending.uscita > 0 && (
                           <div className="text-amber-600">↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} uscita</div>
@@ -607,15 +711,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         </>
       )}
 
-      {/* Floating Action Button (FAB) */}
+      {/* Pulsante «Aggiungi articolo» sempre visibile (PC) */}
       {(userRole === 'admin' || userRole === 'operativo') && (
-        <div className="hidden md:block fixed bottom-10 right-10 z-20">
-          <Link href="/inventory/new">
-            <Button className="h-14 w-14 md:h-14 md:w-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 touch-target">
-              <Plus className="h-8 w-8" />
-            </Button>
-          </Link>
-        </div>
+        <FloatingAddButton href="/inventory/new" label="Aggiungi articolo" />
       )}
 
       {/* Scanner Dialog */}

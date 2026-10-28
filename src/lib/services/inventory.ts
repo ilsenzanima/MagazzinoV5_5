@@ -161,12 +161,13 @@ export const inventoryApi = {
     },
 
     // Modificato per usare RPC avanzata se c'è ricerca o filtri complessi
-    getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string; brand?: string; type?: string; warehouseId?: string }) => {
+    getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string; brand?: string; type?: string; warehouseId?: string; sort?: string; dir?: 'asc' | 'desc' }) => {
         const from = (options.page - 1) * options.limit;
 
         // Se c'è una ricerca o tab specifici, o filtri avanzati, usiamo la RPC get_inventory_search
         // Nota: La RPC deve essere stata creata nel DB e aggiornata per supportare brand/type/warehouse
-        if (options.search || options.tab || options.brand || options.type || options.warehouseId) {
+        const customSort = !!options.sort && !(options.sort === 'name' && (options.dir ?? 'asc') === 'asc');
+        if (options.search || options.tab || options.brand || options.type || options.warehouseId || customSort) {
             const { data, error } = await supabase.rpc('get_inventory_search', {
                 p_search: options.search || '',
                 p_status: options.tab || 'all',
@@ -174,7 +175,9 @@ export const inventoryApi = {
                 p_offset: from,
                 p_brand: options.brand || null,
                 p_type: options.type || null,
-                p_warehouse_id: options.warehouseId || null
+                p_warehouse_id: options.warehouseId || null,
+                p_sort: options.sort || 'name',
+                p_dir: options.dir || 'asc'
             });
 
             if (error) {
@@ -203,6 +206,23 @@ export const inventoryApi = {
             items: data.map(mapDbItemToInventoryItem),
             total: count || 0
         };
+    },
+
+    // Giacenza per magazzino di più articoli (colonna «Magazzino» dell'elenco)
+    getStockByWarehouse: async (itemIds: string[]): Promise<Map<string, { warehouseId: string; quantity: number }[]>> => {
+        const map = new Map<string, { warehouseId: string; quantity: number }[]>();
+        if (itemIds.length === 0) return map;
+        const { data, error } = await supabase
+            .from('inventory_stock_by_warehouse')
+            .select('item_id, warehouse_id, quantity')
+            .in('item_id', itemIds);
+        if (error) throw error;
+        for (const r of data ?? []) {
+            const qty = Number(r.quantity) || 0;
+            if (qty <= 0.001) continue;
+            map.set(r.item_id, [...(map.get(r.item_id) || []), { warehouseId: r.warehouse_id, quantity: qty }]);
+        }
+        return map;
     },
 
     // Check Duplicate
