@@ -46,6 +46,11 @@ import { NotificationBell } from "./NotificationBell";
 import { inventoryApi } from "@/lib/services/inventory";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 
+// Voci che restano nel menu ridotto a sole icone
+const COLLAPSED_HREFS = new Set([
+  "/dashboard", "/inventory", "/purchases", "/movements", "/load-notes", "/attendance", "/jobs",
+]);
+
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   onLinkClick?: () => void;
   collapsed?: boolean;              // solo icone (PC)
@@ -263,6 +268,11 @@ export function Sidebar({ className, onLinkClick, collapsed = false, onToggleCol
     }] : []),
   ];
 
+  // A menu ridotto restano solo le voci di uso quotidiano, così non serve la barra di scorrimento
+  const visibleGroups = routeGroups
+    .map(group => ({ ...group, items: collapsed ? group.items.filter(r => COLLAPSED_HREFS.has(r.href)) : group.items }))
+    .filter(group => group.items.length > 0);
+
   return (
     <div className={cn("pb-12 h-full bg-sidebar text-sidebar-foreground flex flex-col", className)}>
       <div className="space-y-4 py-4 flex-1 overflow-y-auto">
@@ -292,7 +302,7 @@ export function Sidebar({ className, onLinkClick, collapsed = false, onToggleCol
           )}
 
           <div className="space-y-4">
-            {routeGroups.map((group, groupIndex) => (
+            {visibleGroups.map((group, groupIndex) => (
               <div key={groupIndex} className="space-y-1">
                 {group.items.map((route) => (
                   <Link key={route.href} href={route.href} onClick={onLinkClick} prefetch={false}>
@@ -314,7 +324,7 @@ export function Sidebar({ className, onLinkClick, collapsed = false, onToggleCol
                     </Button>
                   </Link>
                 ))}
-                {groupIndex < routeGroups.length - 1 && (
+                {groupIndex < visibleGroups.length - 1 && (
                   <div className="my-2 border-t border-sidebar-border mx-2" />
                 )}
               </div>
