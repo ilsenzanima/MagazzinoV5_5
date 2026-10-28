@@ -99,8 +99,10 @@ export const clientsApi = {
         return data.map(mapDbToClient);
     },
 
-    getPaginated: async (options: { page: number; limit: number; search?: string; letter?: string }) => {
-        let query = supabase.from('clients').select('*', { count: 'estimated' }).is('deleted_at', null);
+    getPaginated: async (options: { page: number; limit: number; search?: string; letter?: string; city?: string; sort?: 'name' | 'city' | 'vat'; dir?: 'asc' | 'desc' }) => {
+        let query = supabase.from('clients').select('*', { count: 'exact' }).is('deleted_at', null);
+
+        if (options.city) query = query.eq('city', options.city);
 
         // Multi-word fuzzy search
         if (options.search) {
@@ -109,7 +111,7 @@ export const clientsApi = {
             // Then we need ALL words to match (AND between words)
             // Supabase doesn't support AND(OR1, OR2), so we chain filters
             for (const word of words) {
-                query = query.or(`name.ilike.%${word}%,vat_number.ilike.%${word}%,email.ilike.%${word}%,city.ilike.%${word}%`);
+                query = query.or(`name.ilike.%${word}%,vat_number.ilike.%${word}%,email.ilike.%${word}%,city.ilike.%${word}%,street.ilike.%${word}%,phone.ilike.%${word}%`);
             }
         }
 
@@ -118,8 +120,10 @@ export const clientsApi = {
             query = query.ilike('name', `${options.letter}%`);
         }
 
-        // Sort by name
-        query = query.order('name');
+        const asc = options.dir !== 'desc';
+        if (options.sort === 'city') query = query.order('city', { ascending: asc, nullsFirst: false }).order('name');
+        else if (options.sort === 'vat') query = query.order('vat_number', { ascending: asc, nullsFirst: false }).order('name');
+        else query = query.order('name', { ascending: asc });
 
         // Pagination
         const from = (options.page - 1) * options.limit;
@@ -133,6 +137,21 @@ export const clientsApi = {
             data: data.map(mapDbToClient),
             total: count || 0
         };
+    },
+
+    // Quante commesse (e quante attive) ha ciascun committente dell'elenco
+    getJobCounts: async (clientIds: string[]) => {
+        const counts = new Map<string, { total: number; active: number }>();
+        if (clientIds.length === 0) return counts;
+        const { data, error } = await supabase.from('jobs').select('client_id, status').in('client_id', clientIds).is('deleted_at', null);
+        if (error) throw error;
+        for (const j of data ?? []) {
+            const c = counts.get(j.client_id) ?? { total: 0, active: 0 };
+            c.total += 1;
+            if (j.status === 'active') c.active += 1;
+            counts.set(j.client_id, c);
+        }
+        return counts;
     },
 
     getById: async (id: string) => {
