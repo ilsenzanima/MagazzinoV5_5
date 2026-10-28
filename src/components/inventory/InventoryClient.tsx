@@ -91,6 +91,78 @@ function InventoryItemImage({ item, typeInfo, thumb }: { item: InventoryItem; ty
   );
 }
 
+// Scorta minima modificabile direttamente nella tabella (solo admin e operativi): clic, scrivi, Invio per salvare
+function MinStockCell({ item, canEdit, onSaved }: { item: InventoryItem; canEdit: boolean; onSaved: (value: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const done = useRef(false);
+
+  const shown = item.minStock ? item.minStock.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : null;
+
+  const start = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    done.current = false;
+    setValue(String(item.minStock ?? 0));
+    setEditing(true);
+  };
+
+  const finish = async (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    if (!save) { setEditing(false); return; }
+    const n = Math.round(Number(value.replace(",", ".")));
+    if (!Number.isFinite(n) || n < 0) {
+      notify.error("La scorta minima deve essere un numero maggiore o uguale a zero");
+      setEditing(false);
+      return;
+    }
+    if (n === (item.minStock ?? 0)) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      await inventoryApi.update(item.id, { minStock: n });
+      onSaved(n);
+    } catch (err) {
+      console.error("Failed to update min stock", err);
+      notify.error("Non sono riuscito a salvare la scorta minima");
+    } finally {
+      setSaving(false);
+      setEditing(false);
+    }
+  };
+
+  if (!canEdit) return shown ? <>{shown}</> : <span className="text-slate-300">—</span>;
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        type="number"
+        min={0}
+        step={1}
+        value={value}
+        disabled={saving}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => finish(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); finish(true); }
+          if (e.key === "Escape") { e.preventDefault(); finish(false); }
+        }}
+        className="ml-auto h-7 w-20 text-right text-sm"
+        aria-label="Scorta minima"
+      />
+    );
+  }
+
+  return (
+    <button type="button" onClick={start} title="Clicca per modificare la scorta minima"
+      className="ml-auto block min-w-10 rounded px-1.5 py-0.5 text-right hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/30">
+      {shown ?? <span className="text-slate-300">—</span>}
+    </button>
+  );
+}
+
 export default function InventoryClient({ initialItems, initialTotal, initialTypes }: InventoryClientProps) {
   const { userRole } = useAuth();
   const router = useRouter();
@@ -614,7 +686,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           <div className="text-[11px] font-normal text-slate-400">{(item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} pz</div>
                         )}
                       </TableCell>
-                      <TableCell className="border-r py-2 text-right text-sm text-slate-500">{item.minStock ? item.minStock.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300">—</span>}</TableCell>
+                      <TableCell className="border-r py-2 text-right text-sm text-slate-500" onClick={(e) => e.stopPropagation()}>
+                        <MinStockCell
+                          item={item}
+                          canEdit={userRole === 'admin' || userRole === 'operativo'}
+                          onSaved={(value) => setItems(prev => prev.map(i => i.id === item.id ? { ...i, minStock: value } : i))}
+                        />
+                      </TableCell>
                       <TableCell className="py-2 text-right text-xs">
                         {pending && pending.uscita > 0 && (
                           <div className="text-amber-600">↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} uscita</div>
