@@ -1029,7 +1029,7 @@ export default function PurchaseDetailPage() {
                                                 Acquisto: {purchase.convertedPurchaseNumber}
                                                 {!isMobile && <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />}
                                             </Link>
-                                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                            {isEditingHeader && (userRole === 'admin' || userRole === 'operativo') && (
                                                 <button
                                                     type="button"
                                                     title="Annulla associazione con questo acquisto"
@@ -1066,7 +1066,7 @@ export default function PurchaseDetailPage() {
                                                 Ordine: {order.deliveryNoteNumber}
                                                 {!isMobile && <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />}
                                             </Link>
-                                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                            {isEditingHeader && (userRole === 'admin' || userRole === 'operativo') && (
                                                 <button
                                                     type="button"
                                                     title="Annulla associazione con questo ordine"
