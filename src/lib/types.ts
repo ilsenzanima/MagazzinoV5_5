@@ -81,7 +81,34 @@ export interface Supplier {
     email?: string;
     phone?: string;
     address?: string;
+    pec?: string;
+    website?: string;
+    paymentTerms?: string;
+    notes?: string;
+    // Voce di servizio per inserire dati incompleti di fornitori vecchi: in elenco sta in fondo con un'etichetta
+    isTechnical?: boolean;
     createdAt: string;
+}
+
+// Fornitore con le statistiche degli acquisti (non ordini) al netto dei resi
+export interface SupplierOverview extends Supplier {
+    purchasesCount: number;
+    lastPurchaseDate: string | null;
+    spentTotal: number;
+    spentYear: number;
+    missingVat: boolean;
+    missingEmail: boolean;
+    missingPhone: boolean;
+}
+
+export interface SupplierContact {
+    id: string;
+    supplierId: string;
+    name: string;
+    role?: string;
+    email?: string;
+    phone?: string;
+    notes?: string;
 }
 
 export interface SupplierGroup {

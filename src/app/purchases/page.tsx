@@ -11,6 +11,7 @@ import {
   ArrowUp, ArrowDown, ArrowUpDown
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
+import { KindBadge } from "@/components/purchases/KindBadge";
 import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -30,25 +31,6 @@ import {
 
 // Documenti per pagina: fisso, uguale per tutti
 const PAGE_SIZE = 50;
-
-const KIND_LABEL: Record<DocumentKind, string> = { purchase: "Acquisto", order: "Ordine", invoice: "Fattura" };
-// Stessi colori dei banner di collegamento nella scheda del documento: fattura blu, ordine ambra, acquisto verde
-const KIND_STYLE: Record<DocumentKind, string> = {
-  purchase: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-800",
-  order: "text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-800",
-  invoice: "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-800",
-};
-const KIND_ICON: Record<DocumentKind, typeof Receipt> = { purchase: ClipboardList, order: ClipboardList, invoice: Receipt };
-
-function KindBadge({ kind }: { kind: DocumentKind }) {
-  const Icon = KIND_ICON[kind];
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium ${KIND_STYLE[kind]}`}>
-      <Icon className="h-3.5 w-3.5" />
-      {KIND_LABEL[kind]}
-    </span>
-  );
-}
 
 function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
   if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30" />;

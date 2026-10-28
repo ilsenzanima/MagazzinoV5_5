@@ -25,7 +25,11 @@ export default function NewSupplierPage() {
     address: "",
     vatNumber: "",
     email: "",
-    phone: ""
+    phone: "",
+    pec: "",
+    website: "",
+    paymentTerms: "",
+    notes: ""
   });
 
   if (userRole === 'user') {
@@ -122,13 +126,52 @@ export default function NewSupplierPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pec">PEC</Label>
+                  <Input
+                    id="pec"
+                    type="email"
+                    value={formData.pec}
+                    onChange={(e) => setFormData({ ...formData, pec: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="website">Sito web</Label>
+                  <Input
+                    id="website"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    placeholder="https://"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="paymentTerms">Condizioni di pagamento</Label>
+                  <Input
+                    id="paymentTerms"
+                    value={formData.paymentTerms}
+                    onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                    placeholder="Es. bonifico 30 gg data fattura"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                <Label htmlFor="notes">Note</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="min-h-[80px]"
                 />
               </div>
 

@@ -23,7 +23,7 @@ import { jobConformitaDocumentTypesApi, JobConformitaDocumentType } from "@/lib/
 import type { Warehouse } from "@/lib/types";
 
 type RenameTarget = {
-    kind: "supplier" | "brand" | "type" | "unit" | "warehouse" | "docType" | "complianceDocType" | "jobSiteDocType" | "jobConformitaDocType";
+    kind: "brand" | "type" | "unit" | "warehouse" | "docType" | "complianceDocType" | "jobSiteDocType" | "jobConformitaDocType";
     id: string;
     name: string;
 };
@@ -38,8 +38,6 @@ export default function SettingsInventoryPage() {
     // Suppliers State
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loadingSuppliers, setLoadingSuppliers] = useState(true);
-    const [newSupplierName, setNewSupplierName] = useState("");
-    const [addingSupplier, setAddingSupplier] = useState(false);
 
     // Supplier Groups State (fatturazione condivisa)
     const [supplierGroups, setSupplierGroups] = useState<SupplierGroup[]>([]);
@@ -304,30 +302,6 @@ export default function SettingsInventoryPage() {
         }
     };
 
-    const handleAddSupplier = async () => {
-        const nameToAdd = newSupplierName.trim();
-        if (!nameToAdd) return;
-
-        // Check for duplicates (case insensitive)
-        if (suppliers.some(s => s.name.toLowerCase() === nameToAdd.toLowerCase())) {
-            notify.warning("Esiste già un fornitore con questo nome.");
-            return;
-        }
-
-        try {
-            setAddingSupplier(true);
-            const newSupplier = await suppliersApi.create({ name: nameToAdd });
-            // Add and re-sort
-            setSuppliers([...suppliers, newSupplier].sort((a, b) => a.name.localeCompare(b.name)));
-            setNewSupplierName("");
-        } catch (error) {
-            console.error("Failed to add supplier", error);
-            notify.error("Errore nell'aggiunta del fornitore");
-        } finally {
-            setAddingSupplier(false);
-        }
-    };
-
     const handleAddBrand = async () => {
         const nameToAdd = newBrandName.trim();
         if (!nameToAdd) return;
@@ -373,17 +347,6 @@ export default function SettingsInventoryPage() {
             notify.error("Errore nell'aggiunta del tipo");
         } finally {
             setAddingType(false);
-        }
-    };
-
-    const handleDeleteSupplier = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questo fornitore?")) return;
-        try {
-            await suppliersApi.delete(id);
-            setSuppliers(suppliers.filter(s => s.id !== id));
-        } catch (error) {
-            console.error("Failed to delete supplier", error);
-            notify.error("Errore nell'eliminazione del fornitore");
         }
     };
 
@@ -659,11 +622,6 @@ export default function SettingsInventoryPage() {
         try {
             setRenaming(true);
             switch (renameTarget.kind) {
-                case "supplier": {
-                    const updated = await suppliersApi.update(renameTarget.id, { name: newName });
-                    setSuppliers(prev => prev.map(s => s.id === renameTarget.id ? updated : s).sort((a, b) => a.name.localeCompare(b.name)));
-                    break;
-                }
                 case "brand": {
                     const updated = await brandsApi.update(renameTarget.id, newName);
                     setBrands(prev => prev.map(b => b.id === renameTarget.id ? updated : b).sort((a, b) => a.name.localeCompare(b.name)));
@@ -719,14 +677,13 @@ export default function SettingsInventoryPage() {
             <div>
                 <h3 className="text-lg font-medium">Impostazioni Elenchi</h3>
                 <p className="text-sm text-muted-foreground">
-                    Gestisci le liste predefinite per prodotti, fornitori e magazzini.
+                    Gestisci le liste predefinite per prodotti e magazzini. I fornitori si gestiscono dalla pagina Fornitori nel menu.
                 </p>
             </div>
             <Separator />
 
-            <Tabs defaultValue="suppliers">
+            <Tabs defaultValue="supplierGroups">
                 <TabsList className="flex-wrap h-auto gap-1">
-                    <TabsTrigger value="suppliers">Fornitori</TabsTrigger>
                     <TabsTrigger value="supplierGroups">Fatturazione Condivisa</TabsTrigger>
                     <TabsTrigger value="brands">Marche</TabsTrigger>
                     <TabsTrigger value="types">Tipologie</TabsTrigger>
@@ -737,63 +694,6 @@ export default function SettingsInventoryPage() {
                     <TabsTrigger value="jobDocTypes">Documenti Cantiere</TabsTrigger>
                     <TabsTrigger value="jobConformitaDocTypes">Documenti Conformità Cantiere</TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="suppliers" className="space-y-4 mt-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Gestione Fornitori</CardTitle>
-                            <CardDescription>Gestisci l'elenco dei fornitori approvati.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex gap-2">
-                                <Input
-                                    placeholder="Nuovo Fornitore..."
-                                    className="max-w-sm"
-                                    value={newSupplierName}
-                                    onChange={(e) => setNewSupplierName(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSupplier()}
-                                />
-                                <Button
-                                    size="icon"
-                                    className="bg-blue-600 hover:bg-blue-700"
-                                    onClick={handleAddSupplier}
-                                    disabled={addingSupplier || !newSupplierName.trim()}
-                                >
-                                    {addingSupplier ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                                </Button>
-                            </div>
-
-                            {loadingSuppliers ? (
-                                <div className="flex items-center gap-2 text-slate-500">
-                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento fornitori...
-                                </div>
-                            ) : (
-                                <div className="flex flex-wrap gap-2">
-                                    {suppliers.map(supplier => (
-                                        <Badge key={supplier.id} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
-                                            {supplier.name}
-                                            <button
-                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
-                                                onClick={() => openRename("supplier", supplier.id, supplier.name)}
-                                            >
-                                                <Pencil className="h-3 w-3 text-slate-500" />
-                                            </button>
-                                            <button
-                                                className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
-                                                onClick={() => handleDeleteSupplier(supplier.id)}
-                                            >
-                                                <X className="h-3 w-3 text-slate-500" />
-                                            </button>
-                                        </Badge>
-                                    ))}
-                                    {suppliers.length === 0 && (
-                                        <p className="text-sm text-muted-foreground italic">Nessun fornitore presente.</p>
-                                    )}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
 
                 <TabsContent value="supplierGroups" className="space-y-4 mt-4">
                     <Card>
