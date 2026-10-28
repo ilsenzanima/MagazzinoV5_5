@@ -54,7 +54,7 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     brand: dbItem.brand,
     type: dbItem.category, // Map category -> type
     quantity: dbItem.quantity,
-    minStock: dbItem.min_stock, // Map min_stock -> minStock
+    minStock: Number(dbItem.min_stock ?? 0), // Map min_stock -> minStock (decimale)
     status: dbItem.quantity <= 0 ? 'out_of_stock' : dbItem.quantity <= dbItem.min_stock ? 'low_stock' : 'in_stock',
     image: dbItem.image_url, // Map image_url -> image
     description: dbItem.description,

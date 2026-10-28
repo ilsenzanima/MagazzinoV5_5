@@ -16,7 +16,7 @@ interface NewItemDialogProps {
 // Crea l'articolo con gli stessi controlli della pagina «Nuovo articolo»
 export async function createItemFromDraft(draft: WizardDraft): Promise<InventoryItem | null> {
     const coefficient = parseFloat(draft.coefficient.replace(",", "."));
-    const minStock = draft.wantsMinStock ? parseInt(draft.minStock, 10) : 0;
+    const minStock = draft.wantsMinStock ? (parseFloat(draft.minStock.replace(",", ".")) || 0) : 0;
     if (isNaN(coefficient) || coefficient <= 0) {
         notify.warning("Il coefficiente deve essere maggiore di 0");
         return null;

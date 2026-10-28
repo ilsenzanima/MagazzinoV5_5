@@ -565,6 +565,9 @@ export default function InventoryDetailPage() {
   };
 
   const status = getStatus(item.quantity, item.minStock);
+
+  // Senza foto si usa l'immagine della tipologia, poi il segnaposto
+  const typeImage = types.find(t => t.name === item.type)?.imageUrl || "/placeholder.svg";
   // Ultimo acquisto con prezzo, dai lotti già caricati
   const lastPurchase = ((lotsData?.lots || []) as { price?: number; date: string }[])
     .filter(l => l.price != null && l.price > 0)
@@ -753,11 +756,11 @@ export default function InventoryDetailPage() {
                 {/* Image Section */}
                 <div className="aspect-square relative mx-auto w-full max-w-[260px] rounded-md overflow-hidden bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center group">
                   <img
-                    src={item.image || "/placeholder.svg"}
+                    src={item.image || typeImage}
                     alt={item.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/placeholder.svg";
+                      { const img = e.target as HTMLImageElement; img.src = img.src.endsWith(typeImage) || typeImage === "/placeholder.svg" ? "/placeholder.svg" : typeImage; }
                     }}
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -1044,10 +1047,10 @@ export default function InventoryDetailPage() {
               <div className="grid gap-4 md:grid-cols-[96px_minmax(0,1fr)]">
                 <div className="h-24 w-24 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
                   <img
-                    src={item.image || "/placeholder.svg"}
+                    src={item.image || typeImage}
                     alt={item.name}
                     className="h-full w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+                    onError={(e) => { { const img = e.target as HTMLImageElement; img.src = img.src.endsWith(typeImage) || typeImage === "/placeholder.svg" ? "/placeholder.svg" : typeImage; } }}
                   />
                 </div>
                 <div className="min-w-0 space-y-4">

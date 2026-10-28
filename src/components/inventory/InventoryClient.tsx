@@ -111,7 +111,7 @@ function MinStockCell({ item, canEdit, onSaved }: { item: InventoryItem; canEdit
     if (done.current) return;
     done.current = true;
     if (!save) { setEditing(false); return; }
-    const n = Math.round(Number(value.replace(",", ".")));
+    const n = Math.round(Number(value.replace(",", ".")) * 100) / 100;
     if (!Number.isFinite(n) || n < 0) {
       notify.error("La scorta minima deve essere un numero maggiore o uguale a zero");
       setEditing(false);
@@ -139,7 +139,7 @@ function MinStockCell({ item, canEdit, onSaved }: { item: InventoryItem; canEdit
         autoFocus
         type="number"
         min={0}
-        step={1}
+        step="any"
         value={value}
         disabled={saving}
         onClick={(e) => e.stopPropagation()}
