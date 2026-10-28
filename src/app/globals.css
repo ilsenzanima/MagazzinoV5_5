@@ -23,7 +23,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-lexend), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -199,22 +199,6 @@
 }
 
 /* ===== FONT ACCESSIBILITY - Disponibile per tutti i temi ===== */
-
-/* Font Lexend - Ottimizzato per la lettura */
-body.font-lexend,
-body.font-lexend * {
-  font-family: var(--font-lexend), system-ui, sans-serif;
-}
-
-body.font-lexend h1,
-body.font-lexend h2,
-body.font-lexend h3,
-body.font-lexend h4,
-body.font-lexend h5,
-body.font-lexend h6 {
-  font-family: var(--font-inter), var(--font-lexend), system-ui, sans-serif;
-  font-weight: 600;
-}
 
 /* Font OpenDyslexic - Progettato per la dislessia */
 body.font-opendyslexic,

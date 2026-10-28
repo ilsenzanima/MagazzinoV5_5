@@ -38,11 +38,15 @@ interface ItemLotsProps {
     onReassignComplete: () => void;
 }
 
+import { PageControls, paginate } from "@/components/ui/page-controls";
+
 export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedPieces, onReassignComplete }: ItemLotsProps) {
     const [isReassignOpen, setIsReassignOpen] = useState(false);
     const [selectedLot, setSelectedLot] = useState("");
     const [quantityToAssign, setQuantityToAssign] = useState(untrackedQuantity.toString());
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [page, setPage] = useState(1);
+    const pagedLots = paginate(lots, page);
 
     const handleReassign = async () => {
         if (!selectedLot || !quantityToAssign) return;
@@ -177,7 +181,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {lots.map(lot => {
+                                {pagedLots.map(lot => {
                                     const usedPercentage = ((lot.originalQty - lot.remainingQty) / lot.originalQty * 100);
                                     const rowContent = (
                                         <>
@@ -239,6 +243,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                             </TableBody>
                         </Table>
                     )}
+                    <PageControls page={page} total={lots.length} onPageChange={setPage} />
                 </CardContent>
             </Card>
         </div>

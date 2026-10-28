@@ -63,7 +63,9 @@ import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemLots } from "@/components/inventory/ItemLots";
-import { ItemConformita } from "@/components/inventory/ItemConformita";
+import { ItemStats } from "@/components/inventory/ItemStats";
+import { PageControls, paginate } from "@/components/ui/page-controls";
+import { supabase } from "@/lib/supabase";
 import { FieldTip } from "@/components/ui/field-tip";
 import { DuplicateItemsNotice } from "@/components/inventory/DuplicateItemsNotice";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -119,6 +121,9 @@ export default function InventoryDetailPage() {
   // Lots State
   const [lotsData, setLotsData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("lots");
+  const [showCodes, setShowCodes] = useState(false);
+  const [movementsPage, setMovementsPage] = useState(1);
+  const [jobUsage, setJobUsage] = useState<{ jobs: number; quantity: number } | null>(null);
 
   // Pending notes for this item
   const [pendingQty, setPendingQty] = useState<{ uscita: number; reso: number }>({ uscita: 0, reso: 0 });
@@ -175,7 +180,8 @@ export default function InventoryDetailPage() {
         // Unblock UI immediately after item is loaded
         setLoading(false);
 
-        // Calculate Stock Value from Batches
+        // Valore stock: parte in parallelo al resto, senza bloccare la pagina
+        void (async () => {
         try {
           const batches = await inventoryApi.getAvailableBatches(id);
           let val = 0;
@@ -203,6 +209,7 @@ export default function InventoryDetailPage() {
           console.error("Error calculating stock value", e);
           setIsStockValueComplete(false);
         }
+        })();
 
       } catch (err: any) {
         console.error("Error loading item:", err);
@@ -212,8 +219,11 @@ export default function InventoryDetailPage() {
       // 2. Load History & Jobs & Aux Data (Non-critical)
       try {
         // Load history first as it is displayed immediately
-        const movementsData = await inventoryApi.getHistory(id);
-        setMovements(movementsData);
+        inventoryApi.getHistory(id).then(data => { setMovements(data); setMovementsPage(1); }).catch(console.error);
+
+        // Commesse in cui l'articolo si trova adesso
+        supabase.from("job_inventory").select("quantity").eq("item_id", id).gt("quantity", 0)
+          .then(({ data }) => setJobUsage({ jobs: (data || []).length, quantity: (data || []).reduce((s, r) => s + Number(r.quantity || 0), 0) }));
 
         // Load lots data
         loadLots();
@@ -556,6 +566,13 @@ export default function InventoryDetailPage() {
 
   const status = getStatus(item.quantity, item.minStock);
 
+  // Senza foto si usa l'immagine della tipologia, poi il segnaposto
+  const typeImage = types.find(t => t.name === item.type)?.imageUrl || "/placeholder.svg";
+  // Ultimo acquisto con prezzo, dai lotti già caricati
+  const lastPurchase = ((lotsData?.lots || []) as { price?: number; date: string }[])
+    .filter(l => l.price != null && l.price > 0)
+    .reduce<{ price: number; date: string } | null>((best, l) => (!best || new Date(l.date) > new Date(best.date) ? { price: l.price as number, date: l.date } : best), null);
+
   return (
     <>
     <DashboardLayout>
@@ -566,7 +583,7 @@ export default function InventoryDetailPage() {
         onCropComplete={handleCropComplete}
         title="Ritaglia Foto Articolo"
       />
-      <div className="max-w-5xl mx-auto space-y-6 pb-20">
+      <div className="mx-auto max-w-[1700px] space-y-6 pb-20">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -610,19 +627,140 @@ export default function InventoryDetailPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left Column: Image, QR & Status */}
+        {/* Numeri principali */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card>
+            <CardContent className="space-y-2 p-4">
+              <div className="flex items-center justify-between">
+                <Label>Quantità disponibile</Label>
+                <span className={`rounded-md border px-2 py-0.5 text-xs font-bold ${status.color}`}>{status.label}</span>
+              </div>
+              <div className="rounded-md border border-blue-100 bg-blue-50 p-3 text-center dark:border-blue-800 dark:bg-blue-900/30">
+                <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+                  {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
+                </div>
+              </div>
+              <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+                {item.coefficient !== 1
+                  ? `${calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true }) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} pezzi fisici`
+                  : `1 ${item.unit} = 1 pezzo`}
+              </div>
+              {jobUsage && (
+                <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+                  {jobUsage.jobs > 0
+                    ? `In ${jobUsage.jobs} ${jobUsage.jobs === 1 ? 'commessa' : 'commesse'} (${jobUsage.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit})`
+                    : 'In nessuna commessa'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-2 p-4">
+              <Label>Da processare (note di carico)</Label>
+              <div className="flex flex-col gap-2 rounded-md border border-amber-100 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300"><ArrowUpRight className="h-3.5 w-3.5" /> Uscita</span>
+                  <span className={`font-bold ${pendingQty.uscita > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                    {pendingQty.uscita > 0 ? `${pendingQty.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : '—'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1 text-green-700 dark:text-green-300"><ArrowDownRight className="h-3.5 w-3.5" /> Entrata</span>
+                  <span className={`font-bold ${pendingQty.reso > 0 ? 'text-green-700 dark:text-green-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                    {pendingQty.reso > 0 ? `${pendingQty.reso.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : '—'}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {(userRole === 'admin' || userRole === 'operativo') && (
+            <Card>
+              <CardContent className="space-y-2 p-4">
+                <Label>Valore stock attuale</Label>
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-center dark:border-slate-700 dark:bg-muted">
+                  <div className="text-3xl font-bold text-slate-700 dark:text-slate-300">
+                    {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', useGrouping: true })}
+                  </div>
+                </div>
+                {lastPurchase && (
+                  <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+                    Ultimo acquisto: <span className="font-medium">{lastPurchase.price.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}/{item.unit}</span> del {new Date(lastPurchase.date).toLocaleDateString('it-IT')}
+                  </div>
+                )}
+                {!isStockValueComplete && (
+                  <div className="flex items-center justify-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>Dati costo incompleti (valore parziale)</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {(userRole === 'admin' || userRole === 'operativo') && (
+            <Card>
+              <CardContent className="p-4">
+              {/* Audit Section - Visible only to admin/operativo */}
+              {(userRole === 'admin' || userRole === 'operativo') && (
+                <div className="space-y-3">
+                  <Label className="text-blue-600 font-semibold">Verifica Inventario (Reale)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      value={realQtyInput}
+                      onChange={(e) => setRealQtyInput(e.target.value)}
+                      placeholder="Q.tà fisica"
+                      className="bg-white dark:bg-card"
+                    />
+                    <Button size="icon" variant="outline" onClick={handleUpdateRealQty} title="Salva quantità reale">
+                      <Save className="h-4 w-4" />
+                    </Button>
+                    {item.realQuantity !== null && item.realQuantity !== undefined && (
+                      <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500">
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {item.realQuantity !== null && item.realQuantity !== undefined && (
+                    <div className={`text-sm p-2 rounded-md flex justify-between items-center ${(item.realQuantity - item.quantity) === 0
+                      ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
+                      : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
+                      }`}>
+                      <span className="font-medium">Differenza:</span>
+                      <span className="font-bold">
+                        {item.realQuantity - item.quantity > 0 ? "+" : ""}
+                        {(item.realQuantity - item.quantity).toFixed(2).replace(/[.,]00$/, "")} {item.unit}
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                    Visibile solo a Admin e Operativi. Indica discrepanze tra sistema e realtà.
+                  </p>
+                </div>
+              )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {isEditing ? (
+          <>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+          {/* Foto e codici */}
           <div className="space-y-6">
             <Card>
-              <CardContent className="p-4 space-y-4">
+              <CardContent className="space-y-4 p-4">
                 {/* Image Section */}
-                <div className="aspect-square relative rounded-md overflow-hidden bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center group">
+                <div className="aspect-square relative mx-auto w-full max-w-[260px] rounded-md overflow-hidden bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center group">
                   <img
-                    src={item.image || "/placeholder.svg"}
+                    src={item.image || typeImage}
                     alt={item.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/placeholder.svg";
+                      { const img = e.target as HTMLImageElement; img.src = img.src.endsWith(typeImage) || typeImage === "/placeholder.svg" ? "/placeholder.svg" : typeImage; }
                     }}
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -660,141 +798,15 @@ export default function InventoryDetailPage() {
                   </div>
                 </div>
 
-                {/* Status Badge */}
-                <div className="space-y-2">
-                  <Label>Stato Stock (Calcolato)</Label>
-                  <div className={`flex items-center justify-center p-2 rounded-md border font-bold ${status.color}`}>
-                    {status.label}
-                  </div>
-                </div>
-
-                {/* Quantity Read-Only */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Quantità Disponibile</Label>
-                    <div className="flex flex-col gap-2">
-                      {/* Calculated Quantity (Main) */}
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-md text-center">
-                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
-                        </div>
-                        <div className="text-xs text-blue-400 dark:text-blue-500 font-medium">Quantità Totale</div>
-                      </div>
-
-                      {/* Da Processare (note di carico pending) */}
-                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-md">
-                        <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold mb-2">Da processare</div>
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
-                              <ArrowUpRight className="h-3.5 w-3.5" /> Uscita
-                            </span>
-                            <span className={`font-bold ${pendingQty.uscita > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-slate-400 dark:text-slate-500'}`}>
-                              {pendingQty.uscita > 0
-                                ? `${pendingQty.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} ${item.unit}`
-                                : '—'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="flex items-center gap-1 text-green-700 dark:text-green-300">
-                              <ArrowDownRight className="h-3.5 w-3.5" /> Entrata
-                            </span>
-                            <span className={`font-bold ${pendingQty.reso > 0 ? 'text-green-700 dark:text-green-300' : 'text-slate-400 dark:text-slate-500'}`}>
-                              {pendingQty.reso > 0
-                                ? `${pendingQty.reso.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} ${item.unit}`
-                                : '—'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Stock Value - Hidden for regular users */}
-                      {(userRole === 'admin' || userRole === 'operativo') && (
-                        <>
-                          <div className="p-3 bg-slate-50 dark:bg-muted border border-slate-200 dark:border-slate-700 rounded-md text-center">
-                            <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-                              {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' , useGrouping: true})}
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Valore Stock Attuale</div>
-                          </div>
-
-                          {!isStockValueComplete && (
-                            <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2 justify-center">
-                              <AlertTriangle className="h-4 w-4 shrink-0" />
-                              <span>Dati costo incompleti (Valore parziale)</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Real Pieces (Secondary) */}
-                      {item.coefficient !== 1 && (
-                        <div className="text-center">
-                          <span className="text-xs text-slate-400 dark:text-slate-500">
-                            {calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true}) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} Pezzi fisici
-                          </span>
-                        </div>
-                      )}
-                      {item.coefficient === 1 && (
-                        <div className="text-center text-[10px] text-slate-400 dark:text-slate-500">
-                          1 {item.unit} = 1 Pezzo
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Audit Section - Visible only to admin/operativo */}
-                  {(userRole === 'admin' || userRole === 'operativo') && (
-                    <div className="pt-4 border-t dark:border-slate-700 space-y-3">
-                      <Label className="text-blue-600 font-semibold">Verifica Inventario (Reale)</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          value={realQtyInput}
-                          onChange={(e) => setRealQtyInput(e.target.value)}
-                          placeholder="Q.tà fisica"
-                          className="bg-white dark:bg-card"
-                        />
-                        <Button size="icon" variant="outline" onClick={handleUpdateRealQty} title="Salva quantità reale">
-                          <Save className="h-4 w-4" />
-                        </Button>
-                        {item.realQuantity !== null && item.realQuantity !== undefined && (
-                          <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500">
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-
-                      {item.realQuantity !== null && item.realQuantity !== undefined && (
-                        <div className={`text-sm p-2 rounded-md flex justify-between items-center ${(item.realQuantity - item.quantity) === 0
-                          ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
-                          : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
-                          }`}>
-                          <span className="font-medium">Differenza:</span>
-                          <span className="font-bold">
-                            {item.realQuantity - item.quantity > 0 ? "+" : ""}
-                            {(item.realQuantity - item.quantity).toFixed(2).replace(/[.,]00$/, "")} {item.unit}
-                          </span>
-                        </div>
-                      )}
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                        Visibile solo a Admin e Operativi. Indica discrepanze tra sistema e realtà.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
                 {/* QR Code & Barcode */}
-                <div className="pt-4 border-t dark:border-slate-700 flex flex-col items-center gap-4">
-                  <div className="w-full">
-                    <Label className="mb-2 block text-center">Codice Identificativo</Label>
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700">
-                        <QRCode value={item.code} size={128} />
-                      </div>
-                      <div className="bg-white dark:bg-card p-2 rounded border dark:border-slate-700 overflow-hidden max-w-full">
-                        <Barcode value={item.code} width={1.5} height={50} fontSize={12} />
-                      </div>
+                <div className="flex flex-col items-center gap-2 border-t pt-3 dark:border-slate-700">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Codice identificativo</Label>
+                  <div className="flex w-full items-center justify-center gap-3">
+                    <div className="shrink-0 rounded border bg-white p-1.5 dark:border-slate-700 dark:bg-card">
+                      <QRCode value={item.code} size={88} />
+                    </div>
+                    <div className="min-w-0 overflow-hidden rounded border bg-white p-1.5 dark:border-slate-700 dark:bg-card">
+                      <Barcode value={item.code} width={1} height={44} fontSize={10} margin={0} />
                     </div>
                   </div>
                 </div>
@@ -802,14 +814,14 @@ export default function InventoryDetailPage() {
             </Card>
           </div>
 
-          {/* Right Column: Details Form */}
-          <div className="md:col-span-2 space-y-6">
+          {/* Dettagli */}
+          <div className="min-w-0 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Dettagli Articolo</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="space-y-2">
                     <Label htmlFor="code" className="flex items-center">
                       Codice Articolo
@@ -832,8 +844,158 @@ export default function InventoryDetailPage() {
                       <Input id="brand" value={item.brand} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Tipologia</Label>
+                    {isEditing ? (
+                      <SearchableSelect
+                        options={types.map((t) => ({ value: t.name, label: t.name }))}
+                        value={editForm.type ?? ""}
+                        onValueChange={(val) => setEditForm({ ...editForm, type: val })}
+                        placeholder="Seleziona tipo"
+                        searchPlaceholder="Scrivi per cercare tipologia..."
+                      />
+                    ) : (
+                      <Input id="type" value={item.type} readOnly className="bg-slate-50 dark:bg-muted" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit">Unità di Misura</Label>
+                    {isEditing ? (
+                      <SearchableSelect
+                        options={units.map((u) => ({ value: u.name, label: u.name }))}
+                        value={editForm.unit ?? ""}
+                        onValueChange={(val) => setEditForm({ ...editForm, unit: val })}
+                        placeholder="Seleziona unità"
+                        searchPlaceholder="Scrivi per cercare unità..."
+                      />
+                    ) : (
+                      <Input id="unit" value={item.unit} readOnly className="bg-slate-50 dark:bg-muted" />
+                    )}
+                  </div>
                 </div>
 
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="minStock" className="flex items-center">
+                      Scorta Minima
+                      <FieldTip text={'Sotto questa soglia l\'articolo compare nel filtro "Basse Scorte". Se lasci 0, l\'avviso non scatta mai.'} />
+                    </Label>
+                    {isEditing ? (
+                      <Input
+                        id="minStock"
+                        type="number"
+                        step="0.01"
+                        value={editForm.minStock || 0}
+                        onChange={(e) => setEditForm({ ...editForm, minStock: parseFloat(e.target.value) })}
+                      />
+                    ) : (
+                      <Input id="minStock" type="number" step="0.01" value={item.minStock} readOnly className="bg-slate-50 dark:bg-muted" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="coefficient" className="flex items-center">
+                      Coeff. Moltiplicazione
+                      <FieldTip text="Converte l'unità di stock in pezzi fisici. Es: una lastra di cartongesso 2500x1200mm equivale a 3 mq; se in stock tieni 1 pezzo (la lastra), il coefficiente è 3." />
+                    </Label>
+                    {isEditing ? (
+                      <div className="space-y-1">
+                        <Input
+                          id="coefficient"
+                          type="number"
+                          step="0.01"
+                          value={coefficientInput}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setCoefficientInput(raw);
+                            const parsed = parseFloat(raw);
+                            setEditForm({ ...editForm, coefficient: isNaN(parsed) ? undefined : parsed });
+                          }}
+                          disabled={userRole !== 'admin'}
+                          className={userRole !== 'admin' ? "bg-slate-100 dark:bg-muted" : ""}
+                        />
+                        {userRole !== 'admin' && (
+                          <p className="text-[10px] text-red-400 dark:text-red-500">Modificabile solo da Admin</p>
+                        )}
+                      </div>
+                    ) : (
+                      <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50 dark:bg-muted" />
+                    )}
+                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="packQuantity" className="flex items-center">
+                    Quantità per confezione
+                    <FieldTip text="Quante unità ci sono normalmente in una scatola o confezione (es. 18 ML). Serve a segnalare acquisti con prezzo o quantità che non tornano." />
+                  </Label>
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="packQuantity"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-40"
+                        placeholder="Es. 18"
+                        value={editForm.packQuantity ?? ""}
+                        onChange={(e) => {
+                          const parsed = parseFloat(e.target.value);
+                          setEditForm({ ...editForm, packQuantity: isNaN(parsed) || parsed <= 0 ? null : parsed });
+                        }}
+                      />
+                      <span className="text-sm text-slate-500">{item.unit}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-700 dark:text-slate-200">
+                      {item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : "Non indicata"}
+                    </p>
+                  )}
+                </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nome Prodotto</Label>
+                  {isEditing ? (
+                    <Input
+                      id="name"
+                      value={editForm.name || ""}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    />
+                  ) : (
+                    <Input id="name" value={item.name} readOnly className="bg-slate-50 dark:bg-muted" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="model" className="flex items-center">
+                      Modello / Variante
+                      <FieldTip text="Distingue varianti dello stesso prodotto (es. colore, misura, diametro). Usa 'Crea Variante' per clonare questo articolo cambiando solo questo campo." />
+                    </Label>
+                    {!isEditing && (
+                      <Link href={`/inventory/new?cloneId=${item.id}`} title="Crea variante da questo articolo">
+                        <Button variant="ghost" size="sm" className="h-6 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2">
+                          <Copy className="h-3 w-3 mr-1" />
+                          Crea Variante
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                  {isEditing ? (
+                    <Input
+                      id="model"
+                      placeholder="Es. 10mm, DN 50..."
+                      value={editForm.model || ""}
+                      onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
+                    />
+                  ) : (
+                    <Input id="model" value={item.model || ""} readOnly className="bg-slate-50 dark:bg-muted" placeholder="-" />
+                  )}
+                  {isEditing && (
+                    <DuplicateItemsNotice name={editForm.name || ""} model={editForm.model || ""} excludeId={item.id} />
+                  )}
+                </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="supplierCode" className="flex items-center">
                     Codice Fornitore Principale
@@ -854,10 +1016,70 @@ export default function InventoryDetailPage() {
                     )
                   )}
                 </div>
+                </div>
 
-                {/* Additional Supplier Codes */}
-                {!isEditing && (
-                  <div className="space-y-2 pt-2 border-t dark:border-slate-700">
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrizione</Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="description"
+                      value={editForm.description || ""}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      className="min-h-[100px]"
+                    />
+                  ) : (
+                    <Textarea
+                      id="description"
+                      value={item.description}
+                      readOnly
+                      className="min-h-[100px] bg-slate-50 dark:bg-muted"
+                    />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+          </>
+        ) : (
+          <Card>
+            <CardContent className="p-4">
+              <div className="grid gap-4 md:grid-cols-[96px_minmax(0,1fr)]">
+                <div className="h-24 w-24 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+                  <img
+                    src={item.image || typeImage}
+                    alt={item.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => { { const img = e.target as HTMLImageElement; img.src = img.src.endsWith(typeImage) || typeImage === "/placeholder.svg" ? "/placeholder.svg" : typeImage; } }}
+                  />
+                </div>
+                <div className="min-w-0 space-y-4">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
+                    {([
+                      ["Marca", item.brand],
+                      ["Tipologia", item.type],
+                      ["Unità di misura", item.unit],
+                      ["Confezione", item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit}` : null],
+                      ["Scorta minima", item.minStock != null ? String(item.minStock) : null],
+                      ["Coeff. moltiplicazione", item.coefficient !== 1 ? String(item.coefficient) : null],
+                      ["Modello / variante", item.model],
+                      ["Codice fornitore", item.supplierCode],
+                      ["Codice articolo", item.code],
+                    ] as [string, string | null | undefined][]).filter(([, v]) => v).map(([label, value]) => (
+                      <div key={label} className="min-w-0">
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500">{label}</p>
+                        <p className="truncate text-sm text-slate-900 dark:text-slate-100" title={value ?? undefined}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {item.description && (
+                    <div>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500">Descrizione</p>
+                      <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{item.description}</p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                  <div className="space-y-2">
                     <Label>Altri Codici Fornitore</Label>
                     <div className="space-y-2">
                       {supplierCodes.map(code => (
@@ -899,204 +1121,50 @@ export default function InventoryDetailPage() {
                       )}
                     </div>
                   </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome Prodotto</Label>
-                  {isEditing ? (
-                    <Input
-                      id="name"
-                      value={editForm.name || ""}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    />
-                  ) : (
-                    <Input id="name" value={item.name} readOnly className="bg-slate-50 dark:bg-muted" />
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="model" className="flex items-center">
-                      Modello / Variante
-                      <FieldTip text="Distingue varianti dello stesso prodotto (es. colore, misura, diametro). Usa 'Crea Variante' per clonare questo articolo cambiando solo questo campo." />
-                    </Label>
-                    {!isEditing && (
-                      <Link href={`/inventory/new?cloneId=${item.id}`} title="Crea variante da questo articolo">
-                        <Button variant="ghost" size="sm" className="h-6 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2">
-                          <Copy className="h-3 w-3 mr-1" />
-                          Crea Variante
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                  {isEditing ? (
-                    <Input
-                      id="model"
-                      placeholder="Es. 10mm, DN 50..."
-                      value={editForm.model || ""}
-                      onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
-                    />
-                  ) : (
-                    <Input id="model" value={item.model || ""} readOnly className="bg-slate-50 dark:bg-muted" placeholder="-" />
-                  )}
-                  {isEditing && (
-                    <DuplicateItemsNotice name={editForm.name || ""} model={editForm.model || ""} excludeId={item.id} />
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Tipologia</Label>
-                    {isEditing ? (
-                      <SearchableSelect
-                        options={types.map((t) => ({ value: t.name, label: t.name }))}
-                        value={editForm.type ?? ""}
-                        onValueChange={(val) => setEditForm({ ...editForm, type: val })}
-                        placeholder="Seleziona tipo"
-                        searchPlaceholder="Scrivi per cercare tipologia..."
-                      />
-                    ) : (
-                      <Input id="type" value={item.type} readOnly className="bg-slate-50 dark:bg-muted" />
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="minStock" className="flex items-center">
-                      Scorta Minima
-                      <FieldTip text={'Sotto questa soglia l\'articolo compare nel filtro "Basse Scorte". Se lasci 0, l\'avviso non scatta mai.'} />
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="minStock"
-                        type="number"
-                        step="0.01"
-                        value={editForm.minStock || 0}
-                        onChange={(e) => setEditForm({ ...editForm, minStock: parseFloat(e.target.value) })}
-                      />
-                    ) : (
-                      <Input id="minStock" type="number" step="0.01" value={item.minStock} readOnly className="bg-slate-50 dark:bg-muted" />
-                    )}
                   </div>
                 </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setShowCodes(true)}>
+                  <QrCode className="mr-2 h-4 w-4" /> QR e codice a barre
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="unit">Unità di Misura</Label>
-                    {isEditing ? (
-                      <SearchableSelect
-                        options={units.map((u) => ({ value: u.name, label: u.name }))}
-                        value={editForm.unit ?? ""}
-                        onValueChange={(val) => setEditForm({ ...editForm, unit: val })}
-                        placeholder="Seleziona unità"
-                        searchPlaceholder="Scrivi per cercare unità..."
-                      />
-                    ) : (
-                      <Input id="unit" value={item.unit} readOnly className="bg-slate-50 dark:bg-muted" />
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="coefficient" className="flex items-center">
-                      Coeff. Moltiplicazione
-                      <FieldTip text="Converte l'unità di stock in pezzi fisici. Es: una lastra di cartongesso 2500x1200mm equivale a 3 mq; se in stock tieni 1 pezzo (la lastra), il coefficiente è 3." />
-                    </Label>
-                    {isEditing ? (
-                      <div className="space-y-1">
-                        <Input
-                          id="coefficient"
-                          type="number"
-                          step="0.01"
-                          value={coefficientInput}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            setCoefficientInput(raw);
-                            const parsed = parseFloat(raw);
-                            setEditForm({ ...editForm, coefficient: isNaN(parsed) ? undefined : parsed });
-                          }}
-                          disabled={userRole !== 'admin'}
-                          className={userRole !== 'admin' ? "bg-slate-100 dark:bg-muted" : ""}
-                        />
-                        {userRole !== 'admin' && (
-                          <p className="text-[10px] text-red-400 dark:text-red-500">Modificabile solo da Admin</p>
-                        )}
-                      </div>
-                    ) : (
-                      <Input id="coefficient" type="number" step="0.01" value={item.coefficient} readOnly className="bg-slate-50 dark:bg-muted" />
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="packQuantity" className="flex items-center">
-                    Quantità per confezione
-                    <FieldTip text="Quante unità ci sono normalmente in una scatola o confezione (es. 18 ML). Serve a segnalare acquisti con prezzo o quantità che non tornano." />
-                  </Label>
-                  {isEditing ? (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="packQuantity"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="w-40"
-                        placeholder="Es. 18"
-                        value={editForm.packQuantity ?? ""}
-                        onChange={(e) => {
-                          const parsed = parseFloat(e.target.value);
-                          setEditForm({ ...editForm, packQuantity: isNaN(parsed) || parsed <= 0 ? null : parsed });
-                        }}
-                      />
-                      <span className="text-sm text-slate-500">{item.unit}</span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-700 dark:text-slate-200">
-                      {item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : "Non indicata"}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descrizione</Label>
-                  {isEditing ? (
-                    <Textarea
-                      id="description"
-                      value={editForm.description || ""}
-                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                      className="min-h-[100px]"
-                    />
-                  ) : (
-                    <Textarea
-                      id="description"
-                      value={item.description}
-                      readOnly
-                      className="min-h-[100px] bg-slate-50 dark:bg-muted"
-                    />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+        <Dialog open={showCodes} onOpenChange={setShowCodes}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Codice identificativo</DialogTitle>
+              <DialogDescription>{item.code}</DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-4 py-2">
+              <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={160} /></div>
+              <div className="max-w-full overflow-hidden rounded border bg-white p-2 dark:border-slate-700"><Barcode value={item.code} width={1.5} height={50} fontSize={12} /></div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
             {/* Tabs: Lotti / Storico Movimenti */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="lots">
+              <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+                <TabsTrigger value="lots" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
                   Lotti
                   <HelpTip
                     title="Lotti"
                     description="Lo stock è tracciato per lotto d'acquisto con logica FIFO: si consuma prima il lotto più vecchio. Se una quantità non risulta assegnata a nessun lotto, puoi riassegnarla da qui."
                   />
                 </TabsTrigger>
-                <TabsTrigger value="movements">
+                <TabsTrigger value="movements" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
                   Storico Movimenti
                   <HelpTip
                     title="Storico Movimenti"
                     description="Ogni riga è un movimento di magazzino: Carico/Entrata aumentano lo stock, Scarico/Uscita/Vendita/Reso al Fornitore lo diminuiscono. Un movimento 'Fittizio' è registrato per pareggiare i conti senza spostare merce reale."
                   />
                 </TabsTrigger>
-                <TabsTrigger value="conformita">
-                  Certificazione
-                  <HelpTip
-                    title="Certificazione"
-                    description="Le certificazioni qui collegate sono solo scorciatoie ai documenti già presenti nella libreria conformità: associarle o rimuoverle non crea né elimina alcun documento."
-                  />
+                <TabsTrigger value="stats" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
+                  Statistiche
                 </TabsTrigger>
               </TabsList>
 
@@ -1147,7 +1215,7 @@ export default function InventoryDetailPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          movements.map((move) => {
+                          paginate(movements, movementsPage).map((move) => {
                             const isPositive = move.quantity > 0;
                             let typeLabel: string = move.type;
                             let typeColor: string = "bg-slate-500";
@@ -1253,17 +1321,16 @@ export default function InventoryDetailPage() {
                         )}
                       </TableBody>
                     </Table>
+                    <PageControls page={movementsPage} total={movements.length} onPageChange={setMovementsPage} />
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              <TabsContent value="conformita" className="mt-4">
-                <ItemConformita itemId={id} />
+              <TabsContent value="stats" className="mt-4">
+                <ItemStats itemId={id} unit={item.unit} movements={movements} showPrices={userRole === 'admin' || userRole === 'operativo'} />
               </TabsContent>
             </Tabs>
 
-          </div>
-        </div>
       </div>
     </DashboardLayout>
 

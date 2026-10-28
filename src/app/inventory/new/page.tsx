@@ -105,7 +105,7 @@ function NewInventoryItemContent() {
     setIsLoading(true);
     try {
       const coeff = parseFloat(data.coefficient);
-      const minStock = parseInt(data.minStock);
+      const minStock = parseFloat(String(data.minStock).replace(",", ".")) || 0;
 
       if (isNaN(coeff) || coeff <= 0) {
         alert("Il coefficiente deve essere maggiore di 0");
