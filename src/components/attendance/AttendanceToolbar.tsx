@@ -1,12 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Check, Info, Trash2 } from "lucide-react";
+import { Check, Info, Trash2, HardHat, X } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { HoursStepper } from "./HoursStepper";
+import type { Job } from "@/lib/api";
 
 export type AttendanceStatus = 'presence' | 'absence' | 'sick' | 'holiday' | 'permit' | 'injury' | 'transfer' | 'course' | 'strike' | 'medical_exam';
 
 interface ToolbarProps {
     selectedTool: AttendanceStatus | 'delete' | null;
     onSelectTool: (tool: AttendanceStatus | 'delete' | null) => void;
+    jobs: Job[];
+    quickJobId: string;
+    onQuickJobChange: (jobId: string) => void;
+    quickHours: number;
+    onQuickHoursChange: (delta: number) => void;
 }
 
 const tools: { id: AttendanceStatus; label: string; color: string; icon: React.ReactElement }[] = [
@@ -49,10 +57,33 @@ const tools: { id: AttendanceStatus; label: string; color: string; icon: React.R
     },
 ];
 
-export function AttendanceToolbar({ selectedTool, onSelectTool }: ToolbarProps) {
+export function AttendanceToolbar({ selectedTool, onSelectTool, jobs, quickJobId, onQuickJobChange, quickHours, onQuickHoursChange }: ToolbarProps) {
     return (
         <div className="flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border mb-4">
             <div className="text-sm font-medium mr-2 text-gray-500 dark:text-gray-400">Scelta Rapida:</div>
+
+            <div className={cn(
+                "flex flex-wrap items-center gap-2 rounded-md border-2 p-1",
+                selectedTool === 'presence' ? "border-green-600 ring-2 ring-offset-1 ring-green-300" : "border-transparent"
+            )}>
+                <HardHat className="ml-1 h-5 w-5 text-green-600" />
+                <SearchableSelect
+                    options={jobs.map(j => ({ value: j.id, label: `${j.code} - ${j.name}` }))}
+                    value={quickJobId}
+                    onValueChange={(id) => { onQuickJobChange(id); onSelectTool(id ? 'presence' : null); }}
+                    placeholder="Cantiere…"
+                    searchPlaceholder="Cerca commessa…"
+                    className="w-52"
+                />
+                <HoursStepper hours={quickHours} onChange={onQuickHoursChange} />
+                {selectedTool === 'presence' && (
+                    <button onClick={() => { onQuickJobChange(""); onSelectTool(null); }} title="Disattiva" className="p-1 text-slate-500 hover:text-slate-800">
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
+            </div>
+
+            <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 mx-2" />
             {tools.map(tool => (
                 <button
                     key={tool.id}
