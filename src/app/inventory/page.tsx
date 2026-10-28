@@ -17,13 +17,13 @@ function InventorySkeleton() {
 export default async function InventoryPage() {
   const supabase = await createClient();
 
-  // Fetch initial data (Page 1, Limit 12, Tab 'all')
+  // Fetch initial data (Page 1, Limit 50, Tab 'all')
   const { data: dbItems, error, count } = await supabase
     .from('inventory')
     .select('*', { count: 'estimated' })
     .is('deleted_at', null) // gli admin vedono anche gli eliminati: non vanno nell'elenco
     .order('name')
-    .range(0, 11); // 0 to 11 is 12 items
+    .range(0, 49); // 50 articoli per pagina
 
   // Fetch item types for images/filtering
   const { data: dbTypes } = await supabase

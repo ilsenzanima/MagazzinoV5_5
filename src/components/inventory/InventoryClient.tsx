@@ -17,10 +17,10 @@ import {
   ScanLine,
   Loader2
 } from "lucide-react";
-import { ViewToggle } from "@/components/ui/view-toggle";
-import { useViewMode } from "@/hooks/useViewMode";
-import { PageSizeSelector } from "@/components/ui/page-size-selector";
-import { usePageSize } from "@/hooks/usePageSize";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+// Articoli per pagina: fisso, uguale per tutti
+const PAGE_SIZE = 50;
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -88,8 +88,6 @@ function InventoryItemImage({ item, typeInfo }: { item: InventoryItem; typeInfo?
 
 export default function InventoryClient({ initialItems, initialTotal, initialTypes }: InventoryClientProps) {
   const { userRole } = useAuth();
-  const [viewMode, setViewMode] = useViewMode('magazzino');
-  const [pageSize, setPageSize] = usePageSize('magazzino');
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "all";
@@ -117,8 +115,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
   // Pagination state
   const [page, setPage] = useState(initialPage);
-  const limit = pageSize;
-  const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / 12) || 1);
+  const limit = PAGE_SIZE;
+  const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / PAGE_SIZE) || 1);
   const [totalItems, setTotalItems] = useState(initialTotal);
 
   // Debounce search term
@@ -196,13 +194,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   useEffect(() => {
     // Skip first load if parameters match initial props
     // This prevents double fetching on mount
-    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && items === initialItems && pageSize === 12) {
+    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && items === initialItems) {
       return;
     }
 
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, selectedWarehouse, pageSize]);
+  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, selectedWarehouse]);
 
   const loadItems = async () => {
     try {
@@ -307,67 +305,6 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                 </Button>
               </Link>
             )}
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant={activeFiltersCount > 0 ? "secondary" : "ghost"} size="icon" className="shrink-0 relative" aria-label="Filtra">
-                  <Filter className={`h-5 w-5 ${activeFiltersCount > 0 ? "text-blue-600" : "text-slate-600 dark:text-slate-400"}`} />
-                  {activeFiltersCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] grid place-items-center h-4 w-4 rounded-full">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>Filtri Avanzati</SheetTitle>
-                  <SheetDescription>
-                    Affina la ricerca per trovare specifici articoli.
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="py-6 space-y-6">
-                  {/* Brand Filter */}
-                  <div className="space-y-2">
-                    <Label>Marca</Label>
-                    <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Tutte le marche" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tutte le marche</SelectItem>
-                        {brands.map((b) => (
-                          <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Type Filter */}
-                  <div className="space-y-2">
-                    <Label>Tipologia</Label>
-                    <Select value={selectedType} onValueChange={setSelectedType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Tutte le tipologie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tutte le tipologie</SelectItem>
-                        {itemTypes.map((t) => (
-                          <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <SheetFooter>
-                  <SheetClose asChild>
-                    <Button variant="outline" onClick={resetFilters}>Resetta</Button>
-                  </SheetClose>
-                  <SheetClose asChild>
-                    <Button>Chiudi</Button>
-                  </SheetClose>
-                </SheetFooter>
-              </SheetContent>
-            </Sheet>
           </div>
         </div>
 
@@ -387,11 +324,70 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant={activeFiltersCount > 0 ? "secondary" : "outline"} size="icon" className="shrink-0 relative" aria-label="Filtra">
+              <Filter className={`h-5 w-5 ${activeFiltersCount > 0 ? "text-blue-600" : "text-slate-600 dark:text-slate-400"}`} />
+              {activeFiltersCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] grid place-items-center h-4 w-4 rounded-full">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Filtri Avanzati</SheetTitle>
+              <SheetDescription>
+                Affina la ricerca per trovare specifici articoli.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="py-6 space-y-6">
+              {/* Brand Filter */}
+              <div className="space-y-2">
+                <Label>Marca</Label>
+                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tutte le marche" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutte le marche</SelectItem>
+                    {brands.map((b) => (
+                      <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Type Filter */}
+              <div className="space-y-2">
+                <Label>Tipologia</Label>
+                <Select value={selectedType} onValueChange={setSelectedType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tutte le tipologie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutte le tipologie</SelectItem>
+                    {itemTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <SheetFooter>
+              <SheetClose asChild>
+                <Button variant="outline" onClick={resetFilters}>Resetta</Button>
+              </SheetClose>
+              <SheetClose asChild>
+                <Button>Chiudi</Button>
+              </SheetClose>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
           <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR" aria-label="Scansiona Barcode/QR">
             <ScanLine className="h-4 w-4" />
           </Button>
-          <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
 
         {/* Tabs Magazzino: solo le sedi fisiche di stoccaggio (principale + operativa),
@@ -444,45 +440,68 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         </div>
       ) : (
         <>
-          {viewMode === 'list' && (
-            <div className="space-y-1.5 mb-4">
-              {items.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 dark:text-slate-500">
-                  <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                  <p>Nessun articolo trovato</p>
-                </div>
-              ) : items.map((item) => {
-                const qtyColor = item.quantity === 0 ? 'text-red-600 border-red-200 bg-red-50 dark:bg-red-900/20'
-                  : item.quantity <= item.minStock ? 'text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-900/20'
-                  : 'text-slate-600 dark:text-slate-400';
-                const pending = pendingMap?.get(item.id);
-                return (
-                  <Link href={`/inventory/${item.id}`} key={item.id}>
-                    <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
-                      <span className="font-mono text-xs text-slate-400 dark:text-slate-500 w-20 shrink-0 truncate hidden sm:block">{item.code}</span>
-                      <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 break-words">
-                        {item.name}
-                        {item.model && <span className="text-slate-500 font-normal ml-1">({item.model})</span>}
-                      </span>
-                      <span className="text-slate-500 dark:text-slate-400 text-xs w-24 shrink-0 truncate hidden sm:block">{item.brand}</span>
-                      <span className="text-slate-400 dark:text-slate-500 text-xs w-24 shrink-0 truncate hidden md:block">{item.type}</span>
-                      <div className="flex items-center gap-1.5 ml-auto shrink-0">
-                        {pending && pending.uscita > 0 && (
-                          <span className="text-[10px] text-amber-600 border border-amber-300 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-full">
-                            ↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})}
-                          </span>
+          {/* Tabella: da tablet in su */}
+          <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+            <Table className="border-collapse">
+              <TableHeader>
+                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                  <TableHead className="w-28 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Codice</TableHead>
+                  <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Nome</TableHead>
+                  <TableHead className="w-48 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Modello / variante</TableHead>
+                  <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Marca</TableHead>
+                  <TableHead className="w-40 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Tipologia</TableHead>
+                  <TableHead className="w-36 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Giacenza</TableHead>
+                  <TableHead className="w-24 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Scorta min.</TableHead>
+                  <TableHead className="w-32 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Da processare</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                      <Package className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                      <p>Nessun articolo trovato</p>
+                    </TableCell>
+                  </TableRow>
+                ) : items.map((item) => {
+                  const qtyColor = item.quantity === 0 ? 'text-red-600'
+                    : item.quantity <= item.minStock ? 'text-amber-600'
+                    : 'text-slate-800 dark:text-slate-200';
+                  const pending = pendingMap?.get(item.id);
+                  return (
+                    <TableRow key={item.id} className="cursor-pointer" onClick={() => router.push(`/inventory/${item.id}`)}>
+                      <TableCell className="border-r py-2 font-mono text-xs text-slate-500">{item.code}</TableCell>
+                      <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">
+                        <Link href={`/inventory/${item.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">{item.name}</Link>
+                      </TableCell>
+                      <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.model || <span className="text-slate-300">—</span>}</TableCell>
+                      <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.brand}</TableCell>
+                      <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.type}</TableCell>
+                      <TableCell className={`border-r py-2 text-right text-sm font-semibold ${qtyColor}`}>
+                        {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} {item.unit}
+                        {item.coefficient !== 1 && (
+                          <div className="text-[11px] font-normal text-slate-400">{(item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} pz</div>
                         )}
-                        <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full ${qtyColor}`}>
-                          {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-          <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "hidden"}>
+                      </TableCell>
+                      <TableCell className="border-r py-2 text-right text-sm text-slate-500">{item.minStock ? item.minStock.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300">—</span>}</TableCell>
+                      <TableCell className="py-2 text-right text-xs">
+                        {pending && pending.uscita > 0 && (
+                          <div className="text-amber-600">↑ {pending.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} uscita</div>
+                        )}
+                        {pending && pending.reso > 0 && (
+                          <div className="text-green-600">↓ {pending.reso.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} entrata</div>
+                        )}
+                        {!(pending && (pending.uscita > 0 || pending.reso > 0)) && <span className="text-slate-300">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Schede: telefono */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:hidden">
             {items.length === 0 ? (
               <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
