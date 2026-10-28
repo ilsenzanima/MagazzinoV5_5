@@ -542,11 +542,11 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         <>
           {/* Tabella: da tablet in su */}
           <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
-            <Table className="border-collapse">
+            <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
-                  <TableHead className="w-14 border-r" />
-                  <TableHead className="w-28 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-12 border-r" />
+                  <TableHead className="w-24 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <button type="button" onClick={() => toggleSort("code")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
                       Codice
                       {sortKey === "code" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
@@ -558,13 +558,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       {sortKey === "name" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </button>
                   </TableHead>
-                  <TableHead className="w-44 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <button type="button" onClick={() => toggleSort("model")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
                       Modello / variante
                       {sortKey === "model" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </button>
                   </TableHead>
-                  <TableHead className="w-40 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-28 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <div className="flex items-center gap-1">
                       <div className="min-w-0 flex-1">
                         <SearchableSelect
@@ -582,7 +582,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </button>
                     </div>
                   </TableHead>
-                  <TableHead className="w-44 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <div className="flex items-center gap-1">
                       <div className="min-w-0 flex-1">
                         <SearchableSelect
@@ -600,7 +600,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </button>
                     </div>
                   </TableHead>
-                  <TableHead className="w-44 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-40 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     {stockWarehouses.length > 1 ? (
                       <Select value={selectedWarehouse} onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}>
                         <SelectTrigger aria-label="Filtra per magazzino" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"><SelectValue placeholder="Magazzino" /></SelectTrigger>
@@ -611,7 +611,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </Select>
                     ) : "Magazzino"}
                   </TableHead>
-                  <TableHead className="w-44 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-36 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <div className="flex items-center gap-1">
                       <div className="min-w-0 flex-1">
                         <Select value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }}>
@@ -636,7 +636,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       {sortKey === "min_stock" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </button>
                   </TableHead>
-                  <TableHead className="w-32 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Da processare</TableHead>
+                  <TableHead className="w-28 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Da processare</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -672,7 +672,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           if (where.length === 0) return <span className="text-slate-300">—</span>;
                           return where.map(w => (
                             <div key={w.warehouseId} className="flex justify-between gap-2">
-                              <span className="truncate">{warehouseName(w.warehouseId)}</span>
+                              <span className="truncate" title={warehouseName(w.warehouseId)}>{warehouseName(w.warehouseId).replace(/^OPI FIRESAFE S\.R\.L\.\s*/i, "")}</span>
                               {where.length > 1 && (
                                 <span className="shrink-0 text-slate-400">{w.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</span>
                               )}
