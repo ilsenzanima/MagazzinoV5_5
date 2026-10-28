@@ -65,6 +65,8 @@ function SuppliersPageContent() {
   );
   const [sortKey, setSortKey] = useState<SortKey>((searchParams.get("sort") as SortKey) || "name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get("dir") === "desc" ? "desc" : "asc");
+  const [year, setYear] = useState<number>(Number(searchParams.get("anno")) || CURRENT_YEAR);
+  const [years, setYears] = useState<number[]>([CURRENT_YEAR]);
   const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [suppliers, setSuppliers] = useState<SupplierOverview[]>([]);
   const [total, setTotal] = useState(0);
@@ -73,6 +75,11 @@ function SuppliersPageContent() {
   const requestId = useRef(0);
 
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+
+  // Anni disponibili per il «speso»
+  useEffect(() => {
+    suppliersApi.getPurchaseYears().then(list => setYears(list.includes(CURRENT_YEAR) ? list : [CURRENT_YEAR, ...list])).catch(console.error);
+  }, []);
 
   // Solo admin e operativi vedono i fornitori
   useEffect(() => {
@@ -94,12 +101,13 @@ function SuppliersPageContent() {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("q", debouncedSearch);
     if (completeness !== "all") params.set("dati", completeness);
+    if (year !== CURRENT_YEAR) params.set("anno", String(year));
     if (sortKey !== "name") params.set("sort", sortKey);
     if (sortDir !== "asc") params.set("dir", sortDir);
     if (page !== 1) params.set("page", String(page));
     const query = params.toString();
     router.replace(query ? `/suppliers?${query}` : "/suppliers", { scroll: false });
-  }, [debouncedSearch, completeness, sortKey, sortDir, page, router]);
+  }, [debouncedSearch, completeness, year, sortKey, sortDir, page, router]);
 
   const load = async () => {
     const id = ++requestId.current;
@@ -107,7 +115,7 @@ function SuppliersPageContent() {
       setLoading(true);
       setError(null);
       const { data, total } = await suppliersApi.getOverview({
-        page, limit: PAGE_SIZE, search: debouncedSearch, completeness, sort: sortKey, dir: sortDir,
+        page, limit: PAGE_SIZE, search: debouncedSearch, completeness, sort: sortKey, dir: sortDir, year,
       });
       if (id !== requestId.current) return;
       setSuppliers(data);
@@ -125,13 +133,14 @@ function SuppliersPageContent() {
     if (!canView) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, completeness, sortKey, sortDir, canView]);
+  }, [page, debouncedSearch, completeness, sortKey, sortDir, year, canView]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir(key === "name" ? "asc" : "desc"); }
     setPage(1);
   };
+  const changeYear = (v: string) => { setYear(Number(v)); setPage(1); };
   const changeCompleteness = (v: string) => { setCompleteness(v as Completeness); setPage(1); };
   const anyFilterActive = completeness !== "all" || !!searchTerm;
   const resetFilters = () => { setCompleteness("all"); setSearchTerm(""); setPage(1); };
@@ -210,7 +219,23 @@ function SuppliersPageContent() {
                   <TableHead className={`w-56 ${headCls}`}>Contatti</TableHead>
                   <TableHead className={`w-24 text-right ${headCls}`}>{sortBtn("count", "Acquisti")}</TableHead>
                   <TableHead className={`w-32 ${headCls}`}>{sortBtn("last", "Ultimo")}</TableHead>
-                  <TableHead className={`w-32 text-right ${headCls}`}>{sortBtn("year", `Speso ${CURRENT_YEAR}`)}</TableHead>
+                  <TableHead className={`w-36 ${headCls}`}>
+                    <div className="flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <Select value={String(year)} onValueChange={changeYear}>
+                          <SelectTrigger aria-label="Anno del speso" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                            <SelectValue>Speso {year}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <button type="button" aria-label="Ordina per speso nell'anno" onClick={() => toggleSort("year")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                        <SortArrow active={sortKey === "year"} dir={sortDir} />
+                      </button>
+                    </div>
+                  </TableHead>
                   <TableHead className={`w-32 text-right ${headCls}`}>{sortBtn("total", "Totale")}</TableHead>
                   <TableHead className="w-44 text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <Select value={completeness} onValueChange={changeCompleteness}>

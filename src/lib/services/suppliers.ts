@@ -105,13 +105,14 @@ export const suppliersApi = {
     },
     // Elenco per la pagina Fornitori: anagrafica + statistiche, con filtri e ordinamento lato database.
     // Le voci «tecniche» stanno sempre in fondo.
-    getOverview: async ({ page = 1, limit = 50, search = '', completeness = 'all', sort = 'name', dir = 'asc' }: {
-        page?: number; limit?: number; search?: string;
+    getOverview: async ({ page = 1, limit = 50, search = '', completeness = 'all', sort = 'name', dir = 'asc', year = new Date().getFullYear() }: {
+        page?: number; limit?: number; search?: string; year?: number;
         completeness?: 'all' | 'incomplete' | 'complete';
         sort?: 'name' | 'last' | 'year' | 'total' | 'count';
         dir?: 'asc' | 'desc';
     }) => {
-        let query = supabase.from('suppliers_overview').select('*', { count: 'exact' });
+        // Funzione al posto della vista: il «speso» si calcola per l'anno scelto
+        let query = supabase.rpc('suppliers_overview_for_year', { p_year: year }, { count: 'exact' });
 
         const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean).map(w => w.replace(/[,()%*\\]/g, '')).filter(Boolean);
         for (const w of words) {
@@ -133,6 +134,13 @@ export const suppliersApi = {
         const { data, error, count } = await fetchWithTimeout(query.range(from, from + limit - 1));
         if (error) throw error;
         return { data: (data || []).map(mapDbToOverview), total: count ?? 0 };
+    },
+
+    // Anni in cui ci sono acquisti, dal più recente
+    getPurchaseYears: async (): Promise<number[]> => {
+        const { data, error } = await supabase.rpc('supplier_purchase_years');
+        if (error) throw error;
+        return (data || []) as number[];
     },
 
     getOverviewById: async (id: string) => {
