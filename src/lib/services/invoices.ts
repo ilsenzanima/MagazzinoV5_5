@@ -94,6 +94,18 @@ export const invoicesApi = {
         return { data: data.map(mapDbToInvoice), total: count ?? 0 };
     },
 
+    // Più fatture insieme, con le bolle collegate (per l'elenco unico degli acquisti)
+    getByIds: async (ids: string[]): Promise<Invoice[]> => {
+        const { data, error } = await fetchWithTimeout(
+            supabase
+                .from('invoices')
+                .select('*, suppliers(name), purchases(id, delivery_note_number, purchase_items(price, quantity, returned_quantity, returned_price, returned_at))')
+                .in('id', ids)
+        );
+        if (error) throw error;
+        return (data || []).map(mapDbToInvoice);
+    },
+
     getById: async (id: string): Promise<Invoice> => {
         const { data, error } = await fetchWithTimeout(
             supabase
