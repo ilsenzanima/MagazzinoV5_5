@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeft, Loader2, Save, Pencil, X, Trash2, Plus, Mail, Phone, Globe, FileText } from "lucide-react";
 import { suppliersApi, SupplierOverview, SupplierContact } from "@/lib/api";
+import type { SupplierYearSpend, SupplierTopItem } from "@/lib/services/suppliers";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { SupplierDeleteDialog } from "@/components/suppliers";
@@ -66,6 +67,10 @@ export default function SupplierDetailPage() {
   const [docsPage, setDocsPage] = useState(1);
   const [docsLoading, setDocsLoading] = useState(false);
 
+  const [yearSpend, setYearSpend] = useState<SupplierYearSpend[]>([]);
+  const [topItems, setTopItems] = useState<SupplierTopItem[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+
   const toForm = (s: SupplierOverview) => ({
     name: s.name, address: s.address || "", vatNumber: s.vatNumber || "", email: s.email || "", phone: s.phone || "",
     pec: s.pec || "", website: s.website || "", paymentTerms: s.paymentTerms || "", notes: s.notes || "",
@@ -112,6 +117,15 @@ export default function SupplierDetailPage() {
   useEffect(() => {
     if (id && canView) loadDocs();
   }, [id, canView, loadDocs]);
+
+  useEffect(() => {
+    if (!id || !canView) return;
+    setStatsLoading(true);
+    Promise.all([suppliersApi.getSpendByYear(id), suppliersApi.getTopItems(id)])
+      .then(([years, items]) => { setYearSpend(years); setTopItems(items); })
+      .catch(error => { console.error("Error loading supplier stats:", error); notify.error("Errore nel caricamento delle statistiche"); })
+      .finally(() => setStatsLoading(false));
+  }, [id, canView]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -259,6 +273,7 @@ export default function SupplierDetailPage() {
             <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
             <TabsTrigger value="contatti">Contatti{contacts.length > 0 ? ` (${contacts.length})` : ""}</TabsTrigger>
             <TabsTrigger value="documenti">Acquisti e fatture</TabsTrigger>
+            <TabsTrigger value="statistiche">Statistiche</TabsTrigger>
           </TabsList>
 
           <TabsContent value="anagrafica" className="mt-4">
@@ -412,6 +427,73 @@ export default function SupplierDetailPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="statistiche" className="mt-4 space-y-4">
+            {statsLoading ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
+            ) : yearSpend.length === 0 ? (
+              <Card><CardContent className="py-8 text-center text-slate-400">Nessun acquisto registrato per questo fornitore</CardContent></Card>
+            ) : (
+              <>
+                <Card>
+                  <CardHeader><CardTitle>Spesa per anno</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                    {(() => {
+                      const max = Math.max(...yearSpend.map(y => y.spent), 1);
+                      return yearSpend.map(y => (
+                        <div key={y.year} className="flex items-center gap-3 text-sm">
+                          <span className="w-12 shrink-0 font-medium text-slate-600 dark:text-slate-300">{y.year}</span>
+                          <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
+                            <div className="h-full rounded bg-blue-500" style={{ width: `${Math.max((y.spent / max) * 100, y.spent > 0 ? 1 : 0)}%` }} />
+                          </div>
+                          <span className="w-28 shrink-0 text-right font-semibold">{formatCurrency(y.spent)}</span>
+                          <span className="hidden w-20 shrink-0 text-right text-xs text-slate-500 sm:inline">{y.purchasesCount} acquist{y.purchasesCount === 1 ? "o" : "i"}</span>
+                        </div>
+                      ));
+                    })()}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Articoli acquistati</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                      <Table className="border-collapse">
+                        <TableHeader>
+                          <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Articolo</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Volte</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Quantità</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Ultimo prezzo</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Min – max</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Speso</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {topItems.map(it => (
+                            <TableRow key={it.itemId} className="cursor-pointer" onClick={() => router.push(`/inventory/${it.itemId}`)}>
+                              <TableCell className="py-2">
+                                <div className="font-medium">{it.name}</div>
+                                <div className="text-xs text-slate-500">{it.code}</div>
+                              </TableCell>
+                              <TableCell className="py-2 text-right text-sm">{it.timesBought}</TableCell>
+                              <TableCell className="py-2 text-right text-sm">{it.totalQuantity.toLocaleString("it-IT", { maximumFractionDigits: 2 })} {it.unit}</TableCell>
+                              <TableCell className="py-2 text-right text-sm font-semibold">{formatCurrency(it.lastPrice)}<div className="text-xs font-normal text-slate-500">{fmtDate(it.lastDate)}</div></TableCell>
+                              <TableCell className="py-2 text-right text-sm text-slate-600 dark:text-slate-300">
+                                {it.minPrice === it.maxPrice ? formatCurrency(it.maxPrice) : `${formatCurrency(it.minPrice)} – ${formatCurrency(it.maxPrice)}`}
+                              </TableCell>
+                              <TableCell className="py-2 text-right text-sm font-semibold">{formatCurrency(it.totalSpent)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">Primi 30 articoli per spesa. Gli ordini non sono conteggiati.</p>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       </div>
