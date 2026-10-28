@@ -142,7 +142,7 @@ export const jobsApi = {
         if (error) throw error;
         return data.map(mapDbToJob);
     },
-    getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '', category }: { page?: number; limit?: number; search?: string; clientId?: string; status?: string; category?: JobCategory } = {}) => {
+    getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '', category, sort = 'status', dir = 'asc' }: { page?: number; limit?: number; search?: string; clientId?: string; status?: string; category?: JobCategory; sort?: 'status' | 'code' | 'name' | 'date'; dir?: 'asc' | 'desc' } = {}) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -197,11 +197,21 @@ export const jobsApi = {
         }
 
         query = query.select('*, clients(*)');
-        query = query
-            .order('status_sort_order', { ascending: true })
+        const asc = dir === 'asc';
+        if (sort === 'code') {
+            query = query.order('code', { ascending: asc }).order('created_at', { ascending: false });
+        } else if (sort === 'name') {
+            query = query.order('name', { ascending: asc }).order('created_at', { ascending: false });
+        } else if (sort === 'date') {
+            query = query.order('start_date', { ascending: asc, nullsFirst: false }).order('created_at', { ascending: false });
+        } else {
+            // Di partenza: attive, sospese, concluse; dentro ogni stato prima quelle in cantiere
+            query = query
+                .order('status_sort_order', { ascending: asc })
                 .order('on_site', { ascending: false })
-            .order('created_at', { ascending: false })
-            .range(from, to);
+                .order('created_at', { ascending: false });
+        }
+        query = query.range(from, to);
 
         const { data, error, count } = await fetchWithTimeout(query);
 

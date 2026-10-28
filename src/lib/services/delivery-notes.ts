@@ -97,14 +97,19 @@ export const deliveryNotesApi = {
         }
     },
 
-    getPaginated: async ({ page = 1, limit = 10, search = '', dateFrom = '', dateTo = '' }) => {
+    getPaginated: async ({ page = 1, limit = 10, search = '', dateFrom = '', dateTo = '', type = '', jobId = '', sort = 'date', dir = 'desc' }: {
+        page?: number; limit?: number; search?: string; dateFrom?: string; dateTo?: string;
+        type?: string; jobId?: string; sort?: 'date' | 'number' | 'type'; dir?: 'asc' | 'desc';
+    }) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
         let query = supabase
             .from('delivery_notes')
-            .select('*, jobs(code, description, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))', { count: 'estimated' });
+            .select('*, jobs(code, description, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))', { count: 'exact' });
 
+        if (type) query = query.eq('type', type);
+        if (jobId) query = query.eq('job_id', jobId);
         if (dateFrom) {
             query = query.gte('date', dateFrom);
         }
@@ -192,10 +197,15 @@ export const deliveryNotesApi = {
             }
         }
 
-        query = query
-            .order('date', { ascending: false })
-            .order('number_int', { ascending: false })
-            .range(from, to);
+        const asc = dir === 'asc';
+        if (sort === 'number') {
+            query = query.order('number_int', { ascending: asc }).order('date', { ascending: false });
+        } else if (sort === 'type') {
+            query = query.order('type', { ascending: asc }).order('date', { ascending: false }).order('number_int', { ascending: false });
+        } else {
+            query = query.order('date', { ascending: asc }).order('number_int', { ascending: asc });
+        }
+        query = query.range(from, to);
 
         const { data, error, count } = await fetchWithTimeout(query);
 

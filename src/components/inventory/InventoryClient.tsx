@@ -27,6 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 // Articoli per pagina: fisso, uguale per tutti
 const PAGE_SIZE = 50;
 import { PaginationControls } from "@/components/ui/pagination-controls";
+import { ListPageHeader } from "@/components/ui/list-page-header";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { InventoryItem } from "@/lib/mock-data";
@@ -388,46 +389,19 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   return (
     <DashboardLayout>
 
-      {/* Header Fisso */}
-      <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <Link href="/dashboard" className="md:hidden">
-              <Button variant="ghost" size="icon" className="-ml-2" aria-label="Torna indietro">
-                <ChevronLeft className="h-6 w-6 text-slate-600 dark:text-slate-400" />
-              </Button>
-            </Link>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Inventario</h1>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {(userRole === 'admin' || userRole === 'operativo') && (
-              <Link href="/inventory/new" className="w-full sm:w-auto md:hidden">
-                <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuovo Articolo
-                </Button>
-              </Link>
-            )}
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-            <Label htmlFor="inventory-search" className="sr-only">Cerca articoli</Label>
-            <Input
-              id="inventory-search"
-              name="search"
-              type="search"
-              autoComplete="off"
-              placeholder="Cerca Articoli (Nome, Codice, Marca, Tipologia...)"
-              className="pl-9 bg-slate-100 dark:bg-muted border-none"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+      <ListPageHeader
+        title="Gestione Inventario"
+        actions={(userRole === 'admin' || userRole === 'operativo') && (
+          <Link href="/inventory/new" className="w-full sm:w-auto md:hidden">
+            <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuovo Articolo
+            </Button>
+          </Link>
+        )}
+        search={{ id: "inventory-search", label: "Cerca articoli", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca Articoli (Nome, Codice, Marca, Tipologia...)" }}
+        searchActions={
+          <>
         {anyFilterActive && (
           <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={() => { setSelectedBrand("all"); setSelectedType("all"); setSelectedWarehouse("all"); setActiveTab("all"); setPage(1); }}>
             Azzera filtri
@@ -497,8 +471,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
           <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR" aria-label="Scansiona Barcode/QR">
             <ScanLine className="h-4 w-4" />
           </Button>
-        </div>
-
+          </>
+        }
+      >
         {/* Telefono: magazzino e scorte in due menu sulla stessa riga */}
         <div className="grid grid-cols-2 gap-2 md:hidden">
           {stockWarehouses.length > 1 ? (
@@ -519,7 +494,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
             </SelectContent>
           </Select>
         </div>
-      </div>
+      </ListPageHeader>
 
       {/* Lista Articoli */}
       {loading ? (

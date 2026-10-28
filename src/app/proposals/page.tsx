@@ -5,13 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -19,17 +17,22 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ViewToggle } from "@/components/ui/view-toggle";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Loader2, Search, MapPin, FileText, Users, Plus } from "lucide-react";
+import { ListPageHeader } from "@/components/ui/list-page-header";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Loader2, MapPin, FileText, Plus, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals";
 import { clientsApi } from "@/lib/api";
 import { Client } from "@/lib/types";
 import { notify } from "@/lib/notify";
 import { useAuth } from "@/components/auth-provider";
-import { useViewMode } from "@/hooks/useViewMode";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+
+// Offerte per pagina: fisso, uguale per tutti
+const PAGE_SIZE = 50;
 
 const PROP_STATUS_LABELS: Record<ProposalStatus, string> = {
   draft: "Bozza", sent: "Inviata", pending: "In attesa", accepted: "Accettata", rejected: "Rifiutata",
@@ -58,39 +61,60 @@ const EMPTY_QUICK_CLIENT_FORM = {
 
 const proposalYear = (p: ClientProposal) => new Date(p.date || p.createdAt).getFullYear();
 
-const ALL_YEARS = "all";
-const CURRENT_YEAR = new Date().getFullYear();
-const LAST_5_YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2, CURRENT_YEAR - 3, CURRENT_YEAR - 4];
+
+type SortKey = "title" | "client" | "status" | "value" | "date";
+
+// Stato di partenza: le offerte ancora aperte (tutte tranne le accettate)
+const STATUS_PROGRESS = "progress";
+
+function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+  if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+  return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
+function StatusBadge({ status }: { status: ProposalStatus }) {
+  return (
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${PROP_STATUS_COLORS[status]}`}>
+      {PROP_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+const money = (v: number) => `€ ${v.toLocaleString("it-IT", { minimumFractionDigits: 2, useGrouping: true })}`;
+const siteLine = (p: ClientProposal) => [p.siteStreet, p.siteCity].filter(Boolean).join(", ");
 
 function ProposalsPageContent() {
   const { userRole } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [viewMode, setViewMode] = useViewMode("proposte");
 
   const [proposals, setProposals] = useState<ProposalWithClient[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get("q") || "");
-  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("status") || "all");
-  const [clientFilter, setClientFilter] = useState<string>(searchParams.get("client") || "all");
-  const [stageTab, setStageTab] = useState<"progress" | "accepted">(
-    searchParams.get("stage") === "accepted" ? "accepted" : "progress"
+  // Compatibile con i vecchi indirizzi (?stage=accepted)
+  const [statusFilter, setStatusFilter] = useState<string>(
+    searchParams.get("status") || (searchParams.get("stage") === "accepted" ? "accepted" : STATUS_PROGRESS)
   );
-  const [yearTab, setYearTab] = useState<string>(searchParams.get("year") || ALL_YEARS);
+  const [clientFilter, setClientFilter] = useState<string>(searchParams.get("client") || "all");
+  const [yearFilter, setYearFilter] = useState<string>(searchParams.get("year") || "all");
+  const [sortKey, setSortKey] = useState<SortKey>((searchParams.get("sort") as SortKey) || "date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get("dir") === "asc" ? "asc" : "desc");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
 
-  // Keep the URL in sync with search/filters/tabs so browser back/forward
-  // restores the exact view instead of resetting it.
+  // L'indirizzo segue filtri, ordinamento e pagina: indietro/avanti del browser ritrovano la stessa vista
   useEffect(() => {
     const params = new URLSearchParams();
     if (search) params.set("q", search);
-    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (statusFilter !== STATUS_PROGRESS) params.set("status", statusFilter);
     if (clientFilter !== "all") params.set("client", clientFilter);
-    if (stageTab !== "progress") params.set("stage", stageTab);
-    if (yearTab !== ALL_YEARS) params.set("year", yearTab);
+    if (yearFilter !== "all") params.set("year", yearFilter);
+    if (sortKey !== "date") params.set("sort", sortKey);
+    if (sortDir !== "desc") params.set("dir", sortDir);
+    if (page !== 1) params.set("page", String(page));
     const query = params.toString();
     router.replace(query ? `/proposals?${query}` : "/proposals", { scroll: false });
-  }, [search, statusFilter, clientFilter, stageTab, yearTab, router]);
+  }, [search, statusFilter, clientFilter, yearFilter, sortKey, sortDir, page, router]);
 
   // Nuova proposta dialog
   const [newProposalOpen, setNewProposalOpen] = useState(false);
@@ -141,41 +165,6 @@ function ProposalsPageContent() {
       setLoading(false);
     }
   };
-
-  const clientNames = useMemo(() => {
-    const names = [...new Set(proposals.map(p => p.clientName).filter(Boolean))];
-    return names.sort((a, b) => a.localeCompare(b, "it"));
-  }, [proposals]);
-
-  const stageFiltered = useMemo(() => {
-    return proposals.filter(p => stageTab === "accepted" ? p.status === "accepted" : p.status !== "accepted");
-  }, [proposals, stageTab]);
-
-  const availableYears = useMemo(() => {
-    const years = new Set(stageFiltered.map(proposalYear));
-    LAST_5_YEARS.forEach(y => years.add(y));
-    return [...years].sort((a, b) => b - a);
-  }, [stageFiltered]);
-
-  const yearTabsToShow = useMemo(() => {
-    const tabs = [...LAST_5_YEARS];
-    if (yearTab !== ALL_YEARS && !tabs.includes(Number(yearTab))) tabs.push(Number(yearTab));
-    return tabs.sort((a, b) => b - a);
-  }, [yearTab]);
-
-  const filtered = useMemo(() => {
-    return stageFiltered.filter(p => {
-      const s = search.toLowerCase();
-      const matchSearch = !s ||
-        p.title.toLowerCase().includes(s) ||
-        p.clientName.toLowerCase().includes(s) ||
-        (p.siteCity && p.siteCity.toLowerCase().includes(s));
-      const matchStatus = statusFilter === "all" || p.status === statusFilter;
-      const matchClient = clientFilter === "all" || p.clientName === clientFilter;
-      const matchYear = yearTab === ALL_YEARS || proposalYear(p) === Number(yearTab);
-      return matchSearch && matchStatus && matchClient && matchYear;
-    });
-  }, [stageFiltered, search, statusFilter, clientFilter, yearTab]);
 
   const openNewProposal = () => {
     setProposalForm(EMPTY_PROPOSAL_FORM);
@@ -232,187 +221,252 @@ function ProposalsPageContent() {
     finally { setSavingQuickClient(false); }
   };
 
+  const clientNames = useMemo(() => {
+    const names = [...new Set(proposals.map(p => p.clientName).filter(Boolean))];
+    return names.sort((a, b) => a.localeCompare(b, "it"));
+  }, [proposals]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set(proposals.map(proposalYear));
+    return [...years].sort((a, b) => b - a);
+  }, [proposals]);
+
+  const filtered = useMemo(() => {
+    const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+    const rows = proposals.filter(p => {
+      const text = [p.title, p.clientName, p.siteCity, p.siteStreet, p.description].filter(Boolean).join(" ").toLowerCase();
+      const matchSearch = words.every(w => text.includes(w));
+      const matchStatus = statusFilter === "all" ? true
+        : statusFilter === STATUS_PROGRESS ? p.status !== "accepted"
+        : p.status === statusFilter;
+      const matchClient = clientFilter === "all" || p.clientName === clientFilter;
+      const matchYear = yearFilter === "all" || proposalYear(p) === Number(yearFilter);
+      return matchSearch && matchStatus && matchClient && matchYear;
+    });
+    const dir = sortDir === "asc" ? 1 : -1;
+    const when = (p: ProposalWithClient) => p.date || p.createdAt || "";
+    const cmp = (a: ProposalWithClient, b: ProposalWithClient): number => {
+      switch (sortKey) {
+        case "title": return a.title.localeCompare(b.title, "it");
+        case "client": return a.clientName.localeCompare(b.clientName, "it");
+        case "status": return a.status.localeCompare(b.status);
+        case "value": return (a.estimatedValue ?? -1) - (b.estimatedValue ?? -1);
+        default: return when(a).localeCompare(when(b));
+      }
+    };
+    return rows.sort((a, b) => cmp(a, b) * dir || when(b).localeCompare(when(a)));
+  }, [proposals, search, statusFilter, clientFilter, yearFilter, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir(key === "date" || key === "value" ? "desc" : "asc"); }
+    setPage(1);
+  };
+  const changeStatus = (v: string) => { setStatusFilter(v); setPage(1); };
+  const changeClient = (v: string) => { setClientFilter(v || "all"); setPage(1); };
+  const changeYear = (v: string) => { setYearFilter(v); setPage(1); };
+
+  const anyFilterActive = statusFilter !== STATUS_PROGRESS || clientFilter !== "all" || yearFilter !== "all" || !!search;
+  const resetFilters = () => { setStatusFilter(STATUS_PROGRESS); setClientFilter("all"); setYearFilter("all"); setSearch(""); setPage(1); };
+
+  const clientOptions = [{ value: "all", label: "Tutti i committenti" }, ...clientNames.map(n => ({ value: n, label: n }))];
   const progressCount = proposals.filter(p => p.status !== "accepted").length;
-  const acceptedCount = proposals.filter(p => p.status === "accepted").length;
+  const statusItems = (
+    <>
+      <SelectItem value={STATUS_PROGRESS}>In lavorazione ({progressCount})</SelectItem>
+      <SelectItem value="all">Tutte</SelectItem>
+      {(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => (
+        <SelectItem key={k} value={k}>{v}</SelectItem>
+      ))}
+    </>
+  );
+  const yearItems = (
+    <>
+      <SelectItem value="all">Tutti gli anni</SelectItem>
+      {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+    </>
+  );
+
+  const headCls = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600";
+  const sortBtn = (key: SortKey, label: string) => (
+    <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+      {label}
+      <SortArrow active={sortKey === key} dir={sortDir} />
+    </button>
+  );
+  const withSort = (control: React.ReactNode, key: SortKey, label: string) => (
+    <div className="flex items-center gap-1">
+      <div className="min-w-0 flex-1">{control}</div>
+      <button type="button" aria-label={`Ordina per ${label}`} onClick={() => toggleSort(key)} className="shrink-0 text-slate-500 hover:text-slate-900">
+        <SortArrow active={sortKey === key} dir={sortDir} />
+      </button>
+    </div>
+  );
+  const triggerCls = "h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase";
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Elenco Offerte</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Tutte le offerte di tutti i committenti</p>
-          </div>
-          {canEdit && (
-            <Button onClick={openNewProposal} className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />Nuova Offerta
-            </Button>
-          )}
-        </div>
-
-        {/* Tabs stato: in lavorazione / accettate */}
-        <Tabs value={stageTab} onValueChange={v => setStageTab(v as "progress" | "accepted")}>
-          <TabsList>
-            <TabsTrigger value="progress">
-              In Lavorazione
-              <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{progressCount}</span>
-            </TabsTrigger>
-            <TabsTrigger value="accepted">
-              Accettate
-              <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{acceptedCount}</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {/* Tabs anno + selettore anno specifico */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Tabs value={yearTab} onValueChange={setYearTab}>
-            <TabsList className="flex-wrap h-auto gap-1">
-              <TabsTrigger value={ALL_YEARS}>Tutti gli anni</TabsTrigger>
-              {yearTabsToShow.map(y => (
-                <TabsTrigger key={y} value={String(y)}>{y}</TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-          <Select value={yearTab === ALL_YEARS || LAST_5_YEARS.includes(Number(yearTab)) ? "" : yearTab} onValueChange={setYearTab}>
-            <SelectTrigger className="w-44">
-              <SelectValue placeholder="Cerca anno specifico..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableYears.map(y => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
+      <ListPageHeader
+        title="Offerte Generali"
+        actions={canEdit && (
+          <Button onClick={openNewProposal} className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto md:hidden">
+            <Plus className="mr-2 h-4 w-4" />Nuova Offerta
+          </Button>
+        )}
+        search={{ id: "proposals-search", label: "Cerca offerte", value: search, onChange: (v) => { setSearch(v); setPage(1); }, placeholder: "Cerca per titolo, committente, città, descrizione..." }}
+        searchActions={anyFilterActive && (
+          <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+            Azzera filtri
+          </Button>
+        )}
+      >
+        {/* Telefono: stato, anno e committente */}
+        <div className="grid grid-cols-2 gap-2 md:hidden">
+          <Select value={statusFilter} onValueChange={changeStatus}>
+            <SelectTrigger aria-label="Stato"><SelectValue placeholder="Stato" /></SelectTrigger>
+            <SelectContent>{statusItems}</SelectContent>
           </Select>
-        </div>
-
-        {/* Filtri + toggle */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              className="pl-9"
-              placeholder="Cerca per titolo, committente, città..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+          <Select value={yearFilter} onValueChange={changeYear}>
+            <SelectTrigger aria-label="Anno"><SelectValue placeholder="Anno" /></SelectTrigger>
+            <SelectContent>{yearItems}</SelectContent>
+          </Select>
+          <div className="col-span-2">
+            <SearchableSelect
+              options={clientOptions}
+              value={clientFilter === "all" ? "" : clientFilter}
+              onValueChange={changeClient}
+              placeholder="Committente"
+              searchPlaceholder="Scrivi per cercare committente..."
             />
           </div>
-          <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-52">
-              <SelectValue placeholder="Tutti i committenti" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tutti i committenti</SelectItem>
-              {clientNames.map(name => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Tutti gli stati" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tutti gli stati</SelectItem>
-              {(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
+      </ListPageHeader>
 
-        {/* Conteggio */}
-        {!loading && (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {filtered.length} offerta{filtered.length !== 1 ? "e" : ""} trovata{filtered.length !== 1 ? "e" : ""}
-            {filtered.length !== stageFiltered.length && ` (su ${stageFiltered.length} totali)`}
-          </p>
-        )}
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      ) : (
+        <>
+          {/* Tabella: da tablet in su */}
+          <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+            <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+              <TableHeader>
+                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                  <TableHead className={headCls}>{sortBtn("title", "Offerta")}</TableHead>
+                  <TableHead className={`w-64 ${headCls}`}>
+                    {withSort(
+                      <SearchableSelect
+                        options={clientOptions}
+                        value={clientFilter === "all" ? "" : clientFilter}
+                        onValueChange={changeClient}
+                        placeholder="Committente"
+                        searchPlaceholder="Scrivi per cercare committente..."
+                        className={triggerCls}
+                        contentClassName="min-w-[22rem]"
+                      />, "client", "committente"
+                    )}
+                  </TableHead>
+                  <TableHead className={`w-44 ${headCls}`}>
+                    {withSort(
+                      <Select value={statusFilter} onValueChange={changeStatus}>
+                        <SelectTrigger aria-label="Filtra per stato" className={triggerCls}><SelectValue placeholder="Stato" /></SelectTrigger>
+                        <SelectContent>{statusItems}</SelectContent>
+                      </Select>, "status", "stato"
+                    )}
+                  </TableHead>
+                  <TableHead className={`w-36 text-right ${headCls}`}>{sortBtn("value", "Valore")}</TableHead>
+                  <TableHead className={`w-52 ${headCls}`}>Indirizzo cantiere</TableHead>
+                  <TableHead className="w-36 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    {withSort(
+                      <Select value={yearFilter} onValueChange={changeYear}>
+                        <SelectTrigger aria-label="Filtra per anno" className={triggerCls}><SelectValue placeholder="Data" /></SelectTrigger>
+                        <SelectContent>{yearItems}</SelectContent>
+                      </Select>, "date", "data"
+                    )}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pageRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                      <FileText className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                      {proposals.length === 0 ? "Nessuna offerta presente." : "Nessuna offerta corrisponde ai filtri."}
+                    </TableCell>
+                  </TableRow>
+                ) : pageRows.map(p => (
+                  <TableRow key={p.id} className="cursor-pointer" onClick={() => router.push(`/clients/${p.clientId}/proposals/${p.id}`)}>
+                    <TableCell className="border-r py-2">
+                      <div className="line-clamp-2 font-medium text-slate-900 dark:text-white" title={p.title}>{p.title}</div>
+                      {p.description && <div className="line-clamp-1 text-[11px] text-slate-400" title={p.description}>{p.description}</div>}
+                    </TableCell>
+                    <TableCell className="border-r py-2 text-sm text-blue-700 dark:text-blue-400">
+                      <span className="line-clamp-2" title={p.clientName}>{p.clientName}</span>
+                    </TableCell>
+                    <TableCell className="border-r py-2"><StatusBadge status={p.status} /></TableCell>
+                    <TableCell className="border-r py-2 text-right text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      {p.estimatedValue !== null ? money(p.estimatedValue) : <span className="font-normal text-slate-300">—</span>}
+                    </TableCell>
+                    <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">
+                      <span className="line-clamp-2" title={siteLine(p)}>{siteLine(p) || <span className="text-slate-300">—</span>}</span>
+                    </TableCell>
+                    <TableCell className="py-2 text-sm text-slate-600 dark:text-slate-300">
+                      {p.date ? format(new Date(p.date), "dd/MM/yyyy", { locale: it }) : <span className="text-slate-300">—</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
-        {/* Contenuto */}
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-slate-400">
-            <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <p>{stageFiltered.length === 0 ? "Nessuna offerta presente." : "Nessuna offerta corrisponde ai filtri."}</p>
-          </div>
-        ) : viewMode === "list" ? (
-          <div className="space-y-1.5">
-            {filtered.map(p => (
+          {/* Schede: telefono */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:hidden">
+            {pageRows.length === 0 ? (
+              <div className="col-span-full py-10 text-center text-slate-400">
+                <FileText className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                <p>{proposals.length === 0 ? "Nessuna offerta presente." : "Nessuna offerta corrisponde ai filtri."}</p>
+              </div>
+            ) : pageRows.map(p => (
               <Link key={p.id} href={`/clients/${p.clientId}/proposals/${p.id}`}>
-                <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
-                  <FileText className="h-4 w-4 text-blue-600 shrink-0" />
-                  <span className="font-medium text-slate-900 dark:text-white text-sm flex-1 min-w-0 truncate">
-                    {p.title}
-                  </span>
-                  <span className="text-blue-700 dark:text-blue-400 text-xs w-44 shrink-0 truncate hidden sm:flex items-center gap-1">
-                    <Users className="h-3 w-3 shrink-0" />{p.clientName}
-                  </span>
-                  {p.estimatedValue !== null && (
-                    <span className="text-slate-600 dark:text-slate-300 text-xs w-28 shrink-0 text-right hidden md:block">
-                      € {p.estimatedValue.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
-                    </span>
-                  )}
-                  {(p.siteCity || p.siteStreet) && (
-                    <span className="text-slate-400 text-xs w-36 shrink-0 truncate hidden lg:flex items-center gap-1">
-                      <MapPin className="h-3 w-3 shrink-0" />{[p.siteStreet, p.siteCity].filter(Boolean).join(", ")}
-                    </span>
-                  )}
-                  {p.date && (
-                    <span className="text-slate-400 text-xs w-24 shrink-0 hidden xl:block">
-                      {format(new Date(p.date), "d MMM yyyy", { locale: it })}
-                    </span>
-                  )}
-                  <Badge className={`text-xs shrink-0 ${PROP_STATUS_COLORS[p.status]}`} variant="secondary">
-                    {PROP_STATUS_LABELS[p.status]}
-                  </Badge>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map(p => (
-              <Link key={p.id} href={`/clients/${p.clientId}/proposals/${p.id}`}>
-                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                  <CardContent className="p-4 space-y-2">
+                <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
+                  <CardContent className="space-y-2 p-4">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium text-slate-900 dark:text-white leading-snug">{p.title}</p>
-                      <Badge className={`text-xs shrink-0 ${PROP_STATUS_COLORS[p.status]}`} variant="secondary">
-                        {PROP_STATUS_LABELS[p.status]}
-                      </Badge>
+                      <p className="font-medium leading-snug text-slate-900 dark:text-white">{p.title}</p>
+                      <StatusBadge status={p.status} />
                     </div>
                     <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">{p.clientName}</p>
-                    {p.estimatedValue !== null && (
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        € {p.estimatedValue.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
-                      </p>
-                    )}
-                    {p.description && (
-                      <p className="text-xs text-slate-500 line-clamp-2">{p.description}</p>
-                    )}
-                    {(p.siteCity || p.siteStreet) && (
+                    {p.estimatedValue !== null && <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{money(p.estimatedValue)}</p>}
+                    {p.description && <p className="line-clamp-2 text-xs text-slate-500">{p.description}</p>}
+                    {siteLine(p) && (
                       <div className="flex items-center gap-1 text-xs text-slate-400">
                         <MapPin className="h-3 w-3 shrink-0" />
-                        <span>{[p.siteStreet, p.siteCity].filter(Boolean).join(", ")}</span>
+                        <span>{siteLine(p)}</span>
                       </div>
                     )}
-                    {p.date && (
-                      <p className="text-xs text-slate-400">
-                        {format(new Date(p.date), "d MMM yyyy", { locale: it })}
-                      </p>
-                    )}
+                    {p.date && <p className="text-xs text-slate-400">{format(new Date(p.date), "d MMM yyyy", { locale: it })}</p>}
                   </CardContent>
                 </Card>
               </Link>
             ))}
           </div>
-        )}
-      </div>
+
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalItems={filtered.length}
+            itemLabel="offerte"
+          />
+        </>
+      )}
+
+      {/* Pulsante «nuova offerta» sempre visibile (PC) */}
+      {canEdit && <FloatingAddButton onClick={openNewProposal} label="Nuova offerta" />}
 
       {/* Nuova proposta dialog */}
       <Dialog open={newProposalOpen} onOpenChange={setNewProposalOpen}>

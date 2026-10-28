@@ -17,7 +17,7 @@ export default async function JobsPage(
   try {
     const { data, total } = await jobsApi.getPaginated({
       page,
-      limit: 12,
+      limit: 50,
       clientId: clientId || ''
     });
     initialJobs = data;

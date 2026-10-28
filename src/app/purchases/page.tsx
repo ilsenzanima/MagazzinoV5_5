@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Search, Loader2, FileText, Calendar, User, AlertTriangle,
+  Loader2, FileText, Calendar, User, AlertTriangle,
   Paperclip, Package, PackageX, Receipt, ClipboardList, ArrowRightLeft, Undo2,
   ArrowUp, ArrowDown, ArrowUpDown
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
+import { KindBadge } from "@/components/purchases/KindBadge";
+import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,25 +31,6 @@ import {
 
 // Documenti per pagina: fisso, uguale per tutti
 const PAGE_SIZE = 50;
-
-const KIND_LABEL: Record<DocumentKind, string> = { purchase: "Acquisto", order: "Ordine", invoice: "Fattura" };
-// Stessi colori dei banner di collegamento nella scheda del documento: fattura blu, ordine ambra, acquisto verde
-const KIND_STYLE: Record<DocumentKind, string> = {
-  purchase: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-800",
-  order: "text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-800",
-  invoice: "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-800",
-};
-const KIND_ICON: Record<DocumentKind, typeof Receipt> = { purchase: ClipboardList, order: ClipboardList, invoice: Receipt };
-
-function KindBadge({ kind }: { kind: DocumentKind }) {
-  const Icon = KIND_ICON[kind];
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium ${KIND_STYLE[kind]}`}>
-      <Icon className="h-3.5 w-3.5" />
-      {KIND_LABEL[kind]}
-    </span>
-  );
-}
 
 function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
   if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
@@ -226,40 +209,36 @@ function PurchasesPageContent() {
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Acquisti</h1>
-          {canSeeAmounts && (
-            <div className="flex gap-1.5 md:hidden">
-              <Link href="/purchases/new"><Button size="sm" className="bg-blue-600 hover:bg-blue-700">Acquisto</Button></Link>
-              <Link href="/purchases/new?type=order"><Button size="sm" variant="outline">Ordine</Button></Link>
-              <Link href="/invoices/new"><Button size="sm" variant="outline">Fattura</Button></Link>
+      <ListPageHeader
+        title="Gestione Acquisti"
+        actions={canSeeAmounts && (
+          <div className="flex gap-1.5 md:hidden">
+            <Link href="/purchases/new"><Button size="sm" className="bg-blue-600 hover:bg-blue-700">Acquisto</Button></Link>
+            <Link href="/purchases/new?type=order"><Button size="sm" variant="outline">Ordine</Button></Link>
+            <Link href="/invoices/new"><Button size="sm" variant="outline">Fattura</Button></Link>
+          </div>
+        )}
+        search={{ id: "purchases-search", label: "Cerca documenti", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca per numero, fornitore, commessa, articolo... (virgola = OR)" }}
+        searchActions={
+          <>
+            <div className="hidden items-center gap-2 md:flex">
+              <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Dal</span>
+              <Input type="date" aria-label="Dal" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
+              <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Al</span>
+              <Input type="date" aria-label="Al" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
             </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-            <Input
-              placeholder="Cerca per numero, fornitore, commessa, articolo... usa la virgola per OR"
-              className="border-none bg-slate-100 pl-9 dark:bg-muted"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Dal</span>
-            <Input type="date" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Al</span>
-            <Input type="date" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
             {anyFilterActive && (
-              <Button variant="outline" size="sm" onClick={resetFilters} className="shrink-0">Azzera filtri</Button>
+              <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+                Azzera filtri
+              </Button>
             )}
-          </div>
-        </div>
-
-        {/* Telefono: tipo e fornitore in due menu sulla stessa riga */}
+          </>
+        }
+      >
+        {/* Telefono: date, tipo e fornitore */}
         <div className="grid grid-cols-2 gap-2 md:hidden">
+          <Input type="date" aria-label="Dal" className="border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
+          <Input type="date" aria-label="Al" className="border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
           <Select value={kind} onValueChange={changeKind}>
             <SelectTrigger aria-label="Tipo"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
@@ -277,7 +256,7 @@ function PurchasesPageContent() {
             searchPlaceholder="Scrivi per cercare fornitore..."
           />
         </div>
-      </div>
+      </ListPageHeader>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">

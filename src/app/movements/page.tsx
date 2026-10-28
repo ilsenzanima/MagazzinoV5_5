@@ -17,13 +17,13 @@ function MovementsSkeleton() {
 export default async function MovementsPage() {
   const supabase = await createClient();
 
-  // Fetch initial data (Page 1, Limit 12)
+  // Fetch initial data (Page 1, Limit 50)
   const { data: dbMovements, error, count } = await supabase
     .from('delivery_notes')
-    .select('*, jobs(code, description, site_address, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))', { count: 'estimated' })
+    .select('*, jobs(code, description, site_address, job_name:name, client_id, clients(id, name)), delivery_note_items(quantity, inventory(name, model))', { count: 'exact' })
     .order('date', { ascending: false })
     .order('number_int', { ascending: false })
-    .range(0, 11);
+    .range(0, 49);
 
   const initialMovements = dbMovements ? dbMovements.map((d: any) => ({
     ...mapDbToDeliveryNote(d),

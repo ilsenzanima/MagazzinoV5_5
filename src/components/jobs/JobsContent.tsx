@@ -1,38 +1,33 @@
 "use client"
 
 import { notify } from "@/lib/notify";
-import { useState, useEffect, useRef, useDeferredValue } from "react";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Search,
-  Plus,
-  Loader2,
-  Briefcase,
-  Calendar,
-  Building,
-  MapPin,
-  ChevronLeft,
-  ChevronRight
-} from "lucide-react";
-import { ViewToggle } from "@/components/ui/view-toggle";
-import { useViewMode } from "@/hooks/useViewMode";
-import { PageSizeSelector } from "@/components/ui/page-size-selector";
-import { usePageSize } from "@/hooks/usePageSize";
+import { Briefcase, Calendar, Building, MapPin, Plus, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { JobOnSiteToggle } from "@/components/jobs/JobOnSiteToggle";
+import { ListPageHeader } from "@/components/ui/list-page-header";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
-import { Job, jobsApi } from "@/lib/api";
+import { Job, jobsApi, clientsApi } from "@/lib/api";
 import { JobCategory, JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Commesse per pagina: fisso, uguale per tutti
+const PAGE_SIZE = 50;
 
 interface JobsContentProps {
   initialJobs: Job[];
   initialTotal: number;
 }
+
+type SortKey = "status" | "code" | "name" | "date";
 
 const STATUS_ORDER: Record<string, number> = { active: 0, suspended: 1, completed: 2 };
 
@@ -41,122 +36,108 @@ const compareJobs = (a: Job, b: Job) =>
   ((STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3)) || (Number(!!b.onSite) - Number(!!a.onSite));
 
 const STATUS_CONFIG = {
-  active:    { label: 'Attiva',     active: 'bg-green-500 hover:bg-green-600 text-white border-green-500',    inactive: 'border border-green-300 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20' },
-  suspended: { label: 'Sospesa',    active: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500',    inactive: 'border border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20' },
-  completed: { label: 'Completata', active: 'bg-slate-500 hover:bg-slate-600 text-white border-slate-500',   inactive: 'border border-slate-300 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800' },
+  active:    { label: 'Attiva',     badge: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' },
+  suspended: { label: 'Sospesa',    badge: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800' },
+  completed: { label: 'Completata', badge: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' },
 } as const;
 
 type JobStatus = keyof typeof STATUS_CONFIG;
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status as JobStatus];
+  return (
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${cfg?.badge ?? ''}`}>
+      {cfg?.label ?? status}
+    </span>
+  );
+}
+
+function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+  if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+  return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
+const formatDate = (d?: string) => (d ? new Date(d).toLocaleDateString('it-IT') : '');
 
 export default function JobsContent({ initialJobs, initialTotal }: JobsContentProps) {
   const router = useRouter();
   const { userRole } = useAuth();
   const searchParams = useSearchParams();
-  const filterClientId = searchParams.get('clientId');
+  const canEdit = userRole === 'admin' || userRole === 'operativo';
 
-  const [viewMode, setViewMode] = useViewMode('commesse');
-  const [pageSize, setPageSize] = usePageSize('commesse');
-
-  const initialCategory = searchParams.get('category');
-  const isValidCategory = (v: string | null): v is JobCategory =>
-    !!v && Object.keys(JOB_CATEGORY_LABELS).includes(v);
+  const isValidCategory = (v: string | null): v is JobCategory => !!v && Object.keys(JOB_CATEGORY_LABELS).includes(v);
+  const initialStatus = searchParams.get('stato');
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || "");
-  const [filterKind, setFilterKind] = useState<'all' | JobCategory>(
-    isValidCategory(initialCategory) ? initialCategory : 'all'
-  );
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+  const [category, setCategory] = useState<'all' | JobCategory>(isValidCategory(searchParams.get('category')) ? (searchParams.get('category') as JobCategory) : 'all');
+  const [status, setStatus] = useState<'all' | JobStatus>(initialStatus && initialStatus in STATUS_CONFIG ? (initialStatus as JobStatus) : 'all');
+  const [clientId, setClientId] = useState(searchParams.get('clientId') || "");
+  const [sortKey, setSortKey] = useState<SortKey>((searchParams.get('sort') as SortKey) || 'status');
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get('dir') === 'desc' ? 'desc' : 'asc');
+  const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
+  const [clients, setClients] = useState<{ value: string; label: string }[]>([]);
+
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
+  const [total, setTotal] = useState(initialTotal);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const loadRequestId = useRef(0);
+  const firstLoad = useRef(true);
 
-  // Pagination
-  const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
-  const limit = pageSize;
-  const [totalItems, setTotalItems] = useState(initialTotal);
-  const [totalPages, setTotalPages] = useState(Math.ceil(initialTotal / 12) || 1);
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
 
-  // Search Debounce
-  const deferredSearchTerm = useDeferredValue(searchTerm);
-
-  // Skip the reset-to-page-1 on the very first render so a page restored
-  // from the URL (e.g. via browser back) isn't immediately wiped out.
-  const isFirstRun = useRef(true);
   useEffect(() => {
-    if (isFirstRun.current) {
-      isFirstRun.current = false;
-      return;
-    }
-    setPage(1);
-  }, [deferredSearchTerm, filterClientId, pageSize, filterKind]);
+    const t = setTimeout(() => {
+      if (searchTerm !== debouncedSearch) {
+        setDebouncedSearch(searchTerm);
+        setPage(1);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchTerm, debouncedSearch]);
 
-  // Keep the URL in sync with search/category/page so browser back/forward
-  // restores the exact view instead of resetting it.
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (deferredSearchTerm) params.set("q", deferredSearchTerm); else params.delete("q");
-    if (filterKind !== "all") params.set("category", filterKind); else params.delete("category");
-    if (page !== 1) params.set("page", String(page)); else params.delete("page");
-    router.replace(`/jobs?${params.toString()}`, { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deferredSearchTerm, filterKind, page]);
-
-  // Sync state with the server-rendered props only on the very first mount.
-  // router.replace() below (used just to keep the URL in sync) also causes
-  // this Server Component's props to refresh in the background; without this
-  // guard that refresh re-ran on every page/filter change and raced the
-  // client-side loadJobs() fetch below for the same change, so whichever of
-  // the two happened to resolve last won - sometimes clobbering the correct
-  // page with stale/empty data ("si vede per un attimo e poi sparisce").
-  const didSyncInitialProps = useRef(false);
-  useEffect(() => {
-    if (didSyncInitialProps.current) return;
-    didSyncInitialProps.current = true;
-    setJobs(initialJobs);
-    setTotalItems(initialTotal);
-    setTotalPages(Math.ceil(initialTotal / limit) || 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    clientsApi.getAll()
+      .then(list => setClients(list.map(c => ({ value: c.id, label: c.name }))))
+      .catch(console.error);
   }, []);
 
-  // Load Jobs (Server Side Search & Pagination)
+  // L'indirizzo segue filtri, ordinamento e pagina: indietro/avanti del browser ritrovano la stessa vista
   useEffect(() => {
-    if (page === 1 && !deferredSearchTerm && !filterClientId && filterKind === 'all' && jobs === initialJobs && initialJobs.length > 0 && pageSize === 12) {
-      return;
-    }
-    loadJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, deferredSearchTerm, filterClientId, pageSize, filterKind]);
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (category !== "all") params.set("category", category);
+    if (status !== "all") params.set("stato", status);
+    if (clientId) params.set("clientId", clientId);
+    if (sortKey !== "status") params.set("sort", sortKey);
+    if (sortDir !== "asc") params.set("dir", sortDir);
+    if (page !== 1) params.set("page", String(page));
+    const query = params.toString();
+    router.replace(query ? `/jobs?${query}` : "/jobs", { scroll: false });
+  }, [debouncedSearch, category, status, clientId, sortKey, sortDir, page, router]);
 
-  // Guards against out-of-order responses: changing page/filter quickly can
-  // fire loadJobs() more than once (e.g. a filter change also resets page to
-  // 1, each triggering its own fetch) - if the older request resolves after
-  // the newer one, its result is discarded instead of overwriting the
-  // current, correct data with a stale/empty one.
-  const loadRequestId = useRef(0);
-
+  // Guards against out-of-order responses: changing page/filter quickly can fire loadJobs() more than once -
+  // if an older request resolves after the newer one its result is discarded.
   const loadJobs = async () => {
     const requestId = ++loadRequestId.current;
     try {
       setLoading(true);
       setError(null);
-
       const { data, total } = await jobsApi.getPaginated({
         page,
-        limit,
-        search: deferredSearchTerm,
-        clientId: filterClientId || '',
-        category: filterKind === 'all' ? undefined : filterKind
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        clientId,
+        status: status === 'all' ? '' : status,
+        category: category === 'all' ? undefined : category,
+        sort: sortKey,
+        dir: sortDir,
       });
-
       if (requestId !== loadRequestId.current) return;
-
-      // Sort: active → suspended → completed
-      data.sort(compareJobs);
-
       setJobs(data);
-      setTotalItems(total);
-      setTotalPages(Math.ceil(total / limit) || 1);
-
+      setTotal(total);
     } catch (error: any) {
       if (requestId !== loadRequestId.current) return;
       console.error("Failed to load jobs:", error);
@@ -166,6 +147,30 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     }
   };
 
+  useEffect(() => {
+    // La prima pagina senza filtri arriva già dal server
+    const isDefault = page === 1 && !debouncedSearch && !clientId && category === 'all' && status === 'all' && sortKey === 'status' && sortDir === 'asc';
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      if (isDefault && initialJobs.length > 0) return;
+    }
+    loadJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, clientId, category, status, sortKey, sortDir]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir(key === "date" ? "desc" : "asc"); }
+    setPage(1);
+  };
+
+  const changeStatus = (v: string) => { setStatus(v as 'all' | JobStatus); setPage(1); };
+  const changeCategory = (v: string) => { setCategory(v as 'all' | JobCategory); setPage(1); };
+  const changeClient = (v: string) => { setClientId(v === "all" ? "" : v); setPage(1); };
+
+  const anyFilterActive = status !== 'all' || category !== 'all' || !!clientId || !!searchTerm;
+  const resetFilters = () => { setStatus('all'); setCategory('all'); setClientId(""); setSearchTerm(""); setPage(1); };
+
   const handleStatusChange = async (job: Job, newStatus: JobStatus) => {
     if (job.status === newStatus) return;
     setUpdatingStatus(job.id);
@@ -173,8 +178,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
       await jobsApi.update(job.id, { status: newStatus });
       setJobs(prev => {
         const updated = prev.map(j => j.id === job.id ? { ...j, status: newStatus } : j);
-        updated.sort(compareJobs);
-        return updated;
+        return sortKey === 'status' && sortDir === 'asc' ? updated.sort(compareJobs) : updated;
       });
     } catch (err: any) {
       notify.error(err?.message || "Errore durante l'aggiornamento dello stato");
@@ -196,52 +200,70 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     }
   };
 
-  const canEdit = userRole === 'admin' || userRole === 'operativo';
+  const clientOptions = [{ value: "all", label: "Tutti i committenti" }, ...clients];
+  const statusOptions = (
+    <>
+      <SelectItem value="all">Tutti gli stati</SelectItem>
+      {(Object.keys(STATUS_CONFIG) as JobStatus[]).map(s => <SelectItem key={s} value={s}>{STATUS_CONFIG[s].label}</SelectItem>)}
+    </>
+  );
+  const categoryOptions = (
+    <>
+      <SelectItem value="all">Tutti i tipi</SelectItem>
+      {(Object.keys(JOB_CATEGORY_LABELS) as JobCategory[]).map(c => <SelectItem key={c} value={c}>{JOB_CATEGORY_LABELS[c]}</SelectItem>)}
+    </>
+  );
 
-  // Sort initial jobs too
-  const sortedJobs = [...jobs].sort(compareJobs);
+  const headCls = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600";
+  const sortBtn = (key: SortKey, label: string) => (
+    <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+      {label}
+      <SortArrow active={sortKey === key} dir={sortDir} />
+    </button>
+  );
 
   return (
     <>
-      <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Commesse</h1>
-          {canEdit && (
-            <Link href="/jobs/new">
-              <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" />
-                Nuova Commessa
-              </Button>
-            </Link>
-          )}
-        </div>
-
-        <Tabs value={filterKind} onValueChange={(v) => setFilterKind(v as 'all' | JobCategory)}>
-          <TabsList className="flex-wrap h-auto gap-1">
-            <TabsTrigger value="all">Tutte</TabsTrigger>
-            <TabsTrigger value="fornitura_posa">{JOB_CATEGORY_LABELS.fornitura_posa}</TabsTrigger>
-            <TabsTrigger value="solo_fornitura">{JOB_CATEGORY_LABELS.solo_fornitura}</TabsTrigger>
-            <TabsTrigger value="solo_posa">{JOB_CATEGORY_LABELS.solo_posa}</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-            <Input
-              placeholder="Cerca Commessa (Codice, Nome, CIG, CUP, Indirizzo...)"
-              className="pl-9 bg-slate-100 dark:bg-muted border-none"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              aria-label="Cerca commessa"
+      <ListPageHeader
+        title="Gestione Commesse"
+        actions={canEdit && (
+          <Link href="/jobs/new" className="w-full sm:w-auto md:hidden">
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuova Commessa
+            </Button>
+          </Link>
+        )}
+        search={{ id: "jobs-search", label: "Cerca commessa", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca Commessa (Codice, Nome, CIG, CUP, Indirizzo...)" }}
+        searchActions={anyFilterActive && (
+          <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+            Azzera filtri
+          </Button>
+        )}
+      >
+        {/* Telefono: stato, tipo e committente */}
+        <div className="grid grid-cols-2 gap-2 md:hidden">
+          <Select value={status} onValueChange={changeStatus}>
+            <SelectTrigger aria-label="Stato"><SelectValue placeholder="Stato" /></SelectTrigger>
+            <SelectContent>{statusOptions}</SelectContent>
+          </Select>
+          <Select value={category} onValueChange={changeCategory}>
+            <SelectTrigger aria-label="Tipo"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>{categoryOptions}</SelectContent>
+          </Select>
+          <div className="col-span-2">
+            <SearchableSelect
+              options={clientOptions}
+              value={clientId}
+              onValueChange={changeClient}
+              placeholder="Committente"
+              searchPlaceholder="Scrivi per cercare committente..."
             />
           </div>
-          <PageSizeSelector value={pageSize} onChange={(s) => { setPageSize(s); setPage(1); }} />
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
-      </div>
+      </ListPageHeader>
 
-      {loading ? (
+      {loading && jobs.length === 0 ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           <span className="ml-2 text-slate-500 dark:text-slate-400">Caricamento commesse...</span>
@@ -253,212 +275,188 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
           </div>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Errore di Caricamento</h3>
           <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md">{error}</p>
-          <Button onClick={loadJobs} variant="outline">
-            Riprova
-          </Button>
+          <Button onClick={loadJobs} variant="outline">Riprova</Button>
         </div>
       ) : (
-        <>
-          {viewMode === 'list' && (
-            <div className="space-y-1.5 mb-4">
-              {sortedJobs.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 dark:text-slate-500">
-                  <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                  <p>Nessuna commessa trovata</p>
-                </div>
-              ) : sortedJobs.map((job) => {
-                const statusCfg = STATUS_CONFIG[job.status as JobStatus];
-                const statusColor = job.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                  : job.status === 'suspended' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
-                return (
-                  <div
-                    key={job.id}
-                    className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer"
-                    onClick={() => router.push(`/jobs/${job.id}`)}
-                  >
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusColor}`}>
-                      {statusCfg?.label ?? job.status}
-                    </span>
-                    <span className="font-mono text-xs text-slate-500 dark:text-slate-400 w-24 shrink-0 truncate">
-                      {job.code}
-                    </span>
-                    <span className="font-semibold text-slate-900 dark:text-white text-sm flex-1 truncate">
-                      {job.name}
-                    </span>
-                    {job.status === 'active' && (
-                      <JobOnSiteToggle onSite={!!job.onSite} canEdit={canEdit} disabled={updatingStatus === job.id} onToggle={() => handleOnSiteToggle(job)} />
-                    )}
-                    <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
-                      {JOB_CATEGORY_LABELS[job.category]}
-                    </Badge>
-                    <span className="text-slate-500 dark:text-slate-400 text-sm w-36 shrink-0 truncate hidden sm:block">
-                      {job.clientName || '—'}
-                    </span>
-                    <span className="text-slate-400 dark:text-slate-500 text-xs w-28 shrink-0 truncate hidden md:block">
-                      {job.siteAddress || '—'}
-                    </span>
-                    {canEdit && (
-                      <div className="flex gap-1 shrink-0 ml-auto" onClick={e => e.stopPropagation()}>
-                        {(Object.keys(STATUS_CONFIG) as JobStatus[]).map((status) => (
-                          <button
-                            key={status}
-                            disabled={updatingStatus === job.id}
-                            onClick={() => handleStatusChange(job, status)}
-                            className={`rounded-full text-[10px] font-medium transition-all disabled:opacity-50 ${
-                              job.status === status
-                                ? `px-2 py-0.5 ${STATUS_CONFIG[status].active}`
-                                : `px-1.5 py-0.5 ${STATUS_CONFIG[status].inactive}`
-                            }`}
-                          >
-                            {STATUS_CONFIG[status].label}
-                          </button>
-                        ))}
+        <div className={loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
+          {/* Tabella: da tablet in su */}
+          <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+            <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+              <TableHeader>
+                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                  <TableHead className="w-12 border-r text-center text-xs font-semibold uppercase tracking-wide text-slate-600" title="In cantiere">
+                    <span className="sr-only">In cantiere</span>
+                  </TableHead>
+                  <TableHead className={`w-40 ${headCls}`}>
+                    <div className="flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <Select value={status} onValueChange={changeStatus}>
+                          <SelectTrigger aria-label="Filtra per stato" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"><SelectValue placeholder="Stato" /></SelectTrigger>
+                          <SelectContent>{statusOptions}</SelectContent>
+                        </Select>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "hidden"}>
-            {sortedJobs.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
-                <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                <p>Nessuna commessa trovata</p>
-              </div>
-            ) : (
-              sortedJobs.map((job) => (
-                <Card
-                  key={job.id}
-                  className="hover:shadow-md transition-shadow flex flex-col h-full cursor-pointer"
-                  onClick={() => router.push(`/jobs/${job.id}`)}
-                >
-                  <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-2">
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0">
-                        <div className="text-xs font-mono text-slate-500 dark:text-muted-foreground mb-1">{job.code}</div>
-                        <CardTitle className="text-base sm:text-lg font-bold text-slate-800 dark:text-white break-words" title={job.name}>{job.name}</CardTitle>
-                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{job.description}</p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        {job.status === 'active' && (
-                          <JobOnSiteToggle onSite={!!job.onSite} canEdit={canEdit} disabled={updatingStatus === job.id} onToggle={() => handleOnSiteToggle(job)} />
-                        )}
-                        <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
-                          {JOB_CATEGORY_LABELS[job.category]}
-                        </Badge>
-                      </div>
+                      <button type="button" aria-label="Ordina per stato" onClick={() => toggleSort("status")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                        <SortArrow active={sortKey === "status"} dir={sortDir} />
+                      </button>
                     </div>
-
-                    {/* Status buttons */}
-                    {canEdit ? (
-                      <div
-                        className="flex gap-1.5 mt-2 flex-wrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {(Object.keys(STATUS_CONFIG) as JobStatus[]).map((status) => (
-                          <button
-                            key={status}
-                            disabled={updatingStatus === job.id}
-                            onClick={() => handleStatusChange(job, status)}
-                            className={`rounded-full font-medium transition-all disabled:opacity-50 ${
-                              job.status === status
-                                ? `text-sm px-3 py-1 ${STATUS_CONFIG[status].active}`
-                                : `text-xs px-2 py-0.5 ${STATUS_CONFIG[status].inactive}`
-                            }`}
-                          >
-                            {STATUS_CONFIG[status].label}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-2">
-                        <Badge
-                          className={
-                            job.status === 'active' ? 'bg-green-600' :
-                            job.status === 'suspended' ? 'bg-amber-500' :
-                            ''
-                          }
-                          variant={job.status === 'completed' ? 'secondary' : undefined}
-                        >
-                          {STATUS_CONFIG[job.status as JobStatus]?.label ?? job.status}
-                        </Badge>
-                      </div>
-                    )}
-                  </CardHeader>
-                  <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 text-sm space-y-3 text-slate-600 dark:text-muted-foreground flex-1">
-                    <div className="flex items-center gap-2">
-                      <Building className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
-                      <span className="font-medium text-slate-700 dark:text-foreground">{job.clientName || 'N/A'}</span>
-                    </div>
-
-                    {(job.cig || job.cup) && (
-                      <div className="flex flex-wrap gap-2">
-                        {job.cig && (
-                          <Badge variant="outline" className="text-xs font-normal text-slate-500 dark:text-muted-foreground bg-slate-50 dark:bg-muted/50">
-                            CIG: {job.cig}
-                          </Badge>
-                        )}
-                        {job.cup && (
-                          <Badge variant="outline" className="text-xs font-normal text-slate-500 dark:text-muted-foreground bg-slate-50 dark:bg-muted/50">
-                            CUP: {job.cup}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-
-                    {job.siteAddress && (
-                      <div className="flex items-start gap-2 text-xs">
-                        <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400 dark:text-slate-500" />
-                        <span>{job.siteAddress}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 text-xs pt-2 mt-auto border-t dark:border-slate-700">
-                      <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
-                      <span>
-                        {job.startDate ? new Date(job.startDate).toLocaleDateString() : 'N/D'}
-                        {' - '}
-                        {job.endDate ? new Date(job.endDate).toLocaleDateString() : 'In corso'}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                  </TableHead>
+                  <TableHead className={`w-28 ${headCls}`}>{sortBtn("code", "Codice")}</TableHead>
+                  <TableHead className={headCls}>{sortBtn("name", "Commessa")}</TableHead>
+                  <TableHead className={`w-56 ${headCls}`}>
+                    <SearchableSelect
+                      options={clientOptions}
+                      value={clientId}
+                      onValueChange={changeClient}
+                      placeholder="Committente"
+                      searchPlaceholder="Scrivi per cercare committente..."
+                      className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"
+                      contentClassName="min-w-[22rem]"
+                    />
+                  </TableHead>
+                  <TableHead className={`w-40 ${headCls}`}>
+                    <Select value={category} onValueChange={changeCategory}>
+                      <SelectTrigger aria-label="Filtra per tipo" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                      <SelectContent>{categoryOptions}</SelectContent>
+                    </Select>
+                  </TableHead>
+                  <TableHead className={`w-44 ${headCls}`}>Indirizzo cantiere</TableHead>
+                  <TableHead className="w-32 text-xs font-semibold uppercase tracking-wide text-slate-600">{sortBtn("date", "Inizio")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {jobs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                      <Briefcase className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                      Nessuna commessa trovata
+                    </TableCell>
+                  </TableRow>
+                ) : jobs.map((job) => (
+                  <TableRow key={job.id} className="cursor-pointer" onClick={() => router.push(`/jobs/${job.id}`)}>
+                    <TableCell className="border-r py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                      {job.status === 'active' && (
+                        <JobOnSiteToggle onSite={!!job.onSite} canEdit={canEdit} disabled={updatingStatus === job.id} onToggle={() => handleOnSiteToggle(job)} />
+                      )}
+                    </TableCell>
+                    <TableCell className="border-r py-2" onClick={(e) => e.stopPropagation()}>
+                      {canEdit ? (
+                        <Select value={job.status} onValueChange={(v) => handleStatusChange(job, v as JobStatus)} disabled={updatingStatus === job.id}>
+                          <SelectTrigger aria-label="Cambia stato" className={`h-7 w-full gap-1 rounded-md border px-2 text-xs font-medium ${STATUS_CONFIG[job.status as JobStatus]?.badge ?? ''}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(Object.keys(STATUS_CONFIG) as JobStatus[]).map(s => <SelectItem key={s} value={s}>{STATUS_CONFIG[s].label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : <StatusBadge status={job.status} />}
+                    </TableCell>
+                    <TableCell className="border-r py-2 font-mono text-xs text-slate-500">{job.code}</TableCell>
+                    <TableCell className="border-r py-2">
+                      <div className="line-clamp-2 font-medium text-slate-900 dark:text-white" title={job.name}>{job.name}</div>
+                      {(job.cig || job.cup) && (
+                        <div className="mt-0.5 truncate text-[11px] text-slate-400">
+                          {job.cig && <>CIG {job.cig}</>}{job.cig && job.cup && " · "}{job.cup && <>CUP {job.cup}</>}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
+                      <span className="line-clamp-2" title={job.clientName}>{job.clientName || <span className="text-slate-300">—</span>}</span>
+                    </TableCell>
+                    <TableCell className="border-r py-2">
+                      <Badge className={`text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>{JOB_CATEGORY_LABELS[job.category]}</Badge>
+                    </TableCell>
+                    <TableCell className="border-r py-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span className="line-clamp-2" title={job.siteAddress}>{job.siteAddress || <span className="text-slate-300">—</span>}</span>
+                    </TableCell>
+                    <TableCell className="py-2 text-xs text-slate-600 dark:text-slate-300">
+                      {formatDate(job.startDate) || <span className="text-slate-300">—</span>}
+                      {job.endDate && <div className="text-slate-400">fino al {formatDate(job.endDate)}</div>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between mt-8 border-t pt-4 dark:border-border gap-4">
-              <div className="text-sm text-slate-500 dark:text-slate-400 order-2 sm:order-1">
-                Pagina {page} di {totalPages} ({totalItems} commesse)
+          {/* Schede: telefono */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:hidden">
+            {jobs.length === 0 ? (
+              <div className="col-span-full py-10 text-center text-slate-400 dark:text-slate-500">
+                <Briefcase className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                <p>Nessuna commessa trovata</p>
               </div>
-              <div className="flex gap-2 order-1 sm:order-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1 || loading}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Precedente
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages || loading}
-                >
-                  Successiva
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
+            ) : jobs.map((job) => (
+              <Card
+                key={job.id}
+                className="flex h-full cursor-pointer flex-col transition-shadow hover:shadow-md"
+                onClick={() => router.push(`/jobs/${job.id}`)}
+              >
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="mb-1 font-mono text-xs text-slate-500 dark:text-muted-foreground">{job.code}</div>
+                      <CardTitle className="break-words text-base font-bold text-slate-800 dark:text-white" title={job.name}>{job.name}</CardTitle>
+                      <p className="line-clamp-1 text-xs text-slate-500 dark:text-slate-400">{job.description}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {job.status === 'active' && (
+                        <JobOnSiteToggle onSite={!!job.onSite} canEdit={canEdit} disabled={updatingStatus === job.id} onToggle={() => handleOnSiteToggle(job)} />
+                      )}
+                      <Badge className={`shrink-0 text-[10px] ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>{JOB_CATEGORY_LABELS[job.category]}</Badge>
+                    </div>
+                  </div>
+                  <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                    {canEdit ? (
+                      <Select value={job.status} onValueChange={(v) => handleStatusChange(job, v as JobStatus)} disabled={updatingStatus === job.id}>
+                        <SelectTrigger aria-label="Cambia stato" className={`h-8 w-40 gap-1 rounded-md border px-2 text-xs font-medium ${STATUS_CONFIG[job.status as JobStatus]?.badge ?? ''}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(STATUS_CONFIG) as JobStatus[]).map(s => <SelectItem key={s} value={s}>{STATUS_CONFIG[s].label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : <StatusBadge status={job.status} />}
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 space-y-3 p-4 pt-0 text-sm text-slate-600 dark:text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Building className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+                    <span className="font-medium text-slate-700 dark:text-foreground">{job.clientName || 'N/A'}</span>
+                  </div>
+                  {(job.cig || job.cup) && (
+                    <div className="flex flex-wrap gap-2">
+                      {job.cig && <Badge variant="outline" className="bg-slate-50 text-xs font-normal text-slate-500 dark:bg-muted/50 dark:text-muted-foreground">CIG: {job.cig}</Badge>}
+                      {job.cup && <Badge variant="outline" className="bg-slate-50 text-xs font-normal text-slate-500 dark:bg-muted/50 dark:text-muted-foreground">CUP: {job.cup}</Badge>}
+                    </div>
+                  )}
+                  {job.siteAddress && (
+                    <div className="flex items-start gap-2 text-xs">
+                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
+                      <span>{job.siteAddress}</span>
+                    </div>
+                  )}
+                  <div className="mt-auto flex items-center gap-2 border-t pt-2 text-xs dark:border-slate-700">
+                    <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
+                    <span>{job.startDate ? formatDate(job.startDate) : 'N/D'}{' - '}{job.endDate ? formatDate(job.endDate) : 'In corso'}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            loading={loading}
+            onPageChange={setPage}
+            totalItems={total}
+            itemLabel="commesse"
+          />
+        </div>
       )}
+
+      {/* Pulsante «nuova commessa» sempre visibile (PC) */}
+      {canEdit && <FloatingAddButton href="/jobs/new" label="Nuova commessa" />}
     </>
   );
 }

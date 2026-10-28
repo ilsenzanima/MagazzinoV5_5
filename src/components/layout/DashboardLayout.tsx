@@ -37,6 +37,7 @@ import {
   ListChecks,
   PanelLeftClose,
   PanelLeftOpen,
+  Store,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -190,6 +191,12 @@ export function Sidebar({ className, onLinkClick, collapsed = false, onToggleCol
           href: "/clients",
           active: pathname === "/clients" || pathname.startsWith("/clients/"),
         },
+        ...(userRole === "admin" || userRole === "operativo" ? [{
+          label: "Fornitori",
+          icon: Store,
+          href: "/suppliers",
+          active: pathname === "/suppliers" || pathname.startsWith("/suppliers/"),
+        }] : []),
         ...(userRole === "admin" || userRole === "operativo" ? [{
           label: "Offerte generali",
           icon: FileText,

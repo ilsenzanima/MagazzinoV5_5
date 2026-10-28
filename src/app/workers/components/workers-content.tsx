@@ -1,39 +1,57 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Worker, workersApi } from "@/lib/api";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Search, Plus, HardHat, Mail, Pencil, Calendar } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, HardHat, Mail, Pencil, Calendar, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { WorkerDialog } from "./worker-dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { cn } from "@/lib/utils";
-import { ViewToggle } from "@/components/ui/view-toggle";
-import { useViewMode } from "@/hooks/useViewMode";
+import { ListPageHeader } from "@/components/ui/list-page-header";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+
+// Operai per pagina: fisso, uguale per tutti
+const PAGE_SIZE = 50;
+
+type SortKey = "name" | "status" | "created";
+type StatusFilter = "all" | "active" | "inactive";
 
 interface WorkersContentProps {
     initialWorkers: Worker[];
 }
+
+function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+    if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+    return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
+function StatusBadge({ active }: { active: boolean }) {
+    return (
+        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${active ? "border-green-200 bg-green-100 text-green-700" : "border-slate-200 bg-slate-100 text-slate-500"}`}>
+            {active ? "Attivo" : "Inattivo"}
+        </span>
+    );
+}
+
+const euro = (v: number) => `€ ${v.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`;
 
 export default function WorkersContent({ initialWorkers }: WorkersContentProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [workers, setWorkers] = useState<Worker[]>(initialWorkers);
     const [search, setSearch] = useState(searchParams.get("q") || "");
-
-    // Keep the URL in sync with the search term so browser back/forward
-    // restores the exact view instead of resetting it.
-    useEffect(() => {
-        const params = new URLSearchParams();
-        if (search) params.set("q", search);
-        const query = params.toString();
-        router.replace(query ? `/workers?${query}` : "/workers", { scroll: false });
-    }, [search, router]);
+    const [status, setStatus] = useState<StatusFilter>(
+        searchParams.get("stato") === "active" ? "active" : searchParams.get("stato") === "inactive" ? "inactive" : "all"
+    );
+    const [sortKey, setSortKey] = useState<SortKey>((searchParams.get("sort") as SortKey) || "name");
+    const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get("dir") === "desc" ? "desc" : "asc");
+    const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -41,28 +59,54 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
     const { userRole } = useAuth();
     const { toast } = useToast();
 
-    const canCreate = userRole === 'admin' || userRole === 'operativo';
     const canEdit = userRole === 'admin' || userRole === 'operativo';
-    const [viewMode, setViewMode] = useViewMode('operai');
 
-    const filteredWorkers = workers.filter((worker) => {
-        if (!search.trim()) return true;
-        const words = search.trim().toLowerCase().split(/\s+/).filter(w => w.length > 0);
-        if (words.length === 0) return true;
-        const searchTarget = `${worker.firstName} ${worker.lastName} ${worker.email || ''}`.toLowerCase();
-        return words.every(word => searchTarget.includes(word));
-    });
+    // L'indirizzo segue filtri, ordinamento e pagina: indietro/avanti del browser ritrovano la stessa vista
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (search) params.set("q", search);
+        if (status !== "all") params.set("stato", status);
+        if (sortKey !== "name") params.set("sort", sortKey);
+        if (sortDir !== "asc") params.set("dir", sortDir);
+        if (page !== 1) params.set("page", String(page));
+        const query = params.toString();
+        router.replace(query ? `/workers?${query}` : "/workers", { scroll: false });
+    }, [search, status, sortKey, sortDir, page, router]);
 
-    const handleWorkerCreated = () => {
-        window.location.reload();
+    const filtered = useMemo(() => {
+        const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const rows = workers.filter((w) => {
+            const target = `${w.firstName} ${w.lastName} ${w.email || ''}`.toLowerCase();
+            return words.every(word => target.includes(word))
+                && (status === "all" || (status === "active" ? w.isActive : !w.isActive));
+        });
+        const dir = sortDir === "asc" ? 1 : -1;
+        const byName = (a: Worker, b: Worker) =>
+            `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "it");
+        return rows.sort((a, b) => {
+            if (sortKey === "status") return (Number(b.isActive) - Number(a.isActive)) * dir || byName(a, b);
+            if (sortKey === "created") return (a.createdAt || "").localeCompare(b.createdAt || "") * dir || byName(a, b);
+            return byName(a, b) * dir;
+        });
+    }, [workers, search, status, sortKey, sortDir]);
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+
+    const toggleSort = (key: SortKey) => {
+        if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+        else { setSortKey(key); setSortDir(key === "created" ? "desc" : "asc"); }
+        setPage(1);
     };
+    const changeStatus = (v: string) => { setStatus(v as StatusFilter); setPage(1); };
+    const anyFilterActive = status !== "all" || !!search;
+    const resetFilters = () => { setStatus("all"); setSearch(""); setPage(1); };
 
-    const handleWorkerUpdated = () => {
-        window.location.reload();
-    };
+    const handleWorkerCreated = () => { window.location.reload(); };
+    const handleWorkerUpdated = () => { window.location.reload(); };
 
-    const handleToggleStatus = async (worker: Worker, checked: boolean, e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleToggleStatus = async (worker: Worker, checked: boolean) => {
         try {
             setTogglingId(worker.id);
             const updated = await workersApi.toggleStatus(worker.id, checked);
@@ -82,173 +126,188 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
         }
     };
 
-    return (
-        <div className="space-y-6">
-            {/* Sticky Header */}
-            <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <HardHat className="h-6 w-6 text-blue-600" />
-                        Gestione Operai
-                    </h1>
-                    {canCreate && (
-                        <Button onClick={() => setIsCreateOpen(true)} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Nuovo Operaio
-                        </Button>
-                    )}
-                </div>
+    const headCls = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600";
+    const sortBtn = (key: SortKey, label: string) => (
+        <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+            {label}
+            <SortArrow active={sortKey === key} dir={sortDir} />
+        </button>
+    );
+    const statusItems = (
+        <>
+            <SelectItem value="all">Tutti</SelectItem>
+            <SelectItem value="active">Attivi</SelectItem>
+            <SelectItem value="inactive">Inattivi</SelectItem>
+        </>
+    );
+    const colCount = canEdit ? 7 : 4;
 
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                        <Input
-                            placeholder="Cerca Operaio (Nome, Email...)"
-                            className="pl-9 bg-slate-100 dark:bg-muted border-none"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                    </div>
-                    <ViewToggle mode={viewMode} onChange={setViewMode} />
+    return (
+        <>
+            <ListPageHeader
+                title="Gestione Operai"
+                actions={canEdit && (
+                    <Button onClick={() => setIsCreateOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto md:hidden">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Nuovo Operaio
+                    </Button>
+                )}
+                search={{ id: "workers-search", label: "Cerca operai", value: search, onChange: (v) => { setSearch(v); setPage(1); }, placeholder: "Cerca Operaio (Nome, Email...)" }}
+                searchActions={anyFilterActive && (
+                    <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+                        Azzera filtri
+                    </Button>
+                )}
+            >
+                {/* Telefono: stato */}
+                <div className="md:hidden">
+                    <Select value={status} onValueChange={changeStatus}>
+                        <SelectTrigger aria-label="Stato"><SelectValue placeholder="Stato" /></SelectTrigger>
+                        <SelectContent>{statusItems}</SelectContent>
+                    </Select>
                 </div>
+            </ListPageHeader>
+
+            {/* Tabella: da tablet in su */}
+            <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+                <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                    <TableHeader>
+                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className={headCls}>{sortBtn("name", "Operaio")}</TableHead>
+                            <TableHead className={`w-64 ${headCls}`}>Email</TableHead>
+                            {canEdit && <TableHead className={`w-32 text-right ${headCls}`}>Tariffa oraria</TableHead>}
+                            {canEdit && <TableHead className={`w-32 text-right ${headCls}`}>Trasferta</TableHead>}
+                            <TableHead className={`w-44 ${headCls}`}>
+                                <div className="flex items-center gap-1">
+                                    <div className="min-w-0 flex-1">
+                                        <Select value={status} onValueChange={changeStatus}>
+                                            <SelectTrigger aria-label="Filtra per stato" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"><SelectValue placeholder="Stato" /></SelectTrigger>
+                                            <SelectContent>{statusItems}</SelectContent>
+                                        </Select>
+                                    </div>
+                                    <button type="button" aria-label="Ordina per stato" onClick={() => toggleSort("status")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                                        <SortArrow active={sortKey === "status"} dir={sortDir} />
+                                    </button>
+                                </div>
+                            </TableHead>
+                            <TableHead className={`w-36 ${canEdit ? headCls : ""} text-xs font-semibold uppercase tracking-wide text-slate-600`}>{sortBtn("created", "Registrato il")}</TableHead>
+                            {canEdit && <TableHead className="w-14" />}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {pageRows.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={colCount} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                    <HardHat className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                                    Nessun operaio trovato
+                                </TableCell>
+                            </TableRow>
+                        ) : pageRows.map((worker) => (
+                            <TableRow key={worker.id} className="cursor-pointer" onClick={() => router.push(`/workers/${worker.id}`)}>
+                                <TableCell className="border-r py-2 font-medium capitalize text-slate-900 dark:text-white">{worker.firstName} {worker.lastName}</TableCell>
+                                <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
+                                    {worker.email ? (
+                                        <a href={`mailto:${worker.email}`} className="block truncate text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()} title={worker.email}>{worker.email}</a>
+                                    ) : <span className="text-slate-300">—</span>}
+                                </TableCell>
+                                {canEdit && <TableCell className="border-r py-2 text-right text-sm text-slate-700 dark:text-slate-300">{euro(worker.hourlyRate)}</TableCell>}
+                                {canEdit && <TableCell className="border-r py-2 text-right text-sm text-slate-700 dark:text-slate-300">{euro(worker.trasfertaRate)}</TableCell>}
+                                <TableCell className="border-r py-2" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center gap-2">
+                                        <StatusBadge active={worker.isActive} />
+                                        {canEdit && (
+                                            <Switch
+                                                checked={worker.isActive}
+                                                disabled={togglingId === worker.id}
+                                                onCheckedChange={(checked) => handleToggleStatus(worker, checked)}
+                                                aria-label="Attivo / inattivo"
+                                            />
+                                        )}
+                                    </div>
+                                </TableCell>
+                                <TableCell className={`py-2 text-sm text-slate-600 dark:text-slate-300 ${canEdit ? "border-r" : ""}`}>{new Date(worker.createdAt).toLocaleDateString('it-IT')}</TableCell>
+                                {canEdit && (
+                                    <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-slate-400 hover:text-blue-600"
+                                            title="Modifica operaio"
+                                            aria-label="Modifica operaio"
+                                            onClick={() => { setSelectedWorker(worker); setIsEditOpen(true); }}
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </TableCell>
+                                )}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             </div>
 
-            {viewMode === 'list' && (
-                <div className="space-y-1.5 mb-4">
-                    {filteredWorkers.length === 0 ? (
-                        <div className="text-center py-10 text-slate-400">
-                            <HardHat className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                            <p>Nessun operaio trovato</p>
-                        </div>
-                    ) : filteredWorkers.map((worker) => (
-                        <div
-                            key={worker.id}
-                            className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer"
-                            onClick={() => router.push(`/workers/${worker.id}`)}
-                        >
-                            <HardHat className="h-4 w-4 text-blue-600 shrink-0" />
-                            <span className="font-semibold text-slate-900 dark:text-white text-sm w-40 shrink-0 truncate capitalize">
-                                {worker.firstName} {worker.lastName}
-                            </span>
-                            <span className="text-slate-500 dark:text-slate-400 text-xs flex-1 truncate hidden sm:block">
-                                {worker.email || '—'}
-                            </span>
-                            <div className="flex items-center gap-2 ml-auto shrink-0" onClick={e => e.stopPropagation()}>
-                                <Badge className={cn(
-                                    "text-xs px-1.5 py-0 pointer-events-none",
-                                    worker.isActive ? "bg-green-100 text-green-700 border-green-200" : "bg-slate-100 text-slate-500"
-                                )}>
-                                    {worker.isActive ? "Attivo" : "Inattivo"}
-                                </Badge>
-                                {canEdit && (
-                                    <Switch
-                                        checked={worker.isActive}
-                                        disabled={togglingId === worker.id}
-                                        onCheckedChange={(checked) => {
-                                            const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
-                                            handleToggleStatus(worker, checked, fakeEvent);
-                                        }}
-                                    />
-                                )}
+            {/* Schede: telefono */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:hidden">
+                {pageRows.length === 0 ? (
+                    <div className="col-span-full py-10 text-center text-slate-400">
+                        <HardHat className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                        <p>Nessun operaio trovato</p>
+                    </div>
+                ) : pageRows.map((worker) => (
+                    <Card key={worker.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => router.push(`/workers/${worker.id}`)}>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center justify-between">
+                                <span className="truncate capitalize">{worker.firstName} {worker.lastName}</span>
                                 {canEdit && (
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-7 w-7 text-slate-400 hover:text-blue-600"
+                                        className="h-8 w-8 shrink-0 text-slate-400 hover:text-blue-600"
+                                        aria-label="Modifica operaio"
                                         onClick={(e) => { e.stopPropagation(); setSelectedWorker(worker); setIsEditOpen(true); }}
                                     >
-                                        <Pencil className="h-3.5 w-3.5" />
+                                        <Pencil className="h-4 w-4" />
                                     </Button>
                                 )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Grid Layout */}
-            <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "hidden"}>
-                {filteredWorkers.length === 0 ? (
-                    <div className="col-span-full text-center py-10 text-slate-400">
-                        <HardHat className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                        <p>Nessun operaio trovato</p>
-                    </div>
-                ) : (
-                    filteredWorkers.map((worker) => (
-                        <Card
-                            key={worker.id}
-                            className="hover:shadow-md transition-shadow cursor-pointer relative group"
-                            onClick={() => router.push(`/workers/${worker.id}`)}
-                        >
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center justify-between">
-                                    <span className="truncate capitalize">{worker.firstName} {worker.lastName}</span>
-                                    {canEdit && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedWorker(worker);
-                                                setIsEditOpen(true);
-                                            }}
-                                        >
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-                                {worker.email && (
-                                    <div className="flex items-center gap-2">
-                                        <Mail className="h-4 w-4 shrink-0" />
-                                        <a
-                                            href={`mailto:${worker.email}`}
-                                            className="hover:underline text-blue-600 truncate"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            {worker.email}
-                                        </a>
-                                    </div>
-                                )}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                            {worker.email && (
                                 <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 shrink-0" />
-                                    <span>Registrato il {new Date(worker.createdAt).toLocaleDateString('it-IT')}</span>
+                                    <Mail className="h-4 w-4 shrink-0" />
+                                    <a href={`mailto:${worker.email}`} className="truncate text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{worker.email}</a>
                                 </div>
-
-                                {/* Toggle attivo/inattivo direttamente sulla scheda */}
-                                <div
-                                    className="flex items-center justify-between pt-1 border-t dark:border-border"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <Badge
-                                        className={cn(
-                                            "text-xs px-1.5 py-0 pointer-events-none",
-                                            worker.isActive
-                                                ? "bg-green-100 text-green-700 border-green-200"
-                                                : "bg-slate-100 text-slate-500"
-                                        )}
-                                    >
-                                        {worker.isActive ? "Attivo" : "Inattivo"}
-                                    </Badge>
-                                    {canEdit && (
-                                        <Switch
-                                            checked={worker.isActive}
-                                            disabled={togglingId === worker.id}
-                                            onCheckedChange={(checked) => {
-                                                const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
-                                                handleToggleStatus(worker, checked, fakeEvent);
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))
-                )}
+                            )}
+                            <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 shrink-0" />
+                                <span>Registrato il {new Date(worker.createdAt).toLocaleDateString('it-IT')}</span>
+                            </div>
+                            <div className="flex items-center justify-between border-t pt-1 dark:border-border" onClick={(e) => e.stopPropagation()}>
+                                <StatusBadge active={worker.isActive} />
+                                {canEdit && (
+                                    <Switch
+                                        checked={worker.isActive}
+                                        disabled={togglingId === worker.id}
+                                        onCheckedChange={(checked) => handleToggleStatus(worker, checked)}
+                                        aria-label="Attivo / inattivo"
+                                    />
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
+
+            <PaginationControls
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={filtered.length}
+                itemLabel="operai"
+            />
+
+            {/* Pulsante «nuovo operaio» sempre visibile (PC) */}
+            {canEdit && <FloatingAddButton onClick={() => setIsCreateOpen(true)} label="Nuovo operaio" />}
 
             {/* Dialogs */}
             <WorkerDialog
@@ -265,6 +324,6 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                     onSuccess={handleWorkerUpdated}
                 />
             )}
-        </div>
+        </>
     );
 }
