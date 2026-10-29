@@ -504,6 +504,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     attendanceMap={filteredAttendanceMap}
                     onCellClick={handleCellClick}
                     selectedTool={selectedTool}
+                    focus={selectedWorker && selectedDate ? { workerId: selectedWorker.id, date: format(selectedDate, 'yyyy-MM-dd') } : null}
                 />
             </div>
 
@@ -539,6 +540,8 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     worker={selectedWorker}
                     date={selectedDate}
                     entries={attendanceMap[selectedWorker.id]?.[format(selectedDate, 'yyyy-MM-dd')] || []}
+                    periodEntries={days.flatMap(d => attendanceMap[selectedWorker.id]?.[format(d, 'yyyy-MM-dd')] || [])}
+                    periodLabel={isMobile ? 'della settimana' : format(monthStart, 'MMMM yyyy', { locale: it })}
                     targets={targets}
                     canEdit={canEdit}
                     onChangeHours={handleChangeHours}

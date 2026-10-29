@@ -11,6 +11,9 @@ interface DayDetailPanelProps {
     worker: Worker;
     date: Date;
     entries: Attendance[];
+    // Tutte le voci dell'operaio nel periodo mostrato, per il riepilogo
+    periodEntries: Attendance[];
+    periodLabel: string;
     targets: SearchableSelectOption[];
     canEdit: boolean;
     onChangeHours: (entry: Attendance, delta: number) => void;
@@ -34,16 +37,32 @@ const entryLabel = (a: Attendance) => isWorkEntry(a)
 
 const fmtHours = (h: number) => `${String(h).replace('.', ',')} h`;
 
-export default function DayDetailPanel({ worker, date, entries, targets, canEdit, onChangeHours, onEdit, onDelete, onAdd, onClose }: DayDetailPanelProps) {
+export default function DayDetailPanel({ worker, date, entries, periodEntries, periodLabel, targets, canEdit, onChangeHours, onEdit, onDelete, onAdd, onClose }: DayDetailPanelProps) {
     const [newJobId, setNewJobId] = useState("");
     const [newHours, setNewHours] = useState(8);
+    const [showSummary, setShowSummary] = useState(false);
+
+    // Riepilogo del periodo: ore e giorni per tipo, poi ore per cantiere
+    const byType = new Map<string, { hours: number; days: Set<string> }>();
+    const byTarget = new Map<string, number>();
+    periodEntries.forEach(a => {
+        const key = isWorkEntry(a) ? 'work' : a.status;
+        const t = byType.get(key) || { hours: 0, days: new Set<string>() };
+        t.hours += a.hours; t.days.add(a.date); byType.set(key, t);
+        if (isWorkEntry(a)) byTarget.set(entryLabel(a), (byTarget.get(entryLabel(a)) || 0) + a.hours);
+    });
+    const typeRows = Array.from(byType.entries()).sort((x, y) => (x[0] === 'work' ? -1 : y[0] === 'work' ? 1 : y[1].hours - x[1].hours));
     const total = entries.reduce((s, a) => s + a.hours, 0);
 
     return (
         <div className="sticky bottom-2 z-30 rounded-lg border border-slate-200 bg-white p-4 shadow-lg dark:border-border dark:bg-card">
             <div className="mb-3 flex items-start justify-between gap-2">
                 <div>
-                    <h2 className="font-semibold text-slate-900 dark:text-white">{worker.lastName} {worker.firstName}</h2>
+                    <h2 className="font-semibold text-slate-900 dark:text-white">
+                        <button type="button" onClick={() => setShowSummary(v => !v)} className="text-left underline decoration-dotted underline-offset-4 hover:text-blue-600" title="Mostra il riepilogo del periodo">
+                            {worker.lastName} {worker.firstName}
+                        </button>
+                    </h2>
                     <p className="text-sm capitalize text-slate-500">
                         {format(date, 'EEEE d MMMM yyyy', { locale: it })}
                         {entries.length > 0 && <span className="normal-case"> · totale {fmtHours(total)}</span>}
@@ -51,6 +70,36 @@ export default function DayDetailPanel({ worker, date, entries, targets, canEdit
                 </div>
                 <Button variant="ghost" size="icon" onClick={onClose} aria-label="Chiudi dettaglio giornata"><X className="h-4 w-4" /></Button>
             </div>
+
+            {showSummary && (
+                <div className="mb-3 rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-800/50">
+                    <p className="mb-2 font-medium capitalize">Riepilogo {periodLabel}</p>
+                    {typeRows.length === 0 ? (
+                        <p className="text-slate-500">Nessuna voce nel periodo</p>
+                    ) : (
+                        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+                            <div>
+                                {typeRows.map(([key, v]) => (
+                                    <div key={key} className="flex justify-between gap-4">
+                                        <span>{key === 'work' ? 'Lavoro' : STATUS_LABELS[key] || key}</span>
+                                        <span className="tabular-nums font-semibold">{fmtHours(v.hours)} <span className="font-normal text-slate-500">· {v.days.size} gg</span></span>
+                                    </div>
+                                ))}
+                            </div>
+                            {byTarget.size > 0 && (
+                                <div className="border-t border-slate-200 pt-2 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 dark:border-slate-700">
+                                    {Array.from(byTarget.entries()).sort((x, y) => y[1] - x[1]).map(([label, h]) => (
+                                        <div key={label} className="flex justify-between gap-4">
+                                            <span className="truncate">{label}</span>
+                                            <span className="tabular-nums font-semibold">{fmtHours(h)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {entries.length === 0 ? (
                 <p className="py-2 text-sm text-slate-500">Nessuna presenza registrata</p>

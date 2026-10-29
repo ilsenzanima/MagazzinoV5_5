@@ -10,6 +10,8 @@ interface MonthGridProps {
     attendanceMap: Record<string, Record<string, Attendance[]>>;
     onCellClick: (worker: Worker, date: Date, assignments: Attendance[]) => void;
     selectedTool: AttendanceStatus | 'delete' | null;
+    // Giornata aperta nel dettaglio: resta a colori con la cornice, il resto va in grigio
+    focus?: { workerId: string; date: string } | null;
 }
 
 const statusConfig: Record<string, { color: string; letter: string }> = {
@@ -30,7 +32,8 @@ export default function AttendanceMonthGrid({
     workers,
     attendanceMap,
     onCellClick,
-    selectedTool
+    selectedTool,
+    focus
 }: MonthGridProps) {
 
     return (
@@ -67,15 +70,19 @@ export default function AttendanceMonthGrid({
                     {workers.map(worker => (
                         <tr key={worker.id} className="group hover:bg-gray-50 dark:hover:bg-slate-800">
                             <td className="sticky left-0 z-10 p-2 font-medium bg-white dark:bg-card group-hover:bg-gray-50 dark:group-hover:bg-slate-800 border-r dark:border-slate-700 border-b shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">
+                                <div className="flex items-center justify-between gap-3">
+                                <div>
                                 <span className="md:hidden">{worker.lastName}</span>
                                 <span className="hidden md:inline">{worker.lastName} {worker.firstName}</span>
+                                </div>
                                 {(() => {
                                     // Ore lavorate nel periodo mostrato (con il filtro cantiere attivo, solo quelle del cantiere)
                                     const total = days.reduce((sum, day) => sum + (attendanceMap[worker.id]?.[format(day, "yyyy-MM-dd")] || [])
                                         .filter(a => a.status === 'presence' || a.status === 'transfer')
                                         .reduce((h, a) => h + (a.hours || 0), 0), 0);
-                                    return total > 0 ? <span className="ml-2 text-xs font-normal text-slate-400" title="Ore lavorate nel periodo">{String(total).replace('.', ',')} h</span> : null;
+                                    return <span className="w-14 shrink-0 text-right text-xs font-normal tabular-nums text-slate-400" title="Ore lavorate nel periodo">{total > 0 ? `${String(total).replace('.', ',')} h` : ''}</span>;
                                 })()}
+                                </div>
                             </td>
                             {days.map(day => {
                                 const dateKey = format(day, "yyyy-MM-dd");
@@ -94,6 +101,8 @@ export default function AttendanceMonthGrid({
                                             "border p-0 cursor-pointer transition-colors relative h-8 text-center align-middle",
                                             !assignments.length && (isWknd || isItalianHoliday(day)) ? "bg-gray-50 dark:bg-slate-800" : "bg-white dark:bg-card",
                                             !assignments.length && !isWknd && !isItalianHoliday(day) && "hover:bg-gray-100 dark:hover:bg-slate-700",
+                                            focus && !selectedTool && !(focus.workerId === worker.id && focus.date === dateKey) && "grayscale opacity-50",
+                                            focus && !selectedTool && focus.workerId === worker.id && focus.date === dateKey && "ring-2 ring-inset ring-blue-600 z-[5]",
                                             selectedTool && "hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-gray-400 dark:hover:ring-slate-500"
                                         )}
                                         onClick={() => onCellClick(worker, day, assignments)}
