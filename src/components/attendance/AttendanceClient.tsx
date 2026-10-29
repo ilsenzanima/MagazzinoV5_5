@@ -50,15 +50,6 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         warehousesApi.getAll().then(setWarehouses).catch(console.error);
     }, []);
 
-    useEffect(() => {
-        if (!isMobile || !selectedWorker) return;
-        let cancelled = false;
-        attendanceApi.getByRange(format(startOfMonth(currentDate), 'yyyy-MM-dd'), format(endOfMonth(currentDate), 'yyyy-MM-dd'))
-            .then(rows => { if (!cancelled) setMobileMonthEntries(rows.filter(r => r.workerId === selectedWorker.id)); })
-            .catch(console.error);
-        return () => { cancelled = true; };
-    }, [isMobile, selectedWorker, currentDate, attendanceList]);
-
     // Dove si può registrare una presenza: commesse attive e magazzini
     const targets = useMemo(() => [
         ...initialJobs.map(j => ({ value: j.id, label: `${j.code} - ${j.name}` })),
@@ -77,6 +68,15 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     // Job filter state
     const [filterJobId, setFilterJobId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!isMobile || !selectedWorker) return;
+        let cancelled = false;
+        attendanceApi.getByRange(format(startOfMonth(currentDate), 'yyyy-MM-dd'), format(endOfMonth(currentDate), 'yyyy-MM-dd'))
+            .then(rows => { if (!cancelled) setMobileMonthEntries(rows.filter(r => r.workerId === selectedWorker.id)); })
+            .catch(console.error);
+        return () => { cancelled = true; };
+    }, [isMobile, selectedWorker, currentDate, attendanceList]);
 
     // Computed: vista settimanale su mobile, mensile su desktop
     const viewStart = isMobile ? startOfWeek(currentDate, { weekStartsOn: 1 }) : startOfMonth(currentDate);
