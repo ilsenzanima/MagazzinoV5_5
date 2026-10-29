@@ -81,8 +81,8 @@ export default function DayDetailPanel({ worker, date, entries, periodEntries, p
                             <div>
                                 {typeRows.map(([key, v]) => (
                                     <div key={key} className="flex justify-between gap-4">
-                                        <span>{key === 'work' ? 'Lavoro' : STATUS_LABELS[key] || key}</span>
-                                        <span className="tabular-nums font-semibold">{fmtHours(v.hours)} <span className="font-normal text-slate-500">· {v.days.size} gg</span></span>
+                                        <span className="min-w-0 flex-1 truncate">{key === 'work' ? 'Lavoro' : STATUS_LABELS[key] || key}</span>
+                                        <span className="shrink-0 whitespace-nowrap tabular-nums font-semibold">{fmtHours(v.hours)} <span className="font-normal text-slate-500">· {v.days.size} gg</span></span>
                                     </div>
                                 ))}
                             </div>
@@ -90,8 +90,8 @@ export default function DayDetailPanel({ worker, date, entries, periodEntries, p
                                 <div className="border-t border-slate-200 pt-2 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 dark:border-slate-700">
                                     {Array.from(byTarget.entries()).sort((x, y) => y[1] - x[1]).map(([label, h]) => (
                                         <div key={label} className="flex justify-between gap-4">
-                                            <span className="truncate">{label}</span>
-                                            <span className="tabular-nums font-semibold">{fmtHours(h)}</span>
+                                            <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
+                                            <span className="shrink-0 whitespace-nowrap tabular-nums font-semibold">{fmtHours(h)}</span>
                                         </div>
                                     ))}
                                 </div>
