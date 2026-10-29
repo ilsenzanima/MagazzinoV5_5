@@ -7,7 +7,14 @@ export interface SupplierDuplicate {
     id: string; name: string; vatNumber: string; address: string; reason: ClientMatchReason;
 }
 
-export const mapDbToSupplier = (db: any): Supplier => ({
+export interface SupplierYearSpend { year: number; purchasesCount: number; spent: number; }
+export interface SupplierTopItem {
+    itemId: string; code: string; name: string; unit: string;
+    timesBought: number; totalQuantity: number; totalSpent: number;
+    lastPrice: number; minPrice: number; maxPrice: number; lastDate: string | null;
+}
+
+export const mapDbToSupplier =(db: any): Supplier => ({
     id: db.id,
     name: db.name,
     vatNumber: db.vat_number,
@@ -141,6 +148,24 @@ export const suppliersApi = {
         const { data, error } = await supabase.rpc('supplier_purchase_years');
         if (error) throw error;
         return (data || []) as number[];
+    },
+
+    // Spesa per anno di un fornitore (al netto dei resi, ordini esclusi)
+    getSpendByYear: async (supplierId: string): Promise<SupplierYearSpend[]> => {
+        const { data, error } = await supabase.rpc('supplier_spend_by_year', { p_supplier: supplierId });
+        if (error) throw error;
+        return (data || []).map((r: any) => ({ year: Number(r.year), purchasesCount: Number(r.purchases_count), spent: Number(r.spent) }));
+    },
+    // Articoli più acquistati da un fornitore, con ultimo prezzo e intervallo dei prezzi
+    getTopItems: async (supplierId: string, limit = 30): Promise<SupplierTopItem[]> => {
+        const { data, error } = await supabase.rpc('supplier_top_items', { p_supplier: supplierId, p_limit: limit });
+        if (error) throw error;
+        return (data || []).map((r: any) => ({
+            itemId: r.item_id, code: r.code ?? '', name: r.name ?? '', unit: r.unit ?? '',
+            timesBought: Number(r.times_bought), totalQuantity: Number(r.total_quantity), totalSpent: Number(r.total_spent),
+            lastPrice: Number(r.last_price ?? 0), minPrice: Number(r.min_price ?? 0), maxPrice: Number(r.max_price ?? 0),
+            lastDate: r.last_date ?? null,
+        }));
     },
 
     getOverviewById: async (id: string) => {

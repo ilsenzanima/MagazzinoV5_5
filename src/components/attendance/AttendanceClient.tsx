@@ -1,6 +1,6 @@
 'use client';
 
-import { Worker, Job, Attendance, AttendanceCorrection, attendanceApi, workerCoursesApi, workerMedicalExamsApi, correctionsApi } from "@/lib/api";
+import { Worker, Job, Attendance, attendanceApi, workerCoursesApi, workerMedicalExamsApi } from "@/lib/api";
 import { useState, useEffect, useMemo } from "react";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from "date-fns";
 import { it } from "date-fns/locale";
@@ -9,11 +9,13 @@ import AttendanceMonthGrid from "./AttendanceMonthGrid"; // New grid
 import { AttendanceToolbar, AttendanceStatus } from "./AttendanceToolbar"; // New toolbar
 import AssignmentModal from "./AssignmentModal";
 import BulkAssignmentModal from "./BulkAssignmentModal";
-import AttendanceInfoPopup from "./AttendanceInfoPopup";
+import DayDetailPanel from "./DayDetailPanel";
 import { CourseQuickSelectDialog } from "./CourseQuickSelectDialog";
-import { generateMonthlyReport } from "./report-generator";
+import { ListPageHeader } from "@/components/ui/list-page-header";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Users, FileDown, Filter, X, FilePlus, PenLine } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Users, Filter, X, FilePlus } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
@@ -32,14 +34,29 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     // State
     const [currentDate, setCurrentDate] = useState(new Date());
     const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
-    const [corrections, setCorrections] = useState<AttendanceCorrection[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedTool, setSelectedTool] = useState<AttendanceStatus | 'delete' | null>(null);
 
     // Modals State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
-    const [isInfoPopupOpen, setIsInfoPopupOpen] = useState(false);
+    const [quickJobId, setQuickJobId] = useState("");
+    const [quickHours, setQuickHours] = useState(8);
+    // Riepilogo sempre mensile: su telefono la griglia ha solo la settimana, quindi il mese si legge a parte
+    const [mobileMonthEntries, setMobileMonthEntries] = useState<Attendance[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+
+    useEffect(() => {
+        warehousesApi.getAll().then(setWarehouses).catch(console.error);
+    }, []);
+
+    // Dove si può registrare una presenza: commesse attive e magazzini
+    const targets = useMemo(() => [
+        ...initialJobs.map(j => ({ value: j.id, label: `${j.code} - ${j.name}` })),
+        ...warehouses.map(w => ({ value: w.id, label: `📦 ${w.name}` })),
+    ], [initialJobs, warehouses]);
+    const targetFields = (id: string) => warehouses.some(w => w.id === id) ? { warehouseId: id } : { jobId: id };
+    const sameTarget = (a: Attendance, id: string) => a.jobId === id || a.warehouseId === id;
 
     const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -51,6 +68,15 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     // Job filter state
     const [filterJobId, setFilterJobId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!isMobile || !selectedWorker) return;
+        let cancelled = false;
+        attendanceApi.getByRange(format(startOfMonth(currentDate), 'yyyy-MM-dd'), format(endOfMonth(currentDate), 'yyyy-MM-dd'))
+            .then(rows => { if (!cancelled) setMobileMonthEntries(rows.filter(r => r.workerId === selectedWorker.id)); })
+            .catch(console.error);
+        return () => { cancelled = true; };
+    }, [isMobile, selectedWorker, currentDate, attendanceList]);
 
     // Computed: vista settimanale su mobile, mensile su desktop
     const viewStart = isMobile ? startOfWeek(currentDate, { weekStartsOn: 1 }) : startOfMonth(currentDate);
@@ -64,12 +90,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         try {
             const startDate = format(viewStart, 'yyyy-MM-dd');
             const endDate = format(viewEnd, 'yyyy-MM-dd');
-            const [data, corr] = await Promise.all([
-                attendanceApi.getByRange(startDate, endDate),
-                correctionsApi.getByRange(startDate, endDate),
-            ]);
-            setAttendanceList(data);
-            setCorrections(corr);
+            setAttendanceList(await attendanceApi.getByRange(startDate, endDate));
         } catch (error) {
             console.error("Failed to load attendance:", error);
             toast.error("Errore nel caricamento delle presenze");
@@ -82,45 +103,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         loadData();
     }, [currentDate, isMobile]);
 
-    // Merge corrections into attendance list: adjust hours or create virtual entries
-    const mergedAttendanceList = useMemo(() => {
-        if (corrections.length === 0) return attendanceList;
-
-        const result = attendanceList.map(a => ({ ...a }));
-
-        corrections.forEach(corr => {
-            const colId = corr.jobId || corr.warehouseId;
-            if (!colId) return;
-
-            // Use explicit job/warehouse matching to avoid undefined === undefined false matches
-            const idx = result.findIndex(a =>
-                a.workerId === corr.workerId &&
-                a.date === corr.date &&
-                (corr.jobId ? a.jobId === corr.jobId : a.warehouseId === corr.warehouseId) &&
-                (a.status === 'presence' || a.status === 'transfer')
-            );
-
-            if (idx >= 0) {
-                result[idx] = { ...result[idx], hours: result[idx].hours + corr.hoursDelta };
-            } else if (corr.hoursDelta !== 0) {
-                // Virtual entry: rettifica su cantiere/magazzino senza presenza base
-                result.push({
-                    id: `virtual_${corr.id}`,
-                    workerId: corr.workerId,
-                    jobId: corr.jobId,
-                    jobCode: corr.jobCode,
-                    jobName: corr.jobName,
-                    warehouseId: corr.warehouseId,
-                    warehouseName: corr.warehouseName,
-                    date: corr.date,
-                    hours: corr.hoursDelta,
-                    status: 'presence',
-                });
-            }
-        });
-
-        return result.filter(a => a.hours > 0);
-    }, [attendanceList, corrections]);
+    const mergedAttendanceList = attendanceList;
 
     // Transform Data for Grid: Map<WorkerId, Map<DateStr, Attendance[]>>
     const attendanceMap = useMemo(() => {
@@ -182,7 +165,6 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         if (!canEdit) {
             setSelectedWorker(worker);
             setSelectedDate(date);
-            setIsInfoPopupOpen(true);
             return;
         }
 
@@ -206,6 +188,21 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             if (selectedTool === 'course') {
                 setPendingCourseEntry({ workerId: worker.id, date: dateStr });
                 setIsCourseDialogOpen(true);
+                return;
+            }
+
+            // Cantiere a scelta rapida: se la persona è già su quel cantiere nel giorno, si sommano le ore
+            if (selectedTool === 'presence') {
+                if (!quickJobId) return;
+                const existing = assignments.find(a => a.status === 'presence' && sameTarget(a, quickJobId));
+                try {
+                    if (existing) await attendanceApi.update(existing.id, { ...existing, hours: Math.min(24, existing.hours + quickHours) });
+                    else await attendanceApi.addAttendance({ workerId: worker.id, date: dateStr, status: 'presence', hours: quickHours, ...targetFields(quickJobId) });
+                    toast.success(existing ? "Ore aggiunte" : "Aggiunto", { duration: 1000, position: 'bottom-center' });
+                    loadData();
+                } catch (e) {
+                    toast.error("Errore salvataggio");
+                }
                 return;
             }
 
@@ -246,10 +243,9 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 toast.error("Errore salvataggio");
             }
         } else {
-            // NORMAL MODE: Open Info Popup
+            // NORMAL MODE: dettaglio della giornata nel pannello in fondo
             setSelectedWorker(worker);
             setSelectedDate(date);
-            setIsInfoPopupOpen(true);
         }
     };
 
@@ -366,6 +362,34 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
         }
     };
 
+    // Ore di una voce: +/- mezz'ora o un'ora, subito a schermo e poi salvate
+    const handleChangeHours = async (entry: Attendance, delta: number) => {
+        const hours = Math.min(24, Math.max(0.5, entry.hours + delta));
+        if (hours === entry.hours) return;
+        setAttendanceList(list => list.map(a => a.id === entry.id ? { ...a, hours } : a));
+        try {
+            await attendanceApi.update(entry.id, { ...entry, hours });
+        } catch (error) {
+            console.error(error);
+            toast.error("Errore salvataggio ore");
+            loadData();
+        }
+    };
+
+    const handleAddToDay = async (jobId: string, hours: number) => {
+        if (!selectedWorker || !selectedDate) return;
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const existing = attendanceMap[selectedWorker.id]?.[dateStr]?.find(a => a.status === 'presence' && sameTarget(a, jobId));
+        try {
+            if (existing) await attendanceApi.update(existing.id, { ...existing, hours: Math.min(24, existing.hours + hours) });
+            else await attendanceApi.addAttendance({ workerId: selectedWorker.id, date: dateStr, status: 'presence', hours, ...targetFields(jobId) });
+            loadData();
+        } catch (error) {
+            console.error(error);
+            toast.error("Errore salvataggio");
+        }
+    };
+
     const handleCourseConfirm = async (courseName: string) => {
         if (!pendingCourseEntry) return;
 
@@ -401,104 +425,88 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     return (
         <div className="space-y-4 min-w-0">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-card p-4 rounded-lg shadow-sm border dark:border-border">
-                <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="font-semibold w-48 text-center capitalize text-lg">
-                        {isMobile
-                            ? (viewStart.getMonth() === viewEnd.getMonth()
-                                ? `${format(viewStart, 'd')} - ${format(viewEnd, 'd MMMM yyyy', { locale: it })}`
-                                : `${format(viewStart, 'd MMM', { locale: it })} - ${format(viewEnd, 'd MMM yyyy', { locale: it })}`)
-                            : format(monthStart, 'MMMM yyyy', { locale: it })}
-                    </div>
-                    <Button variant="outline" size="icon" onClick={handleNextMonth}>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={handleToday} className="ml-2">
-                        Oggi
-                    </Button>
-                </div>
-                <div className="flex items-center flex-wrap gap-2">
-                    {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
-
-                    {canEdit && (
-                        <Button
-                            variant="outline"
-                            onClick={() => generateMonthlyReport(currentDate, initialWorkers, mergedAttendanceList)}
-                            className="gap-2"
-                        >
-                            <FileDown className="h-4 w-4" />
-                            PDF
-                        </Button>
-                    )}
-
-                    <Link href="/attendance/request">
-                        <Button variant="outline" className="gap-2">
-                            <FilePlus className="h-4 w-4" />
-                            Richiesta Permesso
-                        </Button>
-                    </Link>
-
-                    {canEdit && (
-                        <Link href="/attendance/rettifica">
-                            <Button className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
-                                <PenLine className="h-4 w-4" />
-                                Rettifica Ore
+            <ListPageHeader
+                title="Presenze / Assenze"
+                actions={
+                    <>
+                        <Link href="/attendance/request" className="flex-1 sm:flex-none">
+                            <Button variant="outline" className="w-full gap-2">
+                                <FilePlus className="h-4 w-4" />
+                                Richiesta Permesso
                             </Button>
                         </Link>
-                    )}
-
-                    {canEdit && (
-                        <Button onClick={() => setIsBulkModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                            <Users className="mr-2 h-4 w-4" />
-                            Inserisci Presenze
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {canEdit && <AttendanceToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />}
-
-            {/* Job Filter */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white dark:bg-card p-3 rounded-lg shadow-sm border dark:border-border">
-                <Filter className="h-4 w-4 text-slate-500" />
-                <span className="text-sm text-slate-600 dark:text-slate-400">Filtra per cantiere:</span>
-                <Select
-                    value={filterJobId || "all"}
-                    onValueChange={(val) => setFilterJobId(val === "all" ? null : val)}
-                >
-                    <SelectTrigger className="w-full md:w-[300px]">
-                        <SelectValue placeholder="Tutti i cantieri" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Tutti i cantieri</SelectItem>
-                        {jobsInMonth.length === 0 ? (
-                            <SelectItem value="none" disabled>
-                                Nessun cantiere nel mese
-                            </SelectItem>
-                        ) : (
-                            jobsInMonth.map(job => (
-                                <SelectItem key={job.id} value={job.id}>
-                                    {job.code} - {job.name}
-                                </SelectItem>
-                            ))
+                        {canEdit && (
+                            <Button onClick={() => setIsBulkModalOpen(true)} className="flex-1 bg-blue-600 hover:bg-blue-700 sm:flex-none">
+                                <Users className="mr-2 h-4 w-4" />
+                                Inserisci Presenze
+                            </Button>
                         )}
-                    </SelectContent>
-                </Select>
-                {filterJobId && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setFilterJobId(null)}
-                        className="gap-1 text-slate-600"
-                    >
-                        <X className="h-3 w-3" />
-                        Rimuovi filtro
-                    </Button>
-                )}
-            </div>
+                    </>
+                }
+            >
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center justify-center space-x-2">
+                        <Button variant="outline" size="icon" onClick={handlePrevMonth} aria-label="Periodo precedente">
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="font-semibold w-48 text-center capitalize text-lg">
+                            {isMobile
+                                ? (viewStart.getMonth() === viewEnd.getMonth()
+                                    ? `${format(viewStart, 'd')} - ${format(viewEnd, 'd MMMM yyyy', { locale: it })}`
+                                    : `${format(viewStart, 'd MMM', { locale: it })} - ${format(viewEnd, 'd MMM yyyy', { locale: it })}`)
+                                : format(monthStart, 'MMMM yyyy', { locale: it })}
+                        </div>
+                        <Button variant="outline" size="icon" onClick={handleNextMonth} aria-label="Periodo successivo">
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleToday} className="ml-2">
+                            Oggi
+                        </Button>
+                        {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 shrink-0 text-slate-500" />
+                        <Select
+                            value={filterJobId || "all"}
+                            onValueChange={(val) => setFilterJobId(val === "all" ? null : val)}
+                        >
+                            <SelectTrigger className="w-full md:w-[300px]">
+                                <SelectValue placeholder="Tutti i cantieri" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Tutti i cantieri</SelectItem>
+                                {jobsInMonth.length === 0 ? (
+                                    <SelectItem value="none" disabled>
+                                        Nessun cantiere nel mese
+                                    </SelectItem>
+                                ) : (
+                                    jobsInMonth.map(job => (
+                                        <SelectItem key={job.id} value={job.id}>
+                                            {job.code} - {job.name}
+                                        </SelectItem>
+                                    ))
+                                )}
+                            </SelectContent>
+                        </Select>
+                        {filterJobId && (
+                            <Button variant="ghost" size="icon" onClick={() => setFilterJobId(null)} aria-label="Rimuovi filtro" className="shrink-0 text-slate-600">
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </ListPageHeader>
+
+            {canEdit && <AttendanceToolbar
+                selectedTool={selectedTool}
+                onSelectTool={setSelectedTool}
+                targets={targets}
+                quickJobId={quickJobId}
+                onQuickJobChange={setQuickJobId}
+                quickHours={quickHours}
+                onQuickHoursChange={d => setQuickHours(h => Math.min(24, Math.max(0.5, h + d)))}
+            />}
 
             <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border overflow-hidden">
                 <AttendanceMonthGrid
@@ -507,6 +515,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     attendanceMap={filteredAttendanceMap}
                     onCellClick={handleCellClick}
                     selectedTool={selectedTool}
+                    focus={selectedWorker && selectedDate ? { workerId: selectedWorker.id, date: format(selectedDate, 'yyyy-MM-dd') } : null}
                 />
             </div>
 
@@ -537,28 +546,22 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                 preselectedDate={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined}
             />
 
-            <AttendanceInfoPopup
-                isOpen={isInfoPopupOpen}
-                onClose={() => setIsInfoPopupOpen(false)}
-                worker={selectedWorker}
-                date={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null}
-                assignments={
-                    selectedWorker && selectedDate
-                        ? attendanceMap[selectedWorker.id]?.[format(selectedDate, 'yyyy-MM-dd')] || []
-                        : []
-                }
-                onEdit={(assignment) => {
-                    setCurrentAssignment(assignment);
-                    setIsInfoPopupOpen(false);
-                    setIsModalOpen(true);
-                }}
-                onDelete={handleDelete}
-                onAddPresence={() => {
-                    setIsInfoPopupOpen(false);
-                    setIsBulkModalOpen(true);
-                }}
-                canEdit={canEdit}
-            />
+            {selectedWorker && selectedDate && (
+                <DayDetailPanel
+                    worker={selectedWorker}
+                    date={selectedDate}
+                    entries={attendanceMap[selectedWorker.id]?.[format(selectedDate, 'yyyy-MM-dd')] || []}
+                    periodEntries={isMobile ? mobileMonthEntries : days.flatMap(d => attendanceMap[selectedWorker.id]?.[format(d, 'yyyy-MM-dd')] || [])}
+                    periodLabel={format(monthStart, 'MMMM yyyy', { locale: it })}
+                    targets={targets}
+                    canEdit={canEdit}
+                    onChangeHours={handleChangeHours}
+                    onEdit={(assignment) => { setCurrentAssignment(assignment); setIsModalOpen(true); }}
+                    onDelete={handleDelete}
+                    onAdd={handleAddToDay}
+                    onClose={() => { setSelectedWorker(null); setSelectedDate(null); }}
+                />
+            )}
 
             <CourseQuickSelectDialog
                 open={isCourseDialogOpen}

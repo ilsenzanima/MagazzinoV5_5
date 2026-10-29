@@ -10,7 +10,7 @@ interface ListPageHeaderProps {
     title: string;
     // A destra del titolo (es. pulsanti «nuovo» da telefono)
     actions?: React.ReactNode;
-    search: {
+    search?: {
         id: string;
         value: string;
         onChange: (value: string) => void;
@@ -39,8 +39,8 @@ export function ListPageHeader({ title, actions, search, searchActions, children
                 {actions && <div className="flex items-center gap-2 w-full sm:w-auto">{actions}</div>}
             </div>
 
-            <div className="flex gap-2">
-                <div className="relative flex-1">
+            {(search || searchActions) && <div className="flex gap-2">
+                {search && <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                     <Label htmlFor={search.id} className="sr-only">{search.label}</Label>
                     <Input
@@ -53,9 +53,9 @@ export function ListPageHeader({ title, actions, search, searchActions, children
                         value={search.value}
                         onChange={(e) => search.onChange(e.target.value)}
                     />
-                </div>
+                </div>}
                 {searchActions}
-            </div>
+            </div>}
 
             {children}
         </div>
