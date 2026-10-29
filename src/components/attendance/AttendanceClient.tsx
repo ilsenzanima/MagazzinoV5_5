@@ -42,11 +42,22 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
     const [quickJobId, setQuickJobId] = useState("");
     const [quickHours, setQuickHours] = useState(8);
+    // Riepilogo sempre mensile: su telefono la griglia ha solo la settimana, quindi il mese si legge a parte
+    const [mobileMonthEntries, setMobileMonthEntries] = useState<Attendance[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
     useEffect(() => {
         warehousesApi.getAll().then(setWarehouses).catch(console.error);
     }, []);
+
+    useEffect(() => {
+        if (!isMobile || !selectedWorker) return;
+        let cancelled = false;
+        attendanceApi.getByRange(format(startOfMonth(currentDate), 'yyyy-MM-dd'), format(endOfMonth(currentDate), 'yyyy-MM-dd'))
+            .then(rows => { if (!cancelled) setMobileMonthEntries(rows.filter(r => r.workerId === selectedWorker.id)); })
+            .catch(console.error);
+        return () => { cancelled = true; };
+    }, [isMobile, selectedWorker, currentDate, attendanceList]);
 
     // Dove si può registrare una presenza: commesse attive e magazzini
     const targets = useMemo(() => [
@@ -540,8 +551,8 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     worker={selectedWorker}
                     date={selectedDate}
                     entries={attendanceMap[selectedWorker.id]?.[format(selectedDate, 'yyyy-MM-dd')] || []}
-                    periodEntries={days.flatMap(d => attendanceMap[selectedWorker.id]?.[format(d, 'yyyy-MM-dd')] || [])}
-                    periodLabel={isMobile ? 'della settimana' : format(monthStart, 'MMMM yyyy', { locale: it })}
+                    periodEntries={isMobile ? mobileMonthEntries : days.flatMap(d => attendanceMap[selectedWorker.id]?.[format(d, 'yyyy-MM-dd')] || [])}
+                    periodLabel={format(monthStart, 'MMMM yyyy', { locale: it })}
                     targets={targets}
                     canEdit={canEdit}
                     onChangeHours={handleChangeHours}
