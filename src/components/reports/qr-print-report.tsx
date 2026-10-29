@@ -11,7 +11,11 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Loader2, Printer, QrCode, Barcode as BarcodeIcon, Search, CheckSquare, Square } from "lucide-react"
+
+const LIST_PAGE_SIZE = 50
 
 type Mode = "qr" | "barcode"
 type LabelSize = "sm" | "md" | "lg" | "full"
@@ -155,6 +159,9 @@ export default function QrPrintReport() {
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [onlySelected, setOnlySelected] = useState(false)
+  const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [mode, setMode] = useState<Mode>("barcode")
   const [size, setSize] = useState<LabelSize>("md")
@@ -195,9 +202,18 @@ export default function QrPrintReport() {
     }).catch(console.error).finally(() => setLoadingCodes(false))
   }, [size, selected])
 
-  const filtered = items.filter(i =>
-    !search || i.name?.toLowerCase().includes(search.toLowerCase()) || i.code?.toLowerCase().includes(search.toLowerCase())
-  )
+  const types = Array.from(new Set(items.map(i => i.type).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b))
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const filtered = items.filter(i => {
+    if (typeFilter !== "all" && i.type !== typeFilter) return false
+    if (onlySelected && !selected.has(i.id)) return false
+    if (words.length === 0) return true
+    const hay = `${i.code ?? ""} ${i.name ?? ""} ${i.brand ?? ""} ${i.model ?? ""}`.toLowerCase()
+    return words.every(w => hay.includes(w))
+  })
+  const totalPages = Math.max(1, Math.ceil(filtered.length / LIST_PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = filtered.slice((currentPage - 1) * LIST_PAGE_SIZE, currentPage * LIST_PAGE_SIZE)
   const selectedItems = items.filter(i => selected.has(i.id))
 
   const toggleItem = (id: string) => {
@@ -297,15 +313,27 @@ export default function QrPrintReport() {
               <div className="flex gap-2 items-center">
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                  <Input placeholder="Cerca articolo o codice..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8" />
+                  <Input placeholder="Cerca articolo, codice o marca..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} className="pl-8" />
                 </div>
                 <Button size="sm" variant="ghost" onClick={toggleAll} className="gap-1 shrink-0">
                   {allFilteredSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
                   {allFilteredSelected ? "Deseleziona" : "Seleziona tutti"}
                 </Button>
               </div>
-              <div className="max-h-[500px] overflow-y-auto flex flex-col gap-1">
-                {filtered.map(item => (
+              <div className="flex gap-2">
+                <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setPage(1) }}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Categoria" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutte le categorie</SelectItem>
+                    {types.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant={onlySelected ? "default" : "outline"} onClick={() => { setOnlySelected(v => !v); setPage(1) }} disabled={selected.size === 0 && !onlySelected} className="shrink-0">
+                  Solo selezionati{selected.size > 0 ? ` (${selected.size})` : ""}
+                </Button>
+              </div>
+              <div className="flex flex-col gap-1">
+                {pageItems.map(item => (
                   <label key={item.id} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
                     <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleItem(item.id)} />
                     <span className="font-mono text-xs text-slate-500 w-16 shrink-0">{item.code}</span>
@@ -315,6 +343,7 @@ export default function QrPrintReport() {
                 ))}
                 {filtered.length === 0 && <p className="text-center text-sm text-slate-400 py-8">Nessun articolo trovato</p>}
               </div>
+              <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} itemLabel="articoli" />
             </CardContent>
           </Card>
 
