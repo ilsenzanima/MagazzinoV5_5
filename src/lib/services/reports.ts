@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase';
 
+// Le somme di decimali (es. 4,05 + 26,9) in JavaScript danno code come 30,950000000000003: si arrotonda a 5 decimali
+const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
+
 export interface ArticleLot {
     itemId: string;
     itemCode: string;
@@ -84,9 +87,9 @@ export const getArticlesWithStock = async (targetDate?: string, warehouseId?: st
             const item = itemMap.get(lot.item_id);
             if (!item) continue;
 
-            const pieces = lot.remaining_pieces || 0;
+            const pieces = round5(lot.remaining_pieces || 0);
             const coeff = lot.coefficient || item.coefficient || 1;
-            const quantity = pieces * coeff;
+            const quantity = round5(pieces * coeff);
             const price = lot.unit_price || 0;
 
             articles.push({
@@ -103,7 +106,7 @@ export const getArticlesWithStock = async (targetDate?: string, warehouseId?: st
                 price: price,
                 pieces: pieces,
                 quantity: quantity,
-                totalValue: quantity * price
+                totalValue: round5(quantity * price)
             });
         }
 
@@ -183,7 +186,7 @@ export const getInventoryCountData = async (warehouseId?: string): Promise<Inven
             const currentPieces = itemPiecesMap.get(lot.item_id) || 0;
             // Only add positive remaining pieces
             const piecesToAdd = Math.max(0, lot.remaining_pieces || 0);
-            itemPiecesMap.set(lot.item_id, currentPieces + piecesToAdd);
+            itemPiecesMap.set(lot.item_id, round5(currentPieces + piecesToAdd));
         }
 
         // Articoli movimentati (bolle) o acquistati nell'ultimo anno: da evidenziare nel
@@ -238,7 +241,7 @@ export const getInventoryCountData = async (warehouseId?: string): Promise<Inven
                 itemImage: item.image_url || undefined,
                 coefficient: coeff,
                 systemPieces: totalPieces,
-                systemQuantity: totalPieces * coeff,
+                systemQuantity: round5(totalPieces * coeff),
                 recentlyActive: recentlyActiveIds.has(item.id)
             });
         }
