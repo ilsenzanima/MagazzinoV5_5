@@ -11,9 +11,11 @@ import AssignmentModal from "./AssignmentModal";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import DayDetailPanel from "./DayDetailPanel";
 import { CourseQuickSelectDialog } from "./CourseQuickSelectDialog";
-import { generateMonthlyReport } from "./report-generator";
+import { ListPageHeader } from "@/components/ui/list-page-header";
+import { warehousesApi } from "@/lib/services/warehouses";
+import type { Warehouse } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Users, FileDown, Filter, X, FilePlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Users, Filter, X, FilePlus } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
@@ -40,6 +42,19 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
     const [quickJobId, setQuickJobId] = useState("");
     const [quickHours, setQuickHours] = useState(8);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+
+    useEffect(() => {
+        warehousesApi.getAll().then(setWarehouses).catch(console.error);
+    }, []);
+
+    // Dove si può registrare una presenza: commesse attive e magazzini
+    const targets = useMemo(() => [
+        ...initialJobs.map(j => ({ value: j.id, label: `${j.code} - ${j.name}` })),
+        ...warehouses.map(w => ({ value: w.id, label: `📦 ${w.name}` })),
+    ], [initialJobs, warehouses]);
+    const targetFields = (id: string) => warehouses.some(w => w.id === id) ? { warehouseId: id } : { jobId: id };
+    const sameTarget = (a: Attendance, id: string) => a.jobId === id || a.warehouseId === id;
 
     const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -168,10 +183,10 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
             // Cantiere a scelta rapida: se la persona è già su quel cantiere nel giorno, si sommano le ore
             if (selectedTool === 'presence') {
                 if (!quickJobId) return;
-                const existing = assignments.find(a => a.status === 'presence' && a.jobId === quickJobId);
+                const existing = assignments.find(a => a.status === 'presence' && sameTarget(a, quickJobId));
                 try {
                     if (existing) await attendanceApi.update(existing.id, { ...existing, hours: Math.min(24, existing.hours + quickHours) });
-                    else await attendanceApi.addAttendance({ workerId: worker.id, date: dateStr, status: 'presence', hours: quickHours, jobId: quickJobId });
+                    else await attendanceApi.addAttendance({ workerId: worker.id, date: dateStr, status: 'presence', hours: quickHours, ...targetFields(quickJobId) });
                     toast.success(existing ? "Ore aggiunte" : "Aggiunto", { duration: 1000, position: 'bottom-center' });
                     loadData();
                 } catch (e) {
@@ -353,10 +368,10 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     const handleAddToDay = async (jobId: string, hours: number) => {
         if (!selectedWorker || !selectedDate) return;
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        const existing = attendanceMap[selectedWorker.id]?.[dateStr]?.find(a => a.status === 'presence' && a.jobId === jobId);
+        const existing = attendanceMap[selectedWorker.id]?.[dateStr]?.find(a => a.status === 'presence' && sameTarget(a, jobId));
         try {
             if (existing) await attendanceApi.update(existing.id, { ...existing, hours: Math.min(24, existing.hours + hours) });
-            else await attendanceApi.addAttendance({ workerId: selectedWorker.id, date: dateStr, status: 'presence', hours, jobId });
+            else await attendanceApi.addAttendance({ workerId: selectedWorker.id, date: dateStr, status: 'presence', hours, ...targetFields(jobId) });
             loadData();
         } catch (error) {
             console.error(error);
@@ -399,103 +414,88 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     return (
         <div className="space-y-4 min-w-0">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-card p-4 rounded-lg shadow-sm border dark:border-border">
-                <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="font-semibold w-48 text-center capitalize text-lg">
-                        {isMobile
-                            ? (viewStart.getMonth() === viewEnd.getMonth()
-                                ? `${format(viewStart, 'd')} - ${format(viewEnd, 'd MMMM yyyy', { locale: it })}`
-                                : `${format(viewStart, 'd MMM', { locale: it })} - ${format(viewEnd, 'd MMM yyyy', { locale: it })}`)
-                            : format(monthStart, 'MMMM yyyy', { locale: it })}
+            <ListPageHeader
+                title="Presenze / Assenze"
+                actions={
+                    <>
+                        <Link href="/attendance/request" className="flex-1 sm:flex-none">
+                            <Button variant="outline" className="w-full gap-2">
+                                <FilePlus className="h-4 w-4" />
+                                Richiesta Permesso
+                            </Button>
+                        </Link>
+                        {canEdit && (
+                            <Button onClick={() => setIsBulkModalOpen(true)} className="flex-1 bg-blue-600 hover:bg-blue-700 sm:flex-none">
+                                <Users className="mr-2 h-4 w-4" />
+                                Inserisci Presenze
+                            </Button>
+                        )}
+                    </>
+                }
+            >
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center justify-center space-x-2">
+                        <Button variant="outline" size="icon" onClick={handlePrevMonth} aria-label="Periodo precedente">
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="font-semibold w-48 text-center capitalize text-lg">
+                            {isMobile
+                                ? (viewStart.getMonth() === viewEnd.getMonth()
+                                    ? `${format(viewStart, 'd')} - ${format(viewEnd, 'd MMMM yyyy', { locale: it })}`
+                                    : `${format(viewStart, 'd MMM', { locale: it })} - ${format(viewEnd, 'd MMM yyyy', { locale: it })}`)
+                                : format(monthStart, 'MMMM yyyy', { locale: it })}
+                        </div>
+                        <Button variant="outline" size="icon" onClick={handleNextMonth} aria-label="Periodo successivo">
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleToday} className="ml-2">
+                            Oggi
+                        </Button>
+                        {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
                     </div>
-                    <Button variant="outline" size="icon" onClick={handleNextMonth}>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={handleToday} className="ml-2">
-                        Oggi
-                    </Button>
-                </div>
-                <div className="flex items-center flex-wrap gap-2">
-                    {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
 
-                    {canEdit && (
-                        <Button
-                            variant="outline"
-                            onClick={() => generateMonthlyReport(currentDate, initialWorkers, mergedAttendanceList)}
-                            className="gap-2"
+                    <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 shrink-0 text-slate-500" />
+                        <Select
+                            value={filterJobId || "all"}
+                            onValueChange={(val) => setFilterJobId(val === "all" ? null : val)}
                         >
-                            <FileDown className="h-4 w-4" />
-                            PDF
-                        </Button>
-                    )}
-
-                    <Link href="/attendance/request">
-                        <Button variant="outline" className="gap-2">
-                            <FilePlus className="h-4 w-4" />
-                            Richiesta Permesso
-                        </Button>
-                    </Link>
-
-                    {canEdit && (
-                        <Button onClick={() => setIsBulkModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                            <Users className="mr-2 h-4 w-4" />
-                            Inserisci Presenze
-                        </Button>
-                    )}
+                            <SelectTrigger className="w-full md:w-[300px]">
+                                <SelectValue placeholder="Tutti i cantieri" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Tutti i cantieri</SelectItem>
+                                {jobsInMonth.length === 0 ? (
+                                    <SelectItem value="none" disabled>
+                                        Nessun cantiere nel mese
+                                    </SelectItem>
+                                ) : (
+                                    jobsInMonth.map(job => (
+                                        <SelectItem key={job.id} value={job.id}>
+                                            {job.code} - {job.name}
+                                        </SelectItem>
+                                    ))
+                                )}
+                            </SelectContent>
+                        </Select>
+                        {filterJobId && (
+                            <Button variant="ghost" size="icon" onClick={() => setFilterJobId(null)} aria-label="Rimuovi filtro" className="shrink-0 text-slate-600">
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
                 </div>
-            </div>
+            </ListPageHeader>
 
             {canEdit && <AttendanceToolbar
                 selectedTool={selectedTool}
                 onSelectTool={setSelectedTool}
-                jobs={initialJobs}
+                targets={targets}
                 quickJobId={quickJobId}
                 onQuickJobChange={setQuickJobId}
                 quickHours={quickHours}
                 onQuickHoursChange={d => setQuickHours(h => Math.min(24, Math.max(0.5, h + d)))}
             />}
-
-            {/* Job Filter */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white dark:bg-card p-3 rounded-lg shadow-sm border dark:border-border">
-                <Filter className="h-4 w-4 text-slate-500" />
-                <span className="text-sm text-slate-600 dark:text-slate-400">Filtra per cantiere:</span>
-                <Select
-                    value={filterJobId || "all"}
-                    onValueChange={(val) => setFilterJobId(val === "all" ? null : val)}
-                >
-                    <SelectTrigger className="w-full md:w-[300px]">
-                        <SelectValue placeholder="Tutti i cantieri" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Tutti i cantieri</SelectItem>
-                        {jobsInMonth.length === 0 ? (
-                            <SelectItem value="none" disabled>
-                                Nessun cantiere nel mese
-                            </SelectItem>
-                        ) : (
-                            jobsInMonth.map(job => (
-                                <SelectItem key={job.id} value={job.id}>
-                                    {job.code} - {job.name}
-                                </SelectItem>
-                            ))
-                        )}
-                    </SelectContent>
-                </Select>
-                {filterJobId && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setFilterJobId(null)}
-                        className="gap-1 text-slate-600"
-                    >
-                        <X className="h-3 w-3" />
-                        Rimuovi filtro
-                    </Button>
-                )}
-            </div>
 
             <div className="bg-white dark:bg-card rounded-lg shadow-sm border dark:border-border overflow-hidden">
                 <AttendanceMonthGrid
@@ -539,7 +539,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     worker={selectedWorker}
                     date={selectedDate}
                     entries={attendanceMap[selectedWorker.id]?.[format(selectedDate, 'yyyy-MM-dd')] || []}
-                    jobs={initialJobs}
+                    targets={targets}
                     canEdit={canEdit}
                     onChangeHours={handleChangeHours}
                     onEdit={(assignment) => { setCurrentAssignment(assignment); setIsModalOpen(true); }}

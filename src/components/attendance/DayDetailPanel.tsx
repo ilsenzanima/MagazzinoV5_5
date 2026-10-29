@@ -3,15 +3,15 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Attendance, Job, Worker } from "@/lib/api";
+import { SearchableSelect, SearchableSelectOption } from "@/components/ui/searchable-select";
+import { Attendance, Worker } from "@/lib/api";
 import { HoursStepper } from "./HoursStepper";
 
 interface DayDetailPanelProps {
     worker: Worker;
     date: Date;
     entries: Attendance[];
-    jobs: Job[];
+    targets: SearchableSelectOption[];
     canEdit: boolean;
     onChangeHours: (entry: Attendance, delta: number) => void;
     onEdit: (entry: Attendance) => void;
@@ -34,12 +34,10 @@ const entryLabel = (a: Attendance) => isWorkEntry(a)
 
 const fmtHours = (h: number) => `${String(h).replace('.', ',')} h`;
 
-export default function DayDetailPanel({ worker, date, entries, jobs, canEdit, onChangeHours, onEdit, onDelete, onAdd, onClose }: DayDetailPanelProps) {
+export default function DayDetailPanel({ worker, date, entries, targets, canEdit, onChangeHours, onEdit, onDelete, onAdd, onClose }: DayDetailPanelProps) {
     const [newJobId, setNewJobId] = useState("");
     const [newHours, setNewHours] = useState(8);
     const total = entries.reduce((s, a) => s + a.hours, 0);
-
-    const jobOptions = jobs.map(j => ({ value: j.id, label: `${j.code} - ${j.name}` }));
 
     return (
         <div className="sticky bottom-2 z-30 rounded-lg border border-slate-200 bg-white p-4 shadow-lg dark:border-border dark:bg-card">
@@ -86,10 +84,10 @@ export default function DayDetailPanel({ worker, date, entries, jobs, canEdit, o
             {canEdit && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
                     <SearchableSelect
-                        options={jobOptions}
+                        options={targets}
                         value={newJobId}
                         onValueChange={setNewJobId}
-                        placeholder="Aggiungi cantiere…"
+                        placeholder="Aggiungi cantiere o magazzino…"
                         searchPlaceholder="Cerca commessa…"
                         className="w-full sm:w-72"
                     />

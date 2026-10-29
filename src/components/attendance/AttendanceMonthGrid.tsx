@@ -69,6 +69,13 @@ export default function AttendanceMonthGrid({
                             <td className="sticky left-0 z-10 p-2 font-medium bg-white dark:bg-card group-hover:bg-gray-50 dark:group-hover:bg-slate-800 border-r dark:border-slate-700 border-b shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap">
                                 <span className="md:hidden">{worker.lastName}</span>
                                 <span className="hidden md:inline">{worker.lastName} {worker.firstName}</span>
+                                {(() => {
+                                    // Ore lavorate nel periodo mostrato (con il filtro cantiere attivo, solo quelle del cantiere)
+                                    const total = days.reduce((sum, day) => sum + (attendanceMap[worker.id]?.[format(day, "yyyy-MM-dd")] || [])
+                                        .filter(a => a.status === 'presence' || a.status === 'transfer')
+                                        .reduce((h, a) => h + (a.hours || 0), 0), 0);
+                                    return total > 0 ? <span className="ml-2 text-xs font-normal text-slate-400" title="Ore lavorate nel periodo">{String(total).replace('.', ',')} h</span> : null;
+                                })()}
                             </td>
                             {days.map(day => {
                                 const dateKey = format(day, "yyyy-MM-dd");
