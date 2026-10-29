@@ -56,9 +56,9 @@ export default function AttendanceReport() {
     const [error, setError] = useState<string | null>(null);
     const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
 
-    // Generate year options (current year and 2 previous)
+    // Anni selezionabili: corrente e 4 precedenti
     const currentYear = new Date().getFullYear();
-    const years = [currentYear, currentYear - 1, currentYear - 2];
+    const years = [0, 1, 2, 3, 4].map(i => currentYear - i);
 
     useEffect(() => {
         loadData();
@@ -78,8 +78,11 @@ export default function AttendanceReport() {
             const activeWorkers = workersData.filter(w => w.isActive);
             setWorkers(activeWorkers);
             setAttendance(attendanceData);
+            // Si mantiene il dipendente scelto; altrimenti il primo che ha registrazioni nel mese
             setSelectedWorkerId(prev =>
-                prev && activeWorkers.some(w => w.id === prev) ? prev : (activeWorkers[0]?.id ?? null)
+                prev && activeWorkers.some(w => w.id === prev)
+                    ? prev
+                    : (activeWorkers.find(w => attendanceData.some(a => a.workerId === w.id)) ?? activeWorkers[0])?.id ?? null
             );
         } catch (err) {
             console.error("Error loading attendance data:", err);
@@ -145,6 +148,36 @@ export default function AttendanceReport() {
             };
         });
     })();
+
+    // Prospetto di tutti i dipendenti: ore di lavoro e per tipo di assenza
+    const COLUMNS: { key: string; label: string; match: (status: string) => boolean }[] = [
+        { key: 'work', label: 'Lavoro', match: st => st === 'presence' || st === 'transfer' },
+        { key: 'holiday', label: 'Ferie/Perm.', match: st => st === 'holiday' || st === 'permit' },
+        { key: 'sick', label: 'Malattia', match: st => st === 'sick' },
+        { key: 'injury', label: 'Infortunio', match: st => st === 'injury' },
+        { key: 'course', label: 'Corso', match: st => st === 'course' },
+        { key: 'other', label: 'Altro', match: st => ['strike', 'absence', 'medical_exam'].includes(st) },
+    ];
+    const prospect = workers.map(w => {
+        const mine = attendance.filter(a => a.workerId === w.id);
+        const cells = COLUMNS.map(c => mine.filter(a => c.match(a.status)).reduce((sum, a) => sum + a.hours, 0));
+        return { worker: w, cells, total: cells.reduce((x, y) => x + y, 0) };
+    });
+    const prospectTotals = COLUMNS.map((_, i) => prospect.reduce((sum, r) => sum + r.cells[i], 0));
+
+    // Ore di lavoro per cantiere o magazzino nel mese
+    const byTarget = (() => {
+        const map = new Map<string, { hours: number; workers: Set<string> }>();
+        attendance.filter(a => a.status === 'presence' || a.status === 'transfer').forEach(a => {
+            const label = getAttendanceLocation(a);
+            const t = map.get(label) || { hours: 0, workers: new Set<string>() };
+            t.hours += a.hours;
+            t.workers.add(a.workerId);
+            map.set(label, t);
+        });
+        return Array.from(map.entries()).sort((x, y) => y[1].hours - x[1].hours);
+    })();
+    const fmtH = (h: number) => (h === 0 ? '' : String(Math.round(h * 100) / 100).replace('.', ','));
 
     if (loading) {
         return (
@@ -238,10 +271,10 @@ export default function AttendanceReport() {
                 </Card>
             </div>
 
-            {/* Workers Preview */}
+            {/* Prospetto di tutti i dipendenti */}
             <Card>
                 <CardHeader className="pb-2">
-                    <CardTitle className="text-lg dark:text-white">Dipendenti - {monthLabel}</CardTitle>
+                    <CardTitle className="text-lg dark:text-white">Prospetto ore - {monthLabel}</CardTitle>
                     {workers.length > 0 && (
                         <p className="text-xs text-slate-400 dark:text-slate-500">
                             Clicca su un dipendente per vedere il dettaglio giornaliero qui sotto.
@@ -255,45 +288,94 @@ export default function AttendanceReport() {
                             <p>Nessun dipendente attivo trovato.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                            {workers.map(worker => {
-                                const workerAttendance = attendance.filter(a => a.workerId === worker.id);
-                                const workerHours = workerAttendance
-                                    .filter(a => a.status === 'presence' || a.status === 'transfer')
-                                    .reduce((sum, a) => sum + a.hours, 0);
-                                const isSelected = worker.id === selectedWorkerId;
-
-                                return (
-                                    <button
-                                        key={worker.id}
-                                        type="button"
-                                        onClick={() => setSelectedWorkerId(worker.id)}
-                                        className={cn(
-                                            "text-left p-3 border rounded-lg transition-colors",
-                                            isSelected
-                                                ? "bg-blue-50 border-blue-400 ring-1 ring-blue-400 dark:bg-blue-950 dark:border-blue-600"
-                                                : "bg-slate-50 border-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-                                        )}
-                                    >
-                                        <p className="font-medium dark:text-white">{worker.lastName} {worker.firstName}</p>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                                            {workerHours} ore lavorate
-                                        </p>
-                                    </button>
-                                );
-                            })}
+                        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-muted">
+                                        <th className="px-3 py-2 text-left">Dipendente</th>
+                                        {COLUMNS.map(c => <th key={c.key} className="px-3 py-2 text-right">{c.label}</th>)}
+                                        <th className="px-3 py-2 text-right">Totale</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {prospect.map(r => (
+                                        <tr
+                                            key={r.worker.id}
+                                            onClick={() => setSelectedWorkerId(r.worker.id)}
+                                            className={cn(
+                                                "cursor-pointer border-t dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800",
+                                                r.worker.id === selectedWorkerId && "bg-blue-50 hover:bg-blue-50 dark:bg-blue-950"
+                                            )}
+                                        >
+                                            <td className="px-3 py-2 font-medium dark:text-white">{r.worker.lastName} {r.worker.firstName}</td>
+                                            {r.cells.map((h, i) => (
+                                                <td key={COLUMNS[i].key} className={cn("px-3 py-2 text-right tabular-nums", i === 0 ? "font-semibold" : "text-slate-600 dark:text-slate-300")}>{fmtH(h)}</td>
+                                            ))}
+                                            <td className="px-3 py-2 text-right font-semibold tabular-nums">{fmtH(r.total)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t-2 bg-slate-100 font-bold dark:bg-muted dark:border-slate-600">
+                                        <td className="px-3 py-2">Totale</td>
+                                        {prospectTotals.map((h, i) => <td key={COLUMNS[i].key} className="px-3 py-2 text-right tabular-nums">{fmtH(h)}</td>)}
+                                        <td className="px-3 py-2 text-right tabular-nums">{fmtH(prospectTotals.reduce((x, y) => x + y, 0))}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     )}
                 </CardContent>
             </Card>
 
+            {/* Ore per cantiere / magazzino */}
+            {byTarget.length > 0 && (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-lg dark:text-white">Ore per cantiere - {monthLabel}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-muted">
+                                        <th className="px-3 py-2 text-left">Cantiere / magazzino</th>
+                                        <th className="px-3 py-2 text-right w-28">Ore</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {byTarget.map(([label, t]) => (
+                                        <tr key={label} className="border-t dark:border-slate-800">
+                                            <td className="px-3 py-2">{label}</td>
+                                            <td className="px-3 py-2 text-right font-semibold tabular-nums">{fmtH(t.hours)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Dettaglio giornaliero del dipendente selezionato */}
             {selectedWorker && (
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-lg dark:text-white">
-                            {selectedWorker.lastName} {selectedWorker.firstName} - {monthLabel}
-                        </CardTitle>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <CardTitle className="text-lg dark:text-white">
+                                Dettaglio giornaliero - {monthLabel}
+                            </CardTitle>
+                            <Select value={selectedWorker.id} onValueChange={setSelectedWorkerId}>
+                                <SelectTrigger className="w-full sm:w-64">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {workers.map(w => (
+                                        <SelectItem key={w.id} value={w.id}>{w.lastName} {w.firstName}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         {selectedWorkerRows.length > 0 && (
                             <p className="text-xs text-slate-400 dark:text-slate-500">
                                 Le righe evidenziate sono ferie, malattie e altre assenze.

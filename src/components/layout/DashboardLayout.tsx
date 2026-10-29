@@ -207,12 +207,12 @@ export function Sidebar({ className, onLinkClick, collapsed = false, onToggleCol
     },
     {
       items: [
-        {
+        ...(userRole === "admin" || userRole === "operativo" ? [{
           label: "Report",
           icon: BarChart3,
           href: "/reports",
           active: pathname === "/reports",
-        },
+        }] : []),
         {
           label: "Analisi spostamenti",
           icon: TrendingUp,
