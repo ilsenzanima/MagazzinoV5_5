@@ -3,6 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { ListPageHeader } from "@/components/ui/list-page-header";
+import { useAuth } from "@/components/auth-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, Users, ClipboardList, QrCode, Loader2 } from "lucide-react";
 import ArticlesReport from "@/components/reports/articles-report";
@@ -15,6 +17,8 @@ const REPORT_TABS = ["articles", "attendance", "inventory", "qr"];
 function ReportsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { userRole } = useAuth();
+  const canView = userRole === "admin" || userRole === "operativo";
   const initialTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(
     initialTab && REPORT_TABS.includes(initialTab) ? initialTab : "articles"
@@ -29,15 +33,20 @@ function ReportsContent() {
     router.replace(query ? `/reports?${query}` : "/reports", { scroll: false });
   }, [activeTab, router]);
 
+  // Solo admin e operativi vedono i report
+  useEffect(() => {
+    if (userRole && !canView) router.push("/dashboard");
+  }, [userRole, canView, router]);
+
+  if (!canView) {
+    return <DashboardLayout><div className="py-20 text-center text-slate-400">Caricamento...</div></DashboardLayout>;
+  }
+
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Report</h1>
-          <p className="text-slate-500 dark:text-slate-400">Analisi e statistiche del magazzino.</p>
-        </div>
-
+      <div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <ListPageHeader title="Report">
           <TabsList className="grid w-full grid-cols-4 lg:w-[640px]">
             <TabsTrigger value="articles" className="gap-2">
               <Package className="h-4 w-4" />
@@ -56,8 +65,9 @@ function ReportsContent() {
               <span className="hidden sm:inline">QR / Codici</span>
             </TabsTrigger>
           </TabsList>
+          </ListPageHeader>
 
-          <TabsContent value="articles" className="mt-6">
+          <TabsContent value="articles">
             <ArticlesReport />
           </TabsContent>
 
