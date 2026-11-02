@@ -87,6 +87,18 @@ export const complianceApi = {
         return (data || []).map(mapDbToDoc);
     },
 
+    // Tutti i documenti di tutti i fornitori (specifici DDT compresi), per la pagina Gestione conformità
+    getAllDocuments: async (): Promise<ComplianceDocument[]> => {
+        const { data, error } = await supabase
+            .from('supplier_compliance_documents')
+            .select(SELECT_WITH_RELATIONS)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(5000);
+        if (error) throw error;
+        return (data || []).map(mapDbToDoc);
+    },
+
     getBySupplier: async (supplierId: string, excludeDdtSpecific = false): Promise<ComplianceDocument[]> => {
         let query = supabase
             .from('supplier_compliance_documents')
@@ -159,7 +171,8 @@ export const complianceApi = {
 
     create: async (doc: {
         supplierId: string;
-        brandId: string;
+        // Un documento specifico di un DDT non ha marca
+        brandId: string | null;
         documentTypeId?: string | null;
         name: string;
         notes?: string;
@@ -239,9 +252,9 @@ export const complianceApi = {
         }
     },
 
-    uploadFile: async (file: File, supplierName: string): Promise<{ fileId: string; name: string }> => {
+    uploadFile: async (file: File, supplierName: string, ddtSpecific = false): Promise<{ fileId: string; name: string }> => {
         const compressed = await compressImageIfNeeded(file);
-        const result = await uploadFileToDrive(compressed, ['Fornitori', supplierName, 'Compliance']);
+        const result = await uploadFileToDrive(compressed, ['Fornitori', supplierName, 'Compliance', ...(ddtSpecific ? ['DDT'] : [])]);
         return { fileId: result.fileId, name: result.name };
     },
 

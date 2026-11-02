@@ -1,13 +1,12 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Dialog,
     DialogContent,
@@ -45,6 +44,9 @@ import {
     ShieldCheck,
     Receipt,
     X,
+    ArrowUp,
+    ArrowDown,
+    ArrowUpDown,
 } from "lucide-react";
 import { suppliersApi } from "@/lib/services/suppliers";
 import { supplierGroupsApi } from "@/lib/services/supplier-groups";
@@ -52,10 +54,13 @@ import { brandsApi } from "@/lib/services/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ViewToggle } from "@/components/ui/view-toggle";
-import { useViewMode } from "@/hooks/useViewMode";
-import { PageSizeSelector } from "@/components/ui/page-size-selector";
-import { usePageSize } from "@/hooks/usePageSize";
+import { ListPageHeader } from "@/components/ui/list-page-header";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { format } from "date-fns";
+import { it } from "date-fns/locale";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { toast } from "sonner";
 import {
@@ -67,7 +72,8 @@ import { Supplier, Brand } from "@/lib/types";
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
 
-const UNTYPED_KEY = "__untyped__";
+// Il tipo con cui si caricano i documenti che il produttore rilascia per un DDT preciso
+const isProducerConformity = (t?: ComplianceDocumentTypeConfig) => !!t && /conformit.*produttore/i.test(t.name);
 
 function formatFileSize(bytes: number | null): string {
     if (bytes === null) return '';
@@ -222,7 +228,7 @@ function DocumentFormDialog({
     useEffect(() => {
         if (open && editing) {
             setForm({
-                brandId: editing.brandId,
+                brandId: editing.brandId || "",
                 documentTypeId: editing.documentTypeId || "",
                 name: editing.name,
                 notes: editing.notes || "",
@@ -235,8 +241,9 @@ function DocumentFormDialog({
     }, [open, editing]);
 
     const handleSave = async () => {
-        if (!form.brandId || !form.name.trim()) {
-            setError("Marca e nome sono obbligatori.");
+        const ddtSpecific = editing.documentScope === "ddt_specific";
+        if ((!ddtSpecific && !form.brandId) || !form.name.trim()) {
+            setError(ddtSpecific ? "Il nome è obbligatorio." : "Marca e nome sono obbligatori.");
             return;
         }
         if (!form.documentTypeId) {
@@ -250,12 +257,12 @@ function DocumentFormDialog({
             let fileSize = editing.fileSize;
             if (form.file) {
                 const supplierName = suppliers.find(s => s.id === supplierId)?.name || supplierId;
-                const uploaded = await complianceApi.uploadFile(form.file, supplierName);
+                const uploaded = await complianceApi.uploadFile(form.file, supplierName, editing.documentScope === "ddt_specific");
                 fileUrl = uploaded.fileId;
                 fileSize = form.file.size;
             }
             const doc = await complianceApi.update(editing.id, {
-                brandId: form.brandId,
+                brandId: form.brandId || undefined,
                 documentTypeId: form.documentTypeId || null,
                 name: form.name.trim(),
                 notes: form.notes.trim(),
@@ -281,7 +288,7 @@ function DocumentFormDialog({
                 <div className="space-y-4 py-2">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <Label>Marca <span className="text-destructive">*</span></Label>
+                            <Label>Marca {editing.documentScope !== "ddt_specific" && <span className="text-destructive">*</span>}</Label>
                             <Select value={form.brandId} onValueChange={(v) => setForm(f => ({ ...f, brandId: v }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleziona marca" />
@@ -389,7 +396,6 @@ function MultiUploadDialog({
     brands,
     docTypes,
     onUploaded,
-    onSupplierSelected,
 }: {
     open: boolean;
     onOpenChange: (v: boolean) => void;
@@ -398,12 +404,14 @@ function MultiUploadDialog({
     brands: Brand[];
     docTypes: ComplianceDocumentTypeConfig[];
     onUploaded: (docs: ComplianceDocument[]) => void;
-    onSupplierSelected: (id: string) => void;
 }) {
     const [step, setStep] = useState<1 | 2>(1);
     const [localSupplierId, setLocalSupplierId] = useState(supplierId);
     const [brandId, setBrandId] = useState("");
     const [documentTypeId, setDocumentTypeId] = useState("");
+    // Variante "conformità produttore": il documento può essere la prova di una bolla di acquisto precisa
+    const [linkToPurchase, setLinkToPurchase] = useState(false);
+    const [linkedPurchaseId, setLinkedPurchaseId] = useState("");
     const [pendingFiles, setPendingFiles] = useState<PendingComplianceFile[]>([]);
     const [dragOver, setDragOver] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -415,6 +423,8 @@ function MultiUploadDialog({
             setLocalSupplierId(supplierId);
             setBrandId("");
             setDocumentTypeId("");
+            setLinkToPurchase(false);
+            setLinkedPurchaseId("");
             setPendingFiles([]);
             setDragOver(false);
             batchUpload.reset();
@@ -422,6 +432,8 @@ function MultiUploadDialog({
     }, [open, supplierId]);
 
     const effectiveSupplierId = localSupplierId;
+    const producerType = isProducerConformity(docTypes.find(t => t.id === documentTypeId));
+    const linked = producerType && linkToPurchase;
 
     const handleFilesSelected = (files: FileList | null) => {
         if (!files || files.length === 0) return;
@@ -453,7 +465,15 @@ function MultiUploadDialog({
             toast.error("Selezionare il tipo di documento.");
             return;
         }
-        if (!effectiveSupplierId || !brandId || pendingFiles.length === 0) return;
+        if (!effectiveSupplierId || pendingFiles.length === 0) return;
+        if (linked && !linkedPurchaseId) {
+            toast.error("Cerca e seleziona la bolla di acquisto a cui è collegato.");
+            return;
+        }
+        if (!linked && !brandId) {
+            toast.error("Selezionare la marca.");
+            return;
+        }
         setStep(2);
     };
 
@@ -473,21 +493,22 @@ function MultiUploadDialog({
         const supplierName = suppliers.find(s => s.id === effectiveSupplierId)?.name || effectiveSupplierId;
         const uploaded: ComplianceDocument[] = [];
         const { okCount, failedCount } = await batchUpload.run(pendingFiles, async pf => {
-            const result = await complianceApi.uploadFile(pf.file, supplierName);
+            const result = await complianceApi.uploadFile(pf.file, supplierName, linked);
             const doc = await complianceApi.create({
                 supplierId: effectiveSupplierId,
-                brandId,
+                brandId: linked ? null : brandId,
                 documentTypeId: documentTypeId || null,
                 name: pf.name.trim() || pf.file.name,
                 notes: pf.notes.trim() || undefined,
                 fileUrl: result.fileId,
                 fileSize: pf.file.size,
+                purchaseId: linked ? linkedPurchaseId : undefined,
+                documentScope: linked ? "ddt_specific" : "reusable",
             });
             uploaded.push(doc);
         });
         setUploading(false);
         if (uploaded.length > 0) {
-            if (!supplierId) onSupplierSelected(effectiveSupplierId);
             onUploaded(uploaded);
         }
         if (failedCount === 0) {
@@ -509,10 +530,10 @@ function MultiUploadDialog({
                 </DialogHeader>
                 {step === 1 ? (
                     <div className="space-y-4 py-2">
-                        {!supplierId && (
+                        {(
                             <div className="space-y-1.5">
                                 <Label>Fornitore <span className="text-destructive">*</span></Label>
-                                <Select value={localSupplierId} onValueChange={setLocalSupplierId}>
+                                <Select value={localSupplierId} onValueChange={(v) => { setLocalSupplierId(v); setLinkedPurchaseId(""); }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleziona fornitore" />
                                     </SelectTrigger>
@@ -526,7 +547,7 @@ function MultiUploadDialog({
                         )}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <Label>Marca <span className="text-destructive">*</span></Label>
+                                <Label>Marca {!linked && <span className="text-destructive">*</span>}</Label>
                                 <Select value={brandId} onValueChange={setBrandId}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleziona marca" />
@@ -540,7 +561,7 @@ function MultiUploadDialog({
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Tipo documento</Label>
-                                <Select value={documentTypeId} onValueChange={setDocumentTypeId}>
+                                <Select value={documentTypeId} onValueChange={(v) => { setDocumentTypeId(v); setLinkToPurchase(false); setLinkedPurchaseId(""); }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleziona tipo" />
                                     </SelectTrigger>
@@ -552,6 +573,36 @@ function MultiUploadDialog({
                                 </Select>
                             </div>
                         </div>
+                        {producerType && (
+                            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                                    <Checkbox
+                                        className="mt-0.5"
+                                        checked={linkToPurchase}
+                                        onCheckedChange={(c) => { setLinkToPurchase(!!c); if (!c) setLinkedPurchaseId(""); }}
+                                    />
+                                    <span>
+                                        Collegato a una bolla di acquisto
+                                        <span className="block text-xs text-muted-foreground">
+                                            Prova rilasciata dal produttore per quella bolla: si vedrà anche nella pagina dell&apos;acquisto e non sarà riutilizzabile altrove. Non serve la marca.
+                                        </span>
+                                    </span>
+                                </label>
+                                {linkToPurchase && (
+                                    effectiveSupplierId ? (
+                                        <PurchaseSearchCombobox
+                                            key={effectiveSupplierId}
+                                            supplierId={effectiveSupplierId}
+                                            value={linkedPurchaseId}
+                                            onChange={(id) => setLinkedPurchaseId(id)}
+                                        />
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">Scegli prima il fornitore per cercare la bolla.</p>
+                                    )
+                                )}
+                                {linkToPurchase && <p className="text-xs text-muted-foreground">La bolla scelta vale per tutti i file di questo caricamento.</p>}
+                            </div>
+                        )}
                         <div className="space-y-1.5">
                             <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
                             <div
@@ -605,7 +656,7 @@ function MultiUploadDialog({
                     {step === 1 ? (
                         <>
                             <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
-                            <Button onClick={goToStep2} disabled={!effectiveSupplierId || !brandId || pendingFiles.length === 0}>Continua</Button>
+                            <Button onClick={goToStep2} disabled={!effectiveSupplierId || (!brandId && !linked) || pendingFiles.length === 0}>Continua</Button>
                         </>
                     ) : (
                         <>
@@ -622,98 +673,27 @@ function MultiUploadDialog({
     );
 }
 
-// ── Document card ─────────────────────────────────────────────────────────────
+// ── Apertura documento ────────────────────────────────────────────────────────
 
-function DocumentCard({
-    doc,
-    onEdit,
-    onDelete,
-}: {
-    doc: ComplianceDocument;
-    onEdit: (doc: ComplianceDocument) => void;
-    onDelete: (doc: ComplianceDocument) => void;
-}) {
-    const supabase = createClient();
-
-    const openDocument = async () => {
-        if (!doc.fileUrl.includes('/')) {
-            window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&fileName=${encodeURIComponent(doc.name)}`, '_blank');
-            return;
-        }
-        try {
-            const path = doc.fileUrl.split('/public/documents/')[1];
-            if (!path) { window.open(doc.fileUrl, '_blank'); return; }
-            const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600);
-            if (error || !data?.signedUrl) { window.open(doc.fileUrl, '_blank'); return; }
-            window.open(data.signedUrl, '_blank');
-        } catch {
-            window.open(doc.fileUrl, '_blank');
-        }
-    };
-
-    return (
-        <Card className="group">
-            <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-3 min-w-0">
-                        <div className="mt-0.5 shrink-0 h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center">
-                            <FileText className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium text-sm truncate">{doc.name}</span>
-                                {doc.brandName && (
-                                    <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full shrink-0">
-                                        {doc.brandName}
-                                    </span>
-                                )}
-                                {doc.documentScope === 'ddt_specific' && (
-                                    <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 px-2 py-0.5 rounded-full shrink-0">
-                                        Specifico DDT
-                                    </span>
-                                )}
-                            </div>
-                            {doc.notes && (
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{doc.notes}</p>
-                            )}
-                            {doc.purchaseNumber && (
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                    Acquisto: <span className="font-medium">{doc.purchaseNumber}</span>
-                                </p>
-                            )}
-                            <p className="text-xs text-muted-foreground mt-1">
-                                {new Date(doc.createdAt).toLocaleDateString("it-IT")}
-                                {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary" onClick={openDocument} title="Apri PDF">
-                            <FileText className="h-4 w-4" />
-                        </Button>
-                        {doc.purchaseId && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
-                                <a href={`/purchases/${doc.purchaseId}`} target="_blank" rel="noopener noreferrer">
-                                    <Receipt className="h-4 w-4" />
-                                </a>
-                            </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(doc)} title="Modifica">
-                            <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(doc)} title="Elimina">
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
+async function openComplianceDocument(doc: ComplianceDocument) {
+    if (!doc.fileUrl.includes('/')) {
+        window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&fileName=${encodeURIComponent(doc.name)}`, '_blank');
+        return;
+    }
+    try {
+        const path = doc.fileUrl.split('/public/documents/')[1];
+        if (!path) { window.open(doc.fileUrl, '_blank'); return; }
+        const { data, error } = await createClient().storage.from('documents').createSignedUrl(path, 3600);
+        if (error || !data?.signedUrl) { window.open(doc.fileUrl, '_blank'); return; }
+        window.open(data.signedUrl, '_blank');
+    } catch {
+        window.open(doc.fileUrl, '_blank');
+    }
 }
 
-// ── Document list row ─────────────────────────────────────────────────────────
+// ── Pulsanti di riga ──────────────────────────────────────────────────────────
 
-function DocumentRow({
+function RowActions({
     doc,
     onEdit,
     onDelete,
@@ -722,162 +702,43 @@ function DocumentRow({
     onEdit: (doc: ComplianceDocument) => void;
     onDelete: (doc: ComplianceDocument) => void;
 }) {
-    const supabase = createClient();
-
-    const openDocument = async () => {
-        if (!doc.fileUrl.includes('/')) {
-            window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&fileName=${encodeURIComponent(doc.name)}`, '_blank');
-            return;
-        }
-        try {
-            const path = doc.fileUrl.split('/public/documents/')[1];
-            if (!path) { window.open(doc.fileUrl, '_blank'); return; }
-            const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600);
-            if (error || !data?.signedUrl) { window.open(doc.fileUrl, '_blank'); return; }
-            window.open(data.signedUrl, '_blank');
-        } catch {
-            window.open(doc.fileUrl, '_blank');
-        }
-    };
-
     return (
-        <div className="flex items-start gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors">
-            <div className="shrink-0 mt-0.5 h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0 space-y-0.5">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                    <span className="font-medium text-sm">{doc.name}</span>
-                    {doc.brandName && (
-                        <span className="text-xs text-muted-foreground">{doc.brandName}</span>
-                    )}
-                    {doc.documentScope === 'ddt_specific' && (
-                        <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 px-2 py-0.5 rounded-full">
-                            Specifico DDT
-                        </span>
-                    )}
-                    {doc.purchaseNumber && (
-                        <span className="text-xs text-muted-foreground">Acquisto: <span className="font-medium">{doc.purchaseNumber}</span></span>
-                    )}
-                    <span className="text-xs text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString("it-IT")}</span>
-                    {doc.fileSize != null && <span className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</span>}
-                </div>
-                {doc.notes && (
-                    <p className="text-xs text-muted-foreground break-words whitespace-pre-wrap">{doc.notes}</p>
-                )}
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary" onClick={openDocument} title="Apri PDF">
-                    <FileText className="h-3.5 w-3.5" />
+        <div className="flex items-center justify-end gap-0.5">
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary" onClick={(e) => { e.stopPropagation(); openComplianceDocument(doc); }} title="Apri PDF" aria-label="Apri PDF">
+                <FileText className="h-3.5 w-3.5" />
+            </Button>
+            {doc.purchaseId && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
+                    <a href={`/purchases/${doc.purchaseId}`} target="_blank" rel="noopener noreferrer" aria-label="Vai all'acquisto" onClick={(e) => e.stopPropagation()}>
+                        <Receipt className="h-3.5 w-3.5" />
+                    </a>
                 </Button>
-                {doc.purchaseId && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
-                        <a href={`/purchases/${doc.purchaseId}`} target="_blank" rel="noopener noreferrer">
-                            <Receipt className="h-3.5 w-3.5" />
-                        </a>
-                    </Button>
-                )}
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(doc)} title="Modifica">
-                    <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(doc)} title="Elimina">
-                    <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-            </div>
+            )}
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit(doc); }} title="Modifica" aria-label="Modifica">
+                <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(doc); }} title="Elimina" aria-label="Elimina">
+                <Trash2 className="h-3.5 w-3.5" />
+            </Button>
         </div>
     );
 }
 
-// ── Document type tabs content ────────────────────────────────────────────────
-
-function DocumentTypeTabs({
-    docs,
-    docTypes,
-    viewMode,
-    pageSize,
-    activeTab,
-    onTabChange,
-    onEdit,
-    onDelete,
-}: {
-    docs: ComplianceDocument[];
-    docTypes: ComplianceDocumentTypeConfig[];
-    viewMode: 'grid' | 'list';
-    pageSize: number;
-    activeTab: string;
-    onTabChange: (key: string) => void;
-    onEdit: (doc: ComplianceDocument) => void;
-    onDelete: (doc: ComplianceDocument) => void;
-}) {
-    const groups = [
-        ...docTypes.map(t => ({ key: t.id, label: t.name, docs: docs.filter(d => d.documentTypeId === t.id) })),
-        { key: UNTYPED_KEY, label: "Senza tipo", docs: docs.filter(d => !d.documentTypeId) },
-    ].filter(g => g.docs.length > 0);
-    const [pages, setPages] = useState<Record<string, number>>({});
-
-    const getPage = (key: string) => pages[key] ?? 1;
-    const setPage = (key: string, p: number) => setPages(prev => ({ ...prev, [key]: p }));
-
-    const effectiveTab = groups.some(g => g.key === activeTab) ? activeTab : groups[0]?.key;
-
-    return (
-        <Tabs value={effectiveTab} onValueChange={onTabChange}>
-            <TabsList className="flex-wrap h-auto gap-1">
-                {groups.map(({ key, label, docs: groupDocs }) => (
-                    <TabsTrigger key={key} value={key}>
-                        {label}
-                        <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                            {groupDocs.length}
-                        </span>
-                    </TabsTrigger>
-                ))}
-            </TabsList>
-            {groups.map(({ key, docs: typeDocs }) => {
-                const currentPage = getPage(key);
-                const totalPages = Math.ceil(typeDocs.length / pageSize);
-                const paginated = typeDocs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-                return (
-                    <TabsContent key={key} value={key}>
-                        <div className="pt-4 space-y-3">
-                            {viewMode === 'grid' ? (
-                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                    {paginated.map((doc) => (
-                                        <DocumentCard key={doc.id} doc={doc} onEdit={onEdit} onDelete={onDelete} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="space-y-1">
-                                    {paginated.map((doc) => (
-                                        <DocumentRow key={doc.id} doc={doc} onEdit={onEdit} onDelete={onDelete} />
-                                    ))}
-                                </div>
-                            )}
-                            {totalPages > 1 && (
-                                <PaginationControls
-                                    page={currentPage}
-                                    totalPages={totalPages}
-                                    onPageChange={(p) => setPage(key, p)}
-                                />
-                            )}
-                        </div>
-                    </TabsContent>
-                );
-            })}
-        </Tabs>
-    );
+function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+    if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+    return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 50;
+type SortKey = "name" | "type" | "supplier" | "date";
+type Check = "all" | "nobrand" | "notype";
 
 function ComplianceContent() {
     const { userRole } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [viewMode, setViewMode] = useViewMode('compliance');
-    const [pageSize, setPageSize] = usePageSize('compliance');
-
-
 
     useEffect(() => {
         if (userRole && userRole !== "admin" && userRole !== "operativo") {
@@ -888,16 +749,33 @@ function ComplianceContent() {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
     const [docTypes, setDocTypes] = useState<ComplianceDocumentTypeConfig[]>([]);
-    const [selectedSupplierId, setSelectedSupplierId] = useState<string>(searchParams.get("supplier") || "");
     const [documents, setDocuments] = useState<ComplianceDocument[]>([]);
+    const [loadingDocs, setLoadingDocs] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
     const [search, setSearch] = useState(searchParams.get("q") || "");
-    const [activeDocTab, setActiveDocTab] = useState<string>(searchParams.get("docTab") || "");
-    const [loadingDocs, setLoadingDocs] = useState(false);
+    const [supplierId, setSupplierId] = useState(searchParams.get("fornitore") || searchParams.get("supplier") || "");
+    const [typeId, setTypeId] = useState(searchParams.get("tipo") || "");
+    const [brandId, setBrandId] = useState(searchParams.get("marca") || "");
+    const [check, setCheck] = useState<Check>((searchParams.get("controllo") as Check) || "all");
+    const [sortKey, setSortKey] = useState<SortKey>((searchParams.get("sort") as SortKey) || "date");
+    const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get("dir") === "asc" ? "asc" : "desc");
+    const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [editingDoc, setEditingDoc] = useState<ComplianceDocument | null>(null);
     const [deletingDoc, setDeletingDoc] = useState<ComplianceDocument | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    const loadDocuments = () => {
+        setLoadingDocs(true);
+        setLoadError(null);
+        complianceApi.getAllDocuments()
+            .then(setDocuments)
+            .catch((e) => { console.error(e); setLoadError(e.message || "Errore durante il caricamento dei documenti"); })
+            .finally(() => setLoadingDocs(false));
+    };
 
     useEffect(() => {
         Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromPurchasesIds()])
@@ -905,54 +783,78 @@ function ComplianceContent() {
             .catch(console.error);
         brandsApi.getAll().then(setBrands).catch(console.error);
         complianceDocumentTypesApi.getAll().then(setDocTypes).catch(console.error);
+        loadDocuments();
     }, []);
 
-    useEffect(() => {
-        if (!selectedSupplierId) {
-            setDocuments([]);
-            return;
-        }
-        setLoadingDocs(true);
-        complianceApi.getBySupplier(selectedSupplierId)
-            .then(setDocuments)
-            .catch(console.error)
-            .finally(() => setLoadingDocs(false));
-    }, [selectedSupplierId]);
-
-    // Keep the URL in sync with the selected supplier/search/document-type tab
-    // so browser back/forward restores the exact view instead of resetting it.
+    // L'indirizzo segue filtri, ordinamento e pagina: indietro/avanti del browser ritrovano la stessa vista
     useEffect(() => {
         const params = new URLSearchParams();
-        if (selectedSupplierId) params.set("supplier", selectedSupplierId);
         if (search) params.set("q", search);
-        if (activeDocTab) params.set("docTab", activeDocTab);
+        if (supplierId) params.set("fornitore", supplierId);
+        if (typeId) params.set("tipo", typeId);
+        if (brandId) params.set("marca", brandId);
+        if (check !== "all") params.set("controllo", check);
+        if (sortKey !== "date") params.set("sort", sortKey);
+        if (sortDir !== "desc") params.set("dir", sortDir);
+        if (page !== 1) params.set("page", String(page));
         const query = params.toString();
         router.replace(query ? `/compliance?${query}` : "/compliance", { scroll: false });
-    }, [selectedSupplierId, search, activeDocTab, router]);
+    }, [search, supplierId, typeId, brandId, check, sortKey, sortDir, page, router]);
+
+    const supplierName = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
+    const nameOf = (d: ComplianceDocument) => supplierName.get(d.supplierId) || "";
+
+    // Controlli: un documento specifico di un DDT non ha marca per scelta, quindi non conta come "senza marca"
+    const noBrandCount = documents.filter(d => !d.brandId && d.documentScope !== "ddt_specific").length;
+    const noTypeCount = documents.filter(d => !d.documentTypeId).length;
+
+    const filtered = useMemo(() => {
+        const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const list = documents.filter(d => {
+            if (supplierId && d.supplierId !== supplierId) return false;
+            if (typeId === "none" ? !!d.documentTypeId : typeId && d.documentTypeId !== typeId) return false;
+            if (brandId === "none" ? !!d.brandId : brandId && d.brandId !== brandId) return false;
+            if (check === "nobrand" && (d.brandId || d.documentScope === "ddt_specific")) return false;
+            if (check === "notype" && d.documentTypeId) return false;
+            if (words.length === 0) return true;
+            const hay = [d.name, d.notes, d.brandName, d.documentTypeName, d.purchaseNumber, supplierName.get(d.supplierId)]
+                .join(" ").toLowerCase();
+            return words.every(w => hay.includes(w));
+        });
+        const dir = sortDir === "asc" ? 1 : -1;
+        const byDate = (a: ComplianceDocument, b: ComplianceDocument) => a.createdAt.localeCompare(b.createdAt);
+        return [...list].sort((a, b) => {
+            let r: number;
+            if (sortKey === "name") r = a.name.localeCompare(b.name, "it");
+            else if (sortKey === "type") r = (a.documentTypeName || "~").localeCompare(b.documentTypeName || "~", "it") || -byDate(a, b);
+            else if (sortKey === "supplier") r = nameOf(a).localeCompare(nameOf(b), "it") || -byDate(a, b);
+            else r = byDate(a, b);
+            return r * dir;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [documents, search, supplierId, typeId, brandId, check, sortKey, sortDir, supplierName]);
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const currentPage = Math.min(page, totalPages);
+    const rows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    const toggleSort = (key: SortKey) => {
+        if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+        else { setSortKey(key); setSortDir(key === "date" ? "desc" : "asc"); }
+        setPage(1);
+    };
+    const change = (setter: (v: string) => void) => (v: string) => { setter(v === "all" ? "" : v); setPage(1); };
+
+    const anyFilterActive = !!(search || supplierId || typeId || brandId || check !== "all");
+    const resetFilters = () => { setSearch(""); setSupplierId(""); setTypeId(""); setBrandId(""); setCheck("all"); setPage(1); };
 
     const handleSaved = (doc: ComplianceDocument) => {
-        setDocuments(prev => {
-            const idx = prev.findIndex(d => d.id === doc.id);
-            if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = doc;
-                return next;
-            }
-            return [doc, ...prev];
-        });
+        setDocuments(prev => prev.map(d => (d.id === doc.id ? doc : d)));
     };
 
     const handleUploaded = (docs: ComplianceDocument[]) => {
         setDocuments(prev => [...docs, ...prev]);
     };
-
-    // Esclude i documenti "specifici DDT": sono già associati direttamente
-    // all'acquisto di provenienza, quindi non ha senso poterli scegliere o
-    // associare diversamente da qui.
-    const filteredDocuments = (search.trim()
-        ? documents.filter(d => d.name.toLowerCase().includes(search.trim().toLowerCase()))
-        : documents
-    ).filter(d => d.documentScope !== 'ddt_specific');
 
     const handleDelete = async () => {
         if (!deletingDoc) return;
@@ -970,117 +872,239 @@ function ComplianceContent() {
         }
     };
 
+    const supplierOptions = [{ value: "all", label: "Tutti i fornitori" }, ...suppliers.map(s => ({ value: s.id, label: s.name }))];
+    const headCls = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600";
+    const sortBtn = (key: SortKey, label: string) => (
+        <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+            {label}
+            <SortArrow active={sortKey === key} dir={sortDir} />
+        </button>
+    );
+    const selectCls = "h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase";
+
+    const typeSelect = (cls?: string) => (
+        <Select value={typeId || "all"} onValueChange={change(setTypeId)}>
+            <SelectTrigger aria-label="Filtra per tipo" className={cls}><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Tutti i tipi</SelectItem>
+                {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                <SelectItem value="none">Senza tipo</SelectItem>
+            </SelectContent>
+        </Select>
+    );
+    const brandSelect = (cls?: string) => (
+        <Select value={brandId || "all"} onValueChange={change(setBrandId)}>
+            <SelectTrigger aria-label="Filtra per marca" className={cls}><SelectValue placeholder="Marca" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Tutte le marche</SelectItem>
+                {brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                <SelectItem value="none">Senza marca</SelectItem>
+            </SelectContent>
+        </Select>
+    );
+
+    const checkSelect = (
+        <Select value={check} onValueChange={(v) => { setCheck(v as Check); setPage(1); }}>
+            <SelectTrigger aria-label="Da sistemare" className="hidden w-48 shrink-0 border-none bg-slate-100 dark:bg-muted md:flex"><SelectValue /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Tutti i documenti</SelectItem>
+                <SelectItem value="nobrand">Da sistemare: senza marca ({noBrandCount})</SelectItem>
+                <SelectItem value="notype">Da sistemare: senza tipo ({noTypeCount})</SelectItem>
+            </SelectContent>
+        </Select>
+    );
+
+    const docBadges = (d: ComplianceDocument) =>
+        d.documentScope === "ddt_specific" && (
+            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30">Specifico DDT</span>
+        );
+
     return (
         <DashboardLayout>
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex items-center gap-3">
-                    <ShieldCheck className="h-6 w-6 text-primary" />
-                    <div>
-                        <h1 className="text-2xl font-bold">Gestione conformità</h1>
-                        <p className="text-sm text-muted-foreground">Carica e gestisci i documenti di conformità per singolo fornitore.</p>
-                    </div>
-                </div>
-
-                <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                            <p className="text-sm text-muted-foreground">Carica e gestisci i documenti di conformità per singolo fornitore.</p>
-                            <Button onClick={() => setUploadOpen(true)}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Carica documento
+            <ListPageHeader
+                title="Gestione conformità"
+                actions={
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto md:hidden" onClick={() => setUploadOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Carica documento
+                    </Button>
+                }
+                search={{ id: "compliance-search", label: "Cerca documenti", value: search, onChange: (v) => { setSearch(v); setPage(1); }, placeholder: "Cerca per nome, fornitore, marca, bolla, note..." }}
+                searchActions={
+                    <>
+                        {checkSelect}
+                        {anyFilterActive && (
+                            <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+                                Azzera filtri
                             </Button>
-                        </div>
+                        )}
+                    </>
+                }
+            >
+                {/* Telefono: filtri */}
+                <div className="grid grid-cols-2 gap-2 md:hidden">
+                    <SearchableSelect
+                        options={supplierOptions}
+                        value={supplierId}
+                        onValueChange={change(setSupplierId)}
+                        placeholder="Fornitore"
+                        searchPlaceholder="Scrivi per cercare fornitore..."
+                    />
+                    {typeSelect()}
+                    {brandSelect()}
+                    <Select value={check} onValueChange={(v) => { setCheck(v as Check); setPage(1); }}>
+                        <SelectTrigger aria-label="Da sistemare"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Tutti</SelectItem>
+                            <SelectItem value="nobrand">Senza marca ({noBrandCount})</SelectItem>
+                            <SelectItem value="notype">Senza tipo ({noTypeCount})</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </ListPageHeader>
 
-                        {/* Supplier selector */}
-                        <Card>
-                            <CardContent className="p-4">
-                                <div className="flex flex-wrap gap-4">
-                                    <div className="max-w-sm flex-1 space-y-1.5">
-                                        <Label className="text-sm font-medium">Seleziona fornitore</Label>
-                                        <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Scegli un fornitore..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {suppliers.map((s) => (
-                                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {selectedSupplierId && (
-                                        <div className="max-w-sm flex-1 space-y-1.5">
-                                            <Label className="text-sm font-medium">Cerca documento</Label>
-                                            <div className="relative">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                                <Input
-                                                    className="pl-9"
-                                                    placeholder="Cerca per nome..."
-                                                    value={search}
-                                                    onChange={(e) => setSearch(e.target.value)}
+            {loadingDocs && documents.length === 0 ? (
+                <div className="flex justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+            ) : loadError ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                    <p className="max-w-md text-sm text-red-600">{loadError}</p>
+                    <Button variant="outline" onClick={loadDocuments}>Riprova</Button>
+                </div>
+            ) : (
+                <div className={loadingDocs ? "opacity-60 transition-opacity" : "transition-opacity"}>
+                    {/* Tabella: da tablet in su */}
+                    <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+                        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className={`w-44 ${headCls}`}>
+                                        <div className="flex items-center gap-1">
+                                            <div className="min-w-0 flex-1">{typeSelect(selectCls)}</div>
+                                            <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                                                <SortArrow active={sortKey === "type"} dir={sortDir} />
+                                            </button>
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className={headCls}>{sortBtn("name", "Documento")}</TableHead>
+                                    <TableHead className={`w-52 ${headCls}`}>
+                                        <div className="flex items-center gap-1">
+                                            <div className="min-w-0 flex-1">
+                                                <SearchableSelect
+                                                    options={supplierOptions}
+                                                    value={supplierId}
+                                                    onValueChange={change(setSupplierId)}
+                                                    placeholder="Fornitore"
+                                                    searchPlaceholder="Scrivi per cercare fornitore..."
+                                                    className={selectCls}
+                                                    contentClassName="min-w-[20rem]"
                                                 />
                                             </div>
+                                            <button type="button" aria-label="Ordina per fornitore" onClick={() => toggleSort("supplier")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                                                <SortArrow active={sortKey === "supplier"} dir={sortDir} />
+                                            </button>
                                         </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                    </TableHead>
+                                    <TableHead className={`w-40 ${headCls}`}>{brandSelect(selectCls)}</TableHead>
+                                    <TableHead className={`w-28 ${headCls}`}>Bolla</TableHead>
+                                    <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
+                                    <TableHead className="w-32" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rows.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                            <ShieldCheck className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                                            Nessun documento trovato
+                                        </TableCell>
+                                    </TableRow>
+                                ) : rows.map((d) => (
+                                    <TableRow key={d.id} className="cursor-pointer" onClick={() => openComplianceDocument(d)}>
+                                        <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">
+                                            {d.documentTypeName || <span className="font-medium text-amber-600">Senza tipo</span>}
+                                        </TableCell>
+                                        <TableCell className="border-r py-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="line-clamp-2 text-sm font-medium text-slate-900 dark:text-white" title={d.name}>{d.name}</span>
+                                                {docBadges(d)}
+                                            </div>
+                                            {d.notes && <p className="line-clamp-1 text-xs text-slate-500" title={d.notes}>{d.notes}</p>}
+                                        </TableCell>
+                                        <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
+                                            <span className="line-clamp-2" title={nameOf(d)}>{nameOf(d) || <span className="text-slate-300">—</span>}</span>
+                                        </TableCell>
+                                        <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
+                                            {d.brandName || (d.documentScope === "ddt_specific" ? <span className="text-slate-300">—</span> : <span className="font-medium text-amber-600">Senza marca</span>)}
+                                        </TableCell>
+                                        <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
+                                            {d.purchaseNumber || <span className="text-slate-300">—</span>}
+                                        </TableCell>
+                                        <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
+                                            {format(new Date(d.createdAt), "dd/MM/yyyy", { locale: it })}
+                                        </TableCell>
+                                        <TableCell className="py-2"><RowActions doc={d} onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }} onDelete={setDeletingDoc} /></TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
 
-                        {/* Documents area */}
-                        {selectedSupplierId && (
-                            <>
-                                {loadingDocs ? (
-                                    <div className="flex justify-center py-16">
-                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    {/* Schede: telefono */}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:hidden">
+                        {rows.length === 0 ? (
+                            <div className="col-span-full py-10 text-center text-slate-400 dark:text-slate-500">
+                                <ShieldCheck className="mx-auto mb-2 h-12 w-12 opacity-20" />
+                                <p>Nessun documento trovato</p>
+                            </div>
+                        ) : rows.map((d) => (
+                            <Card key={d.id} className="border-slate-200 dark:border-slate-700">
+                                <CardContent className="space-y-2 p-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <button type="button" className="min-w-0 text-left" onClick={() => openComplianceDocument(d)}>
+                                            <p className="break-words text-sm font-semibold text-slate-900 dark:text-white">{d.name}</p>
+                                            <p className="text-xs text-slate-500">
+                                                {d.documentTypeName || "Senza tipo"} · {format(new Date(d.createdAt), "dd/MM/yyyy", { locale: it })}
+                                            </p>
+                                        </button>
+                                        {docBadges(d)}
                                     </div>
-                                ) : documents.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
-                                        <FileText className="h-10 w-10 opacity-30" />
-                                        <p className="text-sm">Nessun documento caricato per questo fornitore.</p>
-                                        <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
-                                            <Plus className="mr-2 h-4 w-4" />
-                                            Carica il primo documento
-                                        </Button>
+                                    <div className="space-y-1 text-xs">
+                                        <div className="flex justify-between gap-3"><span className="text-slate-500">Fornitore</span><span className="text-right font-medium">{nameOf(d) || "—"}</span></div>
+                                        <div className="flex justify-between gap-3"><span className="text-slate-500">Marca</span><span className="text-right font-medium">{d.brandName || "—"}</span></div>
+                                        {d.purchaseNumber && <div className="flex justify-between gap-3"><span className="text-slate-500">Bolla</span><span className="text-right font-medium">{d.purchaseNumber}</span></div>}
                                     </div>
-                                ) : filteredDocuments.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
-                                        <Search className="h-10 w-10 opacity-30" />
-                                        <p className="text-sm">Nessun documento trovato per &quot;{search}&quot;.</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="flex items-center justify-end gap-2">
-                                            <PageSizeSelector value={pageSize} onChange={setPageSize} />
-                                            <ViewToggle mode={viewMode} onChange={setViewMode} />
-                                        </div>
-                                        <DocumentTypeTabs
-                                            docs={filteredDocuments}
-                                            docTypes={docTypes}
-                                            viewMode={viewMode}
-                                            pageSize={pageSize}
-                                            activeTab={activeDocTab}
-                                            onTabChange={setActiveDocTab}
-                                            onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }}
-                                            onDelete={setDeletingDoc}
-                                        />
-                                    </>
-                                )}
-                            </>
-                        )}
+                                    {d.notes && <p className="break-words text-xs text-slate-500">{d.notes}</p>}
+                                    <RowActions doc={d} onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }} onDelete={setDeletingDoc} />
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+
+                    <PaginationControls
+                        page={currentPage}
+                        totalPages={totalPages}
+                        loading={loadingDocs}
+                        onPageChange={setPage}
+                        totalItems={filtered.length}
+                        itemLabel="documenti"
+                    />
                 </div>
-            </div>
+            )}
 
+            {/* Pulsante «carica» sempre visibile (PC) */}
+            <FloatingAddButton onClick={() => setUploadOpen(true)} label="Carica documento" />
 
             {/* Multi upload dialog */}
             <MultiUploadDialog
                 open={uploadOpen}
                 onOpenChange={setUploadOpen}
-                supplierId={selectedSupplierId}
+                supplierId={supplierId}
                 suppliers={suppliers}
                 brands={brands}
                 docTypes={docTypes}
                 onUploaded={handleUploaded}
-                onSupplierSelected={setSelectedSupplierId}
             />
 
             {/* Edit dialog */}
@@ -1088,7 +1112,7 @@ function ComplianceContent() {
                 <DocumentFormDialog
                     open={dialogOpen}
                     onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditingDoc(null); }}
-                    supplierId={selectedSupplierId}
+                    supplierId={editingDoc.supplierId}
                     suppliers={suppliers}
                     brands={brands}
                     docTypes={docTypes}
