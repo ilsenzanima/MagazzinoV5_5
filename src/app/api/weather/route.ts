@@ -64,7 +64,14 @@ export async function GET(req: NextRequest) {
     `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5`,
     { next: { revalidate: 3600 } } // cache 1h
   )
-  const weatherData = await weatherRes.json()
+  // Se Open-Meteo non risponde (es. 503) non c'è nulla da serializzare: errore pulito invece di un crash
+  if (!weatherRes.ok) {
+    return NextResponse.json({ error: 'weather service unavailable' }, { status: 502 })
+  }
+  const weatherData = await weatherRes.json().catch(() => null)
+  if (!weatherData?.daily) {
+    return NextResponse.json({ error: 'weather data unavailable' }, { status: 502 })
+  }
 
   return NextResponse.json(weatherData.daily)
 }
