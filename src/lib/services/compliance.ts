@@ -218,7 +218,11 @@ export const complianceApi = {
         if (doc.notes !== undefined) payload.notes = doc.notes;
         if (doc.fileUrl !== undefined) payload.file_url = doc.fileUrl;
         if (doc.fileSize !== undefined) payload.file_size = doc.fileSize;
-        if ('purchaseId' in doc) payload.purchase_id = doc.purchaseId ?? null;
+        // Collegato a una bolla = prova specifica di quel DDT; scollegato = certificato riutilizzabile
+        if ('purchaseId' in doc) {
+            payload.purchase_id = doc.purchaseId ?? null;
+            payload.document_scope = doc.purchaseId ? 'ddt_specific' : 'reusable';
+        }
 
         let oldFileUrl: string | undefined;
         if (doc.fileUrl !== undefined) {
