@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Save, Search, Loader2, X, Trash } from "lucide-react";
+import { ArrowLeft, Save, Search, Loader2, X, Trash, Lock } from "lucide-react";
 import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -30,6 +30,8 @@ interface NoteLine {
     coefficient: number;
     unit: string;
     isChecked?: boolean;
+    // Id della riga già salvata (le righe nuove non ce l'hanno)
+    itemRowId?: string;
 }
 
 const emptyLine = (): NoteLine => ({
@@ -103,6 +105,7 @@ export default function EditLoadNotePage() {
                     coefficient: item.coefficient || 1,
                     unit: item.inventoryUnit || "PZ",
                     isChecked: item.isChecked,
+                    itemRowId: item.id,
                 }));
                 // Always end with an empty row
                 setLines([...existingLines, emptyLine()]);
@@ -157,6 +160,8 @@ export default function EditLoadNotePage() {
     }, []);
 
     const openItemSelector = (rowId: string) => {
+        // Le righe spuntate sono già state registrate in un movimento: non si toccano
+        if (lines.find(l => l.tempId === rowId)?.isChecked) return;
         setOpenItemSelectorForRowId(rowId);
         setIsItemSelectorOpen(true);
     };
@@ -235,6 +240,7 @@ export default function EditLoadNotePage() {
 
     const removeLine = (tempId: string) => {
         setLines(prev => {
+            if (prev.find(l => l.tempId === tempId)?.isChecked) return prev;
             if (prev.length === 1) return [emptyLine()];
             const updated = prev.filter(l => l.tempId !== tempId);
             return ensureTrailingEmpty(updated);
@@ -258,7 +264,9 @@ export default function EditLoadNotePage() {
                     inventoryId: l.itemId,
                     quantity: parseFloat(l.quantity),
                     pieces: parseFloat(l.pieces) || parseFloat(l.quantity),
-                    coefficient: l.coefficient
+                    coefficient: l.coefficient,
+                    isChecked: l.isChecked,
+                    id: l.itemRowId
                 }))
             });
 
@@ -383,10 +391,10 @@ export default function EditLoadNotePage() {
                                         {lines.map((line, index) => {
                                             const isLast = index === lines.length - 1;
                                             return (
-                                                <TableRow key={line.tempId} className="group">
+                                                <TableRow key={line.tempId} className={`group ${line.isChecked ? "bg-muted/40" : ""}`}>
                                                     {/* Materiale */}
                                                     <TableCell
-                                                        className="cursor-pointer select-none py-2"
+                                                        className={`select-none py-2 ${line.isChecked ? "cursor-not-allowed" : "cursor-pointer"}`}
                                                         onClick={() => openItemSelector(line.tempId)}
                                                     >
                                                         {line.itemId ? (
@@ -416,7 +424,7 @@ export default function EditLoadNotePage() {
                                                             onChange={e => handleLinePiecesChange(line.tempId, e.target.value)}
                                                             placeholder="0"
                                                             className="h-9 text-center px-1"
-                                                            disabled={!line.itemId}
+                                                            disabled={!line.itemId || line.isChecked}
                                                         />
                                                     </TableCell>
 
@@ -432,7 +440,7 @@ export default function EditLoadNotePage() {
                                                                 onChange={e => handleLineQuantityChange(line.tempId, e.target.value)}
                                                                 placeholder="0.00"
                                                                 className="h-9 text-center px-1"
-                                                                disabled={!line.itemId}
+                                                                disabled={!line.itemId || line.isChecked}
                                                             />
                                                             <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:block">{line.unit}</span>
                                                         </div>
@@ -440,6 +448,11 @@ export default function EditLoadNotePage() {
 
                                                     {/* Elimina */}
                                                     <TableCell className="py-2 px-1">
+                                                        {line.isChecked ? (
+                                                            <span title="Riga spuntata: già registrata, non si può modificare. Per cambiarla togli prima la spunta dal dettaglio della nota." className="flex h-8 w-8 items-center justify-center text-muted-foreground">
+                                                                <Lock className="h-4 w-4" />
+                                                            </span>
+                                                        ) : (
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -449,6 +462,7 @@ export default function EditLoadNotePage() {
                                                         >
                                                             <Trash className="h-4 w-4" />
                                                         </Button>
+                                                        )}
                                                     </TableCell>
                                                 </TableRow>
                                             );

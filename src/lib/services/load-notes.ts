@@ -12,6 +12,9 @@ export interface LoadNoteInput {
         pieces?: number;
         quantity: number;
         coefficient?: number;
+        isChecked?: boolean;
+        // Riga già esistente (in modifica): si aggiorna invece di ricrearla
+        id?: string;
     }[];
 }
 
@@ -43,65 +46,68 @@ export const loadNotesService = {
             throw error;
         }
 
-        // Now fetch items for each note
-        const notesWithItems = await Promise.all(
-            (notes || []).map(async (note) => {
-                const { data: items, error: itemsError } = await supabase
-                    .from('load_note_items')
-                    .select(`
-                        id,
-                        inventory_id,
-                        pieces,
-                        quantity,
-                        coefficient,
-                        is_checked,
-                        inventory:inventory_id (
-                            code,
-                            name,
-                            unit,
-                            brand,
-                            model,
-                            coefficient
-                        )
-                    `)
-                    .eq('load_note_id', note.id);
+        // Le righe di tutte le note in una sola richiesta (prima ce n'era una per nota)
+        const ids = (notes || []).map(n => n.id);
+        const itemsByNote = new Map<string, any[]>();
+        if (ids.length > 0) {
+            const { data: allItems, error: itemsError } = await supabase
+                .from('load_note_items')
+                .select(`
+                    id,
+                    load_note_id,
+                    inventory_id,
+                    pieces,
+                    quantity,
+                    coefficient,
+                    is_checked,
+                    inventory:inventory_id (
+                        code,
+                        name,
+                        unit,
+                        brand,
+                        model,
+                        coefficient
+                    )
+                `)
+                .in('load_note_id', ids);
+            if (itemsError) console.error('Error fetching items for notes', itemsError);
+            (allItems || []).forEach((it: any) => {
+                const list = itemsByNote.get(it.load_note_id) || [];
+                list.push(it);
+                itemsByNote.set(it.load_note_id, list);
+            });
+        }
 
-                if (itemsError) {
-                    console.error('Error fetching items for note', note.id, itemsError);
-                }
+        return (notes || []).map(note => {
+            const mappedItems: LoadNoteItem[] = (itemsByNote.get(note.id) || []).map((item: any) => ({
+                id: item.id,
+                inventoryId: item.inventory_id,
+                inventoryCode: item.inventory?.code || '',
+                inventoryName: item.inventory?.name || '',
+                inventoryUnit: item.inventory?.unit || '',
+                inventoryBrand: item.inventory?.brand || '',
+                inventoryModel: item.inventory?.model || '',
+                pieces: item.pieces,
+                quantity: item.quantity,
+                coefficient: item.coefficient || item.inventory?.coefficient || 1,
+                isChecked: item.is_checked
+            }));
 
-                const mappedItems: LoadNoteItem[] = (items || []).map((item: any) => ({
-                    id: item.id,
-                    inventoryId: item.inventory_id,
-                    inventoryCode: item.inventory?.code || '',
-                    inventoryName: item.inventory?.name || '',
-                    inventoryUnit: item.inventory?.unit || '',
-                    inventoryBrand: item.inventory?.brand || '',
-                    inventoryModel: item.inventory?.model || '',
-                    pieces: item.pieces,
-                    quantity: item.quantity,
-                    coefficient: item.coefficient || item.inventory?.coefficient || 1,
-                    isChecked: item.is_checked
-                }));
-
-                return {
-                    id: note.id,
-                    date: note.date,
-                    noteType: note.note_type,
-                    jobId: note.job_id,
-                    jobCode: note.job_code,
-                    jobDescription: note.job_description,
-                    notes: note.notes,
-                    status: note.status,
-                    items: mappedItems,
-                    createdBy: note.created_by,
-                    createdByName: note.created_by_name,
-                    createdAt: note.created_at
-                } as LoadNote;
-            })
-        );
-
-        return notesWithItems;
+            return {
+                id: note.id,
+                date: note.date,
+                noteType: note.note_type,
+                jobId: note.job_id,
+                jobCode: note.job_code,
+                jobDescription: note.job_description,
+                notes: note.notes,
+                status: note.status,
+                items: mappedItems,
+                createdBy: note.created_by,
+                createdByName: note.created_by_name,
+                createdAt: note.created_at
+            } as LoadNote;
+        });
     },
 
     getById: async (id: string): Promise<LoadNote | null> => {
@@ -201,7 +207,8 @@ export const loadNotesService = {
                 inventory_id: item.inventoryId,
                 pieces: item.pieces || null,
                 quantity: item.quantity,
-                coefficient: item.coefficient || 1
+                coefficient: item.coefficient || 1,
+                is_checked: item.isChecked ?? false
             }));
 
             const { error: itemsError } = await supabase
@@ -211,7 +218,7 @@ export const loadNotesService = {
             if (itemsError) {
                 console.error('Error creating items:', itemsError);
                 // Rollback note creation
-                await supabase.from('load_notes').delete().eq('id', note.id);
+                await supabase.from('load_notes').update(await getSoftDeletePayload()).eq('id', note.id);
                 throw itemsError;
             }
         }
@@ -238,27 +245,48 @@ export const loadNotesService = {
             throw error;
         }
 
-        // Update items if provided
+        // Update items if provided: si aggiornano le righe esistenti, si aggiungono le nuove e si tolgono
+        // quelle eliminate. Le righe spuntate (già registrate in un movimento) non si toccano mai.
         if (input.items !== undefined) {
-            // Delete existing items
-            await supabase.from('load_note_items').delete().eq('load_note_id', id);
+            const { data: existing, error: existingError } = await supabase
+                .from('load_note_items')
+                .select('id, is_checked')
+                .eq('load_note_id', id);
+            if (existingError) throw existingError;
 
-            // Insert new items
-            if (input.items.length > 0) {
-                const itemsToInsert = input.items.map(item => ({
-                    load_note_id: id,
-                    inventory_id: item.inventoryId,
-                    pieces: item.pieces || null,
-                    quantity: item.quantity,
-                    coefficient: item.coefficient || 1
-                }));
+            const locked = new Set((existing || []).filter(r => r.is_checked).map(r => r.id as string));
+            const keptIds = new Set(input.items.map(i => i.id).filter(Boolean) as string[]);
 
-                const { error: itemsError } = await supabase
-                    .from('load_note_items')
-                    .insert(itemsToInsert);
+            const toDelete = (existing || []).filter(r => !r.is_checked && !keptIds.has(r.id)).map(r => r.id as string);
+            if (toDelete.length > 0) {
+                const { error: delError } = await supabase.from('load_note_items').delete().in('id', toDelete);
+                if (delError) {
+                    console.error('Error removing items:', delError);
+                    throw delError;
+                }
+            }
 
+            const toFields = (item: NonNullable<LoadNoteInput['items']>[number]) => ({
+                inventory_id: item.inventoryId,
+                pieces: item.pieces || null,
+                quantity: item.quantity,
+                coefficient: item.coefficient || 1
+            });
+
+            for (const item of input.items) {
+                if (!item.id || locked.has(item.id)) continue;
+                const { error: updError } = await supabase.from('load_note_items').update(toFields(item)).eq('id', item.id);
+                if (updError) {
+                    console.error('Error updating item:', updError);
+                    throw updError;
+                }
+            }
+
+            const toInsert = input.items.filter(item => !item.id).map(item => ({ load_note_id: id, ...toFields(item), is_checked: false }));
+            if (toInsert.length > 0) {
+                const { error: itemsError } = await supabase.from('load_note_items').insert(toInsert);
                 if (itemsError) {
-                    console.error('Error updating items:', itemsError);
+                    console.error('Error adding items:', itemsError);
                     throw itemsError;
                 }
             }

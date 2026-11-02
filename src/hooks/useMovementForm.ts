@@ -6,6 +6,7 @@ import { warehousesApi } from "@/lib/services/warehouses";
 import { InventoryItem, Job, Warehouse, DeliveryNote } from "@/lib/types";
 import { createMovement, updateMovement } from "@/app/movements/actions";
 import { notify } from "@/lib/notify";
+import { deliveryNoteDraftsApi } from "@/lib/services/delivery-note-drafts";
 
 export interface PurchaseItemToImport {
     purchaseItemId: string;
@@ -18,6 +19,22 @@ export interface PurchaseItemToImport {
     remainingQty: number;
     remainingPieces?: number;
     batchDate?: string;
+}
+
+// Riga pronta da una nota di carico: lotto già scelto e lotti tra cui poter cambiare
+export interface NoteLineToImport {
+    itemId: string;
+    itemName: string;
+    itemCode: string;
+    itemUnit: string;
+    itemBrand?: string;
+    coefficient: number;
+    quantity: string;
+    pieces: string;
+    purchaseItemId?: string;
+    purchaseRef?: string;
+    isFictitious: boolean;
+    availableBatches: any[];
 }
 
 export interface MovementLine {
@@ -68,13 +85,17 @@ interface UseMovementFormProps {
     initialInventory: InventoryItem[];
     initialJobs: Job[];
     initialNote?: DeliveryNote;
+    // Se presente, initialNote è una bozza: si compila come una modifica ma si salva come nuova bolla
+    draftId?: string;
 }
 
-export function useMovementForm({ initialInventory, initialJobs, initialNote }: UseMovementFormProps) {
+export function useMovementForm({ initialInventory, initialJobs, initialNote, draftId }: UseMovementFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
-    const isEditing = !!initialNote;
+    const hasInitial = !!initialNote;
+    const isEditing = hasInitial && !draftId;
+    const [savingDraft, setSavingDraft] = useState(false);
     const editingId = initialNote?.id;
 
     const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
@@ -113,7 +134,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         if (initialNote?.items && initialNote.items.length > 0) {
             return ensureTrailingEmpty(
                 initialNote.items.map((item) => ({
-                    id: item.id,
+                    id: draftId ? undefined : item.id,
                     tempId: item.id || Math.random().toString(36).substr(2, 9),
                     itemId: item.inventoryId,
                     itemName: item.inventoryName || "",
@@ -123,7 +144,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
                     itemCategory: item.inventoryCategory,
                     itemDescription: item.inventoryDescription,
                     coefficient: item.coefficient || 1,
-                    quantity: item.quantity.toString(),
+                    quantity: item.quantity ? item.quantity.toString() : "",
                     pieces: item.pieces?.toString() || "",
                     kgEccedenza: item.kgEccedenza?.toString() || "",
                     purchaseItemId: item.purchaseItemId,
@@ -151,7 +172,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             // Solo per un movimento nuovo precompiliamo col magazzino principale.
             // In modifica i campi restano quelli salvati finché l'utente non
             // sceglie esplicitamente un magazzino dai menu a tendina.
-            if (!isEditing) {
+            if (!hasInitial) {
                 const primary = list.find((w) => w.isPrimary);
                 if (primary) {
                     setFromWarehouseId(primary.id);
@@ -206,7 +227,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     // handleFromWarehouseSelect/handleToWarehouseSelect, così un cambio di
     // commessa non cancella eventuali integrazioni manuali fatte dall'utente
     // sulla dicitura del magazzino.
-    const editingDefaultsSuppressed = useRef(isEditing);
+    const editingDefaultsSuppressed = useRef(hasInitial);
     const initialTabJob = useRef({ tab: activeTab, jobId: selectedJob?.id ?? null });
 
     useEffect(() => {
@@ -281,7 +302,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
     // entrambi su toWarehouseId nello stesso render si sovrascrivono a
     // vicenda (l'ultimo vince), quindi la logica va tenuta unita qui.
     useEffect(() => {
-        if (isEditing) return;
+        if (hasInitial) return;
         const roles = warehouseRoles(activeTab);
 
         if (roles.from === "pickup" && fromWarehouseId) {
@@ -802,6 +823,90 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         [activeTab]
     );
 
+    const handleNoteItemsImport = useCallback((items: NoteLineToImport[]) => {
+        setLines((prev) => {
+            const filledLines = prev.filter((l) => l.itemId || l.quantity || l.pieces);
+            const newLines: MovementLine[] = items.map((item) => ({
+                tempId: Math.random().toString(36).substr(2, 9),
+                kgEccedenza: "",
+                batchesLoading: false,
+                ...item,
+            }));
+            return ensureTrailingEmpty([...filledLines, ...newLines]);
+        });
+    }, []);
+
+    // Salva (o aggiorna) la bozza: niente controlli sui lotti e nessun effetto sul magazzino
+    const handleSaveDraft = async () => {
+        if (!numberPart) {
+            notify.warning("Inserisci il numero del documento");
+            return;
+        }
+        const roles = warehouseRoles(activeTab);
+        try {
+            setSavingDraft(true);
+            await deliveryNoteDraftsApi.save(
+                {
+                    type: activeTab,
+                    number: fullNumber,
+                    date,
+                    jobId: selectedJob?.id,
+                    causal,
+                    pickupLocation,
+                    deliveryLocation,
+                    fromWarehouseId: roles.from === "pickup" ? fromWarehouseId || undefined : undefined,
+                    toWarehouseId: roles.to === "delivery" ? toWarehouseId || undefined : undefined,
+                    transportMean,
+                    transportTime,
+                    appearance,
+                    packagesCount: parseInt(packagesCount) || 1,
+                    notes,
+                    items: lines
+                        .filter((l) => l.itemId)
+                        .map((l) => ({
+                            inventoryId: l.itemId,
+                            inventoryName: l.itemName,
+                            inventoryCode: l.itemCode,
+                            inventoryUnit: l.itemUnit,
+                            inventoryBrand: l.itemBrand,
+                            inventoryCategory: l.itemCategory,
+                            inventoryDescription: l.itemDescription,
+                            quantity: parseFloat(l.quantity) || 0,
+                            pieces: l.pieces ? parseFloat(l.pieces) : undefined,
+                            kgEccedenza: l.kgEccedenza ? parseFloat(l.kgEccedenza) : undefined,
+                            coefficient: l.coefficient,
+                            purchaseItemId: l.purchaseItemId,
+                            purchaseNumber: l.purchaseRef,
+                            isFictitious: l.isFictitious,
+                        })),
+                },
+                draftId
+            );
+            notify.success("Bozza salvata");
+            router.push("/movements");
+            router.refresh();
+        } catch (error: any) {
+            console.error("Draft save failed", error);
+            notify.error(`Errore nel salvataggio della bozza: ${error.message}`);
+        } finally {
+            setSavingDraft(false);
+        }
+    };
+
+    const handleDeleteDraft = async () => {
+        if (!draftId) return;
+        try {
+            setSavingDraft(true);
+            await deliveryNoteDraftsApi.delete(draftId);
+            router.push("/movements");
+            router.refresh();
+        } catch (error: any) {
+            notify.error(`Errore nell'eliminazione della bozza: ${error.message}`);
+        } finally {
+            setSavingDraft(false);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!numberPart) {
             notify.warning("Inserisci il numero del documento");
@@ -941,6 +1046,8 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
             } else {
                 const result = await createMovement(noteData, itemsData);
                 if (!result.success) throw new Error(result.error);
+                // La bolla vera è stata creata con gli stessi dati: la bozza non serve più
+                if (draftId) await deliveryNoteDraftsApi.delete(draftId).catch(console.error);
             }
             router.push("/movements");
             router.refresh();
@@ -1005,6 +1112,11 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         handleInlineLineDuplicate,
         handleInlineLineSplit,
         handlePurchaseItemsImport,
+        handleNoteItemsImport,
         handleSubmit,
+        draftId,
+        savingDraft,
+        handleSaveDraft,
+        handleDeleteDraft,
     };
 }

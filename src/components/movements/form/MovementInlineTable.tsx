@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Search, Loader2, Trash2, Package, Copy } from "lucide-react";
 import { format } from "date-fns";
-import { MovementLine, PurchaseItemToImport } from "@/hooks/useMovementForm";
+import { MovementLine, PurchaseItemToImport, NoteLineToImport } from "@/hooks/useMovementForm";
 import { InventoryItem, Job } from "@/lib/types";
 import { MovementMaterialDialog } from "./MovementMaterialDialog";
 import { MovementLineDialog } from "./MovementLineDialog";
@@ -52,6 +52,7 @@ interface MovementInlineTableProps {
     onDuplicate: (rowId: string) => void;
     onSplit: (rowId: string, patches: Partial<MovementLine>[]) => void;
     onPurchaseItemsImport: (items: PurchaseItemToImport[]) => void;
+    onNoteItemsImport: (items: NoteLineToImport[]) => void;
 }
 
 export function MovementInlineTable({
@@ -69,6 +70,7 @@ export function MovementInlineTable({
     onDuplicate,
     onSplit,
     onPurchaseItemsImport,
+    onNoteItemsImport,
 }: MovementInlineTableProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [activeRowId, setActiveRowId] = useState<string>("");
@@ -479,6 +481,7 @@ export function MovementInlineTable({
                 onItemSelect={(rowId, item, prefill) => { onItemSelect(rowId, item, prefill); openDetailForRow(rowId); }}
                 onReturnBatchSelect={(rowId, batch, prefill) => { onReturnBatchSelect(rowId, batch, prefill); openDetailForRow(rowId); }}
                 onPurchaseItemsImport={onPurchaseItemsImport}
+                onNoteItemsImport={onNoteItemsImport}
             />
 
             <MovementLineDialog

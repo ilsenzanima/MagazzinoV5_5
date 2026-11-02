@@ -11,6 +11,8 @@ import {
     ShoppingBag,
     Recycle,
     Repeat,
+    Trash2,
+    FileClock,
 } from "lucide-react";
 import Link from "next/link";
 import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
@@ -27,15 +29,17 @@ interface NewMovementContentProps {
     initialInventory: InventoryItem[];
     initialJobs: Job[];
     initialNote?: DeliveryNote;
+    draftId?: string;
 }
 
 export default function NewMovementContent({
     initialInventory,
     initialJobs,
     initialNote,
+    draftId,
 }: NewMovementContentProps) {
     const { userRole } = useAuth();
-    const form = useMovementForm({ initialInventory, initialJobs, initialNote });
+    const form = useMovementForm({ initialInventory, initialJobs, initialNote, draftId });
 
     if (userRole === "user") {
         return (
@@ -70,21 +74,53 @@ export default function NewMovementContent({
                         </Button>
                     </Link>
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        {form.isEditing ? "Modifica Movimento" : "Nuovo Movimento"}
+                        {form.draftId ? "Bozza di movimento" : form.isEditing ? "Modifica Movimento" : "Nuovo Movimento"}
                     </h1>
-                </div>
-                <Button
-                    onClick={form.handleSubmit}
-                    disabled={form.loading}
-                    className="bg-[#003366] hover:bg-[#002244]"
-                >
-                    {form.loading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <Save className="mr-2 h-4 w-4" />
+                    {form.draftId && (
+                        <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase text-amber-800">Bozza</span>
                     )}
-                    {form.isEditing ? "Salva Modifiche" : "Salva Documento"}
-                </Button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    {form.draftId && (
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                if (window.confirm("Eliminare questa bozza? Non è ancora una bolla e il magazzino non cambia.")) form.handleDeleteDraft();
+                            }}
+                            disabled={form.loading || form.savingDraft}
+                            className="text-red-600 hover:text-red-700"
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Elimina bozza
+                        </Button>
+                    )}
+                    {!form.isEditing && (
+                        <Button
+                            variant="outline"
+                            onClick={form.handleSaveDraft}
+                            disabled={form.loading || form.savingDraft}
+                        >
+                            {form.savingDraft ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <FileClock className="mr-2 h-4 w-4" />
+                            )}
+                            {form.draftId ? "Salva bozza" : "Salva come bozza"}
+                        </Button>
+                    )}
+                    <Button
+                        onClick={form.handleSubmit}
+                        disabled={form.loading || form.savingDraft}
+                        className="bg-[#003366] hover:bg-[#002244]"
+                    >
+                        {form.loading ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Save className="mr-2 h-4 w-4" />
+                        )}
+                        {form.draftId ? "Conferma e crea bolla" : form.isEditing ? "Salva Modifiche" : "Salva Documento"}
+                    </Button>
+                </div>
             </div>
 
             {/* Type Tabs */}
@@ -199,6 +235,7 @@ export default function NewMovementContent({
                         onDuplicate={form.handleInlineLineDuplicate}
                         onSplit={form.handleInlineLineSplit}
                         onPurchaseItemsImport={form.handlePurchaseItemsImport}
+                        onNoteItemsImport={form.handleNoteItemsImport}
                     />
 
                     <MovementFooter
