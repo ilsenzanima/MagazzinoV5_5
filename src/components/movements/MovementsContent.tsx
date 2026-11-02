@@ -40,6 +40,7 @@ const TYPE_OPTIONS = [
   { value: "waste", label: "Eccedenze" },
   { value: "transfer", label: "Trasferimenti" },
   { value: "sale", label: "Vendite" },
+  { value: "draft", label: "Bozze" },
 ];
 
 const getTypeConfig = (type: string) => {
@@ -70,7 +71,7 @@ function TypeBadge({ type }: { type: string }) {
 }
 
 function DraftBadge() {
-  return <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-amber-800">Bozza</span>;
+  return <span className="rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-amber-800">Bozza</span>;
 }
 
 function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
@@ -146,7 +147,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
     return sortDir === "asc" ? r : -r;
   };
   const draftMatches = (d: DeliveryNote) => {
-    if (type !== "all" && d.type !== type) return false;
+    if (type !== "all" && type !== "draft" && d.type !== type) return false;
     if (jobId && d.jobId !== jobId) return false;
     if (dateFrom && d.date < dateFrom) return false;
     if (dateTo && d.date > dateTo) return false;
@@ -374,8 +375,8 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                   </TableRow>
                 ) : rows.map((m) => (
                   <TableRow key={m.id} className={`cursor-pointer ${m.isDraft ? "bg-amber-50/60 hover:bg-amber-50 dark:bg-amber-950/20" : ""}`} onClick={() => router.push(rowHref(m))}>
-                    <TableCell className="border-r py-2"><TypeBadge type={m.type} /></TableCell>
-                    <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">{m.number}{m.isDraft && <DraftBadge />}</TableCell>
+                    <TableCell className="border-r py-2"><div className="flex flex-wrap items-center gap-1">{m.isDraft && <DraftBadge />}<TypeBadge type={m.type} /></div></TableCell>
+                    <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">{m.number}</TableCell>
                     <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(m.date), 'dd/MM/yyyy', { locale: it })}</TableCell>
                     <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">{m.causal || <span className="text-slate-300">—</span>}</TableCell>
                     <TableCell className="border-r py-2 text-sm text-blue-600 dark:text-blue-400">
@@ -413,10 +414,10 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                   <CardContent className="p-3 sm:p-5">
                     <div className="mb-3 flex items-start justify-between sm:mb-4">
                       <div className="mr-2 min-w-0 flex-1">
-                        <div className="mb-1"><TypeBadge type={movement.type} /></div>
+                        <div className="mb-1 flex flex-wrap items-center gap-1">{movement.isDraft && <DraftBadge />}<TypeBadge type={movement.type} /></div>
                         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white sm:text-base">
                           <FileText className="h-4 w-4 shrink-0 text-blue-600" />
-                          <span className="truncate">Bolla: {movement.number}</span>{movement.isDraft && <DraftBadge />}
+                          <span className="truncate">Bolla: {movement.number}</span>
                         </h3>
                         <p className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                           <Calendar className="h-3 w-3 shrink-0" />
