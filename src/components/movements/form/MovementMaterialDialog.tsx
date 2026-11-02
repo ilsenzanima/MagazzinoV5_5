@@ -30,6 +30,7 @@ import { loadNotesService } from "@/lib/services/load-notes";
 import { inventoryApi } from "@/lib/services/inventory";
 import { purchasesApi } from "@/lib/services/purchases";
 import { PurchaseItemToImport, NoteLineToImport } from "@/hooks/useMovementForm";
+import { NoteImportReview, NotePlanEntry, NO_BATCH } from "./NoteImportReview";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -57,18 +58,6 @@ interface MovementMaterialDialogProps {
     ) => void;
     onPurchaseItemsImport: (items: PurchaseItemToImport[]) => void;
     onNoteItemsImport: (items: NoteLineToImport[]) => void;
-}
-
-// Esito dell'analisi di una riga di nota prima dell'importazione
-interface NotePlanEntry {
-    noteId: string;
-    noteLabel: string;
-    item: LoadNoteItem;
-    status: "ok" | "split" | "blocked";
-    reason?: string;
-    allocations: { batch: any; qty: number }[];
-    batches: any[];
-    fictitious: boolean;
 }
 
 const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
@@ -122,6 +111,7 @@ export function MovementMaterialDialog({
     const [selectedNoteItemIds, setSelectedNoteItemIds] = useState<Set<string>>(new Set());
     const [noteStep, setNoteStep] = useState<"list" | "review">("list");
     const [notePlan, setNotePlan] = useState<NotePlanEntry[]>([]);
+    const [noteTotals, setNoteTotals] = useState<Record<string, number>>({});
     const [planning, setPlanning] = useState(false);
 
     // Purchase tab state
@@ -304,9 +294,9 @@ export function MovementMaterialDialog({
         });
     };
 
-    // Analizza le righe selezionate: quali si importano direttamente, quali vanno divise su più lotti
-    // e quali non si possono importare (restano in sospeso, senza spunta)
-    const buildNotePlan = async (): Promise<NotePlanEntry[]> => {
+    // Analizza le righe selezionate: quali si importano direttamente, quali vanno divise su più lotti,
+    // quali hanno disponibilità insufficiente (le sceglie l'utente) e quali non si possono importare
+    const buildNotePlan = async (): Promise<{ plan: NotePlanEntry[]; totals: Record<string, number> }> => {
         const selected: { note: LoadNote; item: LoadNoteItem }[] = [];
         for (const note of notes) {
             for (const item of note.items) {
@@ -315,6 +305,7 @@ export function MovementMaterialDialog({
         }
 
         const pool = new Map<string, number>(); // disponibilità residua per lotto, condivisa tra righe dello stesso articolo
+        const totals: Record<string, number> = {};
         const batchCache = new Map<string, any[]>();
 
         const batchesFor = async (inventoryId: string): Promise<any[]> => {
@@ -338,28 +329,29 @@ export function MovementMaterialDialog({
                 const all = await inventoryApi.getAvailableBatches(inventoryId);
                 list = all.filter((b: any) => (b.remainingQty ?? 0) > 0.0001);
             }
-            list.forEach((b) => pool.set(b.id, b.remainingQty));
+            list.forEach((b) => {
+                pool.set(b.id, b.remainingQty);
+                totals[b.id] = b.remainingQty;
+            });
             batchCache.set(inventoryId, list);
             return list;
         };
 
+        const newKey = () => Math.random().toString(36).slice(2);
         const plan: NotePlanEntry[] = [];
         for (const { note, item } of selected) {
             const noteLabel = note.jobDescription || note.notes || "Appunto generico";
-            const base = { noteId: note.id, noteLabel, item, allocations: [] as { batch: any; qty: number }[], batches: [] as any[], fictitious: false };
+            const base = { noteId: note.id, noteLabel, item, rows: [], batches: [] as any[], available: 0 };
             const qty = Number(item.quantity);
             if (!(qty > 0)) {
-                plan.push({ ...base, status: "blocked", reason: "quantità non valida" });
+                plan.push({ ...base, kind: "blocked", decision: "skip", reason: "quantità non valida" });
                 continue;
             }
 
             const batches = await batchesFor(item.inventoryId);
-            if (batches.length === 0) {
-                plan.push({
-                    ...base,
-                    status: "blocked",
-                    reason: isEntryWithJob ? "mai portato in questa commessa" : "nessun lotto disponibile a magazzino",
-                });
+            // Reso di un articolo mai portato in commessa: non si può scaricare
+            if (batches.length === 0 && isEntryWithJob) {
+                plan.push({ ...base, kind: "blocked", decision: "skip", reason: "mai portato in questa commessa" });
                 continue;
             }
 
@@ -367,46 +359,64 @@ export function MovementMaterialDialog({
             const single = batches.find((b) => (pool.get(b.id) ?? 0) + 0.0001 >= qty);
             if (single) {
                 pool.set(single.id, (pool.get(single.id) ?? 0) - qty);
-                plan.push({ ...base, status: "ok", allocations: [{ batch: single, qty }], batches });
+                plan.push({
+                    ...base,
+                    kind: "ok",
+                    decision: "import",
+                    batches,
+                    rows: [{ key: newKey(), batchId: single.id, qty: String(qty), fictitious: false }],
+                });
                 continue;
             }
 
-            // Serve più di un lotto: si propone la divisione in ordine di data (FIFO)
-            const total = batches.reduce((s, b) => s + (pool.get(b.id) ?? 0), 0);
-            if (total + 0.0001 < qty) {
+            // Più lotti in ordine di data (FIFO); se non bastano, il resto è proposto come fittizio
+            const available = batches.reduce((s, b) => s + (pool.get(b.id) ?? 0), 0);
+            const short = available + 0.0001 < qty;
+            if (short && activeTab === "transfer") {
                 plan.push({
                     ...base,
-                    status: "blocked",
-                    reason: isEntryWithJob
-                        ? `in commessa ce ne sono solo ${fmtQty(total)} su ${fmtQty(qty)}`
-                        : `a magazzino ce ne sono solo ${fmtQty(total)} su ${fmtQty(qty)}`,
+                    kind: "blocked",
+                    decision: "skip",
+                    reason: `a magazzino ce ne sono solo ${fmtQty(available)} su ${fmtQty(qty)}`,
                 });
                 continue;
             }
             let need = qty;
-            const allocations: { batch: any; qty: number }[] = [];
+            const rows: NotePlanEntry["rows"] = [];
             for (const b of batches) {
                 if (need <= 0.0001) break;
                 const take = Math.min(pool.get(b.id) ?? 0, need);
                 if (take <= 0.0001) continue;
-                allocations.push({ batch: b, qty: round4(take) });
+                rows.push({ key: newKey(), batchId: b.id, qty: String(round4(take)), fictitious: false });
                 pool.set(b.id, (pool.get(b.id) ?? 0) - take);
                 need -= take;
             }
-            plan.push({ ...base, status: "split", allocations, batches });
+            if (need > 0.0001) rows.push({ key: newKey(), batchId: NO_BATCH, qty: String(round4(need)), fictitious: true });
+            plan.push({
+                ...base,
+                kind: short ? "short" : "split",
+                // La disponibilità insufficiente la decide l'utente: di default resta in sospeso
+                decision: short ? "skip" : "import",
+                batches,
+                rows,
+                available: round4(available),
+            });
         }
-        return plan;
+        return { plan, totals };
     };
 
     const planToLines = (plan: NotePlanEntry[]): NoteLineToImport[] => {
         const lines: NoteLineToImport[] = [];
         for (const entry of plan) {
-            if (entry.status === "blocked") continue;
+            if (entry.kind === "blocked" || entry.decision !== "import") continue;
             const coef = entry.item.coefficient || 1;
-            for (const alloc of entry.allocations) {
-                const isSingle = entry.allocations.length === 1;
-                const pieces = isSingle && entry.item.pieces ? String(entry.item.pieces) : String(round4(alloc.qty / coef));
-                const fictitious = isEntryWithJob ? !!alloc.batch.isFictitious : activeTab === "transfer";
+            const rows = entry.rows.filter((r) => parseFloat(r.qty) > 0);
+            for (const row of rows) {
+                const qty = parseFloat(row.qty);
+                const batch = row.fictitious ? undefined : entry.batches.find((b) => b.id === row.batchId);
+                const isSingle = rows.length === 1;
+                const pieces = isSingle && entry.item.pieces ? String(entry.item.pieces) : String(round4(qty / coef));
+                const fictitious = row.fictitious || (isEntryWithJob ? !!batch?.isFictitious : activeTab === "transfer");
                 lines.push({
                     itemId: entry.item.inventoryId,
                     itemName: entry.item.inventoryName || "",
@@ -414,10 +424,10 @@ export function MovementMaterialDialog({
                     itemUnit: entry.item.inventoryUnit || "PZ",
                     itemBrand: entry.item.inventoryBrand || undefined,
                     coefficient: coef,
-                    quantity: String(alloc.qty),
+                    quantity: String(round4(qty)),
                     pieces,
-                    purchaseItemId: alloc.batch.id,
-                    purchaseRef: alloc.batch.purchaseRef,
+                    purchaseItemId: batch?.id,
+                    purchaseRef: batch?.purchaseRef,
                     isFictitious: fictitious,
                     availableBatches: entry.batches,
                 });
@@ -431,7 +441,9 @@ export function MovementMaterialDialog({
         if (lines.length === 0) return;
         onNoteItemsImport(lines);
         // Spunta solo le righe importate: le altre restano in sospeso
-        plan.filter((e) => e.status !== "blocked").forEach((e) => setItemChecked(e.noteId, e.item.id, true));
+        plan
+            .filter((e) => e.kind !== "blocked" && e.decision === "import" && e.rows.some((r) => parseFloat(r.qty) > 0))
+            .forEach((e) => setItemChecked(e.noteId, e.item.id, true));
         onOpenChange(false);
     };
 
@@ -439,12 +451,13 @@ export function MovementMaterialDialog({
         if (selectedNoteItemIds.size === 0) return;
         setPlanning(true);
         try {
-            const plan = await buildNotePlan();
+            const { plan, totals } = await buildNotePlan();
             // Se è tutto lineare si importa subito; altrimenti si passa dalla pagina di verifica
-            if (plan.length > 0 && plan.every((e) => e.status === "ok")) {
+            if (plan.length > 0 && plan.every((e) => e.kind === "ok")) {
                 commitNotePlan(plan);
             } else {
                 setNotePlan(plan);
+                setNoteTotals(totals);
                 setNoteStep("review");
             }
         } catch (error) {
@@ -846,69 +859,15 @@ export function MovementMaterialDialog({
                         className="flex-1 overflow-hidden flex flex-col px-6 pb-6 mt-4"
                     >
                         {noteStep === "review" ? (
-                            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setNoteStep("list")}
-                                    className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                                >
-                                    <ArrowLeft className="h-4 w-4" />
-                                    Torna alla selezione
-                                </button>
-
-                                {notePlan.some((e) => e.status === "blocked") && (
-                                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/30">
-                                        <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-                                            <AlertTriangle className="h-4 w-4" />
-                                            Non importabili ({notePlan.filter((e) => e.status === "blocked").length}): restano in sospeso nella nota, senza spunta
-                                        </div>
-                                        <ul className="mt-2 space-y-1 text-sm">
-                                            {notePlan.filter((e) => e.status === "blocked").map((e) => (
-                                                <li key={e.item.id} className="flex flex-wrap justify-between gap-x-3">
-                                                    <span className="font-medium">{e.item.inventoryName} <span className="font-normal text-muted-foreground">({fmtQty(Number(e.item.quantity))} {e.item.inventoryUnit})</span></span>
-                                                    <span className="text-amber-800 dark:text-amber-300">{e.reason}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-
-                                {notePlan.some((e) => e.status === "split") && (
-                                    <div className="rounded-lg border p-3">
-                                        <p className="text-sm font-semibold">Da dividere su più lotti ({notePlan.filter((e) => e.status === "split").length})</p>
-                                        <p className="text-xs text-muted-foreground">Proposta in ordine di data: diventano più righe nel movimento, che potrai ancora modificare.</p>
-                                        <div className="mt-2 space-y-3">
-                                            {notePlan.filter((e) => e.status === "split").map((e) => (
-                                                <div key={e.item.id} className="text-sm">
-                                                    <div className="font-medium">{e.item.inventoryName} <span className="font-normal text-muted-foreground">— totale {fmtQty(Number(e.item.quantity))} {e.item.inventoryUnit}</span></div>
-                                                    <ul className="mt-1 space-y-0.5 pl-3 text-xs">
-                                                        {e.allocations.map((a, i) => (
-                                                            <li key={i} className="flex justify-between gap-3">
-                                                                <span>Lotto {a.batch.purchaseRef || "—"}{a.batch.date ? ` · ${format(new Date(a.batch.date), "dd/MM/yy")}` : ""}{a.batch.isFictitious ? " · fittizio" : ""}</span>
-                                                                <span className="font-semibold">{fmtQty(a.qty)} {e.item.inventoryUnit}</span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {notePlan.some((e) => e.status === "ok") && (
-                                    <div className="rounded-lg border p-3 text-sm">
-                                        <p className="font-semibold">Importazione diretta ({notePlan.filter((e) => e.status === "ok").length})</p>
-                                        <ul className="mt-1 space-y-0.5 text-xs">
-                                            {notePlan.filter((e) => e.status === "ok").map((e) => (
-                                                <li key={e.item.id} className="flex justify-between gap-3">
-                                                    <span>{e.item.inventoryName} · lotto {e.allocations[0].batch.purchaseRef || "—"}</span>
-                                                    <span className="font-semibold">{fmtQty(Number(e.item.quantity))} {e.item.inventoryUnit}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-                            </div>
+                            <NoteImportReview
+                                plan={notePlan}
+                                totals={noteTotals}
+                                onChange={setNotePlan}
+                                onBack={() => setNoteStep("list")}
+                                onConfirm={() => commitNotePlan(notePlan)}
+                                linesCount={planToLines(notePlan).length}
+                                allowNone={activeTab !== "transfer"}
+                            />
                         ) : (
                         <>
                         {notesLoading ? (
@@ -1085,18 +1044,7 @@ export function MovementMaterialDialog({
                         </>
                         )}
 
-                        {noteStep === "review" ? (
-                            <div className="shrink-0 pt-3 border-t mt-3">
-                                <Button
-                                    className="w-full"
-                                    disabled={notePlan.every((e) => e.status === "blocked")}
-                                    onClick={() => commitNotePlan(notePlan)}
-                                >
-                                    <PlusCircle className="h-4 w-4 mr-2" />
-                                    Importa {planToLines(notePlan).length} righe
-                                </Button>
-                            </div>
-                        ) : selectedNoteItemIds.size > 0 && (
+                        {noteStep !== "review" && selectedNoteItemIds.size > 0 && (
                             <div className="shrink-0 pt-3 border-t mt-3">
                                 <Button className="w-full" onClick={handleImportNoteSelection} disabled={planning}>
                                     {planning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlusCircle className="h-4 w-4 mr-2" />}
