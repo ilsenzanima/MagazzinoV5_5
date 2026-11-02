@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { deliveryNotesApi, jobsApi, DeliveryNote, DeliveryNoteItem } from "@/lib/api";
+import { deliveryNoteDraftsApi } from "@/lib/services/delivery-note-drafts";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
@@ -66,6 +67,10 @@ function TypeBadge({ type }: { type: string }) {
       <Icon className="h-3.5 w-3.5" />{cfg.label}
     </span>
   );
+}
+
+function DraftBadge() {
+  return <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-amber-800">Bozza</span>;
 }
 
 function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
@@ -123,6 +128,44 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   const firstLoad = useRef(true);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  // Bozze: poche e fuori dal magazzino, quindi si caricano tutte e si fondono con la pagina corrente
+  const [drafts, setDrafts] = useState<DeliveryNote[]>([]);
+  useEffect(() => {
+    if (!canEdit) return;
+    deliveryNoteDraftsApi.getAll().then(setDrafts).catch(console.error);
+  }, [canEdit]);
+
+  const numInt = (m: DeliveryNote) => parseInt(m.number, 10) || 0;
+  const cmp = (a: DeliveryNote, b: DeliveryNote) => {
+    const byDate = a.date.localeCompare(b.date);
+    let r: number;
+    if (sortKey === "number") r = numInt(a) - numInt(b) || -byDate;
+    else if (sortKey === "type") r = a.type.localeCompare(b.type) || -byDate || numInt(b) - numInt(a);
+    else r = byDate || numInt(a) - numInt(b);
+    return sortDir === "asc" ? r : -r;
+  };
+  const draftMatches = (d: DeliveryNote) => {
+    if (type !== "all" && d.type !== type) return false;
+    if (jobId && d.jobId !== jobId) return false;
+    if (dateFrom && d.date < dateFrom) return false;
+    if (dateTo && d.date > dateTo) return false;
+    if (!debouncedSearch) return true;
+    const hay = [d.number, d.causal, d.notes, d.pickupLocation, d.deliveryLocation, d.jobCode, jobLabel(d), ...(d.itemNames ?? [])]
+      .join(" ").toLowerCase();
+    return debouncedSearch.toLowerCase().split(",").some(group =>
+      group.trim().split(/\s+/).filter(Boolean).every(w => hay.includes(w)));
+  };
+  const matchingDrafts = drafts.filter(draftMatches);
+  // Una bozza compare nella pagina in cui la collocherebbe l'ordinamento corrente
+  const shownDrafts = matchingDrafts.filter(d => {
+    if (movements.length === 0) return page === 1;
+    const first = movements[0], last = movements[movements.length - 1];
+    return (page === 1 && cmp(d, first) <= 0) || (page >= totalPages && cmp(d, last) >= 0) ||
+      (cmp(d, first) >= 0 && cmp(d, last) <= 0);
+  });
+  const rows = shownDrafts.length === 0 ? movements : [...movements, ...shownDrafts].sort(cmp);
+  const rowHref = (m: DeliveryNote) => (m.isDraft ? `/movements/bozza/${m.id}` : `/movements/${m.id}`);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -322,17 +365,17 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {movements.length === 0 ? (
+                {rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-slate-400 dark:text-slate-500">
                       <Truck className="mx-auto mb-2 h-12 w-12 opacity-20" />
                       Nessun movimento trovato
                     </TableCell>
                   </TableRow>
-                ) : movements.map((m) => (
-                  <TableRow key={m.id} className="cursor-pointer" onClick={() => router.push(`/movements/${m.id}`)}>
+                ) : rows.map((m) => (
+                  <TableRow key={m.id} className={`cursor-pointer ${m.isDraft ? "bg-amber-50/60 hover:bg-amber-50 dark:bg-amber-950/20" : ""}`} onClick={() => router.push(rowHref(m))}>
                     <TableCell className="border-r py-2"><TypeBadge type={m.type} /></TableCell>
-                    <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">{m.number}</TableCell>
+                    <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">{m.number}{m.isDraft && <DraftBadge />}</TableCell>
                     <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(m.date), 'dd/MM/yyyy', { locale: it })}</TableCell>
                     <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">{m.causal || <span className="text-slate-300">—</span>}</TableCell>
                     <TableCell className="border-r py-2 text-sm text-blue-600 dark:text-blue-400">
@@ -342,14 +385,14 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                       <span className="line-clamp-2" title={m.itemNames?.join(', ')}>{m.itemNames?.join(', ') || <span className="text-slate-300">—</span>}</span>
                     </TableCell>
                     <TableCell className="py-2 text-center">
-                      <button
+                      {!m.isDraft && <button
                         onClick={(e) => quickPrint(e, m)}
                         className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
                         title="Stampa rapida"
                         aria-label="Stampa rapida"
                       >
                         <Printer className="h-4 w-4" />
-                      </button>
+                      </button>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -359,13 +402,13 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
 
           {/* Schede: telefono */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:hidden">
-            {movements.length === 0 ? (
+            {rows.length === 0 ? (
               <div className="col-span-full py-10 text-center text-slate-400 dark:text-slate-500">
                 <Truck className="mx-auto mb-2 h-12 w-12 opacity-20" />
                 <p>Nessun movimento trovato</p>
               </div>
-            ) : movements.map((movement) => (
-              <Link href={`/movements/${movement.id}`} key={movement.id}>
+            ) : rows.map((movement) => (
+              <Link href={rowHref(movement)} key={movement.id}>
                 <Card className="h-full cursor-pointer border-slate-200 transition-shadow hover:shadow-md dark:border-slate-700">
                   <CardContent className="p-3 sm:p-5">
                     <div className="mb-3 flex items-start justify-between sm:mb-4">
@@ -373,21 +416,21 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                         <div className="mb-1"><TypeBadge type={movement.type} /></div>
                         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white sm:text-base">
                           <FileText className="h-4 w-4 shrink-0 text-blue-600" />
-                          <span className="truncate">Bolla: {movement.number}</span>
+                          <span className="truncate">Bolla: {movement.number}</span>{movement.isDraft && <DraftBadge />}
                         </h3>
                         <p className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                           <Calendar className="h-3 w-3 shrink-0" />
                           {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
                         </p>
                       </div>
-                      <button
+                      {!movement.isDraft && <button
                         onClick={(e) => quickPrint(e, movement)}
                         className="shrink-0 rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
                         title="Stampa rapida"
                         aria-label="Stampa rapida"
                       >
                         <Printer className="h-4 w-4" />
-                      </button>
+                      </button>}
                     </div>
 
                     <div className="space-y-2 text-xs sm:text-sm">
@@ -426,7 +469,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
             totalPages={totalPages}
             loading={loading}
             onPageChange={setPage}
-            totalItems={total}
+            totalItems={total + matchingDrafts.length}
             itemLabel="movimenti"
           />
         </div>

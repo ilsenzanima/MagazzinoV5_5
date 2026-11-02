@@ -455,6 +455,8 @@ export interface DeliveryNote {
     itemCount?: number;
     totalQuantity?: number;
     itemNames?: string[];
+    // Bozza di movimentazione: non è ancora una bolla e non tocca il magazzino
+    isDraft?: boolean;
 }
 
 // Sites (derived from Jobs)
