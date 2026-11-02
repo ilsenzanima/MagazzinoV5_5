@@ -299,8 +299,18 @@ export async function markFolderDeleted(segments: string[]): Promise<void> {
     await drive.files.update({ fileId: parentId, requestBody: { name: `ELIMINATO - ${name}` } });
 }
 
-export async function downloadFile(fileId: string): Promise<{ buffer: Buffer; mimeType: string; name: string }> {
+export async function downloadFile(
+    fileId: string,
+    options?: { onlyMimePrefix?: string }
+): Promise<{ buffer: Buffer; mimeType: string; name: string }> {
     const drive = getDriveClient();
+    // Con un filtro sul tipo si controllano prima i metadati, cosi' un file diverso non viene nemmeno scaricato
+    if (options?.onlyMimePrefix) {
+        const meta = await drive.files.get({ fileId, fields: 'mimeType' });
+        if (!(meta.data.mimeType || '').startsWith(options.onlyMimePrefix)) {
+            throw Object.assign(new Error('Tipo di file non consentito'), { code: 'NOT_AN_IMAGE' });
+        }
+    }
     const [metadata, res] = await Promise.all([
         drive.files.get({ fileId, fields: 'mimeType, name' }),
         drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' }),

@@ -13,6 +13,15 @@ export function generatePasscode(): string {
     return `OPI-${code}`;
 }
 
+export const MIN_PASSCODE_LENGTH = 6;
+
+// Un codice scelto a mano troppo corto si indovina in pochi tentativi
+function checkPasscode(passcode: string) {
+    if (passcode.length < MIN_PASSCODE_LENGTH) {
+        throw new Error(`Il codice di accesso deve avere almeno ${MIN_PASSCODE_LENGTH} caratteri`);
+    }
+}
+
 const mapSite = (db: any): GuestSite => ({
     id: db.id,
     name: db.name,
@@ -51,6 +60,24 @@ export const guestSitesApi = {
         return (data || []).map(mapSite);
     },
 
+    // Codici delle commesse collegate, per cantiere: serve alla lista per mostrare cosa vedra' l'ospite
+    getJobCodesBySite: async (): Promise<Record<string, string[]>> => {
+        const { data, error } = await supabase
+            .from('guest_site_jobs')
+            .select('guest_site_id, jobs!inner(code, deleted_at)')
+            .is('deleted_at', null)
+            .is('jobs.deleted_at', null);
+        if (error) throw error;
+        const bySite: Record<string, string[]> = {};
+        for (const row of (data || []) as any[]) {
+            const job = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
+            if (!job?.code) continue;
+            (bySite[row.guest_site_id] ||= []).push(job.code);
+        }
+        for (const codes of Object.values(bySite)) codes.sort();
+        return bySite;
+    },
+
     getById: async (id: string): Promise<GuestSite | null> => {
         const { data, error } = await supabase
             .from('guest_sites')
@@ -63,7 +90,8 @@ export const guestSitesApi = {
     },
 
     create: async (payload: { name: string; address: string; passcode?: string }): Promise<GuestSite> => {
-        const passcode = payload.passcode || generatePasscode();
+        const passcode = payload.passcode?.trim() || generatePasscode();
+        checkPasscode(passcode);
         const { data, error } = await supabase
             .from('guest_sites')
             .insert({
@@ -78,6 +106,7 @@ export const guestSitesApi = {
     },
 
     update: async (id: string, payload: { name?: string; address?: string; passcode?: string }): Promise<GuestSite> => {
+        if (payload.passcode !== undefined) checkPasscode(payload.passcode.trim());
         const { data, error } = await supabase
             .from('guest_sites')
             .update({
@@ -114,9 +143,10 @@ export const guestSitesApi = {
     getJobsForSite: async (guestSiteId: string): Promise<GuestSiteJob[]> => {
         const { data, error } = await supabase
             .from('guest_site_jobs')
-            .select('*, jobs(code, name, description, start_date, end_date)')
+            .select('*, jobs!inner(code, name, description, start_date, end_date, deleted_at)')
             .eq('guest_site_id', guestSiteId)
             .is('deleted_at', null)
+            .is('jobs.deleted_at', null)
             .order('created_at', { ascending: true });
         if (error) throw error;
         return (data || []).map(mapAssociation);
