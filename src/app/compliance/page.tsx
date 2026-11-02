@@ -269,6 +269,65 @@ async function openComplianceDocument(doc: ComplianceDocument) {
 
 // ── Pulsanti di riga ──────────────────────────────────────────────────────────
 
+// Nota modificabile direttamente dalla tabella: clic per scrivere, Invio o clic fuori per salvare, Esc per annullare
+function NoteCell({ doc, onSaved }: { doc: ComplianceDocument; onSaved: (doc: ComplianceDocument) => void }) {
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState(doc.notes || "");
+    const [saving, setSaving] = useState(false);
+    const done = useRef(false);
+
+    const start = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        done.current = false;
+        setValue(doc.notes || "");
+        setEditing(true);
+    };
+
+    const save = async () => {
+        if (done.current) return;
+        done.current = true;
+        const next = value.trim();
+        if (next === (doc.notes || "")) { setEditing(false); return; }
+        setSaving(true);
+        try {
+            const updated = await complianceApi.update(doc.id, { notes: next });
+            onSaved(updated);
+        } catch (e) {
+            console.error(e);
+            toast.error(e instanceof Error ? e.message : "Errore durante il salvataggio della nota");
+        } finally {
+            setSaving(false);
+            setEditing(false);
+        }
+    };
+
+    if (editing) {
+        return (
+            <Textarea
+                autoFocus
+                rows={3}
+                value={value}
+                disabled={saving}
+                className="resize-none break-words text-xs"
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setValue(e.target.value)}
+                onBlur={save}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
+                    if (e.key === "Escape") { done.current = true; setEditing(false); }
+                }}
+            />
+        );
+    }
+    return (
+        <button type="button" onClick={start} title="Clicca per modificare la nota" className="group block w-full rounded px-1 py-0.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800">
+            {doc.notes
+                ? <span className="line-clamp-3 whitespace-pre-wrap break-words text-slate-600 dark:text-slate-300">{doc.notes}</span>
+                : <span className="text-slate-300 group-hover:text-slate-500">Aggiungi nota</span>}
+        </button>
+    );
+}
+
 function RowActions({
     doc,
     onEdit,
@@ -558,15 +617,16 @@ function ComplianceContent() {
                                             </button>
                                         </div>
                                     </TableHead>
+                                    <TableHead className={`w-64 ${headCls}`}>Note</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>Bolla</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
-                                    <TableHead className="w-32" />
+                                    <TableHead className="w-28" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {rows.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                        <TableCell colSpan={7} className="py-10 text-center text-slate-400 dark:text-slate-500">
                                             <ShieldCheck className="mx-auto mb-2 h-12 w-12 opacity-20" />
                                             Nessun documento trovato
                                         </TableCell>
@@ -581,10 +641,12 @@ function ComplianceContent() {
                                                 <span className="line-clamp-2 text-sm font-medium text-slate-900 dark:text-white" title={d.name}>{d.name}</span>
                                                 {docBadges(d)}
                                             </div>
-                                            {d.notes && <p className="line-clamp-1 text-xs text-slate-500" title={d.notes}>{d.notes}</p>}
                                         </TableCell>
                                         <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
                                             <span className="line-clamp-2" title={nameOf(d)}>{nameOf(d) || <span className="text-slate-300">—</span>}</span>
+                                        </TableCell>
+                                        <TableCell className="border-r py-1" onClick={(e) => e.stopPropagation()}>
+                                            <NoteCell doc={d} onSaved={handleSaved} />
                                         </TableCell>
                                         <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
                                             {d.purchaseNumber || <span className="text-slate-300">—</span>}
@@ -622,7 +684,7 @@ function ComplianceContent() {
                                         <div className="flex justify-between gap-3"><span className="text-slate-500">Fornitore</span><span className="text-right font-medium">{nameOf(d) || "—"}</span></div>
                                         {d.purchaseNumber && <div className="flex justify-between gap-3"><span className="text-slate-500">Bolla</span><span className="text-right font-medium">{d.purchaseNumber}</span></div>}
                                     </div>
-                                    {d.notes && <p className="break-words text-xs text-slate-500">{d.notes}</p>}
+                                    <NoteCell doc={d} onSaved={handleSaved} />
                                     <RowActions doc={d} onEdit={(doc) => { setEditingDoc(doc); setDialogOpen(true); }} onDelete={setDeletingDoc} />
                                 </CardContent>
                             </Card>
