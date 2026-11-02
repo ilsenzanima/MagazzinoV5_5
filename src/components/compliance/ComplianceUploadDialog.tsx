@@ -23,7 +23,7 @@ import { Loader2, Search, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { complianceApi, ComplianceDocument } from "@/lib/services/compliance";
 import { ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
-import { Supplier, Brand } from "@/lib/types";
+import { Supplier } from "@/lib/types";
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
 
@@ -142,7 +142,6 @@ export function ComplianceUploadDialog({
     onOpenChange,
     supplierId,
     suppliers,
-    brands,
     docTypes,
     onUploaded,
     fixedPurchase,
@@ -152,7 +151,6 @@ export function ComplianceUploadDialog({
     onOpenChange: (v: boolean) => void;
     supplierId: string;
     suppliers: Supplier[];
-    brands: Brand[];
     docTypes: ComplianceDocumentTypeConfig[];
     onUploaded: (docs: ComplianceDocument[]) => void;
     // Aperto dalla pagina di un acquisto: fornitore e bolla sono già noti e il documento è sempre specifico di quel DDT
@@ -161,7 +159,6 @@ export function ComplianceUploadDialog({
 }) {
     const [step, setStep] = useState<1 | 2>(1);
     const [localSupplierId, setLocalSupplierId] = useState(supplierId);
-    const [brandId, setBrandId] = useState("");
     const [documentTypeId, setDocumentTypeId] = useState("");
     // Variante "conformità produttore": il documento può essere la prova di una bolla di acquisto precisa
     const [linkToPurchase, setLinkToPurchase] = useState(false);
@@ -175,7 +172,6 @@ export function ComplianceUploadDialog({
         if (open) {
             setStep(1);
             setLocalSupplierId(supplierId);
-            setBrandId("");
             setDocumentTypeId("");
             setLinkToPurchase(false);
             setLinkedPurchaseId("");
@@ -225,10 +221,6 @@ export function ComplianceUploadDialog({
             toast.error("Cerca e seleziona la bolla di acquisto a cui è collegato.");
             return;
         }
-        if (!brandId) {
-            toast.error("Selezionare la marca.");
-            return;
-        }
         setStep(2);
     };
 
@@ -251,7 +243,7 @@ export function ComplianceUploadDialog({
             const result = await complianceApi.uploadFile(pf.file, supplierName, linked);
             const doc = await complianceApi.create({
                 supplierId: effectiveSupplierId,
-                brandId,
+                brandId: null,
                 documentTypeId: documentTypeId || null,
                 name: pf.name.trim() || pf.file.name,
                 notes: pf.notes.trim() || undefined,
@@ -300,20 +292,6 @@ export function ComplianceUploadDialog({
                                 </Select>
                             </div>
                         )}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <Label>Marca <span className="text-destructive">*</span></Label>
-                                <Select value={brandId} onValueChange={setBrandId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleziona marca" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {brands.map((b) => (
-                                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
                             <div className="space-y-1.5">
                                 <Label>Tipo documento</Label>
                                 <Select value={documentTypeId} onValueChange={(v) => { setDocumentTypeId(v); setLinkToPurchase(false); setLinkedPurchaseId(""); }}>
@@ -327,7 +305,6 @@ export function ComplianceUploadDialog({
                                     </SelectContent>
                                 </Select>
                             </div>
-                        </div>
                         {fixedPurchase && (
                             <p className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
                                 Il documento sarà collegato alla bolla{fixedPurchase.number ? <> <span className="font-medium text-foreground">{fixedPurchase.number}</span></> : ""}: specifico di quel DDT, non riutilizzabile altrove.
@@ -416,7 +393,7 @@ export function ComplianceUploadDialog({
                     {step === 1 ? (
                         <>
                             <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
-                            <Button onClick={goToStep2} disabled={!effectiveSupplierId || !brandId || pendingFiles.length === 0}>Continua</Button>
+                            <Button onClick={goToStep2} disabled={!effectiveSupplierId || pendingFiles.length === 0}>Continua</Button>
                         </>
                     ) : (
                         <>

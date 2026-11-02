@@ -36,8 +36,7 @@ import {
     PurchaseComplianceAssociation,
 } from "@/lib/services/compliance"
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types"
-import { brandsApi } from "@/lib/services/inventory"
-import { Supplier, Brand } from "@/lib/types"
+import { Supplier } from "@/lib/types"
 import { ComplianceUploadDialog } from "@/components/compliance/ComplianceUploadDialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 
@@ -62,7 +61,6 @@ export function PurchaseDDTConformita({
     // Upload: stesso modale della pagina Gestione conformità, con fornitore e bolla già compilati
     const [uploadOpen, setUploadOpen] = useState(false)
     const [initialFiles, setInitialFiles] = useState<File[]>([])
-    const [brands, setBrands] = useState<Brand[]>([])
     const [cardDragOver, setCardDragOver] = useState(false)
 
     // Disassociate
@@ -76,13 +74,11 @@ export function PurchaseDDTConformita({
     const load = async () => {
         try {
             setLoading(true)
-            const [own, assocs, types, brandList] = await Promise.all([
+            const [own, assocs, types] = await Promise.all([
                 complianceApi.getByPurchaseId(purchaseId),
                 purchaseComplianceApi.getByPurchaseId(purchaseId),
                 complianceDocumentTypesApi.getAll(),
-                brandsApi.getAll(),
             ])
-            setBrands(brandList)
             setOwnDocs(own)
             setAssociations(assocs)
             setDocTypes(types)
@@ -251,7 +247,6 @@ export function PurchaseDDTConformita({
                 onOpenChange={setUploadOpen}
                 supplierId={supplierId}
                 suppliers={[{ id: supplierId, name: supplierName || supplierId } as Supplier]}
-                brands={brands}
                 docTypes={docTypes}
                 fixedPurchase={{ id: purchaseId }}
                 initialFiles={initialFiles}

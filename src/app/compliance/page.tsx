@@ -50,7 +50,6 @@ import {
 } from "lucide-react";
 import { suppliersApi } from "@/lib/services/suppliers";
 import { supplierGroupsApi } from "@/lib/services/supplier-groups";
-import { brandsApi } from "@/lib/services/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/auth-provider";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -68,7 +67,7 @@ import {
     ComplianceDocument,
 } from "@/lib/services/compliance";
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
-import { Supplier, Brand } from "@/lib/types";
+import { Supplier } from "@/lib/types";
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
 import { ComplianceUploadDialog, PurchaseSearchCombobox } from "@/components/compliance/ComplianceUploadDialog";
@@ -76,7 +75,6 @@ import { ComplianceUploadDialog, PurchaseSearchCombobox } from "@/components/com
 // ── Document form dialog ──────────────────────────────────────────────────────
 
 interface DocFormData {
-    brandId: string;
     documentTypeId: string;
     name: string;
     notes: string;
@@ -90,7 +88,6 @@ function DocumentFormDialog({
     onOpenChange,
     supplierId,
     suppliers,
-    brands,
     docTypes,
     editing,
     onSaved,
@@ -99,13 +96,11 @@ function DocumentFormDialog({
     onOpenChange: (v: boolean) => void;
     supplierId: string;
     suppliers: Supplier[];
-    brands: Brand[];
     docTypes: ComplianceDocumentTypeConfig[];
     editing: ComplianceDocument;
     onSaved: (doc: ComplianceDocument) => void;
 }) {
     const [form, setForm] = useState<DocFormData>({
-        brandId: "",
         documentTypeId: "",
         name: "",
         notes: "",
@@ -120,7 +115,6 @@ function DocumentFormDialog({
     useEffect(() => {
         if (open && editing) {
             setForm({
-                brandId: editing.brandId || "",
                 documentTypeId: editing.documentTypeId || "",
                 name: editing.name,
                 notes: editing.notes || "",
@@ -133,8 +127,8 @@ function DocumentFormDialog({
     }, [open, editing]);
 
     const handleSave = async () => {
-        if (!form.brandId || !form.name.trim()) {
-            setError("Marca e nome sono obbligatori.");
+        if (!form.name.trim()) {
+            setError("Il nome è obbligatorio.");
             return;
         }
         if (!form.documentTypeId) {
@@ -153,7 +147,6 @@ function DocumentFormDialog({
                 fileSize = form.file.size;
             }
             const doc = await complianceApi.update(editing.id, {
-                brandId: form.brandId || undefined,
                 documentTypeId: form.documentTypeId || null,
                 name: form.name.trim(),
                 notes: form.notes.trim(),
@@ -177,20 +170,6 @@ function DocumentFormDialog({
                     <DialogTitle>Modifica documento</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label>Marca <span className="text-destructive">*</span></Label>
-                            <Select value={form.brandId} onValueChange={(v) => setForm(f => ({ ...f, brandId: v }))}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleziona marca" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {brands.map((b) => (
-                                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
                         <div className="space-y-1.5">
                             <Label>Tipo documento</Label>
                             <Select value={form.documentTypeId} onValueChange={(v) => setForm(f => ({ ...f, documentTypeId: v }))}>
@@ -204,7 +183,6 @@ function DocumentFormDialog({
                                 </SelectContent>
                             </Select>
                         </div>
-                    </div>
                     <div className="space-y-1.5">
                         <Label>Nome documento <span className="text-destructive">*</span></Label>
                         <Input
@@ -302,9 +280,6 @@ function RowActions({
 }) {
     return (
         <div className="flex items-center justify-end gap-0.5">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary" onClick={(e) => { e.stopPropagation(); openComplianceDocument(doc); }} title="Apri PDF" aria-label="Apri PDF">
-                <FileText className="h-3.5 w-3.5" />
-            </Button>
             {doc.purchaseId && (
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
                     <a href={`/purchases/${doc.purchaseId}`} target="_blank" rel="noopener noreferrer" aria-label="Vai all'acquisto" onClick={(e) => e.stopPropagation()}>
@@ -331,7 +306,7 @@ function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 
 const PAGE_SIZE = 50;
 type SortKey = "name" | "type" | "supplier" | "date";
-type Check = "all" | "nobrand" | "notype";
+type Check = "all" | "notype";
 
 function ComplianceContent() {
     const { userRole } = useAuth();
@@ -345,7 +320,6 @@ function ComplianceContent() {
     }, [userRole, router]);
 
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-    const [brands, setBrands] = useState<Brand[]>([]);
     const [docTypes, setDocTypes] = useState<ComplianceDocumentTypeConfig[]>([]);
     const [documents, setDocuments] = useState<ComplianceDocument[]>([]);
     const [loadingDocs, setLoadingDocs] = useState(true);
@@ -354,7 +328,6 @@ function ComplianceContent() {
     const [search, setSearch] = useState(searchParams.get("q") || "");
     const [supplierId, setSupplierId] = useState(searchParams.get("fornitore") || searchParams.get("supplier") || "");
     const [typeId, setTypeId] = useState(searchParams.get("tipo") || "");
-    const [brandId, setBrandId] = useState(searchParams.get("marca") || "");
     const [check, setCheck] = useState<Check>((searchParams.get("controllo") as Check) || "all");
     const [sortKey, setSortKey] = useState<SortKey>((searchParams.get("sort") as SortKey) || "date");
     const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get("dir") === "asc" ? "asc" : "desc");
@@ -379,7 +352,6 @@ function ComplianceContent() {
         Promise.all([suppliersApi.getAll(), supplierGroupsApi.getHiddenFromPurchasesIds()])
             .then(([allSuppliers, hiddenIds]) => setSuppliers(allSuppliers.filter(s => !hiddenIds.includes(s.id))))
             .catch(console.error);
-        brandsApi.getAll().then(setBrands).catch(console.error);
         complianceDocumentTypesApi.getAll().then(setDocTypes).catch(console.error);
         loadDocuments();
     }, []);
@@ -390,20 +362,18 @@ function ComplianceContent() {
         if (search) params.set("q", search);
         if (supplierId) params.set("fornitore", supplierId);
         if (typeId) params.set("tipo", typeId);
-        if (brandId) params.set("marca", brandId);
         if (check !== "all") params.set("controllo", check);
         if (sortKey !== "date") params.set("sort", sortKey);
         if (sortDir !== "desc") params.set("dir", sortDir);
         if (page !== 1) params.set("page", String(page));
         const query = params.toString();
         router.replace(query ? `/compliance?${query}` : "/compliance", { scroll: false });
-    }, [search, supplierId, typeId, brandId, check, sortKey, sortDir, page, router]);
+    }, [search, supplierId, typeId, check, sortKey, sortDir, page, router]);
 
     const supplierName = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
     const nameOf = (d: ComplianceDocument) => supplierName.get(d.supplierId) || "";
 
-    // Controlli: documenti a cui manca la marca o il tipo
-    const noBrandCount = documents.filter(d => !d.brandId).length;
+    // Controlli: documenti a cui manca il tipo
     const noTypeCount = documents.filter(d => !d.documentTypeId).length;
 
     const filtered = useMemo(() => {
@@ -411,11 +381,9 @@ function ComplianceContent() {
         const list = documents.filter(d => {
             if (supplierId && d.supplierId !== supplierId) return false;
             if (typeId === "none" ? !!d.documentTypeId : typeId && d.documentTypeId !== typeId) return false;
-            if (brandId === "none" ? !!d.brandId : brandId && d.brandId !== brandId) return false;
-            if (check === "nobrand" && d.brandId) return false;
             if (check === "notype" && d.documentTypeId) return false;
             if (words.length === 0) return true;
-            const hay = [d.name, d.notes, d.brandName, d.documentTypeName, d.purchaseNumber, supplierName.get(d.supplierId)]
+            const hay = [d.name, d.notes, d.documentTypeName, d.purchaseNumber, supplierName.get(d.supplierId)]
                 .join(" ").toLowerCase();
             return words.every(w => hay.includes(w));
         });
@@ -430,7 +398,7 @@ function ComplianceContent() {
             return r * dir;
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [documents, search, supplierId, typeId, brandId, check, sortKey, sortDir, supplierName]);
+    }, [documents, search, supplierId, typeId, check, sortKey, sortDir, supplierName]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     const currentPage = Math.min(page, totalPages);
@@ -443,8 +411,8 @@ function ComplianceContent() {
     };
     const change = (setter: (v: string) => void) => (v: string) => { setter(v === "all" ? "" : v); setPage(1); };
 
-    const anyFilterActive = !!(search || supplierId || typeId || brandId || check !== "all");
-    const resetFilters = () => { setSearch(""); setSupplierId(""); setTypeId(""); setBrandId(""); setCheck("all"); setPage(1); };
+    const anyFilterActive = !!(search || supplierId || typeId || check !== "all");
+    const resetFilters = () => { setSearch(""); setSupplierId(""); setTypeId(""); setCheck("all"); setPage(1); };
 
     const handleSaved = (doc: ComplianceDocument) => {
         setDocuments(prev => prev.map(d => (d.id === doc.id ? doc : d)));
@@ -490,23 +458,11 @@ function ComplianceContent() {
             </SelectContent>
         </Select>
     );
-    const brandSelect = (cls?: string) => (
-        <Select value={brandId || "all"} onValueChange={change(setBrandId)}>
-            <SelectTrigger aria-label="Filtra per marca" className={cls}><SelectValue placeholder="Marca" /></SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">Tutte le marche</SelectItem>
-                {brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                <SelectItem value="none">Senza marca</SelectItem>
-            </SelectContent>
-        </Select>
-    );
-
     const checkSelect = (
         <Select value={check} onValueChange={(v) => { setCheck(v as Check); setPage(1); }}>
             <SelectTrigger aria-label="Da sistemare" className="hidden w-48 shrink-0 border-none bg-slate-100 dark:bg-muted md:flex"><SelectValue /></SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">Tutti i documenti</SelectItem>
-                <SelectItem value="nobrand">Da sistemare: senza marca ({noBrandCount})</SelectItem>
                 <SelectItem value="notype">Da sistemare: senza tipo ({noTypeCount})</SelectItem>
             </SelectContent>
         </Select>
@@ -527,7 +483,7 @@ function ComplianceContent() {
                         Carica documento
                     </Button>
                 }
-                search={{ id: "compliance-search", label: "Cerca documenti", value: search, onChange: (v) => { setSearch(v); setPage(1); }, placeholder: "Cerca per nome, fornitore, marca, bolla, note..." }}
+                search={{ id: "compliance-search", label: "Cerca documenti", value: search, onChange: (v) => { setSearch(v); setPage(1); }, placeholder: "Cerca per nome, fornitore, bolla, note..." }}
                 searchActions={
                     <>
                         {checkSelect}
@@ -549,12 +505,10 @@ function ComplianceContent() {
                         searchPlaceholder="Scrivi per cercare fornitore..."
                     />
                     {typeSelect()}
-                    {brandSelect()}
                     <Select value={check} onValueChange={(v) => { setCheck(v as Check); setPage(1); }}>
                         <SelectTrigger aria-label="Da sistemare"><SelectValue /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Tutti</SelectItem>
-                            <SelectItem value="nobrand">Senza marca ({noBrandCount})</SelectItem>
                             <SelectItem value="notype">Senza tipo ({noTypeCount})</SelectItem>
                         </SelectContent>
                     </Select>
@@ -604,7 +558,6 @@ function ComplianceContent() {
                                             </button>
                                         </div>
                                     </TableHead>
-                                    <TableHead className={`w-40 ${headCls}`}>{brandSelect(selectCls)}</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>Bolla</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
                                     <TableHead className="w-32" />
@@ -613,7 +566,7 @@ function ComplianceContent() {
                             <TableBody>
                                 {rows.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                        <TableCell colSpan={6} className="py-10 text-center text-slate-400 dark:text-slate-500">
                                             <ShieldCheck className="mx-auto mb-2 h-12 w-12 opacity-20" />
                                             Nessun documento trovato
                                         </TableCell>
@@ -632,9 +585,6 @@ function ComplianceContent() {
                                         </TableCell>
                                         <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
                                             <span className="line-clamp-2" title={nameOf(d)}>{nameOf(d) || <span className="text-slate-300">—</span>}</span>
-                                        </TableCell>
-                                        <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
-                                            {d.brandName || <span className="font-medium text-amber-600">Senza marca</span>}
                                         </TableCell>
                                         <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
                                             {d.purchaseNumber || <span className="text-slate-300">—</span>}
@@ -670,7 +620,6 @@ function ComplianceContent() {
                                     </div>
                                     <div className="space-y-1 text-xs">
                                         <div className="flex justify-between gap-3"><span className="text-slate-500">Fornitore</span><span className="text-right font-medium">{nameOf(d) || "—"}</span></div>
-                                        <div className="flex justify-between gap-3"><span className="text-slate-500">Marca</span><span className="text-right font-medium">{d.brandName || "—"}</span></div>
                                         {d.purchaseNumber && <div className="flex justify-between gap-3"><span className="text-slate-500">Bolla</span><span className="text-right font-medium">{d.purchaseNumber}</span></div>}
                                     </div>
                                     {d.notes && <p className="break-words text-xs text-slate-500">{d.notes}</p>}
@@ -700,7 +649,6 @@ function ComplianceContent() {
                 onOpenChange={setUploadOpen}
                 supplierId={supplierId}
                 suppliers={suppliers}
-                brands={brands}
                 docTypes={docTypes}
                 onUploaded={handleUploaded}
             />
@@ -712,7 +660,6 @@ function ComplianceContent() {
                     onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditingDoc(null); }}
                     supplierId={editingDoc.supplierId}
                     suppliers={suppliers}
-                    brands={brands}
                     docTypes={docTypes}
                     editing={editingDoc}
                     onSaved={handleSaved}
