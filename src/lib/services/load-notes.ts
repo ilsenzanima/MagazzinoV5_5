@@ -13,6 +13,8 @@ export interface LoadNoteInput {
         quantity: number;
         coefficient?: number;
         isChecked?: boolean;
+        // Riga già esistente (in modifica): si aggiorna invece di ricrearla
+        id?: string;
     }[];
 }
 
@@ -216,7 +218,7 @@ export const loadNotesService = {
             if (itemsError) {
                 console.error('Error creating items:', itemsError);
                 // Rollback note creation
-                await supabase.from('load_notes').delete().eq('id', note.id);
+                await supabase.from('load_notes').update(await getSoftDeletePayload()).eq('id', note.id);
                 throw itemsError;
             }
         }
@@ -243,29 +245,48 @@ export const loadNotesService = {
             throw error;
         }
 
-        // Update items if provided
+        // Update items if provided: si aggiornano le righe esistenti, si aggiungono le nuove e si tolgono
+        // quelle eliminate. Le righe spuntate (già registrate in un movimento) non si toccano mai.
         if (input.items !== undefined) {
-            // Delete existing items
-            await supabase.from('load_note_items').delete().eq('load_note_id', id);
+            const { data: existing, error: existingError } = await supabase
+                .from('load_note_items')
+                .select('id, is_checked')
+                .eq('load_note_id', id);
+            if (existingError) throw existingError;
 
-            // Insert new items
-            if (input.items.length > 0) {
-                const itemsToInsert = input.items.map(item => ({
-                    load_note_id: id,
-                    inventory_id: item.inventoryId,
-                    pieces: item.pieces || null,
-                    quantity: item.quantity,
-                    coefficient: item.coefficient || 1,
-                    // Le spunte già fatte non si azzerano modificando la nota
-                    is_checked: item.isChecked ?? false
-                }));
+            const locked = new Set((existing || []).filter(r => r.is_checked).map(r => r.id as string));
+            const keptIds = new Set(input.items.map(i => i.id).filter(Boolean) as string[]);
 
-                const { error: itemsError } = await supabase
-                    .from('load_note_items')
-                    .insert(itemsToInsert);
+            const toDelete = (existing || []).filter(r => !r.is_checked && !keptIds.has(r.id)).map(r => r.id as string);
+            if (toDelete.length > 0) {
+                const { error: delError } = await supabase.from('load_note_items').delete().in('id', toDelete);
+                if (delError) {
+                    console.error('Error removing items:', delError);
+                    throw delError;
+                }
+            }
 
+            const toFields = (item: NonNullable<LoadNoteInput['items']>[number]) => ({
+                inventory_id: item.inventoryId,
+                pieces: item.pieces || null,
+                quantity: item.quantity,
+                coefficient: item.coefficient || 1
+            });
+
+            for (const item of input.items) {
+                if (!item.id || locked.has(item.id)) continue;
+                const { error: updError } = await supabase.from('load_note_items').update(toFields(item)).eq('id', item.id);
+                if (updError) {
+                    console.error('Error updating item:', updError);
+                    throw updError;
+                }
+            }
+
+            const toInsert = input.items.filter(item => !item.id).map(item => ({ load_note_id: id, ...toFields(item), is_checked: false }));
+            if (toInsert.length > 0) {
+                const { error: itemsError } = await supabase.from('load_note_items').insert(toInsert);
                 if (itemsError) {
-                    console.error('Error updating items:', itemsError);
+                    console.error('Error adding items:', itemsError);
                     throw itemsError;
                 }
             }

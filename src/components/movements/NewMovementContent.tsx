@@ -199,6 +199,7 @@ export default function NewMovementContent({
                         onDuplicate={form.handleInlineLineDuplicate}
                         onSplit={form.handleInlineLineSplit}
                         onPurchaseItemsImport={form.handlePurchaseItemsImport}
+                        onNoteItemsImport={form.handleNoteItemsImport}
                     />
 
                     <MovementFooter

@@ -20,12 +20,16 @@ import {
     ChevronDown,
     ChevronRight,
     ShoppingCart,
+    CheckCircle2,
+    Circle,
+    AlertTriangle,
+    ArrowLeft,
 } from "lucide-react";
 import { InventoryItem, Job, LoadNote, LoadNoteItem, Purchase } from "@/lib/types";
 import { loadNotesService } from "@/lib/services/load-notes";
 import { inventoryApi } from "@/lib/services/inventory";
 import { purchasesApi } from "@/lib/services/purchases";
-import { PurchaseItemToImport } from "@/hooks/useMovementForm";
+import { PurchaseItemToImport, NoteLineToImport } from "@/hooks/useMovementForm";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -52,7 +56,23 @@ interface MovementMaterialDialogProps {
         prefill?: { pieces?: string; quantity?: string }
     ) => void;
     onPurchaseItemsImport: (items: PurchaseItemToImport[]) => void;
+    onNoteItemsImport: (items: NoteLineToImport[]) => void;
 }
+
+// Esito dell'analisi di una riga di nota prima dell'importazione
+interface NotePlanEntry {
+    noteId: string;
+    noteLabel: string;
+    item: LoadNoteItem;
+    status: "ok" | "split" | "blocked";
+    reason?: string;
+    allocations: { batch: any; qty: number }[];
+    batches: any[];
+    fictitious: boolean;
+}
+
+const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
+const fmtQty = (n: number) => String(round4(n)).replace(".", ",");
 
 interface CombinedPurchaseItem {
     id: string;
@@ -85,6 +105,7 @@ export function MovementMaterialDialog({
     onItemSelect,
     onReturnBatchSelect,
     onPurchaseItemsImport,
+    onNoteItemsImport,
 }: MovementMaterialDialogProps) {
     const isEntryWithJob = activeTab === "entry" && !!selectedJob;
     const defaultDialogTab = isEntryWithJob ? "cantiere" : "magazzino";
@@ -97,6 +118,11 @@ export function MovementMaterialDialog({
     const [expandedNoteIds, setExpandedNoteIds] = useState<Set<string>>(new Set());
     const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
     const [noteItemLoading, setNoteItemLoading] = useState<string | null>(null);
+    // Importazione di più righe: selezione e pagina di verifica
+    const [selectedNoteItemIds, setSelectedNoteItemIds] = useState<Set<string>>(new Set());
+    const [noteStep, setNoteStep] = useState<"list" | "review">("list");
+    const [notePlan, setNotePlan] = useState<NotePlanEntry[]>([]);
+    const [planning, setPlanning] = useState(false);
 
     // Purchase tab state
     const [purchaseSearchTerm, setPurchaseSearchTerm] = useState("");
@@ -113,6 +139,9 @@ export function MovementMaterialDialog({
         if (open) {
             setDialogTab(isEntryWithJob ? "cantiere" : "magazzino");
             setSearchTerm("");
+            setSelectedNoteItemIds(new Set());
+            setNoteStep("list");
+            setNotePlan([]);
             setPurchaseSearchTerm("");
             setPurchaseDateFilter("");
             setPurchasesData([]);
@@ -220,8 +249,8 @@ export function MovementMaterialDialog({
             // Auto-check the item in the note
             const parentNote = notes.find((n) => n.items.some((i) => i.id === noteItem.id));
             if (parentNote) {
-                // Forza la spunta (false = «non ancora spuntata»): usarla due volte non deve toglierla
-                toggleCheck(parentNote.id, noteItem.id, false);
+                // Spunta sempre (non alterna): usarla due volte non deve toglierla
+                setItemChecked(parentNote.id, noteItem.id, true);
             }
 
             if (isEntryWithJob) {
@@ -245,24 +274,184 @@ export function MovementMaterialDialog({
         }
     };
 
-    const toggleCheck = async (noteId: string, itemId: string, currentChecked?: boolean) => {
-        // Use the passed current state, or fall back to local set
-        const isChecked = currentChecked ?? checkedItems.has(itemId);
-        const newChecked = !isChecked;
-        const next = new Set(checkedItems);
-        newChecked ? next.add(itemId) : next.delete(itemId);
-        setCheckedItems(next);
-        // Also update the notes array so item.isChecked reflects the new state immediately
-        setNotes(prev => prev.map(n =>
-            n.id === noteId
-                ? { ...n, items: n.items.map(i => i.id === itemId ? { ...i, isChecked: newChecked } : i) }
-                : n
-        ));
+    // Spunta o toglie la spunta di una riga (registrata o ancora da fare), aggiornando anche lo stato a schermo
+    const setItemChecked = async (noteId: string, itemId: string, checked: boolean) => {
+        setCheckedItems((prev) => {
+            const next = new Set(prev);
+            checked ? next.add(itemId) : next.delete(itemId);
+            return next;
+        });
+        setNotes((prev) =>
+            prev.map((n) =>
+                n.id === noteId
+                    ? { ...n, items: n.items.map((i) => (i.id === itemId ? { ...i, isChecked: checked } : i)) }
+                    : n
+            )
+        );
         try {
-            await loadNotesService.toggleItemCheck(noteId, itemId, newChecked);
+            await loadNotesService.toggleItemCheck(noteId, itemId, checked);
         } catch (error) {
             console.error("Failed to toggle item check", error);
             notify.error("Errore nell'aggiornamento dello stato dell'articolo");
+        }
+    };
+
+    const toggleNoteSelection = (itemId: string) => {
+        setSelectedNoteItemIds((prev) => {
+            const next = new Set(prev);
+            next.has(itemId) ? next.delete(itemId) : next.add(itemId);
+            return next;
+        });
+    };
+
+    // Analizza le righe selezionate: quali si importano direttamente, quali vanno divise su più lotti
+    // e quali non si possono importare (restano in sospeso, senza spunta)
+    const buildNotePlan = async (): Promise<NotePlanEntry[]> => {
+        const selected: { note: LoadNote; item: LoadNoteItem }[] = [];
+        for (const note of notes) {
+            for (const item of note.items) {
+                if (selectedNoteItemIds.has(item.id) && !item.isChecked) selected.push({ note, item });
+            }
+        }
+
+        const pool = new Map<string, number>(); // disponibilità residua per lotto, condivisa tra righe dello stesso articolo
+        const batchCache = new Map<string, any[]>();
+
+        const batchesFor = async (inventoryId: string): Promise<any[]> => {
+            const cached = batchCache.get(inventoryId);
+            if (cached) return cached;
+            let list: any[];
+            if (isEntryWithJob) {
+                // Reso: solo il materiale già portato in questa commessa. I lotti veri prima di quelli fittizi.
+                list = jobBatchAvailability
+                    .filter((b) => b.itemId === inventoryId && (b.quantity ?? 0) > 0.0001)
+                    .map((b) => ({
+                        id: b.purchaseItemId,
+                        purchaseRef: b.purchaseRef,
+                        remainingQty: b.quantity,
+                        remainingPieces: b.pieces,
+                        date: b.date,
+                        isFictitious: !!b.isFictitious,
+                    }))
+                    .sort((a, b) => Number(a.isFictitious) - Number(b.isFictitious));
+            } else {
+                const all = await inventoryApi.getAvailableBatches(inventoryId);
+                list = all.filter((b: any) => (b.remainingQty ?? 0) > 0.0001);
+            }
+            list.forEach((b) => pool.set(b.id, b.remainingQty));
+            batchCache.set(inventoryId, list);
+            return list;
+        };
+
+        const plan: NotePlanEntry[] = [];
+        for (const { note, item } of selected) {
+            const noteLabel = note.jobDescription || note.notes || "Appunto generico";
+            const base = { noteId: note.id, noteLabel, item, allocations: [] as { batch: any; qty: number }[], batches: [] as any[], fictitious: false };
+            const qty = Number(item.quantity);
+            if (!(qty > 0)) {
+                plan.push({ ...base, status: "blocked", reason: "quantità non valida" });
+                continue;
+            }
+
+            const batches = await batchesFor(item.inventoryId);
+            if (batches.length === 0) {
+                plan.push({
+                    ...base,
+                    status: "blocked",
+                    reason: isEntryWithJob ? "mai portato in questa commessa" : "nessun lotto disponibile a magazzino",
+                });
+                continue;
+            }
+
+            // Un solo lotto basta: il primo, in ordine di data, che lo copre per intero
+            const single = batches.find((b) => (pool.get(b.id) ?? 0) + 0.0001 >= qty);
+            if (single) {
+                pool.set(single.id, (pool.get(single.id) ?? 0) - qty);
+                plan.push({ ...base, status: "ok", allocations: [{ batch: single, qty }], batches });
+                continue;
+            }
+
+            // Serve più di un lotto: si propone la divisione in ordine di data (FIFO)
+            const total = batches.reduce((s, b) => s + (pool.get(b.id) ?? 0), 0);
+            if (total + 0.0001 < qty) {
+                plan.push({
+                    ...base,
+                    status: "blocked",
+                    reason: isEntryWithJob
+                        ? `in commessa ce ne sono solo ${fmtQty(total)} su ${fmtQty(qty)}`
+                        : `a magazzino ce ne sono solo ${fmtQty(total)} su ${fmtQty(qty)}`,
+                });
+                continue;
+            }
+            let need = qty;
+            const allocations: { batch: any; qty: number }[] = [];
+            for (const b of batches) {
+                if (need <= 0.0001) break;
+                const take = Math.min(pool.get(b.id) ?? 0, need);
+                if (take <= 0.0001) continue;
+                allocations.push({ batch: b, qty: round4(take) });
+                pool.set(b.id, (pool.get(b.id) ?? 0) - take);
+                need -= take;
+            }
+            plan.push({ ...base, status: "split", allocations, batches });
+        }
+        return plan;
+    };
+
+    const planToLines = (plan: NotePlanEntry[]): NoteLineToImport[] => {
+        const lines: NoteLineToImport[] = [];
+        for (const entry of plan) {
+            if (entry.status === "blocked") continue;
+            const coef = entry.item.coefficient || 1;
+            for (const alloc of entry.allocations) {
+                const isSingle = entry.allocations.length === 1;
+                const pieces = isSingle && entry.item.pieces ? String(entry.item.pieces) : String(round4(alloc.qty / coef));
+                const fictitious = isEntryWithJob ? !!alloc.batch.isFictitious : activeTab === "transfer";
+                lines.push({
+                    itemId: entry.item.inventoryId,
+                    itemName: entry.item.inventoryName || "",
+                    itemCode: entry.item.inventoryCode || "",
+                    itemUnit: entry.item.inventoryUnit || "PZ",
+                    itemBrand: entry.item.inventoryBrand || undefined,
+                    coefficient: coef,
+                    quantity: String(alloc.qty),
+                    pieces,
+                    purchaseItemId: alloc.batch.id,
+                    purchaseRef: alloc.batch.purchaseRef,
+                    isFictitious: fictitious,
+                    availableBatches: entry.batches,
+                });
+            }
+        }
+        return lines;
+    };
+
+    const commitNotePlan = (plan: NotePlanEntry[]) => {
+        const lines = planToLines(plan);
+        if (lines.length === 0) return;
+        onNoteItemsImport(lines);
+        // Spunta solo le righe importate: le altre restano in sospeso
+        plan.filter((e) => e.status !== "blocked").forEach((e) => setItemChecked(e.noteId, e.item.id, true));
+        onOpenChange(false);
+    };
+
+    const handleImportNoteSelection = async () => {
+        if (selectedNoteItemIds.size === 0) return;
+        setPlanning(true);
+        try {
+            const plan = await buildNotePlan();
+            // Se è tutto lineare si importa subito; altrimenti si passa dalla pagina di verifica
+            if (plan.length > 0 && plan.every((e) => e.status === "ok")) {
+                commitNotePlan(plan);
+            } else {
+                setNotePlan(plan);
+                setNoteStep("review");
+            }
+        } catch (error) {
+            console.error("Failed to prepare note import", error);
+            notify.error("Errore nella preparazione dell'importazione");
+        } finally {
+            setPlanning(false);
         }
     };
 
@@ -656,6 +845,72 @@ export function MovementMaterialDialog({
                         value="note"
                         className="flex-1 overflow-hidden flex flex-col px-6 pb-6 mt-4"
                     >
+                        {noteStep === "review" ? (
+                            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setNoteStep("list")}
+                                    className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                                >
+                                    <ArrowLeft className="h-4 w-4" />
+                                    Torna alla selezione
+                                </button>
+
+                                {notePlan.some((e) => e.status === "blocked") && (
+                                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/30">
+                                        <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                            <AlertTriangle className="h-4 w-4" />
+                                            Non importabili ({notePlan.filter((e) => e.status === "blocked").length}): restano in sospeso nella nota, senza spunta
+                                        </div>
+                                        <ul className="mt-2 space-y-1 text-sm">
+                                            {notePlan.filter((e) => e.status === "blocked").map((e) => (
+                                                <li key={e.item.id} className="flex flex-wrap justify-between gap-x-3">
+                                                    <span className="font-medium">{e.item.inventoryName} <span className="font-normal text-muted-foreground">({fmtQty(Number(e.item.quantity))} {e.item.inventoryUnit})</span></span>
+                                                    <span className="text-amber-800 dark:text-amber-300">{e.reason}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {notePlan.some((e) => e.status === "split") && (
+                                    <div className="rounded-lg border p-3">
+                                        <p className="text-sm font-semibold">Da dividere su più lotti ({notePlan.filter((e) => e.status === "split").length})</p>
+                                        <p className="text-xs text-muted-foreground">Proposta in ordine di data: diventano più righe nel movimento, che potrai ancora modificare.</p>
+                                        <div className="mt-2 space-y-3">
+                                            {notePlan.filter((e) => e.status === "split").map((e) => (
+                                                <div key={e.item.id} className="text-sm">
+                                                    <div className="font-medium">{e.item.inventoryName} <span className="font-normal text-muted-foreground">— totale {fmtQty(Number(e.item.quantity))} {e.item.inventoryUnit}</span></div>
+                                                    <ul className="mt-1 space-y-0.5 pl-3 text-xs">
+                                                        {e.allocations.map((a, i) => (
+                                                            <li key={i} className="flex justify-between gap-3">
+                                                                <span>Lotto {a.batch.purchaseRef || "—"}{a.batch.date ? ` · ${format(new Date(a.batch.date), "dd/MM/yy")}` : ""}{a.batch.isFictitious ? " · fittizio" : ""}</span>
+                                                                <span className="font-semibold">{fmtQty(a.qty)} {e.item.inventoryUnit}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {notePlan.some((e) => e.status === "ok") && (
+                                    <div className="rounded-lg border p-3 text-sm">
+                                        <p className="font-semibold">Importazione diretta ({notePlan.filter((e) => e.status === "ok").length})</p>
+                                        <ul className="mt-1 space-y-0.5 text-xs">
+                                            {notePlan.filter((e) => e.status === "ok").map((e) => (
+                                                <li key={e.item.id} className="flex justify-between gap-3">
+                                                    <span>{e.item.inventoryName} · lotto {e.allocations[0].batch.purchaseRef || "—"}</span>
+                                                    <span className="font-semibold">{fmtQty(Number(e.item.quantity))} {e.item.inventoryUnit}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                        <>
                         {notesLoading ? (
                             <div className="flex justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -749,12 +1004,15 @@ export function MovementMaterialDialog({
                                                                         : "bg-background hover:border-primary/50"
                                                                 }`}
                                                             >
-                                                                <Checkbox
-                                                                    checked={isChecked}
-                                                                    onCheckedChange={() =>
-                                                                        toggleCheck(note.id, item.id, isChecked)
-                                                                    }
-                                                                />
+                                                                {isChecked ? (
+                                                                    <span className="h-4 w-4 shrink-0" />
+                                                                ) : (
+                                                                    <Checkbox
+                                                                        checked={selectedNoteItemIds.has(item.id)}
+                                                                        onCheckedChange={() => toggleNoteSelection(item.id)}
+                                                                        aria-label="Seleziona per importare"
+                                                                    />
+                                                                )}
                                                                 <div
                                                                     className={`flex-1 min-w-0 ${
                                                                         isChecked
@@ -778,12 +1036,29 @@ export function MovementMaterialDialog({
                                                                 >
                                                                     {item.quantity} {item.inventoryUnit}
                                                                 </div>
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className={`h-7 w-7 flex-shrink-0 ${isChecked ? "text-emerald-600" : "text-muted-foreground"}`}
+                                                                    title={isChecked ? "Registrata: clicca per togliere la spunta" : "Segna come registrata"}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setItemChecked(note.id, item.id, !isChecked);
+                                                                        setSelectedNoteItemIds((prev) => {
+                                                                            const next = new Set(prev);
+                                                                            next.delete(item.id);
+                                                                            return next;
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    {isChecked ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                                                                </Button>
                                                                 {!isChecked && (
                                                                     <Button
                                                                         size="icon"
                                                                         variant="ghost"
                                                                         className="h-7 w-7 text-primary flex-shrink-0"
-                                                                        title="Usa in DDT"
+                                                                        title="Usa subito in questa riga"
                                                                         disabled={isLoading}
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
@@ -805,6 +1080,28 @@ export function MovementMaterialDialog({
                                         </Collapsible>
                                     );
                                 })}
+                            </div>
+                        )}
+                        </>
+                        )}
+
+                        {noteStep === "review" ? (
+                            <div className="shrink-0 pt-3 border-t mt-3">
+                                <Button
+                                    className="w-full"
+                                    disabled={notePlan.every((e) => e.status === "blocked")}
+                                    onClick={() => commitNotePlan(notePlan)}
+                                >
+                                    <PlusCircle className="h-4 w-4 mr-2" />
+                                    Importa {planToLines(notePlan).length} righe
+                                </Button>
+                            </div>
+                        ) : selectedNoteItemIds.size > 0 && (
+                            <div className="shrink-0 pt-3 border-t mt-3">
+                                <Button className="w-full" onClick={handleImportNoteSelection} disabled={planning}>
+                                    {planning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlusCircle className="h-4 w-4 mr-2" />}
+                                    Importa selezionati ({selectedNoteItemIds.size})
+                                </Button>
                             </div>
                         )}
                     </TabsContent>

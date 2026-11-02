@@ -20,6 +20,22 @@ export interface PurchaseItemToImport {
     batchDate?: string;
 }
 
+// Riga pronta da una nota di carico: lotto già scelto e lotti tra cui poter cambiare
+export interface NoteLineToImport {
+    itemId: string;
+    itemName: string;
+    itemCode: string;
+    itemUnit: string;
+    itemBrand?: string;
+    coefficient: number;
+    quantity: string;
+    pieces: string;
+    purchaseItemId?: string;
+    purchaseRef?: string;
+    isFictitious: boolean;
+    availableBatches: any[];
+}
+
 export interface MovementLine {
     id?: string;
     tempId: string;
@@ -802,6 +818,19 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         [activeTab]
     );
 
+    const handleNoteItemsImport = useCallback((items: NoteLineToImport[]) => {
+        setLines((prev) => {
+            const filledLines = prev.filter((l) => l.itemId || l.quantity || l.pieces);
+            const newLines: MovementLine[] = items.map((item) => ({
+                tempId: Math.random().toString(36).substr(2, 9),
+                kgEccedenza: "",
+                batchesLoading: false,
+                ...item,
+            }));
+            return ensureTrailingEmpty([...filledLines, ...newLines]);
+        });
+    }, []);
+
     const handleSubmit = async () => {
         if (!numberPart) {
             notify.warning("Inserisci il numero del documento");
@@ -1005,6 +1034,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote }: 
         handleInlineLineDuplicate,
         handleInlineLineSplit,
         handlePurchaseItemsImport,
+        handleNoteItemsImport,
         handleSubmit,
     };
 }

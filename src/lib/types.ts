@@ -546,6 +546,7 @@ export interface LoadNoteItem {
     inventoryId: string;
     inventoryName: string;
     inventoryModel?: string;
+    inventoryBrand?: string;
     inventoryCode?: string;
     inventoryUnit: string;
     quantity: number;
