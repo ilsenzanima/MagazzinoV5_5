@@ -36,11 +36,9 @@ import {
     PurchaseComplianceAssociation,
 } from "@/lib/services/compliance"
 import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types"
-import { compressImageIfNeeded } from "@/lib/image-compress"
-import { uploadFileToDrive } from "@/lib/drive-upload"
+import { Supplier } from "@/lib/types"
+import { ComplianceUploadDialog } from "@/components/compliance/ComplianceUploadDialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { useBatchUpload } from "@/hooks/useBatchUpload"
-import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
 interface PurchaseDDTConformitaProps {
     purchaseId: string
@@ -60,16 +58,10 @@ export function PurchaseDDTConformita({
     const [docTypes, setDocTypes] = useState<ComplianceDocumentTypeConfig[]>([])
     const [loading, setLoading] = useState(true)
 
-    // Upload (schermata unica, drag&drop)
+    // Upload: stesso modale della pagina Gestione conformità, con fornitore e bolla già compilati
     const [uploadOpen, setUploadOpen] = useState(false)
-    const [upDocTypeId, setUpDocTypeId] = useState("")
-    const [upFile, setUpFile] = useState<File | null>(null)
-    const [upName, setUpName] = useState("")
-    const [uploading, setUploading] = useState(false)
-    const [dragOver, setDragOver] = useState(false)
+    const [initialFiles, setInitialFiles] = useState<File[]>([])
     const [cardDragOver, setCardDragOver] = useState(false)
-    const upRef = useRef<HTMLInputElement>(null)
-    const batchUpload = useBatchUpload()
 
     // Disassociate
     const [disassocOpen, setDisassocOpen] = useState(false)
@@ -97,68 +89,18 @@ export function PurchaseDDTConformita({
         }
     }
 
-    // ── Upload wizard ─────────────────────────────────────────────────────────
+    // ── Upload ────────────────────────────────────────────────────────────────
 
-    const openUpload = (file?: File) => {
-        setUpDocTypeId("")
-        setUpFile(file ?? null)
-        setUpName(file ? file.name.replace(/\.[^.]+$/, "") : "")
-        batchUpload.reset()
+    const openUpload = (files?: File[]) => {
+        setInitialFiles(files ?? [])
         setUploadOpen(true)
-    }
-
-    const setFile = (f: File) => {
-        setUpFile(f)
-        setUpName(f.name.replace(/\.[^.]+$/, ""))
-    }
-
-    const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const f = e.target.files?.[0]
-        if (f) setFile(f)
-        e.target.value = ""
-    }
-
-    const handleDialogDrop = (e: React.DragEvent) => {
-        e.preventDefault()
-        setDragOver(false)
-        const f = e.dataTransfer.files?.[0]
-        if (f) setFile(f)
     }
 
     const handleCardDrop = (e: React.DragEvent) => {
         e.preventDefault()
         setCardDragOver(false)
-        const f = e.dataTransfer.files?.[0]
-        if (f) openUpload(f)
-    }
-
-    const handleUpload = async () => {
-        if (!upFile || !upDocTypeId) return
-        setUploading(true)
-        const { failedCount } = await batchUpload.run([upFile], async (file) => {
-            const compressed = await compressImageIfNeeded(file)
-            const result = await uploadFileToDrive(compressed, ["Fornitori", supplierName || supplierId, "Compliance", "DDT"])
-
-            await complianceApi.create({
-                supplierId,
-                brandId: null as any,
-                documentTypeId: upDocTypeId,
-                name: upName.trim() || file.name,
-                fileUrl: result.fileId,
-                fileSize: compressed.size,
-                purchaseId,
-                documentScope: "ddt_specific",
-            })
-        })
-        setUploading(false)
-        if (failedCount > 0) {
-            toast.error("Errore durante il caricamento")
-            return
-        }
-        toast.success("Documento caricato")
-        setUploadOpen(false)
-        load()
-        onUpdate?.()
+        const files = Array.from(e.dataTransfer.files ?? [])
+        if (files.length > 0) openUpload(files)
     }
 
     const confirmDisassoc = (assoc: PurchaseComplianceAssociation) => {
@@ -300,79 +242,16 @@ export function PurchaseDDTConformita({
                 </CardContent>
             </Card>
 
-            {/* Upload: schermata unica */}
-            <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Carica documento di conformità</DialogTitle>
-                    </DialogHeader>
-
-                    <div className="space-y-4 py-2">
-                        <div className="space-y-1.5">
-                            <Label>Tipo di documento *</Label>
-                            <Select value={upDocTypeId} onValueChange={setUpDocTypeId} disabled={uploading}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleziona tipo..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {docTypes.map(t => (
-                                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>File * (clicca o trascina qui)</Label>
-                            <div
-                                className={`border-2 border-dashed rounded-md p-4 text-center transition-colors ${uploading ? "opacity-60" : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"} ${dragOver ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}`}
-                                onClick={() => !uploading && upRef.current?.click()}
-                                onDragOver={e => { e.preventDefault(); if (!uploading) setDragOver(true) }}
-                                onDragLeave={e => { e.preventDefault(); setDragOver(false) }}
-                                onDrop={e => !uploading && handleDialogDrop(e)}
-                            >
-                                {upFile ? (
-                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{upFile.name}</p>
-                                ) : (
-                                    <>
-                                        <Upload className="h-6 w-6 mx-auto mb-1 text-slate-400" />
-                                        <p className="text-sm text-slate-400">
-                                            {dragOver ? "Rilascia il file qui..." : "Clicca o trascina qui un file"}
-                                        </p>
-                                    </>
-                                )}
-                            </div>
-                            {uploading && <UploadStatusBar state={batchUpload.statuses[0]} />}
-                            <input
-                                ref={upRef}
-                                type="file"
-                                className="hidden"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                disabled={uploading}
-                                onChange={handleFileSelected}
-                            />
-                        </div>
-                        {upFile && (
-                            <div className="space-y-1.5">
-                                <Label>Nome documento</Label>
-                                <Input
-                                    value={upName}
-                                    disabled={uploading}
-                                    onChange={e => setUpName(e.target.value)}
-                                    placeholder="Nome del documento"
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setUploadOpen(false)} disabled={uploading}>Annulla</Button>
-                        <Button onClick={handleUpload} disabled={!upFile || !upDocTypeId || uploading}>
-                            {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Carica
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <ComplianceUploadDialog
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
+                supplierId={supplierId}
+                suppliers={[{ id: supplierId, name: supplierName || supplierId } as Supplier]}
+                docTypes={docTypes}
+                fixedPurchase={{ id: purchaseId }}
+                initialFiles={initialFiles}
+                onUploaded={() => { load(); onUpdate?.() }}
+            />
 
             {/* Disassociate confirm */}
             <ConfirmDeleteDialog
