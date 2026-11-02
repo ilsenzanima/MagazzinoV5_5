@@ -258,7 +258,8 @@ export default function EditLoadNotePage() {
                     inventoryId: l.itemId,
                     quantity: parseFloat(l.quantity),
                     pieces: parseFloat(l.pieces) || parseFloat(l.quantity),
-                    coefficient: l.coefficient
+                    coefficient: l.coefficient,
+                    isChecked: l.isChecked
                 }))
             });
 

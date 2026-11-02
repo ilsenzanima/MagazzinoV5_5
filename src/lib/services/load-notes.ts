@@ -12,6 +12,7 @@ export interface LoadNoteInput {
         pieces?: number;
         quantity: number;
         coefficient?: number;
+        isChecked?: boolean;
     }[];
 }
 
@@ -43,65 +44,68 @@ export const loadNotesService = {
             throw error;
         }
 
-        // Now fetch items for each note
-        const notesWithItems = await Promise.all(
-            (notes || []).map(async (note) => {
-                const { data: items, error: itemsError } = await supabase
-                    .from('load_note_items')
-                    .select(`
-                        id,
-                        inventory_id,
-                        pieces,
-                        quantity,
-                        coefficient,
-                        is_checked,
-                        inventory:inventory_id (
-                            code,
-                            name,
-                            unit,
-                            brand,
-                            model,
-                            coefficient
-                        )
-                    `)
-                    .eq('load_note_id', note.id);
+        // Le righe di tutte le note in una sola richiesta (prima ce n'era una per nota)
+        const ids = (notes || []).map(n => n.id);
+        const itemsByNote = new Map<string, any[]>();
+        if (ids.length > 0) {
+            const { data: allItems, error: itemsError } = await supabase
+                .from('load_note_items')
+                .select(`
+                    id,
+                    load_note_id,
+                    inventory_id,
+                    pieces,
+                    quantity,
+                    coefficient,
+                    is_checked,
+                    inventory:inventory_id (
+                        code,
+                        name,
+                        unit,
+                        brand,
+                        model,
+                        coefficient
+                    )
+                `)
+                .in('load_note_id', ids);
+            if (itemsError) console.error('Error fetching items for notes', itemsError);
+            (allItems || []).forEach((it: any) => {
+                const list = itemsByNote.get(it.load_note_id) || [];
+                list.push(it);
+                itemsByNote.set(it.load_note_id, list);
+            });
+        }
 
-                if (itemsError) {
-                    console.error('Error fetching items for note', note.id, itemsError);
-                }
+        return (notes || []).map(note => {
+            const mappedItems: LoadNoteItem[] = (itemsByNote.get(note.id) || []).map((item: any) => ({
+                id: item.id,
+                inventoryId: item.inventory_id,
+                inventoryCode: item.inventory?.code || '',
+                inventoryName: item.inventory?.name || '',
+                inventoryUnit: item.inventory?.unit || '',
+                inventoryBrand: item.inventory?.brand || '',
+                inventoryModel: item.inventory?.model || '',
+                pieces: item.pieces,
+                quantity: item.quantity,
+                coefficient: item.coefficient || item.inventory?.coefficient || 1,
+                isChecked: item.is_checked
+            }));
 
-                const mappedItems: LoadNoteItem[] = (items || []).map((item: any) => ({
-                    id: item.id,
-                    inventoryId: item.inventory_id,
-                    inventoryCode: item.inventory?.code || '',
-                    inventoryName: item.inventory?.name || '',
-                    inventoryUnit: item.inventory?.unit || '',
-                    inventoryBrand: item.inventory?.brand || '',
-                    inventoryModel: item.inventory?.model || '',
-                    pieces: item.pieces,
-                    quantity: item.quantity,
-                    coefficient: item.coefficient || item.inventory?.coefficient || 1,
-                    isChecked: item.is_checked
-                }));
-
-                return {
-                    id: note.id,
-                    date: note.date,
-                    noteType: note.note_type,
-                    jobId: note.job_id,
-                    jobCode: note.job_code,
-                    jobDescription: note.job_description,
-                    notes: note.notes,
-                    status: note.status,
-                    items: mappedItems,
-                    createdBy: note.created_by,
-                    createdByName: note.created_by_name,
-                    createdAt: note.created_at
-                } as LoadNote;
-            })
-        );
-
-        return notesWithItems;
+            return {
+                id: note.id,
+                date: note.date,
+                noteType: note.note_type,
+                jobId: note.job_id,
+                jobCode: note.job_code,
+                jobDescription: note.job_description,
+                notes: note.notes,
+                status: note.status,
+                items: mappedItems,
+                createdBy: note.created_by,
+                createdByName: note.created_by_name,
+                createdAt: note.created_at
+            } as LoadNote;
+        });
     },
 
     getById: async (id: string): Promise<LoadNote | null> => {
@@ -201,7 +205,8 @@ export const loadNotesService = {
                 inventory_id: item.inventoryId,
                 pieces: item.pieces || null,
                 quantity: item.quantity,
-                coefficient: item.coefficient || 1
+                coefficient: item.coefficient || 1,
+                is_checked: item.isChecked ?? false
             }));
 
             const { error: itemsError } = await supabase
@@ -250,7 +255,9 @@ export const loadNotesService = {
                     inventory_id: item.inventoryId,
                     pieces: item.pieces || null,
                     quantity: item.quantity,
-                    coefficient: item.coefficient || 1
+                    coefficient: item.coefficient || 1,
+                    // Le spunte già fatte non si azzerano modificando la nota
+                    is_checked: item.isChecked ?? false
                 }));
 
                 const { error: itemsError } = await supabase

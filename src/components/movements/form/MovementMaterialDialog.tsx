@@ -220,7 +220,8 @@ export function MovementMaterialDialog({
             // Auto-check the item in the note
             const parentNote = notes.find((n) => n.items.some((i) => i.id === noteItem.id));
             if (parentNote) {
-                toggleCheck(parentNote.id, noteItem.id);
+                // Forza la spunta (false = «non ancora spuntata»): usarla due volte non deve toglierla
+                toggleCheck(parentNote.id, noteItem.id, false);
             }
 
             if (isEntryWithJob) {
