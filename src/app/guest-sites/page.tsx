@@ -257,10 +257,10 @@ function GuestSitesContent() {
 
     const rowActions = (site: GuestSite) => (
         <div className="flex justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-7 w-7" title="Copia il link del portale" aria-label="Copia il link del portale" onClick={() => copy(portalUrl(site.id), "Link copiato negli appunti")}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 md:size-7" title="Copia il link del portale" aria-label="Copia il link del portale" onClick={() => copy(portalUrl(site.id), "Link copiato negli appunti")}>
                 <LinkIcon className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" title="Apri il portale" aria-label="Apri il portale" onClick={() => window.open(portalUrl(site.id), "_blank", "noopener,noreferrer")}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 md:size-7" title="Apri il portale" aria-label="Apri il portale" onClick={() => window.open(portalUrl(site.id), "_blank", "noopener,noreferrer")}>
                 <ExternalLink className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7 md:size-7 text-slate-400 hover:bg-destructive/10 hover:text-destructive" title="Elimina" aria-label="Elimina" onClick={() => setDeleteSite(site)}>
