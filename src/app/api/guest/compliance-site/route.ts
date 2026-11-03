@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
                 return {
                     id: doc.id,
                     name: doc.name,
-                    notes: doc.notes,
+                    notes: null,
                     fileUrl: signedUrl,
                     rawFileId: doc.file_url && !doc.file_url.includes("/") ? doc.file_url : null,
                     fileType: doc.file_type,
@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
                 return {
                     id: assocDoc.id,
                     name: assocDoc.custom_name || doc.name,
-                    notes: assocDoc.custom_notes || doc.notes,
+                    notes: null,
                     fileUrl: signedUrl,
                     rawFileId: doc.file_url && !doc.file_url.includes("/") ? doc.file_url : null,
                     fileType: fileExt,
@@ -374,7 +374,7 @@ export async function POST(req: NextRequest) {
                     return {
                         id: doc.id,
                         name: doc.name,
-                        notes: doc.notes ? `DDT Fornitore: ${ddtNumber}. Note: ${doc.notes}` : `DDT Fornitore: ${ddtNumber}`,
+                        notes: `DDT Fornitore: ${ddtNumber}`,
                         fileUrl: signedUrl,
                         rawFileId: doc.file_url && !doc.file_url.includes("/") ? doc.file_url : null,
                         fileType: fileExt,
