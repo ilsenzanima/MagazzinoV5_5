@@ -340,7 +340,7 @@ function RowActions({
     return (
         <div className="flex items-center justify-end gap-0.5">
             {doc.purchaseId && (
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
+                <Button variant="ghost" size="icon" className="h-7 w-7 md:size-7 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
                     <a href={`/purchases/${doc.purchaseId}`} target="_blank" rel="noopener noreferrer" aria-label="Vai all'acquisto" onClick={(e) => e.stopPropagation()}>
                         <Receipt className="h-3.5 w-3.5" />
                     </a>
