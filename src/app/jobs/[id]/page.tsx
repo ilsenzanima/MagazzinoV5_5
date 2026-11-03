@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Printer, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2 } from "lucide-react";
+import { ArrowLeft, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -104,6 +104,7 @@ export default function JobDetailsPage() {
         }
     };
 
+    // Scheda PDF della commessa: pulsante tolto dalla pagina finché il contenuto non è rivisto
     const handlePrint = async () => {
         if (!job) return;
 
@@ -548,10 +549,6 @@ export default function JobDetailsPage() {
                                         <span className="hidden sm:inline">Scarica documentazione</span>
                                     </>
                                 )}
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={handlePrint} className="px-2 md:px-4">
-                                <Printer className="h-4 w-4 md:mr-2" />
-                                <span className="hidden sm:inline">Stampa</span>
                             </Button>
                         </div>
                     )}
