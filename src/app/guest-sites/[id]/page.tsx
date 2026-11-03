@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "react-qr-code";
-import { guestSitesApi } from "@/lib/services/guest-sites";
+import { guestSitesApi, MIN_PASSCODE_LENGTH } from "@/lib/services/guest-sites";
 import { jobsApi } from "@/lib/api";
 import { GuestSite, GuestSiteJob, Job } from "@/lib/types";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
@@ -97,13 +97,15 @@ function GuestSiteDetailContent() {
     const qrWithPasscodeRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (userRole && userRole !== "admin" && userRole !== "operativo") {
+        if (!userRole) return;
+        if (userRole !== "admin" && userRole !== "operativo") {
             router.replace("/dashboard");
             return;
         }
         if (id) {
             loadData();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, userRole]);
 
     const loadData = async () => {
@@ -153,13 +155,17 @@ function GuestSiteDetailContent() {
             toast.error("Compila tutti i campi obbligatori");
             return;
         }
+        if (passcode.length < MIN_PASSCODE_LENGTH) {
+            toast.error(`Il codice di accesso deve avere almeno ${MIN_PASSCODE_LENGTH} caratteri`);
+            return;
+        }
 
         try {
             setSavingDetails(true);
             const updated = await guestSitesApi.update(site.id, {
                 name,
                 address,
-                passcode: passcode || undefined,
+                passcode,
             });
             setSite(updated);
             setSiteName(updated.name);
@@ -285,10 +291,11 @@ function GuestSiteDetailContent() {
 
     const handleCopyLink = () => {
         if (!site) return;
-        navigator.clipboard.writeText(getPortalUrl(site.id));
-        setCopiedLink(true);
-        toast.success("Link copiato negli appunti");
-        setTimeout(() => setCopiedLink(false), 2000);
+        navigator.clipboard.writeText(getPortalUrl(site.id)).then(() => {
+            setCopiedLink(true);
+            toast.success("Link copiato negli appunti");
+            setTimeout(() => setCopiedLink(false), 2000);
+        }, () => toast.error("Copia non riuscita"));
     };
 
     const handleCopyInvite = () => {
@@ -302,10 +309,11 @@ Codice di accesso (Passcode): ${site.passcode}
 
 Note: Questo link consente di visualizzare in sola lettura i certificati di conformità e i DDT di cantiere relativi alle lavorazioni.`;
 
-        navigator.clipboard.writeText(inviteText);
-        setCopiedInvite(true);
-        toast.success("Testo invito copiato");
-        setTimeout(() => setCopiedInvite(false), 2000);
+        navigator.clipboard.writeText(inviteText).then(() => {
+            setCopiedInvite(true);
+            toast.success("Testo invito copiato");
+            setTimeout(() => setCopiedInvite(false), 2000);
+        }, () => toast.error("Copia non riuscita"));
     };
 
     const filteredAvailableJobs = allJobs.filter(j =>
@@ -598,7 +606,7 @@ Note: Questo link consente di visualizzare in sola lettura i certificati di conf
                                         onChange={(e) => setJobSearch(e.target.value)}
                                     />
                                 </div>
-                                <div className="border rounded-md max-h-[150px] overflow-y-auto mt-2 divide-y text-xs">
+                                <div className="border rounded-md max-h-64 overflow-y-auto mt-2 divide-y text-xs">
                                     {loadingJobs ? (
                                         <div className="p-4 flex justify-center">
                                             <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
@@ -705,7 +713,7 @@ Note: Questo link consente di visualizzare in sola lettura i certificati di conf
                 onOpenChange={setDeleteOpen}
                 onConfirm={handleDeleteSite}
                 title="Elimina portale cantiere ospite"
-                description={`Sei sicuro di voler eliminare permanentemente questo portale cantiere ospiti? L'accesso per gli ospiti tramite link e QR code verrà disattivato immediatamente.`}
+                description={`Il portale "${site.name}" smetterà di funzionare subito: link, QR code e codice di accesso non daranno più accesso. I documenti e le commesse non vengono toccati.`}
                 loading={deletingSite}
             />
         </div>

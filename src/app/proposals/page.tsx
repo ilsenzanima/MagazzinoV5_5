@@ -18,13 +18,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DuplicateProposalsNotice } from "@/components/proposals/DuplicateProposalsNotice";
+import { NewClientDialog } from "@/components/clients/NewClientDialog";
+import { parseSiteAddress } from "@/lib/utils/site-address";
 import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, MapPin, FileText, Plus, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals";
-import { clientsApi } from "@/lib/api";
+import { clientsApi, jobsApi, Job } from "@/lib/api";
 import { Client } from "@/lib/types";
 import { notify } from "@/lib/notify";
 import { useAuth } from "@/components/auth-provider";
@@ -52,11 +55,6 @@ const EMPTY_PROPOSAL_FORM = {
   title: "", description: "", estimatedValue: "",
   status: "draft" as ProposalStatus, date: "", notes: "",
   siteStreet: "", siteStreetNumber: "", sitePostalCode: "", siteCity: "", siteProvince: "",
-};
-
-const EMPTY_QUICK_CLIENT_FORM = {
-  name: "", street: "", streetNumber: "", postalCode: "", city: "", province: "",
-  vatNumber: "", email: "", phone: "",
 };
 
 const proposalYear = (p: ClientProposal) => new Date(p.date || p.createdAt).getFullYear();
@@ -121,11 +119,11 @@ function ProposalsPageContent() {
   const [proposalForm, setProposalForm] = useState(EMPTY_PROPOSAL_FORM);
   const [useClientAddr, setUseClientAddr] = useState(false);
   const [savingProposal, setSavingProposal] = useState(false);
+  const [sourceJobId, setSourceJobId] = useState("");
+  const [jobs, setJobs] = useState<Job[]>([]);
 
   // Nuovo committente rapido (dal modale nuova proposta)
   const [quickClientOpen, setQuickClientOpen] = useState(false);
-  const [quickClientForm, setQuickClientForm] = useState(EMPTY_QUICK_CLIENT_FORM);
-  const [savingQuickClient, setSavingQuickClient] = useState(false);
 
   const canEdit = userRole === "admin" || userRole === "operativo";
 
@@ -156,8 +154,9 @@ function ProposalsPageContent() {
   const load = async () => {
     try {
       setLoading(true);
-      const [props, cls] = await Promise.all([clientProposalsApi.getAll(), clientsApi.getAll()]);
+      const [props, cls, allJobs] = await Promise.all([clientProposalsApi.getAll(), clientsApi.getAll(), jobsApi.getAll()]);
       setProposals(props);
+      setJobs(allJobs);
       setClients(cls.sort((a, b) => a.name.localeCompare(b.name, "it")));
     } catch {
       notify.error("Errore caricamento offerte");
@@ -169,7 +168,28 @@ function ProposalsPageContent() {
   const openNewProposal = () => {
     setProposalForm(EMPTY_PROPOSAL_FORM);
     setUseClientAddr(false);
+    setSourceJobId("");
     setNewProposalOpen(true);
+  };
+
+  // Parte da una commessa esistente (stesso cliente/cantiere): copia committente, nome, descrizione e indirizzo
+  const applySourceJob = (id: string) => {
+    setSourceJobId(id);
+    const src = jobs.find(j => j.id === id);
+    if (!src) return;
+    setUseClientAddr(false);
+    const addr = parseSiteAddress(src.siteAddress);
+    setProposalForm({
+      ...EMPTY_PROPOSAL_FORM,
+      clientId: src.clientId,
+      title: src.name,
+      description: src.description || "",
+      siteStreet: addr.street,
+      siteStreetNumber: addr.streetNumber,
+      sitePostalCode: addr.postalCode,
+      siteCity: addr.city,
+      siteProvince: addr.province,
+    });
   };
 
   const handleNewProposal = async () => {
@@ -197,28 +217,9 @@ function ProposalsPageContent() {
     finally { setSavingProposal(false); }
   };
 
-  const handleQuickClient = async () => {
-    if (!quickClientForm.name.trim()) { notify.warning("Il nome del committente è obbligatorio"); return; }
-    try {
-      setSavingQuickClient(true);
-      const created = await clientsApi.create({
-        name: quickClientForm.name.trim(),
-        street: quickClientForm.street,
-        streetNumber: quickClientForm.streetNumber,
-        postalCode: quickClientForm.postalCode,
-        city: quickClientForm.city,
-        province: quickClientForm.province,
-        vatNumber: quickClientForm.vatNumber,
-        email: quickClientForm.email,
-        phone: quickClientForm.phone,
-      });
-      setClients(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "it")));
-      setProposalForm(f => ({ ...f, clientId: created.id }));
-      setQuickClientForm(EMPTY_QUICK_CLIENT_FORM);
-      setQuickClientOpen(false);
-      notify.success("Committente creato");
-    } catch { notify.error("Errore durante la creazione del committente"); }
-    finally { setSavingQuickClient(false); }
+  const handleClientCreated = (created: Client) => {
+    setClients(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "it")));
+    setProposalForm(f => ({ ...f, clientId: created.id }));
   };
 
   const clientNames = useMemo(() => {
@@ -470,78 +471,111 @@ function ProposalsPageContent() {
 
       {/* Nuova proposta dialog */}
       <Dialog open={newProposalOpen} onOpenChange={setNewProposalOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nuova Offerta</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1">
-              <Label>Committente *</Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <SearchableSelect
-                    options={clients.map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                      description: c.address || undefined
-                    }))}
-                    value={proposalForm.clientId}
-                    onValueChange={v => setProposalForm({ ...proposalForm, clientId: v })}
-                    placeholder="Cerca committente..."
-                    searchPlaceholder="Digita per cercare..."
-                    emptyMessage="Nessun committente trovato."
-                  />
+          <div className="space-y-5 py-2">
+            <div className="space-y-1 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+              <Label>Parti da una commessa esistente <span className="font-normal text-slate-500">(opzionale)</span></Label>
+              <SearchableSelect
+                options={jobs.map((j) => ({
+                  value: j.id,
+                  label: `${j.code} · ${j.name}`,
+                  description: [j.clientName, j.siteAddress].filter(Boolean).join(" · ") || undefined,
+                }))}
+                value={sourceJobId}
+                onValueChange={applySourceJob}
+                placeholder="Nessuna: offerta del tutto nuova"
+                searchPlaceholder="Cerca per codice, nome o committente..."
+                emptyMessage="Nessuna commessa trovata."
+              />
+              <p className="text-xs text-slate-500">Copia committente, nome, descrizione e indirizzo del cantiere: poi modifichi quello che cambia.</p>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Offerta</h3>
+              <div className="space-y-1">
+                <Label>Committente *</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <SearchableSelect
+                      options={clients.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                        description: c.address || undefined
+                      }))}
+                      value={proposalForm.clientId}
+                      onValueChange={v => setProposalForm({ ...proposalForm, clientId: v })}
+                      placeholder="Cerca committente..."
+                      searchPlaceholder="Digita per cercare..."
+                      emptyMessage="Nessun committente trovato."
+                    />
+                  </div>
+                  <Button type="button" variant="outline" size="icon" onClick={() => setQuickClientOpen(true)} title="Nuovo committente">
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button type="button" variant="outline" size="icon" onClick={() => setQuickClientOpen(true)} title="Nuovo committente">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Titolo *</Label>
-              <Input value={proposalForm.title} onChange={e => setProposalForm({ ...proposalForm, title: e.target.value })} placeholder="Es. Ristrutturazione appartamento Via Roma" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Stato</Label>
-                <Select value={proposalForm.status} onValueChange={v => setProposalForm({ ...proposalForm, status: v as ProposalStatus })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                </Select>
               </div>
               <div className="space-y-1">
-                <Label>Data</Label>
-                <Input type="date" value={proposalForm.date} onChange={e => setProposalForm({ ...proposalForm, date: e.target.value })} />
+                <Label>Titolo *</Label>
+                <Input value={proposalForm.title} onChange={e => setProposalForm({ ...proposalForm, title: e.target.value })} placeholder="Es. Ristrutturazione appartamento Via Roma" />
+              </div>
+              <DuplicateProposalsNotice
+                title={proposalForm.title}
+                clientId={proposalForm.clientId}
+                siteAddress={[proposalForm.siteStreet, proposalForm.siteStreetNumber, proposalForm.siteCity].filter(Boolean).join(" ")}
+                proposals={proposals}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label>Stato</Label>
+                  <Select value={proposalForm.status} onValueChange={v => setProposalForm({ ...proposalForm, status: v as ProposalStatus })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Data</Label>
+                  <Input type="date" value={proposalForm.date} onChange={e => setProposalForm({ ...proposalForm, date: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Valore stimato (€)</Label>
+                  <Input type="number" value={proposalForm.estimatedValue} onChange={e => setProposalForm({ ...proposalForm, estimatedValue: e.target.value })} placeholder="0.00" />
+                </div>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>Valore Stimato (€)</Label>
-              <Input type="number" value={proposalForm.estimatedValue} onChange={e => setProposalForm({ ...proposalForm, estimatedValue: e.target.value })} placeholder="0.00" />
-            </div>
-            <div className="space-y-1">
-              <Label>Descrizione</Label>
-              <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.description} onChange={e => setProposalForm({ ...proposalForm, description: e.target.value })} />
-            </div>
+
             {/* Indirizzo cantiere */}
-            <div className="space-y-3 border-t pt-3">
-              <div className="flex items-center justify-between">
-                <Label className="font-semibold">Indirizzo Cantiere</Label>
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Indirizzo cantiere</h3>
                 <div className="flex items-center gap-2">
                   <Checkbox id="useClientAddrNew" checked={useClientAddr} onCheckedChange={v => setUseClientAddr(v as boolean)} disabled={!proposalForm.clientId} />
                   <label htmlFor="useClientAddrNew" className="text-xs cursor-pointer text-slate-600">Usa indirizzo committente</label>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                <div className="col-span-3 space-y-1"><Label className="text-xs">Via / Piazza</Label><Input value={proposalForm.siteStreet} onChange={e => setProposalForm({ ...proposalForm, siteStreet: e.target.value })} placeholder="Via Roma" /></div>
-                <div className="col-span-1 space-y-1"><Label className="text-xs">N. Civico</Label><Input value={proposalForm.siteStreetNumber} onChange={e => setProposalForm({ ...proposalForm, siteStreetNumber: e.target.value })} placeholder="1" /></div>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="col-span-3 space-y-1"><Label>Via / Piazza</Label><Input value={proposalForm.siteStreet} onChange={e => setProposalForm({ ...proposalForm, siteStreet: e.target.value })} placeholder="Via Roma" /></div>
+                <div className="col-span-1 space-y-1"><Label>N. civico</Label><Input value={proposalForm.siteStreetNumber} onChange={e => setProposalForm({ ...proposalForm, siteStreetNumber: e.target.value })} placeholder="1" /></div>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                <div className="col-span-1 space-y-1"><Label className="text-xs">CAP</Label><Input value={proposalForm.sitePostalCode} onChange={e => setProposalForm({ ...proposalForm, sitePostalCode: e.target.value })} placeholder="00100" /></div>
-                <div className="col-span-2 space-y-1"><Label className="text-xs">Città</Label><Input value={proposalForm.siteCity} onChange={e => setProposalForm({ ...proposalForm, siteCity: e.target.value })} placeholder="Milano" /></div>
-                <div className="col-span-1 space-y-1"><Label className="text-xs">Prov.</Label><Input value={proposalForm.siteProvince} onChange={e => setProposalForm({ ...proposalForm, siteProvince: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" /></div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1"><Label>CAP</Label><Input value={proposalForm.sitePostalCode} onChange={e => setProposalForm({ ...proposalForm, sitePostalCode: e.target.value })} placeholder="00100" /></div>
+                <div className="md:col-span-2 space-y-1"><Label>Città</Label><Input value={proposalForm.siteCity} onChange={e => setProposalForm({ ...proposalForm, siteCity: e.target.value })} placeholder="Milano" /></div>
+                <div className="space-y-1"><Label>Provincia</Label><Input value={proposalForm.siteProvince} onChange={e => setProposalForm({ ...proposalForm, siteProvince: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" /></div>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>Note</Label>
-              <textarea className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.notes} onChange={e => setProposalForm({ ...proposalForm, notes: e.target.value })} />
+
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dettagli</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Descrizione</Label>
+                  <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.description} onChange={e => setProposalForm({ ...proposalForm, description: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Note</Label>
+                  <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.notes} onChange={e => setProposalForm({ ...proposalForm, notes: e.target.value })} />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -553,65 +587,7 @@ function ProposalsPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Nuovo committente rapido */}
-      <Dialog open={quickClientOpen} onOpenChange={setQuickClientOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nuovo Committente</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1">
-              <Label>Ragione Sociale / Nome *</Label>
-              <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Inserisci il nome dell'azienda o del cliente" />
-            </div>
-            <div className="space-y-4 border-t border-b py-4 border-slate-100">
-              <h3 className="font-medium text-slate-900 dark:text-white text-sm">Indirizzo Sede</h3>
-              <div className="grid grid-cols-4 gap-4">
-                <div className="col-span-3 space-y-1">
-                  <Label>Via / Piazza</Label>
-                  <Input value={quickClientForm.street} onChange={e => setQuickClientForm({ ...quickClientForm, street: e.target.value })} placeholder="Via Roma" />
-                </div>
-                <div className="col-span-1 space-y-1">
-                  <Label>N. Civico</Label>
-                  <Input value={quickClientForm.streetNumber} onChange={e => setQuickClientForm({ ...quickClientForm, streetNumber: e.target.value })} placeholder="10" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="md:col-span-1 space-y-1">
-                  <Label>CAP</Label>
-                  <Input value={quickClientForm.postalCode} onChange={e => setQuickClientForm({ ...quickClientForm, postalCode: e.target.value })} placeholder="00100" />
-                </div>
-                <div className="md:col-span-2 space-y-1">
-                  <Label>Città</Label>
-                  <Input value={quickClientForm.city} onChange={e => setQuickClientForm({ ...quickClientForm, city: e.target.value })} placeholder="Milano" />
-                </div>
-                <div className="md:col-span-1 space-y-1">
-                  <Label>Provincia</Label>
-                  <Input value={quickClientForm.province} onChange={e => setQuickClientForm({ ...quickClientForm, province: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" />
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Partita IVA / Codice Fiscale</Label>
-                <Input value={quickClientForm.vatNumber} onChange={e => setQuickClientForm({ ...quickClientForm, vatNumber: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <Label>Telefono</Label>
-                <Input type="tel" value={quickClientForm.phone} onChange={e => setQuickClientForm({ ...quickClientForm, phone: e.target.value })} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setQuickClientOpen(false)}>Annulla</Button>
-            <Button onClick={handleQuickClient} disabled={savingQuickClient} className="bg-blue-600 hover:bg-blue-700">
-              {savingQuickClient && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Crea Committente
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewClientDialog open={quickClientOpen} onOpenChange={setQuickClientOpen} onCreated={handleClientCreated} />
     </DashboardLayout>
   );
 }

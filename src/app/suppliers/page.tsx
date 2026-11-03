@@ -12,6 +12,7 @@ import { SupplierOverview, suppliersApi } from "@/lib/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { ListPageHeader } from "@/components/ui/list-page-header";
+import { NewSupplierDialog } from "@/components/suppliers/NewSupplierDialog";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { formatCurrency } from "@/lib/utils/format";
@@ -57,6 +58,10 @@ function SuppliersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const canView = userRole === 'admin' || userRole === 'operativo';
+  // Si apre anche dal vecchio indirizzo /suppliers/new (rimandato qui con ?nuovo=1)
+  const [newOpen, setNewOpen] = useState(false);
+  // il ruolo arriva dopo il primo disegno: si apre appena è noto
+  useEffect(() => { if (searchParams.get('nuovo') === '1' && canView) setNewOpen(true); }, [searchParams, canView]);
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -170,12 +175,10 @@ function SuppliersPageContent() {
       <ListPageHeader
         title="Gestione Fornitori"
         actions={
-          <Link href="/suppliers/new" className="w-full sm:w-auto md:hidden">
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuovo Fornitore
-            </Button>
-          </Link>
+          <Button className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto md:hidden" onClick={() => setNewOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuovo Fornitore
+          </Button>
         }
         search={{ id: "suppliers-search", label: "Cerca fornitore", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca Fornitore (Nome, P.IVA, Email, Telefono, Indirizzo...)" }}
         searchActions={anyFilterActive && (
@@ -320,7 +323,8 @@ function SuppliersPageContent() {
       )}
 
       {/* Pulsante «nuovo fornitore» sempre visibile (PC) */}
-      <FloatingAddButton href="/suppliers/new" label="Nuovo fornitore" />
+      <FloatingAddButton onClick={() => setNewOpen(true)} label="Nuovo fornitore" />
+      <NewSupplierDialog open={newOpen} onOpenChange={setNewOpen} onCreated={(sup) => router.push(`/suppliers/${sup.id}`)} />
     </DashboardLayout>
   );
 }

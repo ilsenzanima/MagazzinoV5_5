@@ -10,20 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ArrowLeft, Loader2, Save, RefreshCw, Plus } from "lucide-react";
 import Link from "next/link";
-import { jobsApi, clientsApi, Client } from "@/lib/api";
+import { jobsApi, clientsApi, Client, Job } from "@/lib/api";
 import { JobCategory } from "@/lib/types";
 import { JobCategorySelector } from "@/components/jobs/JobCategorySelector";
+import { DuplicateJobsNotice } from "@/components/jobs/DuplicateJobsNotice";
+import { NewClientDialog } from "@/components/clients/NewClientDialog";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { BlockBrowserBack } from "@/components/BlockBrowserBack";
-
-const EMPTY_QUICK_CLIENT_FORM = {
-  name: "", street: "", streetNumber: "", postalCode: "", city: "", province: "",
-  vatNumber: "", email: "", phone: "",
-};
 
 export default function NewJobPage() {
   return (
@@ -36,7 +32,13 @@ export default function NewJobPage() {
 function NewJobForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const cloneId = searchParams.get("clone");
+  // Commessa da cui si parte ("Nuovo inizio"): dall'indirizzo (?clone=) oppure scelta nel modulo
+  const [cloneId, setCloneId] = useState<string | null>(searchParams.get("clone"));
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+  // Indirizzo cantiere copiato dalla commessa di partenza (testo unico, modificabile)
+  const [inheritedAddress, setInheritedAddress] = useState<string | null>(null);
+  // Commesse dello stesso cantiere di quella di partenza: non vanno segnalate come doppioni
+  const [chainIds, setChainIds] = useState<string[]>([]);
   const { userRole } = useAuth();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -83,8 +85,6 @@ function NewJobForm() {
 
   // Nuovo committente rapido
   const [quickClientOpen, setQuickClientOpen] = useState(false);
-  const [quickClientForm, setQuickClientForm] = useState(EMPTY_QUICK_CLIENT_FORM);
-  const [savingQuickClient, setSavingQuickClient] = useState(false);
 
   useEffect(() => {
     const loadClients = async () => {
@@ -97,11 +97,17 @@ function NewJobForm() {
       }
     };
     loadClients();
+    jobsApi.getAll().then(setAllJobs).catch(console.error);
   }, []);
 
   // Se viene da "Nuovo inizio cantiere", pre-compila con i dati della commessa originale
   useEffect(() => {
-    if (!cloneId) return;
+    if (!cloneId) { setChainIds([]); return; }
+    jobsApi.getChain(cloneId).then(c => setChainIds(c.map(x => x.id))).catch(() => setChainIds([cloneId]));
+  }, [cloneId]);
+
+  useEffect(() => {
+    if (!cloneId) { setInheritedAddress(null); return; }
     const loadCloneData = async () => {
       try {
         const [job, allClients] = await Promise.all([
@@ -110,6 +116,7 @@ function NewJobForm() {
         ]);
         if (!job) return;
         setClients(allClients);
+        setInheritedAddress(job.siteAddress?.trim() || null);
         const client = allClients.find(c => c.id === job.clientId);
         const code = client ? generateCode(client.name) : "";
         setFormData(prev => ({
@@ -171,28 +178,9 @@ function NewJobForm() {
     }));
   };
 
-  const handleQuickClient = async () => {
-    if (!quickClientForm.name.trim()) { notify.warning("Il nome del committente è obbligatorio"); return; }
-    try {
-      setSavingQuickClient(true);
-      const created = await clientsApi.create({
-        name: quickClientForm.name.trim(),
-        street: quickClientForm.street,
-        streetNumber: quickClientForm.streetNumber,
-        postalCode: quickClientForm.postalCode,
-        city: quickClientForm.city,
-        province: quickClientForm.province,
-        vatNumber: quickClientForm.vatNumber,
-        email: quickClientForm.email,
-        phone: quickClientForm.phone,
-      });
-      setClients(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "it")));
-      handleClientChange(created.id);
-      setQuickClientForm(EMPTY_QUICK_CLIENT_FORM);
-      setQuickClientOpen(false);
-      notify.success("Committente creato");
-    } catch { notify.error("Errore durante la creazione del committente"); }
-    finally { setSavingQuickClient(false); }
+  const handleClientCreated = (created: Client) => {
+    setClients(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "it")));
+    handleClientChange(created.id);
   };
 
   const regenerateCode = () => {
@@ -211,7 +199,7 @@ function NewJobForm() {
 
     try {
       setLoading(true);
-      const siteAddressParts = [
+      const siteAddressParts = inheritedAddress !== null ? [inheritedAddress.trim()].filter(Boolean) : [
         siteFields.street && `${siteFields.street}${siteFields.streetNumber ? " " + siteFields.streetNumber : ""}`,
         (siteFields.postalCode || siteFields.city) && `${siteFields.postalCode} ${siteFields.city}`.trim(),
         siteFields.province && `(${siteFields.province.toUpperCase()})`,
@@ -219,6 +207,7 @@ function NewJobForm() {
       const created = await jobsApi.create({
         ...formData,
         siteAddress: siteAddressParts.join(", "),
+        originJobId: cloneId,
       });
       router.push(`/jobs/${created.id}`);
       router.refresh();
@@ -233,7 +222,7 @@ function NewJobForm() {
   return (
     <DashboardLayout>
       <BlockBrowserBack />
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="mb-6">
           <Link href="/jobs" className="flex items-center text-slate-500 hover:text-slate-900 mb-2">
             <ArrowLeft className="h-4 w-4 mr-1" />
@@ -249,26 +238,55 @@ function NewJobForm() {
           )}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Dettagli Commessa & Cantiere</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
 
-              {/* Sezione Tipologia */}
-              <div className="space-y-4 border-b pb-4">
-                <JobCategorySelector
-                  value={formData.category}
-                  onChange={(category) => setFormData({ ...formData, category })}
-                />
+          {/* Nuovo inizio: parti da una commessa esistente */}
+          <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+            <Label>Parti da una commessa esistente <span className="font-normal text-slate-500">(nuovo inizio dello stesso cantiere, opzionale)</span></Label>
+            <SearchableSelect
+              options={allJobs.map((j) => ({
+                value: j.id,
+                label: `${j.code} · ${j.name}`,
+                description: [j.clientName, j.startDate ? new Date(j.startDate).toLocaleDateString("it-IT") : ""].filter(Boolean).join(" · ") || undefined,
+              }))}
+              value={cloneId || ""}
+              onValueChange={(v) => setCloneId(v || null)}
+              placeholder="Nessuna: commessa del tutto nuova"
+              searchPlaceholder="Cerca per codice, nome o committente..."
+              emptyMessage="Nessuna commessa trovata."
+            />
+            {cloneId ? (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Committente, nome, descrizione, referente, tipologia e indirizzo vengono copiati. Le due commesse risulteranno collegate (stesso cantiere).
+                </p>
+                <Button type="button" variant="ghost" size="sm" className="shrink-0 text-xs" onClick={() => setCloneId(null)}>Togli</Button>
               </div>
+            ) : (
+              <p className="text-xs text-slate-500">Se il cantiere è già stato lavorato, partire da una commessa precedente evita di reinserire i dati e le tiene collegate.</p>
+            )}
+          </div>
 
-              {/* Sezione Committente */}
-              <div className="space-y-4 border-b pb-4">
-                <h3 className="font-semibold text-slate-700">Committente</h3>
+          {/* Tipologia: tre schede affiancate a tutta larghezza */}
+          <Card>
+            <CardContent className="pt-6">
+              <JobCategorySelector
+                value={formData.category}
+                onChange={(category) => setFormData({ ...formData, category })}
+              />
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+            {/* Colonna sinistra: chi e cosa */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Committente e commessa</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="client">Seleziona Committente *</Label>
+                  <Label htmlFor="client">Committente *</Label>
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <SearchableSelect
@@ -289,15 +307,10 @@ function NewJobForm() {
                     </Button>
                   </div>
                 </div>
-              </div>
 
-              {/* Sezione Dati Commessa */}
-              <div className="space-y-4 border-b pb-4">
-                <h3 className="font-semibold text-slate-700">Dati Commessa</h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="code">Codice Commessa (Auto)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="code">Codice (auto)</Label>
                     <div className="flex gap-2">
                       <Input
                         id="code"
@@ -309,11 +322,10 @@ function NewJobForm() {
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="text-xs text-slate-500">Formato: Anno-Mese-Committente</p>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome Commessa *</Label>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="name">Nome commessa *</Label>
                     <Input
                       id="name"
                       required
@@ -324,8 +336,17 @@ function NewJobForm() {
                   </div>
                 </div>
 
+                <DuplicateJobsNotice
+                  name={formData.name}
+                  clientId={formData.clientId}
+                  siteAddress={inheritedAddress ?? [siteFields.street, siteFields.streetNumber, siteFields.postalCode, siteFields.city].filter(Boolean).join(" ")}
+                  jobs={allJobs}
+                  excludeIds={chainIds}
+                  onUseAsSource={(id) => { setCloneId(id); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                />
+
                 <div className="space-y-2">
-                  <Label htmlFor="description">Descrizione (Opzionale)</Label>
+                  <Label htmlFor="description">Descrizione (opzionale)</Label>
                   <textarea
                     id="description"
                     className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -334,30 +355,38 @@ function NewJobForm() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="cig">CIG (Codice Identificativo Gara)</Label>
+                    <Label htmlFor="cig">CIG</Label>
                     <Input
                       id="cig"
                       value={formData.cig}
                       onChange={(e) => setFormData({ ...formData, cig: e.target.value })}
-                      placeholder="Es. 1234567890"
+                      placeholder="Codice Identificativo Gara"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cup">CUP (Codice Unico Progetto)</Label>
+                    <Label htmlFor="cup">CUP</Label>
                     <Input
                       id="cup"
                       value={formData.cup}
                       onChange={(e) => setFormData({ ...formData, cup: e.target.value })}
-                      placeholder="Es. A1B2C3D4E5"
+                      placeholder="Codice Unico Progetto"
                     />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Colonna destra: dove e quando */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Cantiere e tempi</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="startDate">Data Inizio</Label>
+                    <Label htmlFor="startDate">Data inizio</Label>
                     <Input
                       id="startDate"
                       type="date"
@@ -366,7 +395,7 @@ function NewJobForm() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="endDate">Data Fine (Prevista)</Label>
+                    <Label htmlFor="endDate">Fine (prevista)</Label>
                     <Input
                       id="endDate"
                       type="date"
@@ -374,187 +403,138 @@ function NewJobForm() {
                       onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status">Stato</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(val: any) => setFormData({ ...formData, status: val })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Attiva</SelectItem>
-                      <SelectItem value="completed">Completata</SelectItem>
-                      <SelectItem value="suspended">Sospesa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <h3 className="font-semibold text-slate-700 dark:text-slate-200">Indirizzo Cantiere</h3>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="useClientAddress"
-                      checked={useClientAddress}
-                      onCheckedChange={(checked) => setUseClientAddress(checked as boolean)}
-                    />
-                    <Label htmlFor="useClientAddress" className="text-sm font-normal cursor-pointer">
-                      Usa indirizzo committente
-                    </Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Stato</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(val: any) => setFormData({ ...formData, status: val })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Attiva</SelectItem>
+                        <SelectItem value="completed">Completata</SelectItem>
+                        <SelectItem value="suspended">Sospesa</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="col-span-3 space-y-2">
-                    <Label htmlFor="siteStreet">Via / Piazza</Label>
-                    <Input
-                      id="siteStreet"
-                      value={siteFields.street}
-                      onChange={(e) => setSiteFields({ ...siteFields, street: e.target.value })}
-                      placeholder="Via Roma"
-                    />
+                <div className="border-t pt-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Indirizzo cantiere</h3>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="useClientAddress"
+                        checked={useClientAddress}
+                        onCheckedChange={(checked) => { setUseClientAddress(checked as boolean); if (checked) setInheritedAddress(null); }}
+                      />
+                      <Label htmlFor="useClientAddress" className="text-sm font-normal cursor-pointer">
+                        Usa indirizzo committente
+                      </Label>
+                    </div>
                   </div>
-                  <div className="col-span-1 space-y-2">
-                    <Label htmlFor="siteStreetNumber">N. Civico</Label>
-                    <Input
-                      id="siteStreetNumber"
-                      value={siteFields.streetNumber}
-                      onChange={(e) => setSiteFields({ ...siteFields, streetNumber: e.target.value })}
-                      placeholder="1"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="md:col-span-1 space-y-2">
-                    <Label htmlFor="sitePostalCode">CAP</Label>
-                    <Input
-                      id="sitePostalCode"
-                      value={siteFields.postalCode}
-                      onChange={(e) => setSiteFields({ ...siteFields, postalCode: e.target.value })}
-                      placeholder="00100"
-                    />
-                  </div>
-                  <div className="md:col-span-2 space-y-2">
-                    <Label htmlFor="siteCity">Città</Label>
-                    <Input
-                      id="siteCity"
-                      value={siteFields.city}
-                      onChange={(e) => setSiteFields({ ...siteFields, city: e.target.value })}
-                      placeholder="Milano"
-                    />
-                  </div>
-                  <div className="md:col-span-1 space-y-2">
-                    <Label htmlFor="siteProvince">Provincia</Label>
-                    <Input
-                      id="siteProvince"
-                      value={siteFields.province}
-                      onChange={(e) => setSiteFields({ ...siteFields, province: e.target.value.toUpperCase() })}
-                      placeholder="MI"
-                      maxLength={2}
-                      className="uppercase"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="siteManager">Capocantiere / Referente (Opzionale)</Label>
-                  <Input
-                    id="siteManager"
-                    value={formData.siteManager}
-                    onChange={(e) => setFormData({ ...formData, siteManager: e.target.value })}
-                    placeholder="Nome Cognome"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-6 flex justify-end gap-2 border-t mt-6">
-                <Link href="/jobs">
-                  <Button type="button" variant="outline">Annulla</Button>
-                </Link>
-                <Button type="submit" disabled={loading} className="bg-blue-600">
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Salvataggio...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Salva Commessa
-                    </>
+                  {inheritedAddress !== null && (
+                    <div className="space-y-2">
+                      <Label htmlFor="inheritedAddress">Indirizzo copiato dalla commessa di partenza</Label>
+                      <Input id="inheritedAddress" value={inheritedAddress} onChange={(e) => setInheritedAddress(e.target.value)} />
+                      <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => setInheritedAddress(null)}>
+                        Compila con i campi separati
+                      </button>
+                    </div>
                   )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+
+                  <div className={inheritedAddress !== null ? "hidden" : "grid grid-cols-4 gap-4"}>
+                    <div className="col-span-3 space-y-2">
+                      <Label htmlFor="siteStreet">Via / Piazza</Label>
+                      <Input
+                        id="siteStreet"
+                        value={siteFields.street}
+                        onChange={(e) => setSiteFields({ ...siteFields, street: e.target.value })}
+                        placeholder="Via Roma"
+                      />
+                    </div>
+                    <div className="col-span-1 space-y-2">
+                      <Label htmlFor="siteStreetNumber">N. Civico</Label>
+                      <Input
+                        id="siteStreetNumber"
+                        value={siteFields.streetNumber}
+                        onChange={(e) => setSiteFields({ ...siteFields, streetNumber: e.target.value })}
+                        placeholder="1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className={inheritedAddress !== null ? "hidden" : "grid grid-cols-2 md:grid-cols-4 gap-4"}>
+                    <div className="md:col-span-1 space-y-2">
+                      <Label htmlFor="sitePostalCode">CAP</Label>
+                      <Input
+                        id="sitePostalCode"
+                        value={siteFields.postalCode}
+                        onChange={(e) => setSiteFields({ ...siteFields, postalCode: e.target.value })}
+                        placeholder="00100"
+                      />
+                    </div>
+                    <div className="md:col-span-2 space-y-2">
+                      <Label htmlFor="siteCity">Città</Label>
+                      <Input
+                        id="siteCity"
+                        value={siteFields.city}
+                        onChange={(e) => setSiteFields({ ...siteFields, city: e.target.value })}
+                        placeholder="Milano"
+                      />
+                    </div>
+                    <div className="md:col-span-1 space-y-2">
+                      <Label htmlFor="siteProvince">Provincia</Label>
+                      <Input
+                        id="siteProvince"
+                        value={siteFields.province}
+                        onChange={(e) => setSiteFields({ ...siteFields, province: e.target.value.toUpperCase() })}
+                        placeholder="MI"
+                        maxLength={2}
+                        className="uppercase"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="siteManager">Capocantiere / Referente (opzionale)</Label>
+                    <Input
+                      id="siteManager"
+                      value={formData.siteManager}
+                      onChange={(e) => setFormData({ ...formData, siteManager: e.target.value })}
+                      placeholder="Nome Cognome"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Link href="/jobs">
+              <Button type="button" variant="outline">Annulla</Button>
+            </Link>
+            <Button type="submit" disabled={loading} className="bg-blue-600">
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Salva Commessa
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
       </div>
 
-      {/* Nuovo committente rapido */}
-      <Dialog open={quickClientOpen} onOpenChange={setQuickClientOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nuovo Committente</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1">
-              <Label>Ragione Sociale / Nome *</Label>
-              <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Inserisci il nome dell'azienda o del cliente" />
-            </div>
-            <div className="space-y-4 border-t border-b py-4 border-slate-100">
-              <h3 className="font-medium text-slate-900 dark:text-white text-sm">Indirizzo Sede</h3>
-              <div className="grid grid-cols-4 gap-4">
-                <div className="col-span-3 space-y-1">
-                  <Label>Via / Piazza</Label>
-                  <Input value={quickClientForm.street} onChange={e => setQuickClientForm({ ...quickClientForm, street: e.target.value })} placeholder="Via Roma" />
-                </div>
-                <div className="col-span-1 space-y-1">
-                  <Label>N. Civico</Label>
-                  <Input value={quickClientForm.streetNumber} onChange={e => setQuickClientForm({ ...quickClientForm, streetNumber: e.target.value })} placeholder="10" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="md:col-span-1 space-y-1">
-                  <Label>CAP</Label>
-                  <Input value={quickClientForm.postalCode} onChange={e => setQuickClientForm({ ...quickClientForm, postalCode: e.target.value })} placeholder="00100" />
-                </div>
-                <div className="md:col-span-2 space-y-1">
-                  <Label>Città</Label>
-                  <Input value={quickClientForm.city} onChange={e => setQuickClientForm({ ...quickClientForm, city: e.target.value })} placeholder="Milano" />
-                </div>
-                <div className="md:col-span-1 space-y-1">
-                  <Label>Provincia</Label>
-                  <Input value={quickClientForm.province} onChange={e => setQuickClientForm({ ...quickClientForm, province: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" />
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Partita IVA / Codice Fiscale</Label>
-                <Input value={quickClientForm.vatNumber} onChange={e => setQuickClientForm({ ...quickClientForm, vatNumber: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <Label>Telefono</Label>
-                <Input type="tel" value={quickClientForm.phone} onChange={e => setQuickClientForm({ ...quickClientForm, phone: e.target.value })} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setQuickClientOpen(false)}>Annulla</Button>
-            <Button onClick={handleQuickClient} disabled={savingQuickClient} className="bg-blue-600 hover:bg-blue-700">
-              {savingQuickClient && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Crea Committente
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewClientDialog open={quickClientOpen} onOpenChange={setQuickClientOpen} onCreated={handleClientCreated} />
     </DashboardLayout>
   );
 }

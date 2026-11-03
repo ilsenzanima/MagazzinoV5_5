@@ -81,14 +81,14 @@ function GuestPortalContent({ params }: Props) {
         const savedPasscode = sessionStorage.getItem(`opi_guest_passcode_${siteId}`);
         if (savedPasscode) {
             setPasscode(savedPasscode);
-            verifyAndLoad(savedPasscode);
+            verifyAndLoad(savedPasscode, true);
         } else {
             setCheckingAuth(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [siteId]);
 
-    const verifyAndLoad = async (codeToVerify: string) => {
+    const verifyAndLoad = async (codeToVerify: string, silent = false) => {
         setLoadingData(true);
         try {
             const response = await fetch("/api/guest/compliance-site", {
@@ -110,7 +110,8 @@ function GuestPortalContent({ params }: Props) {
             sessionStorage.setItem(`opi_guest_passcode_${siteId}`, codeToVerify);
         } catch (e: any) {
             console.error(e);
-            toast.error(e.message || "Errore durante la verifica del codice");
+            // Accesso automatico con un codice ricordato (es. cambiato nel frattempo): si torna al form senza messaggi
+            if (!silent) toast.error(e.message || "Errore durante la verifica del codice");
             sessionStorage.removeItem(`opi_guest_passcode_${siteId}`);
             setIsAuthenticated(false);
         } finally {

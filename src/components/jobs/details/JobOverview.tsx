@@ -2,13 +2,14 @@
 
 import { notify } from "@/lib/notify";
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Job, Client, jobsApi, clientsApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Trash2, Pencil, Building2, MapPin, User, FileText, Clock, RefreshCcw } from "lucide-react"
+import { Calendar, Trash2, Pencil, Building2, MapPin, User, FileText, Clock, RefreshCcw, QrCode, Link2 } from "lucide-react"
+import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -28,6 +29,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useAuth } from "@/components/auth-provider"
+import { JobPortalDialog } from "@/components/guest-sites/JobPortalDialog"
+import { JobChainItem } from "@/lib/types"
 import { JobMap } from "./JobMap"
 import { JobWeatherWidget } from "./JobWeatherWidget"
 
@@ -42,6 +45,11 @@ interface JobOverviewProps {
   onJobUpdated?: () => void
 }
 
+const localToday = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: JobOverviewProps) {
   const router = useRouter()
   const { userRole } = useAuth()
@@ -54,6 +62,18 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
   const [updateExistingMovements, setUpdateExistingMovements] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
   const [isLoadingClients, setIsLoadingClients] = useState(false)
+
+  // Stesso cantiere: commesse collegate da "Nuovo inizio"
+  const [chain, setChain] = useState<JobChainItem[]>([])
+  useEffect(() => {
+    let cancelled = false
+    jobsApi.getChain(job.id).then(c => { if (!cancelled) setChain(c) }).catch(console.error)
+    return () => { cancelled = true }
+  }, [job.id])
+
+  // Portale ospiti: dal pulsante, oppure proposto quando la commessa passa a completata
+  const [portalOpen, setPortalOpen] = useState(false)
+  const [portalReason, setPortalReason] = useState<"completed" | "manual">("manual")
 
   const mockBudget = 0
   const percentage = mockBudget > 0 ? Math.min(100, Math.round((totalCost / mockBudget) * 100)) : 0
@@ -89,8 +109,15 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
   const handleSave = async () => {
     try {
       setIsSaving(true)
-      await jobsApi.update(job.id, editForm, updateExistingMovements)
+      const becomesCompleted = job.status !== 'completed' && editForm.status === 'completed'
+      // Completata: la fine cantiere diventa il giorno del cambio di stato (salvo che l'abbia modificata a mano)
+      const payload = becomesCompleted && editForm.endDate === job.endDate ? { ...editForm, endDate: localToday() } : editForm
+      await jobsApi.update(job.id, payload, updateExistingMovements)
       setIsEditOpen(false)
+      if (becomesCompleted && (userRole === 'admin' || userRole === 'operativo')) {
+        setPortalReason("completed")
+        setPortalOpen(true)
+      }
       if (onJobUpdated) {
         onJobUpdated()
       } else {
@@ -142,10 +169,20 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
                   size="sm"
                   onClick={() => router.push(`/jobs/new?clone=${job.id}`)}
                   className="px-2 md:px-4 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950"
-                  title="Nuovo inizio cantiere"
+                  title="Nuovo inizio cantiere: nuova commessa collegata a questa, con gli stessi dati"
                 >
-                  <RefreshCcw className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Nuovo inizio</span>
+                  <RefreshCcw className="h-4 w-4 mr-1.5 md:mr-2" />
+                  <span>Nuovo inizio</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setPortalReason("manual"); setPortalOpen(true) }}
+                  className="px-2 md:px-4"
+                  title="Portale ospiti"
+                >
+                  <QrCode className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Portale ospiti</span>
                 </Button>
               </>
             )}
@@ -174,6 +211,22 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
           )}
         </div>
       </div>
+
+      {/* Stesso cantiere */}
+      {chain.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 text-xs dark:border-blue-900/40 dark:bg-blue-950/20">
+          <span className="flex items-center gap-1.5 font-semibold text-blue-700 dark:text-blue-300">
+            <Link2 className="h-3.5 w-3.5" /> Stesso cantiere: {chain.length} commesse
+          </span>
+          {chain.map(c => c.id === job.id ? (
+            <span key={c.id} className="rounded bg-blue-600 px-2 py-0.5 font-mono font-semibold text-white" title={c.name}>{c.code}</span>
+          ) : (
+            <Link key={c.id} href={`/jobs/${c.id}`} className="rounded border border-blue-200 bg-white px-2 py-0.5 font-mono font-semibold text-blue-700 hover:bg-blue-100 dark:bg-transparent" title={c.name}>
+              {c.code}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
@@ -484,6 +537,8 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <JobPortalDialog jobId={job.id} open={portalOpen} onOpenChange={setPortalOpen} reason={portalReason} />
     </div>
   )
 }

@@ -158,6 +158,18 @@ export interface Job {
     category: JobCategory;
     // In cantiere: commessa dove gli operai stanno lavorando, mostrata per prima nelle ricerche
     onSite?: boolean;
+    // "Nuovo inizio": commessa da cui questa deriva (stesso cantiere)
+    originJobId?: string | null;
+}
+
+// Commessa della stessa catena di "nuovo inizio" (stesso cantiere)
+export interface JobChainItem {
+    id: string;
+    originJobId: string | null;
+    code: string;
+    name: string;
+    status: 'active' | 'completed' | 'suspended';
+    startDate: string | null;
 }
 
 // Fornitura e posa: commessa completa (materiali + manodopera).

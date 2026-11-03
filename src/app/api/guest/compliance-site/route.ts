@@ -53,6 +53,8 @@ const RATE_LIMIT_WINDOW_MINUTES = 15;
 const MAX_ATTEMPTS_PER_SITE_IP = 8;
 const MAX_ATTEMPTS_PER_IP = 30;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function getClientIp(req: NextRequest): string {
     const forwardedFor = req.headers.get("x-forwarded-for");
     if (forwardedFor) return forwardedFor.split(",")[0].trim();
@@ -91,6 +93,10 @@ export async function POST(req: NextRequest) {
 
         if (!siteId || !passcode) {
             return NextResponse.json({ error: "Parametri mancanti" }, { status: 400 });
+        }
+        // Un id che non e' un UUID farebbe fallire la query con un errore interno: e' semplicemente un link sbagliato
+        if (typeof siteId !== "string" || !UUID_RE.test(siteId)) {
+            return NextResponse.json({ error: "Credenziali non valide" }, { status: 401 });
         }
 
         const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -147,7 +153,8 @@ export async function POST(req: NextRequest) {
                     start_date,
                     end_date,
                     site_address,
-                    status
+                    status,
+                    deleted_at
                 )
             `)
             .eq("guest_site_id", siteId)
@@ -161,7 +168,8 @@ export async function POST(req: NextRequest) {
         // 3. Per ciascuna commessa, estrae i documenti delle 3 categorie
         for (const assoc of (associations || [])) {
             const job = assoc.jobs as any;
-            if (!job) continue;
+            // Una commessa eliminata non deve restare visibile all'ospite
+            if (!job || job.deleted_at) continue;
 
             const jobId = job.id;
 
@@ -201,7 +209,7 @@ export async function POST(req: NextRequest) {
                 return {
                     id: doc.id,
                     name: doc.name,
-                    notes: doc.notes,
+                    notes: null,
                     fileUrl: signedUrl,
                     rawFileId: doc.file_url && !doc.file_url.includes("/") ? doc.file_url : null,
                     fileType: doc.file_type,
@@ -272,7 +280,7 @@ export async function POST(req: NextRequest) {
                 return {
                     id: assocDoc.id,
                     name: assocDoc.custom_name || doc.name,
-                    notes: assocDoc.custom_notes || doc.notes,
+                    notes: null,
                     fileUrl: signedUrl,
                     rawFileId: doc.file_url && !doc.file_url.includes("/") ? doc.file_url : null,
                     fileType: fileExt,
@@ -366,7 +374,7 @@ export async function POST(req: NextRequest) {
                     return {
                         id: doc.id,
                         name: doc.name,
-                        notes: doc.notes ? `DDT Fornitore: ${ddtNumber}. Note: ${doc.notes}` : `DDT Fornitore: ${ddtNumber}`,
+                        notes: `DDT Fornitore: ${ddtNumber}`,
                         fileUrl: signedUrl,
                         rawFileId: doc.file_url && !doc.file_url.includes("/") ? doc.file_url : null,
                         fileType: fileExt,
@@ -490,6 +498,6 @@ export async function POST(req: NextRequest) {
 
     } catch (error: any) {
         console.error("Errore API Route ospiti:", error);
-        return NextResponse.json({ error: "Errore interno del server: " + error.message }, { status: 500 });
+        return NextResponse.json({ error: "Errore interno del server. Riprova tra qualche istante." }, { status: 500 });
     }
 }
