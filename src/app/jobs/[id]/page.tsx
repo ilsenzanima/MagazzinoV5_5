@@ -21,6 +21,8 @@ import { buildInternalJobZipPlan } from "@/lib/zip/internal-job-zip-plan";
 import { buildCoverPdfBlob } from "@/lib/pdf/job-documentation-cover-pdf";
 import { buildAndDownloadDocumentationZip } from "@/lib/zip/build-documentation-zip";
 import { HelpTip } from "@/components/ui/help-tip";
+import { Badge } from "@/components/ui/badge";
+import { JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
 import { jobConformitaDocumentTypesApi } from "@/lib/services/job-conformita-document-types";
 import { jobSiteDocumentTypesApi } from "@/lib/services/job-site-document-types";
 import { proposalDocumentTypesApi } from "@/lib/services/proposal-document-types";
@@ -43,8 +45,8 @@ import { clientProposalsApi, ClientProposal } from "@/lib/services/client-propos
 type TabGroupKey = 'generale' | 'documenti' | 'economico';
 
 const TAB_GROUPS: { key: TabGroupKey; label: string; adminOnly?: boolean; tabs: string[] }[] = [
-    { key: 'generale', label: 'Generale', tabs: ['overview', 'cronoprogramma', 'stock', 'attendance', 'eccedenze', 'ordini'] },
-    { key: 'documenti', label: 'Documenti', tabs: ['conformita', 'documents', 'commessa-documents'] },
+    { key: 'generale', label: 'Generale', tabs: ['overview', 'cronoprogramma', 'stock', 'attendance', 'eccedenze'] },
+    { key: 'documenti', label: 'Documenti', tabs: ['conformita', 'documents', 'commessa-documents', 'ordini'] },
     { key: 'economico', label: 'Economico', adminOnly: true, tabs: ['costi-sal', 'analisi-costi', 'fatturazione'] },
 ];
 
@@ -520,9 +522,17 @@ export default function JobDetailsPage() {
                             <span className="hidden md:inline">Torna alle Commesse</span>
                         </Button>
                     </Link>
-                    <h1 className="flex-1 text-center text-sm md:text-lg font-semibold text-slate-800 dark:text-slate-100 truncate px-2">
-                        {job?.name}
-                    </h1>
+                    <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-2">
+                        <h1 className="truncate text-sm md:text-lg font-semibold text-slate-800 dark:text-slate-100">
+                            {job?.name}
+                        </h1>
+                        <Badge className={`hidden shrink-0 text-xs sm:inline-flex ${job.status === 'active' ? 'bg-green-600' : job.status === 'completed' ? 'bg-slate-500' : 'bg-yellow-500'}`}>
+                            {job.status === 'active' ? 'Attiva' : job.status === 'completed' ? 'Completata' : 'Sospesa'}
+                        </Badge>
+                        <Badge className={`hidden shrink-0 text-xs md:inline-flex ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
+                            {JOB_CATEGORY_LABELS[job.category]}
+                        </Badge>
+                    </div>
                     {(userRole === 'admin' || userRole === 'operativo') && (
                         <div className="flex items-center gap-2">
                             <Button

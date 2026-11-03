@@ -6,9 +6,9 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Job, Client, jobsApi, clientsApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Trash2, Pencil, Building2, MapPin, User, FileText, Clock, RefreshCcw, QrCode, Link2 } from "lucide-react"
+import { Calendar, Trash2, Pencil, Building2, MapPin, User, FileText, Clock, RefreshCcw, QrCode, Link2, MoreHorizontal } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -36,7 +36,6 @@ import { JobWeatherWidget } from "./JobWeatherWidget"
 
 import { Checkbox } from "@/components/ui/checkbox"
 import { JobCategorySelector } from "@/components/jobs/JobCategorySelector"
-import { JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types"
 
 interface JobOverviewProps {
   job: Job
@@ -143,73 +142,52 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
 
   return (
     <div className="space-y-6 overflow-x-hidden">
-      {/* Header Actions */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-start gap-2 justify-between">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white truncate">{job.name}</h1>
-            <Badge className={`shrink-0 text-xs ${job.status === 'active' ? 'bg-green-600' :
-              job.status === 'completed' ? 'bg-slate-500' : 'bg-yellow-500'
-              }`}>
-              {job.status === 'active' ? 'Attiva' : job.status === 'completed' ? 'Completata' : 'Sospesa'}
-            </Badge>
-            <Badge className={`shrink-0 text-xs ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
-              {JOB_CATEGORY_LABELS[job.category]}
-            </Badge>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            {(userRole === 'admin' || userRole === 'operativo') && (
-              <>
-                <Button variant="outline" size="sm" onClick={handleEditClick} className="px-2 md:px-4">
-                  <Pencil className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Modifica</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/jobs/new?clone=${job.id}`)}
-                  className="px-2 md:px-4 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950"
-                  title="Nuovo inizio cantiere: nuova commessa collegata a questa, con gli stessi dati"
-                >
-                  <RefreshCcw className="h-4 w-4 mr-1.5 md:mr-2" />
-                  <span>Nuovo inizio</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setPortalReason("manual"); setPortalOpen(true) }}
-                  className="px-2 md:px-4"
-                  title="Portale ospiti"
-                >
-                  <QrCode className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Portale ospiti</span>
-                </Button>
-              </>
-            )}
-            {(userRole === 'admin' || userRole === 'operativo') && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setIsDeleteDialogOpen(true)}
-                className="px-2 md:px-4"
-              >
-                <Trash2 className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Elimina</span>
-              </Button>
-            )}
-          </div>
-        </div>
+      {/* Codice, data e azioni (nome e stato sono nella testata della pagina) */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs md:text-sm text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1 md:gap-2">
           <span className="font-mono">#{job.code}</span>
           <span>•</span>
           <span>Creata il {new Date(job.createdAt || new Date()).toLocaleDateString()}</span>
-          {job.description && (
-            <>
-              <span className="hidden md:inline">•</span>
-              <span className="italic hidden md:inline">{job.description}</span>
-            </>
-          )}
         </div>
+        {(userRole === 'admin' || userRole === 'operativo') && (
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={handleEditClick} className="px-2 md:px-4">
+              <Pencil className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Modifica</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setPortalReason("manual"); setPortalOpen(true) }}
+              className="px-2 md:px-4"
+              title="Portale ospiti"
+            >
+              <QrCode className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Portale ospiti</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="px-2" aria-label="Altre azioni">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => router.push(`/jobs/new?clone=${job.id}`)}>
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Nuovo inizio cantiere
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Elimina commessa
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
 
       {/* Stesso cantiere */}
@@ -298,47 +276,33 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Additional Info Card */}
+      {(job.cig || job.cup || job.description) && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Informazioni Amministrative</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Dati commessa</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-slate-500">Codice Commessa</Label>
-                <div className="font-mono font-medium">{job.code}</div>
+            {(job.cig || job.cup) && (
+              <div className="grid grid-cols-2 gap-4 md:max-w-md">
+                <div>
+                  <Label className="text-slate-500">CIG</Label>
+                  <div className="font-medium">{job.cig || '-'}</div>
+                </div>
+                <div>
+                  <Label className="text-slate-500">CUP</Label>
+                  <div className="font-medium">{job.cup || '-'}</div>
+                </div>
               </div>
+            )}
+            {job.description && (
               <div>
-                <Label className="text-slate-500">Stato</Label>
-                <div className="font-medium capitalize">{
-                  job.status === 'active' ? 'In Lavorazione' :
-                    job.status === 'completed' ? 'Completata' : 'Sospesa'
-                }</div>
+                <Label className="text-slate-500">Descrizione lavori</Label>
+                <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{job.description}</p>
               </div>
-              <div>
-                <Label className="text-slate-500">CIG</Label>
-                <div className="font-medium">{job.cig || '-'}</div>
-              </div>
-              <div>
-                <Label className="text-slate-500">CUP</Label>
-                <div className="font-medium">{job.cup || '-'}</div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
-
-        {/* Description Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Descrizione Lavori</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-700 whitespace-pre-wrap">{job.description}</p>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
       {job.siteAddress && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -526,7 +490,7 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
           <DialogHeader>
             <DialogTitle>Elimina Commessa</DialogTitle>
             <DialogDescription>
-              Sei sicuro di voler eliminare la commessa <strong>{job.description}</strong>?
+              Sei sicuro di voler eliminare la commessa <strong>{job.name}</strong>?
               <br />
               La commessa verrà spostata nel Cestino e potrà essere ripristinata dagli admin entro 30 giorni. L'eliminazione è bloccata se la commessa ha movimenti o acquisti collegati.
             </DialogDescription>
