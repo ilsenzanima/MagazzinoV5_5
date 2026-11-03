@@ -39,7 +39,9 @@ function ClientsPageContent() {
   const searchParams = useSearchParams();
   const canEdit = userRole === 'admin' || userRole === 'operativo';
   // Si apre anche dal vecchio indirizzo /clients/new (rimandato qui con ?nuovo=1)
-  const [newOpen, setNewOpen] = useState(searchParams.get('nuovo') === '1' && canEdit);
+  const [newOpen, setNewOpen] = useState(false);
+  // il ruolo arriva dopo il primo disegno: si apre appena è noto
+  useEffect(() => { if (searchParams.get('nuovo') === '1' && canEdit) setNewOpen(true); }, [searchParams, canEdit]);
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
