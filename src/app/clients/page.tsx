@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth-provider";
 import { ClientCard } from "@/components/clients";
 import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
+import { NewClientDialog } from "@/components/clients/NewClientDialog";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -37,6 +38,8 @@ function ClientsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const canEdit = userRole === 'admin' || userRole === 'operativo';
+  // Si apre anche dal vecchio indirizzo /clients/new (rimandato qui con ?nuovo=1)
+  const [newOpen, setNewOpen] = useState(searchParams.get('nuovo') === '1' && canEdit);
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -166,12 +169,10 @@ function ClientsPageContent() {
       <ListPageHeader
         title="Gestione Committenti"
         actions={canEdit && (
-          <Link href="/clients/new" className="w-full sm:w-auto md:hidden">
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuovo Committente
-            </Button>
-          </Link>
+          <Button className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto md:hidden" onClick={() => setNewOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuovo Committente
+          </Button>
         )}
         search={{
           id: "clients-search", label: "Cerca committente", value: searchTerm,
@@ -307,7 +308,8 @@ function ClientsPageContent() {
       )}
 
       {/* Pulsante «nuovo committente» sempre visibile (PC) */}
-      {canEdit && <FloatingAddButton href="/clients/new" label="Nuovo committente" />}
+      {canEdit && <FloatingAddButton onClick={() => setNewOpen(true)} label="Nuovo committente" />}
+      <NewClientDialog open={newOpen} onOpenChange={setNewOpen} onCreated={(c) => router.push(`/clients/${c.id}`)} />
     </DashboardLayout>
   );
 }

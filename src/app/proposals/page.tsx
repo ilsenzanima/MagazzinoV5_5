@@ -18,7 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { DuplicateClientsNotice } from "@/components/clients/DuplicateClientsNotice";
+import { NewClientDialog } from "@/components/clients/NewClientDialog";
 import { parseSiteAddress } from "@/lib/utils/site-address";
 import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
@@ -54,11 +54,6 @@ const EMPTY_PROPOSAL_FORM = {
   title: "", description: "", estimatedValue: "",
   status: "draft" as ProposalStatus, date: "", notes: "",
   siteStreet: "", siteStreetNumber: "", sitePostalCode: "", siteCity: "", siteProvince: "",
-};
-
-const EMPTY_QUICK_CLIENT_FORM = {
-  name: "", street: "", streetNumber: "", postalCode: "", city: "", province: "",
-  vatNumber: "", email: "", phone: "",
 };
 
 const proposalYear = (p: ClientProposal) => new Date(p.date || p.createdAt).getFullYear();
@@ -128,8 +123,6 @@ function ProposalsPageContent() {
 
   // Nuovo committente rapido (dal modale nuova proposta)
   const [quickClientOpen, setQuickClientOpen] = useState(false);
-  const [quickClientForm, setQuickClientForm] = useState(EMPTY_QUICK_CLIENT_FORM);
-  const [savingQuickClient, setSavingQuickClient] = useState(false);
 
   const canEdit = userRole === "admin" || userRole === "operativo";
 
@@ -223,28 +216,9 @@ function ProposalsPageContent() {
     finally { setSavingProposal(false); }
   };
 
-  const handleQuickClient = async () => {
-    if (!quickClientForm.name.trim()) { notify.warning("Il nome del committente è obbligatorio"); return; }
-    try {
-      setSavingQuickClient(true);
-      const created = await clientsApi.create({
-        name: quickClientForm.name.trim(),
-        street: quickClientForm.street,
-        streetNumber: quickClientForm.streetNumber,
-        postalCode: quickClientForm.postalCode,
-        city: quickClientForm.city,
-        province: quickClientForm.province,
-        vatNumber: quickClientForm.vatNumber,
-        email: quickClientForm.email,
-        phone: quickClientForm.phone,
-      });
-      setClients(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "it")));
-      setProposalForm(f => ({ ...f, clientId: created.id }));
-      setQuickClientForm(EMPTY_QUICK_CLIENT_FORM);
-      setQuickClientOpen(false);
-      notify.success("Committente creato");
-    } catch { notify.error("Errore durante la creazione del committente"); }
-    finally { setSavingQuickClient(false); }
+  const handleClientCreated = (created: Client) => {
+    setClients(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "it")));
+    setProposalForm(f => ({ ...f, clientId: created.id }));
   };
 
   const clientNames = useMemo(() => {
@@ -595,73 +569,7 @@ function ProposalsPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Nuovo committente rapido */}
-      <Dialog open={quickClientOpen} onOpenChange={setQuickClientOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nuovo Committente</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1">
-              <Label>Ragione Sociale / Nome *</Label>
-              <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Inserisci il nome dell'azienda o del cliente" />
-            </div>
-            <DuplicateClientsNotice
-              name={quickClientForm.name}
-              vatNumber={quickClientForm.vatNumber}
-              street={quickClientForm.street}
-              streetNumber={quickClientForm.streetNumber}
-              postalCode={quickClientForm.postalCode}
-              city={quickClientForm.city}
-            />
-            <div className="space-y-4 border-t border-b py-4 border-slate-100">
-              <h3 className="font-medium text-slate-900 dark:text-white text-sm">Indirizzo Sede</h3>
-              <div className="grid grid-cols-4 gap-4">
-                <div className="col-span-3 space-y-1">
-                  <Label>Via / Piazza</Label>
-                  <Input value={quickClientForm.street} onChange={e => setQuickClientForm({ ...quickClientForm, street: e.target.value })} placeholder="Via Roma" />
-                </div>
-                <div className="col-span-1 space-y-1">
-                  <Label>N. Civico</Label>
-                  <Input value={quickClientForm.streetNumber} onChange={e => setQuickClientForm({ ...quickClientForm, streetNumber: e.target.value })} placeholder="10" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="md:col-span-1 space-y-1">
-                  <Label>CAP</Label>
-                  <Input value={quickClientForm.postalCode} onChange={e => setQuickClientForm({ ...quickClientForm, postalCode: e.target.value })} placeholder="00100" />
-                </div>
-                <div className="md:col-span-2 space-y-1">
-                  <Label>Città</Label>
-                  <Input value={quickClientForm.city} onChange={e => setQuickClientForm({ ...quickClientForm, city: e.target.value })} placeholder="Milano" />
-                </div>
-                <div className="md:col-span-1 space-y-1">
-                  <Label>Provincia</Label>
-                  <Input value={quickClientForm.province} onChange={e => setQuickClientForm({ ...quickClientForm, province: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" />
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Partita IVA / Codice Fiscale</Label>
-                <Input value={quickClientForm.vatNumber} onChange={e => setQuickClientForm({ ...quickClientForm, vatNumber: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <Label>Telefono</Label>
-                <Input type="tel" value={quickClientForm.phone} onChange={e => setQuickClientForm({ ...quickClientForm, phone: e.target.value })} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input type="email" value={quickClientForm.email} onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setQuickClientOpen(false)}>Annulla</Button>
-            <Button onClick={handleQuickClient} disabled={savingQuickClient} className="bg-blue-600 hover:bg-blue-700">
-              {savingQuickClient && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Crea Committente
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewClientDialog open={quickClientOpen} onOpenChange={setQuickClientOpen} onCreated={handleClientCreated} />
     </DashboardLayout>
   );
 }
