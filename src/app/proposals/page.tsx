@@ -18,6 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DuplicateProposalsNotice } from "@/components/proposals/DuplicateProposalsNotice";
 import { NewClientDialog } from "@/components/clients/NewClientDialog";
 import { parseSiteAddress } from "@/lib/utils/site-address";
 import { ListPageHeader } from "@/components/ui/list-page-header";
@@ -470,9 +471,9 @@ function ProposalsPageContent() {
 
       {/* Nuova proposta dialog */}
       <Dialog open={newProposalOpen} onOpenChange={setNewProposalOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nuova Offerta</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-5 py-2">
             <div className="space-y-1 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
               <Label>Parti da una commessa esistente <span className="font-normal text-slate-500">(opzionale)</span></Label>
               <SearchableSelect
@@ -489,75 +490,92 @@ function ProposalsPageContent() {
               />
               <p className="text-xs text-slate-500">Copia committente, nome, descrizione e indirizzo del cantiere: poi modifichi quello che cambia.</p>
             </div>
-            <div className="space-y-1">
-              <Label>Committente *</Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <SearchableSelect
-                    options={clients.map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                      description: c.address || undefined
-                    }))}
-                    value={proposalForm.clientId}
-                    onValueChange={v => setProposalForm({ ...proposalForm, clientId: v })}
-                    placeholder="Cerca committente..."
-                    searchPlaceholder="Digita per cercare..."
-                    emptyMessage="Nessun committente trovato."
-                  />
+
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Offerta</h3>
+              <div className="space-y-1">
+                <Label>Committente *</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <SearchableSelect
+                      options={clients.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                        description: c.address || undefined
+                      }))}
+                      value={proposalForm.clientId}
+                      onValueChange={v => setProposalForm({ ...proposalForm, clientId: v })}
+                      placeholder="Cerca committente..."
+                      searchPlaceholder="Digita per cercare..."
+                      emptyMessage="Nessun committente trovato."
+                    />
+                  </div>
+                  <Button type="button" variant="outline" size="icon" onClick={() => setQuickClientOpen(true)} title="Nuovo committente">
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button type="button" variant="outline" size="icon" onClick={() => setQuickClientOpen(true)} title="Nuovo committente">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Titolo *</Label>
-              <Input value={proposalForm.title} onChange={e => setProposalForm({ ...proposalForm, title: e.target.value })} placeholder="Es. Ristrutturazione appartamento Via Roma" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Stato</Label>
-                <Select value={proposalForm.status} onValueChange={v => setProposalForm({ ...proposalForm, status: v as ProposalStatus })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                </Select>
               </div>
               <div className="space-y-1">
-                <Label>Data</Label>
-                <Input type="date" value={proposalForm.date} onChange={e => setProposalForm({ ...proposalForm, date: e.target.value })} />
+                <Label>Titolo *</Label>
+                <Input value={proposalForm.title} onChange={e => setProposalForm({ ...proposalForm, title: e.target.value })} placeholder="Es. Ristrutturazione appartamento Via Roma" />
+              </div>
+              <DuplicateProposalsNotice
+                title={proposalForm.title}
+                clientId={proposalForm.clientId}
+                siteAddress={[proposalForm.siteStreet, proposalForm.siteStreetNumber, proposalForm.siteCity].filter(Boolean).join(" ")}
+                proposals={proposals}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label>Stato</Label>
+                  <Select value={proposalForm.status} onValueChange={v => setProposalForm({ ...proposalForm, status: v as ProposalStatus })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Data</Label>
+                  <Input type="date" value={proposalForm.date} onChange={e => setProposalForm({ ...proposalForm, date: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Valore stimato (€)</Label>
+                  <Input type="number" value={proposalForm.estimatedValue} onChange={e => setProposalForm({ ...proposalForm, estimatedValue: e.target.value })} placeholder="0.00" />
+                </div>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>Valore Stimato (€)</Label>
-              <Input type="number" value={proposalForm.estimatedValue} onChange={e => setProposalForm({ ...proposalForm, estimatedValue: e.target.value })} placeholder="0.00" />
-            </div>
-            <div className="space-y-1">
-              <Label>Descrizione</Label>
-              <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.description} onChange={e => setProposalForm({ ...proposalForm, description: e.target.value })} />
-            </div>
+
             {/* Indirizzo cantiere */}
-            <div className="space-y-3 border-t pt-3">
-              <div className="flex items-center justify-between">
-                <Label className="font-semibold">Indirizzo Cantiere</Label>
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Indirizzo cantiere</h3>
                 <div className="flex items-center gap-2">
                   <Checkbox id="useClientAddrNew" checked={useClientAddr} onCheckedChange={v => setUseClientAddr(v as boolean)} disabled={!proposalForm.clientId} />
                   <label htmlFor="useClientAddrNew" className="text-xs cursor-pointer text-slate-600">Usa indirizzo committente</label>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                <div className="col-span-3 space-y-1"><Label className="text-xs">Via / Piazza</Label><Input value={proposalForm.siteStreet} onChange={e => setProposalForm({ ...proposalForm, siteStreet: e.target.value })} placeholder="Via Roma" /></div>
-                <div className="col-span-1 space-y-1"><Label className="text-xs">N. Civico</Label><Input value={proposalForm.siteStreetNumber} onChange={e => setProposalForm({ ...proposalForm, siteStreetNumber: e.target.value })} placeholder="1" /></div>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="col-span-3 space-y-1"><Label>Via / Piazza</Label><Input value={proposalForm.siteStreet} onChange={e => setProposalForm({ ...proposalForm, siteStreet: e.target.value })} placeholder="Via Roma" /></div>
+                <div className="col-span-1 space-y-1"><Label>N. civico</Label><Input value={proposalForm.siteStreetNumber} onChange={e => setProposalForm({ ...proposalForm, siteStreetNumber: e.target.value })} placeholder="1" /></div>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                <div className="col-span-1 space-y-1"><Label className="text-xs">CAP</Label><Input value={proposalForm.sitePostalCode} onChange={e => setProposalForm({ ...proposalForm, sitePostalCode: e.target.value })} placeholder="00100" /></div>
-                <div className="col-span-2 space-y-1"><Label className="text-xs">Città</Label><Input value={proposalForm.siteCity} onChange={e => setProposalForm({ ...proposalForm, siteCity: e.target.value })} placeholder="Milano" /></div>
-                <div className="col-span-1 space-y-1"><Label className="text-xs">Prov.</Label><Input value={proposalForm.siteProvince} onChange={e => setProposalForm({ ...proposalForm, siteProvince: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" /></div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1"><Label>CAP</Label><Input value={proposalForm.sitePostalCode} onChange={e => setProposalForm({ ...proposalForm, sitePostalCode: e.target.value })} placeholder="00100" /></div>
+                <div className="md:col-span-2 space-y-1"><Label>Città</Label><Input value={proposalForm.siteCity} onChange={e => setProposalForm({ ...proposalForm, siteCity: e.target.value })} placeholder="Milano" /></div>
+                <div className="space-y-1"><Label>Provincia</Label><Input value={proposalForm.siteProvince} onChange={e => setProposalForm({ ...proposalForm, siteProvince: e.target.value.toUpperCase() })} placeholder="MI" maxLength={2} className="uppercase" /></div>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>Note</Label>
-              <textarea className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.notes} onChange={e => setProposalForm({ ...proposalForm, notes: e.target.value })} />
+
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dettagli</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Descrizione</Label>
+                  <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.description} onChange={e => setProposalForm({ ...proposalForm, description: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Note</Label>
+                  <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={proposalForm.notes} onChange={e => setProposalForm({ ...proposalForm, notes: e.target.value })} />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
