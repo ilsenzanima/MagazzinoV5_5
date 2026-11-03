@@ -263,7 +263,7 @@ function GuestSitesContent() {
             <Button variant="ghost" size="icon" className="h-7 w-7" title="Apri il portale" aria-label="Apri il portale" onClick={() => window.open(portalUrl(site.id), "_blank", "noopener,noreferrer")}>
                 <ExternalLink className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:bg-destructive/10 hover:text-destructive" title="Elimina" aria-label="Elimina" onClick={() => setDeleteSite(site)}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 md:size-7 text-slate-400 hover:bg-destructive/10 hover:text-destructive" title="Elimina" aria-label="Elimina" onClick={() => setDeleteSite(site)}>
                 <Trash2 className="h-4 w-4" />
             </Button>
         </div>
@@ -325,7 +325,7 @@ function GuestSitesContent() {
                                     <TableHead className={`w-52 ${headCls}`}>Commesse collegate</TableHead>
                                     <TableHead className={`w-44 ${headCls}`}>Codice di accesso</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Creato il")}</TableHead>
-                                    <TableHead className="w-28" />
+                                    <TableHead className="w-32" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
