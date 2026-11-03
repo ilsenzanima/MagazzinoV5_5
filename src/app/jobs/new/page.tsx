@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ArrowLeft, Loader2, Save, RefreshCw, Plus } from "lucide-react";
 import Link from "next/link";
-import { jobsApi, clientsApi, Client } from "@/lib/api";
+import { jobsApi, clientsApi, Client, Job } from "@/lib/api";
 import { JobCategory } from "@/lib/types";
 import { JobCategorySelector } from "@/components/jobs/JobCategorySelector";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -36,7 +36,11 @@ export default function NewJobPage() {
 function NewJobForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const cloneId = searchParams.get("clone");
+  // Commessa da cui si parte ("Nuovo inizio"): dall'indirizzo (?clone=) oppure scelta nel modulo
+  const [cloneId, setCloneId] = useState<string | null>(searchParams.get("clone"));
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+  // Indirizzo cantiere copiato dalla commessa di partenza (testo unico, modificabile)
+  const [inheritedAddress, setInheritedAddress] = useState<string | null>(null);
   const { userRole } = useAuth();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -97,11 +101,12 @@ function NewJobForm() {
       }
     };
     loadClients();
+    jobsApi.getAll().then(setAllJobs).catch(console.error);
   }, []);
 
   // Se viene da "Nuovo inizio cantiere", pre-compila con i dati della commessa originale
   useEffect(() => {
-    if (!cloneId) return;
+    if (!cloneId) { setInheritedAddress(null); return; }
     const loadCloneData = async () => {
       try {
         const [job, allClients] = await Promise.all([
@@ -110,6 +115,7 @@ function NewJobForm() {
         ]);
         if (!job) return;
         setClients(allClients);
+        setInheritedAddress(job.siteAddress?.trim() || null);
         const client = allClients.find(c => c.id === job.clientId);
         const code = client ? generateCode(client.name) : "";
         setFormData(prev => ({
@@ -211,7 +217,7 @@ function NewJobForm() {
 
     try {
       setLoading(true);
-      const siteAddressParts = [
+      const siteAddressParts = inheritedAddress !== null ? [inheritedAddress.trim()].filter(Boolean) : [
         siteFields.street && `${siteFields.street}${siteFields.streetNumber ? " " + siteFields.streetNumber : ""}`,
         (siteFields.postalCode || siteFields.city) && `${siteFields.postalCode} ${siteFields.city}`.trim(),
         siteFields.province && `(${siteFields.province.toUpperCase()})`,
@@ -219,6 +225,7 @@ function NewJobForm() {
       const created = await jobsApi.create({
         ...formData,
         siteAddress: siteAddressParts.join(", "),
+        originJobId: cloneId,
       });
       router.push(`/jobs/${created.id}`);
       router.refresh();
@@ -255,6 +262,33 @@ function NewJobForm() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+
+              {/* Nuovo inizio: parti da una commessa esistente */}
+              <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+                <Label>Parti da una commessa esistente <span className="font-normal text-slate-500">(nuovo inizio dello stesso cantiere, opzionale)</span></Label>
+                <SearchableSelect
+                  options={allJobs.map((j) => ({
+                    value: j.id,
+                    label: `${j.code} · ${j.name}`,
+                    description: [j.clientName, j.startDate ? new Date(j.startDate).toLocaleDateString("it-IT") : ""].filter(Boolean).join(" · ") || undefined,
+                  }))}
+                  value={cloneId || ""}
+                  onValueChange={(v) => setCloneId(v || null)}
+                  placeholder="Nessuna: commessa del tutto nuova"
+                  searchPlaceholder="Cerca per codice, nome o committente..."
+                  emptyMessage="Nessuna commessa trovata."
+                />
+                {cloneId ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      Committente, nome, descrizione, referente, tipologia e indirizzo vengono copiati. Le due commesse risulteranno collegate (stesso cantiere).
+                    </p>
+                    <Button type="button" variant="ghost" size="sm" className="shrink-0 text-xs" onClick={() => setCloneId(null)}>Togli</Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">Se il cantiere è già stato lavorato, partire da una commessa precedente evita di reinserire i dati e le tiene collegate.</p>
+                )}
+              </div>
 
               {/* Sezione Tipologia */}
               <div className="space-y-4 border-b pb-4">
@@ -401,7 +435,7 @@ function NewJobForm() {
                     <Checkbox
                       id="useClientAddress"
                       checked={useClientAddress}
-                      onCheckedChange={(checked) => setUseClientAddress(checked as boolean)}
+                      onCheckedChange={(checked) => { setUseClientAddress(checked as boolean); if (checked) setInheritedAddress(null); }}
                     />
                     <Label htmlFor="useClientAddress" className="text-sm font-normal cursor-pointer">
                       Usa indirizzo committente
@@ -409,7 +443,17 @@ function NewJobForm() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4">
+                {inheritedAddress !== null && (
+                  <div className="space-y-2">
+                    <Label htmlFor="inheritedAddress">Indirizzo copiato dalla commessa di partenza</Label>
+                    <Input id="inheritedAddress" value={inheritedAddress} onChange={(e) => setInheritedAddress(e.target.value)} />
+                    <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => setInheritedAddress(null)}>
+                      Compila con i campi separati
+                    </button>
+                  </div>
+                )}
+
+                <div className={inheritedAddress !== null ? "hidden" : "grid grid-cols-4 gap-4"}>
                   <div className="col-span-3 space-y-2">
                     <Label htmlFor="siteStreet">Via / Piazza</Label>
                     <Input
@@ -430,7 +474,7 @@ function NewJobForm() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className={inheritedAddress !== null ? "hidden" : "grid grid-cols-2 md:grid-cols-4 gap-4"}>
                   <div className="md:col-span-1 space-y-2">
                     <Label htmlFor="sitePostalCode">CAP</Label>
                     <Input

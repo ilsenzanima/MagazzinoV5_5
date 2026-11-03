@@ -18,6 +18,7 @@ import { Job, jobsApi, clientsApi } from "@/lib/api";
 import { JobCategory, JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { JobPortalDialog } from "@/components/guest-sites/JobPortalDialog";
 
 // Commesse per pagina: fisso, uguale per tutti
 const PAGE_SIZE = 50;
@@ -171,6 +172,9 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const anyFilterActive = status !== 'all' || category !== 'all' || !!clientId || !!searchTerm;
   const resetFilters = () => { setStatus('all'); setCategory('all'); setClientId(""); setSearchTerm(""); setPage(1); };
 
+  // Commessa appena completata: si propone il portale ospiti
+  const [portalJobId, setPortalJobId] = useState<string | null>(null);
+
   const handleStatusChange = async (job: Job, newStatus: JobStatus) => {
     if (job.status === newStatus) return;
     setUpdatingStatus(job.id);
@@ -180,6 +184,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         const updated = prev.map(j => j.id === job.id ? { ...j, status: newStatus } : j);
         return sortKey === 'status' && sortDir === 'asc' ? updated.sort(compareJobs) : updated;
       });
+      if (newStatus === 'completed' && canEdit) setPortalJobId(job.id);
     } catch (err: any) {
       notify.error(err?.message || "Errore durante l'aggiornamento dello stato");
     } finally {
@@ -457,6 +462,8 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
 
       {/* Pulsante «nuova commessa» sempre visibile (PC) */}
       {canEdit && <FloatingAddButton href="/jobs/new" label="Nuova commessa" />}
+
+      <JobPortalDialog jobId={portalJobId} open={!!portalJobId} onOpenChange={(o) => { if (!o) setPortalJobId(null); }} reason="completed" />
     </>
   );
 }

@@ -121,6 +121,7 @@ function ProposalsPageContent() {
   const [proposalForm, setProposalForm] = useState(EMPTY_PROPOSAL_FORM);
   const [useClientAddr, setUseClientAddr] = useState(false);
   const [savingProposal, setSavingProposal] = useState(false);
+  const [sourceProposalId, setSourceProposalId] = useState("");
 
   // Nuovo committente rapido (dal modale nuova proposta)
   const [quickClientOpen, setQuickClientOpen] = useState(false);
@@ -169,7 +170,30 @@ function ProposalsPageContent() {
   const openNewProposal = () => {
     setProposalForm(EMPTY_PROPOSAL_FORM);
     setUseClientAddr(false);
+    setSourceProposalId("");
     setNewProposalOpen(true);
+  };
+
+  // Parte da un'offerta esistente (stesso cliente/cantiere): copia i dati, la nuova resta in bozza e con la data da inserire
+  const applySourceProposal = (id: string) => {
+    setSourceProposalId(id);
+    const src = proposals.find(p => p.id === id);
+    if (!src) return;
+    setUseClientAddr(false);
+    setProposalForm({
+      clientId: src.clientId,
+      title: src.title,
+      description: src.description,
+      estimatedValue: src.estimatedValue !== null ? String(src.estimatedValue) : "",
+      status: "draft",
+      date: "",
+      notes: src.notes,
+      siteStreet: src.siteStreet,
+      siteStreetNumber: src.siteStreetNumber,
+      sitePostalCode: src.sitePostalCode,
+      siteCity: src.siteCity,
+      siteProvince: src.siteProvince,
+    });
   };
 
   const handleNewProposal = async () => {
@@ -473,6 +497,22 @@ function ProposalsPageContent() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nuova Offerta</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
+            <div className="space-y-1 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+              <Label>Parti da un&apos;offerta esistente <span className="font-normal text-slate-500">(opzionale)</span></Label>
+              <SearchableSelect
+                options={proposals.map((p) => ({
+                  value: p.id,
+                  label: p.title,
+                  description: [p.clientName, siteLine(p)].filter(Boolean).join(" · ") || undefined,
+                }))}
+                value={sourceProposalId}
+                onValueChange={applySourceProposal}
+                placeholder="Nessuna: offerta del tutto nuova"
+                searchPlaceholder="Cerca per titolo o committente..."
+                emptyMessage="Nessuna offerta trovata."
+              />
+              <p className="text-xs text-slate-500">Copia committente, titolo, descrizione, valore, indirizzo e note: poi modifichi quello che cambia.</p>
+            </div>
             <div className="space-y-1">
               <Label>Committente *</Label>
               <div className="flex gap-2">

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Job, JobLog, JobDocument, Site, JobCategory } from '@/lib/types';
+import { Job, JobLog, JobDocument, Site, JobCategory, JobChainItem } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload, deleteDriveFileIfApplicable } from './utils';
 
 // Mappers
@@ -27,6 +27,7 @@ export const mapDbToJob = (db: any): Job => ({
     estimatedCost: db.estimated_cost ?? null,
     category: db.job_category || 'fornitura_posa',
     onSite: db.on_site ?? false,
+    originJobId: db.origin_job_id ?? null,
 });
 
 const mapJobToDb = (job: Partial<Job>) => {
@@ -46,6 +47,7 @@ const mapJobToDb = (job: Partial<Job>) => {
     if (job.createdAt !== undefined) dbJob.created_at = job.createdAt;
     if (job.category !== undefined) dbJob.job_category = job.category;
     if (job.onSite !== undefined) dbJob.on_site = job.onSite;
+    if (job.originJobId !== undefined) dbJob.origin_job_id = job.originJobId;
 
     // Handle nullable fields - only include when explicitly passed
     if ('endDate' in job) {
@@ -260,6 +262,19 @@ export const jobsApi = {
         );
         if (error) throw error;
         return mapDbToJob(data);
+    },
+    /** Commesse dello stesso cantiere (catena di "nuovo inizio"), in ordine di data; include quella indicata. */
+    getChain: async (id: string): Promise<JobChainItem[]> => {
+        const { data, error } = await supabase.rpc('get_job_chain', { p_job_id: id });
+        if (error) throw error;
+        return (data || []).map((r: any) => ({
+            id: r.id,
+            originJobId: r.origin_job_id,
+            code: r.code,
+            name: r.name,
+            status: r.status,
+            startDate: r.start_date,
+        }));
     },
     /** Verifica se una commessa esiste ancora (anche se soft-deleted), senza lanciare errore se è stata eliminata definitivamente. */
     getStatusById: async (id: string): Promise<{ exists: boolean; deletedAt: string | null }> => {

@@ -78,6 +78,27 @@ export const guestSitesApi = {
         return bySite;
     },
 
+    // Portali (non eliminati) che contengono almeno una delle commesse indicate, con le commesse collegate
+    findSitesForJobs: async (jobIds: string[]): Promise<{ site: GuestSite; jobIds: string[] }[]> => {
+        if (jobIds.length === 0) return [];
+        const { data, error } = await supabase
+            .from('guest_site_jobs')
+            .select('job_id, guest_site_id, guest_sites!inner(*)')
+            .in('job_id', jobIds)
+            .is('deleted_at', null)
+            .is('guest_sites.deleted_at', null);
+        if (error) throw error;
+        const bySite = new Map<string, { site: GuestSite; jobIds: string[] }>();
+        for (const row of (data || []) as any[]) {
+            const raw = Array.isArray(row.guest_sites) ? row.guest_sites[0] : row.guest_sites;
+            if (!raw) continue;
+            const entry = bySite.get(raw.id) ?? { site: mapSite(raw), jobIds: [] };
+            entry.jobIds.push(row.job_id);
+            bySite.set(raw.id, entry);
+        }
+        return Array.from(bySite.values());
+    },
+
     getById: async (id: string): Promise<GuestSite | null> => {
         const { data, error } = await supabase
             .from('guest_sites')
