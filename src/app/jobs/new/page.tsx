@@ -16,6 +16,8 @@ import Link from "next/link";
 import { jobsApi, clientsApi, Client, Job } from "@/lib/api";
 import { JobCategory } from "@/lib/types";
 import { JobCategorySelector } from "@/components/jobs/JobCategorySelector";
+import { DuplicateJobsNotice } from "@/components/jobs/DuplicateJobsNotice";
+import { DuplicateClientsNotice } from "@/components/clients/DuplicateClientsNotice";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/components/auth-provider";
 import { BlockBrowserBack } from "@/components/BlockBrowserBack";
@@ -41,6 +43,8 @@ function NewJobForm() {
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   // Indirizzo cantiere copiato dalla commessa di partenza (testo unico, modificabile)
   const [inheritedAddress, setInheritedAddress] = useState<string | null>(null);
+  // Commesse dello stesso cantiere di quella di partenza: non vanno segnalate come doppioni
+  const [chainIds, setChainIds] = useState<string[]>([]);
   const { userRole } = useAuth();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -105,6 +109,11 @@ function NewJobForm() {
   }, []);
 
   // Se viene da "Nuovo inizio cantiere", pre-compila con i dati della commessa originale
+  useEffect(() => {
+    if (!cloneId) { setChainIds([]); return; }
+    jobsApi.getChain(cloneId).then(c => setChainIds(c.map(x => x.id))).catch(() => setChainIds([cloneId]));
+  }, [cloneId]);
+
   useEffect(() => {
     if (!cloneId) { setInheritedAddress(null); return; }
     const loadCloneData = async () => {
@@ -358,6 +367,15 @@ function NewJobForm() {
                   </div>
                 </div>
 
+                <DuplicateJobsNotice
+                  name={formData.name}
+                  clientId={formData.clientId}
+                  siteAddress={inheritedAddress ?? [siteFields.street, siteFields.streetNumber, siteFields.postalCode, siteFields.city].filter(Boolean).join(" ")}
+                  jobs={allJobs}
+                  excludeIds={chainIds}
+                  onUseAsSource={(id) => { setCloneId(id); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                />
+
                 <div className="space-y-2">
                   <Label htmlFor="description">Descrizione (Opzionale)</Label>
                   <textarea
@@ -549,6 +567,14 @@ function NewJobForm() {
               <Label>Ragione Sociale / Nome *</Label>
               <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Inserisci il nome dell'azienda o del cliente" />
             </div>
+            <DuplicateClientsNotice
+              name={quickClientForm.name}
+              vatNumber={quickClientForm.vatNumber}
+              street={quickClientForm.street}
+              streetNumber={quickClientForm.streetNumber}
+              postalCode={quickClientForm.postalCode}
+              city={quickClientForm.city}
+            />
             <div className="space-y-4 border-t border-b py-4 border-slate-100">
               <h3 className="font-medium text-slate-900 dark:text-white text-sm">Indirizzo Sede</h3>
               <div className="grid grid-cols-4 gap-4">

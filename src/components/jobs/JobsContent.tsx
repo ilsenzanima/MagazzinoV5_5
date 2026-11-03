@@ -179,9 +179,12 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     if (job.status === newStatus) return;
     setUpdatingStatus(job.id);
     try {
-      await jobsApi.update(job.id, { status: newStatus });
+      // Completata: la fine cantiere diventa il giorno del cambio di stato
+      const d = new Date();
+      const endDate = newStatus === 'completed' ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : undefined;
+      await jobsApi.update(job.id, endDate ? { status: newStatus, endDate } : { status: newStatus });
       setJobs(prev => {
-        const updated = prev.map(j => j.id === job.id ? { ...j, status: newStatus } : j);
+        const updated = prev.map(j => j.id === job.id ? { ...j, status: newStatus, ...(endDate ? { endDate } : {}) } : j);
         return sortKey === 'status' && sortDir === 'asc' ? updated.sort(compareJobs) : updated;
       });
       if (newStatus === 'completed' && canEdit) setPortalJobId(job.id);

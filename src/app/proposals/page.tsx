@@ -18,13 +18,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DuplicateClientsNotice } from "@/components/clients/DuplicateClientsNotice";
+import { parseSiteAddress } from "@/lib/utils/site-address";
 import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, MapPin, FileText, Plus, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals";
-import { clientsApi } from "@/lib/api";
+import { clientsApi, jobsApi, Job } from "@/lib/api";
 import { Client } from "@/lib/types";
 import { notify } from "@/lib/notify";
 import { useAuth } from "@/components/auth-provider";
@@ -121,7 +123,8 @@ function ProposalsPageContent() {
   const [proposalForm, setProposalForm] = useState(EMPTY_PROPOSAL_FORM);
   const [useClientAddr, setUseClientAddr] = useState(false);
   const [savingProposal, setSavingProposal] = useState(false);
-  const [sourceProposalId, setSourceProposalId] = useState("");
+  const [sourceJobId, setSourceJobId] = useState("");
+  const [jobs, setJobs] = useState<Job[]>([]);
 
   // Nuovo committente rapido (dal modale nuova proposta)
   const [quickClientOpen, setQuickClientOpen] = useState(false);
@@ -157,8 +160,9 @@ function ProposalsPageContent() {
   const load = async () => {
     try {
       setLoading(true);
-      const [props, cls] = await Promise.all([clientProposalsApi.getAll(), clientsApi.getAll()]);
+      const [props, cls, allJobs] = await Promise.all([clientProposalsApi.getAll(), clientsApi.getAll(), jobsApi.getAll()]);
       setProposals(props);
+      setJobs(allJobs);
       setClients(cls.sort((a, b) => a.name.localeCompare(b.name, "it")));
     } catch {
       notify.error("Errore caricamento offerte");
@@ -170,29 +174,27 @@ function ProposalsPageContent() {
   const openNewProposal = () => {
     setProposalForm(EMPTY_PROPOSAL_FORM);
     setUseClientAddr(false);
-    setSourceProposalId("");
+    setSourceJobId("");
     setNewProposalOpen(true);
   };
 
-  // Parte da un'offerta esistente (stesso cliente/cantiere): copia i dati, la nuova resta in bozza e con la data da inserire
-  const applySourceProposal = (id: string) => {
-    setSourceProposalId(id);
-    const src = proposals.find(p => p.id === id);
+  // Parte da una commessa esistente (stesso cliente/cantiere): copia committente, nome, descrizione e indirizzo
+  const applySourceJob = (id: string) => {
+    setSourceJobId(id);
+    const src = jobs.find(j => j.id === id);
     if (!src) return;
     setUseClientAddr(false);
+    const addr = parseSiteAddress(src.siteAddress);
     setProposalForm({
+      ...EMPTY_PROPOSAL_FORM,
       clientId: src.clientId,
-      title: src.title,
-      description: src.description,
-      estimatedValue: src.estimatedValue !== null ? String(src.estimatedValue) : "",
-      status: "draft",
-      date: "",
-      notes: src.notes,
-      siteStreet: src.siteStreet,
-      siteStreetNumber: src.siteStreetNumber,
-      sitePostalCode: src.sitePostalCode,
-      siteCity: src.siteCity,
-      siteProvince: src.siteProvince,
+      title: src.name,
+      description: src.description || "",
+      siteStreet: addr.street,
+      siteStreetNumber: addr.streetNumber,
+      sitePostalCode: addr.postalCode,
+      siteCity: addr.city,
+      siteProvince: addr.province,
     });
   };
 
@@ -498,20 +500,20 @@ function ProposalsPageContent() {
           <DialogHeader><DialogTitle>Nuova Offerta</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
-              <Label>Parti da un&apos;offerta esistente <span className="font-normal text-slate-500">(opzionale)</span></Label>
+              <Label>Parti da una commessa esistente <span className="font-normal text-slate-500">(opzionale)</span></Label>
               <SearchableSelect
-                options={proposals.map((p) => ({
-                  value: p.id,
-                  label: p.title,
-                  description: [p.clientName, siteLine(p)].filter(Boolean).join(" · ") || undefined,
+                options={jobs.map((j) => ({
+                  value: j.id,
+                  label: `${j.code} · ${j.name}`,
+                  description: [j.clientName, j.siteAddress].filter(Boolean).join(" · ") || undefined,
                 }))}
-                value={sourceProposalId}
-                onValueChange={applySourceProposal}
+                value={sourceJobId}
+                onValueChange={applySourceJob}
                 placeholder="Nessuna: offerta del tutto nuova"
-                searchPlaceholder="Cerca per titolo o committente..."
-                emptyMessage="Nessuna offerta trovata."
+                searchPlaceholder="Cerca per codice, nome o committente..."
+                emptyMessage="Nessuna commessa trovata."
               />
-              <p className="text-xs text-slate-500">Copia committente, titolo, descrizione, valore, indirizzo e note: poi modifichi quello che cambia.</p>
+              <p className="text-xs text-slate-500">Copia committente, nome, descrizione e indirizzo del cantiere: poi modifichi quello che cambia.</p>
             </div>
             <div className="space-y-1">
               <Label>Committente *</Label>
@@ -602,6 +604,14 @@ function ProposalsPageContent() {
               <Label>Ragione Sociale / Nome *</Label>
               <Input value={quickClientForm.name} onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })} placeholder="Inserisci il nome dell'azienda o del cliente" />
             </div>
+            <DuplicateClientsNotice
+              name={quickClientForm.name}
+              vatNumber={quickClientForm.vatNumber}
+              street={quickClientForm.street}
+              streetNumber={quickClientForm.streetNumber}
+              postalCode={quickClientForm.postalCode}
+              city={quickClientForm.city}
+            />
             <div className="space-y-4 border-t border-b py-4 border-slate-100">
               <h3 className="font-medium text-slate-900 dark:text-white text-sm">Indirizzo Sede</h3>
               <div className="grid grid-cols-4 gap-4">

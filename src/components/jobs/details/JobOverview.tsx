@@ -45,6 +45,11 @@ interface JobOverviewProps {
   onJobUpdated?: () => void
 }
 
+const localToday = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: JobOverviewProps) {
   const router = useRouter()
   const { userRole } = useAuth()
@@ -105,7 +110,9 @@ export function JobOverview({ job, totalCost, totalHours = 0, onJobUpdated }: Jo
     try {
       setIsSaving(true)
       const becomesCompleted = job.status !== 'completed' && editForm.status === 'completed'
-      await jobsApi.update(job.id, editForm, updateExistingMovements)
+      // Completata: la fine cantiere diventa il giorno del cambio di stato (salvo che l'abbia modificata a mano)
+      const payload = becomesCompleted && editForm.endDate === job.endDate ? { ...editForm, endDate: localToday() } : editForm
+      await jobsApi.update(job.id, payload, updateExistingMovements)
       setIsEditOpen(false)
       if (becomesCompleted && (userRole === 'admin' || userRole === 'operativo')) {
         setPortalReason("completed")
