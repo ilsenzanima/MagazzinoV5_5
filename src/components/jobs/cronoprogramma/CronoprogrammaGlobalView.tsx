@@ -51,9 +51,10 @@ function jobColorClass(jobId: string): string {
     return `job-color-${hash % JOB_COLOR_COUNT}`
 }
 
-type StatusFilter = "active" | "all" | "suspended" | "completed"
+type StatusFilter = "onsite" | "active" | "all" | "suspended" | "completed"
 
 const STATUS_FILTER_LABEL: Record<StatusFilter, string> = {
+    onsite: "In cantiere",
     active: "Attive",
     all: "Tutte",
     suspended: "Sospese",
@@ -67,8 +68,11 @@ const JOB_TO_TASK_STATUS: Record<string, JobTask['status']> = {
     suspended: "delayed",
 }
 
-const SUMMARY_PREFIX = "job:"
+const SUMMARY_PREFIX = "job-" // niente ":" negli id: frappe-gantt li usa nei selettori CSS
 const isSummaryId = (id: string) => id.startsWith(SUMMARY_PREFIX)
+
+const matchesStatus = (job: Job, filter: StatusFilter) =>
+    filter === "all" ? true : filter === "onsite" ? job.status === "active" && !!job.onSite : job.status === filter
 
 const localToday = () => {
     const d = new Date()
@@ -96,7 +100,7 @@ export function CronoprogrammaGlobalView() {
     const [workers, setWorkers] = useState<Worker[]>([])
     const [links, setLinks] = useState<Map<string, JobChainItem[]>>(new Map())
     const [loading, setLoading] = useState(true)
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>("active")
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("onsite")
     const [jobFilter, setJobFilter] = useState<string>("all")
     const [showPhases, setShowPhases] = useState(true)
     const [isFormOpen, setIsFormOpen] = useState(false)
@@ -149,17 +153,30 @@ export function CronoprogrammaGlobalView() {
             return `${first}|${members.length > 1 ? root : j.id}`
         }
         return jobs
-            .filter(j => (statusFilter === "all" || j.status === statusFilter) && (jobFilter === "all" || j.id === jobFilter))
+            .filter(j => matchesStatus(j, statusFilter) && (jobFilter === "all" || j.id === jobFilter))
             .filter(j => startOf(j))
             .sort((x, y) => groupKey(x).localeCompare(groupKey(y)) || startOf(x).localeCompare(startOf(y)))
     }, [jobs, links, tasksByJob, statusFilter, jobFilter])
 
-    // Riga di riepilogo con il periodo reale della commessa (fine mancante = oggi, finché è aperta)
+    const lastPresenceByJob = useMemo(() => {
+        const map = new Map<string, string>()
+        attendance.forEach(a => {
+            if (!a.jobId || (a.status !== 'presence' && a.status !== 'transfer')) return
+            const known = map.get(a.jobId)
+            if (!known || a.date > known) map.set(a.jobId, a.date)
+        })
+        return map
+    }, [attendance])
+
+    // Riga di riepilogo con il periodo reale della commessa. Senza data di fine: se è in cantiere arriva a oggi,
+    // altrimenti si ferma all'ultima presenza registrata (una commessa attiva ma ferma non si allunga all'infinito)
     const summaryRow = (job: Job): JobTask => {
         const jobTasks = tasksByJob.get(job.id) ?? []
         const start = (job.startDate || jobTasks[0]?.startDate || "").slice(0, 10)
         const lastTaskEnd = jobTasks.map(t => t.endDate).sort().slice(-1)[0]
-        let end = (job.endDate || "").slice(0, 10) || (job.status === "completed" ? (lastTaskEnd || start) : localToday())
+        const lastPresence = lastPresenceByJob.get(job.id)
+        const idleEnd = lastPresence && lastPresence >= start ? lastPresence : (lastTaskEnd || start)
+        let end = (job.endDate || "").slice(0, 10) || (job.status === "active" && job.onSite ? localToday() : idleEnd)
         if (end < start) end = start
         return {
             id: SUMMARY_PREFIX + job.id,
@@ -181,12 +198,12 @@ export function CronoprogrammaGlobalView() {
     const rows = useMemo(
         () => visibleJobs.flatMap(job => [summaryRow(job), ...(showPhases ? (tasksByJob.get(job.id) ?? []) : [])]),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [visibleJobs, tasksByJob, showPhases]
+        [visibleJobs, tasksByJob, showPhases, lastPresenceByJob]
     )
 
     // Presenze: si leggono solo per il periodo che si sta guardando
-    const rangeFrom = rows.map(r => r.startDate).sort()[0]
-    const rangeTo = rows.map(r => r.endDate).sort().slice(-1)[0]
+    const rangeFrom = visibleJobs.map(j => (j.startDate || tasksByJob.get(j.id)?.[0]?.startDate || "").slice(0, 10)).filter(Boolean).sort()[0]
+    const rangeTo = rangeFrom ? [localToday(), ...visibleJobs.map(j => (j.endDate || "").slice(0, 10))].sort().slice(-1)[0] : undefined
     useEffect(() => {
         if (!rangeFrom || !rangeTo) { setAttendance([]); return }
         let cancelled = false
@@ -240,7 +257,7 @@ export function CronoprogrammaGlobalView() {
         () => [
             { value: "all", label: "Tutte le commesse" },
             ...jobs
-                .filter(j => statusFilter === "all" || j.status === statusFilter)
+                .filter(j => matchesStatus(j, statusFilter))
                 .map(j => ({ value: j.id, label: `${j.code} · ${j.name}`, description: j.clientName || undefined })),
         ],
         [jobs, statusFilter]
@@ -428,7 +445,7 @@ export function CronoprogrammaGlobalView() {
                             />
                             <div className="space-y-1 text-[11px] text-slate-400">
                                 <p>
-                                    Barra scura = periodo della commessa (dall&apos;inizio alla fine; se è ancora aperta arriva a oggi). Clic sulla barra per aprire la commessa.
+                                    Barra scura = periodo della commessa (dall&apos;inizio alla fine; senza data di fine arriva a oggi se è in cantiere, altrimenti all&apos;ultima presenza). Clic sulla barra per aprire la commessa. Per spostarti trascina lo sfondo del diagramma o usa le frecce.
                                 </p>
                                 <p>
                                     <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-emerald-500 text-white text-[8px] align-middle">n</span> sotto la barra = numero di lavoratori presenti quel giorno sul cantiere. Per le commesse senza fasi i puntini sono sotto la barra del periodo.

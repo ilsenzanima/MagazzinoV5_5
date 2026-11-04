@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import "@/styles/frappe-gantt.css";
 import { JobTask } from "@/lib/api";
 
@@ -46,6 +47,33 @@ interface TimelineChartProps {
 
 export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
+    // Posizione di scorrimento tra un ridisegno e l'altro (il diagramma si rifà a ogni modifica)
+    const savedScroll = useRef<{ left: number; top: number } | null>(null);
+    const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+
+    const scroller = () => containerRef.current?.querySelector(".gantt-container") as HTMLElement | null;
+    const scrollByPage = (dir: 1 | -1) => {
+        const el = scroller();
+        if (el) el.scrollBy({ left: dir * el.clientWidth * 0.6, behavior: "smooth" });
+    };
+
+    // Trascinando lo sfondo ci si sposta nel tempo (le barre e le maniglie restano trascinabili)
+    const onPointerDown = (e: React.PointerEvent) => {
+        if (e.pointerType !== "mouse" || e.button !== 0) return;
+        if ((e.target as HTMLElement).closest(".bar-wrapper, .handle, .popup-wrapper, .side-header, button, select")) return;
+        const el = scroller();
+        if (!el) return;
+        drag.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    };
+    const onPointerMove = (e: React.PointerEvent) => {
+        if (!drag.current) return;
+        const el = scroller();
+        if (!el) return;
+        el.scrollLeft = drag.current.left - (e.clientX - drag.current.x);
+        el.scrollTop = drag.current.top - (e.clientY - drag.current.y);
+    };
+    const endDrag = () => { drag.current = null; };
 
     useEffect(() => {
         if (!containerRef.current || tasks.length === 0) return;
@@ -80,6 +108,19 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
                     const original = tasks.find(t => t.id === task.id);
                     if (original) set_details(popupContent(original));
                 } : undefined,
+            });
+
+            // Posizione: quella di prima se si sta ridisegnando, altrimenti con «oggi» a circa due terzi dello schermo
+            requestAnimationFrame(() => {
+                const el = scroller();
+                if (cancelled || !el) return;
+                if (savedScroll.current) {
+                    el.scrollLeft = savedScroll.current.left;
+                    el.scrollTop = savedScroll.current.top;
+                    return;
+                }
+                const today = el.querySelector(".current-highlight") as HTMLElement | null;
+                if (today) el.scrollLeft = Math.max(0, today.offsetLeft - el.clientWidth * 0.66);
             });
 
             if (cancelled || !rowPresence || !containerRef.current) return;
@@ -142,6 +183,8 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
 
         return () => {
             cancelled = true;
+            const el = scroller();
+            if (el) savedScroll.current = { left: el.scrollLeft, top: el.scrollTop };
             if (containerRef.current) containerRef.current.innerHTML = "";
         };
     }, [tasks, taskLabel, isSummary, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly]);
@@ -159,11 +202,25 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
     const minHeight = HEADER_HEIGHT + tasks.length * (BAR_HEIGHT + BAR_PADDING);
 
     return (
-        <div
-            className="w-full overflow-x-auto overflow-y-visible border rounded-md bg-white dark:bg-slate-900"
-            style={{ minHeight }}
-        >
-            <div ref={containerRef} className="w-full" />
+        <div className="space-y-2">
+            <div className="flex items-center justify-end gap-1">
+                <button type="button" onClick={() => scrollByPage(-1)} aria-label="Indietro nel tempo" className="rounded-md border p-1 text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => scrollByPage(1)} aria-label="Avanti nel tempo" className="rounded-md border p-1 text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <ChevronRight className="h-4 w-4" />
+                </button>
+            </div>
+            <div
+                className="w-full overflow-x-auto overflow-y-visible border rounded-md bg-white dark:bg-slate-900 cursor-grab active:cursor-grabbing"
+                style={{ minHeight }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+            >
+                <div ref={containerRef} className="w-full" />
+            </div>
         </div>
     );
 }
