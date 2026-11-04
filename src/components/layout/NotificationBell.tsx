@@ -6,6 +6,7 @@ import { AlertTriangle, Bell, CalendarClock, Euro, HardDrive, HeartPulse, Loader
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   NotificationPreferences,
@@ -46,6 +47,7 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ onNavigate }: NotificationBellProps) {
+  const { isMobile } = useIsMobile();
   const { user, userRole } = useAuth();
   // Gli avvisi sui prezzi di commessa servono a chi gestisce le commesse
   const canSeeJobPrices = userRole === "admin" || userRole === "operativo";
@@ -153,7 +155,14 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent side="right" align="end" sideOffset={8} className="w-80 p-0">
+      {/* Da telefono il pannello sta sopra la campanella e non esce dallo schermo; da PC si apre di lato */}
+      <PopoverContent
+        side={isMobile ? "top" : "right"}
+        align="end"
+        sideOffset={8}
+        collisionPadding={8}
+        className="w-80 max-w-[calc(100vw-1rem)] p-0"
+      >
         <div className="flex items-center justify-between px-3 py-2 border-b">
           <div>
             <p className="text-sm font-semibold">Notifiche</p>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,11 @@ import { GanttChartSquare, ExternalLink, Loader2, Plus, Trash2, Users } from "lu
 import { jobTasksApi, jobsApi, attendanceApi, jobTaskAssignmentsApi, workersApi, JobTask, Job, Attendance, JobTaskAssignment, Worker } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
+import { SearchableSelect } from "@/components/ui/searchable-select"
+import { HelpTip } from "@/components/ui/help-tip"
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
+import { buildJobLinks } from "@/lib/utils/job-links"
+import type { JobChainItem } from "@/lib/types"
 
 const STATUS_LABEL: Record<JobTask['status'], string> = {
     planned: "Pianificata",
@@ -46,6 +52,40 @@ function jobColorClass(jobId: string): string {
     return `job-color-${hash % JOB_COLOR_COUNT}`
 }
 
+type StatusFilter = "onsite" | "active" | "all" | "suspended" | "completed"
+
+const STATUS_FILTER_LABEL: Record<StatusFilter, string> = {
+    onsite: "In cantiere",
+    active: "Attive",
+    all: "Tutte",
+    suspended: "Sospese",
+    completed: "Completate",
+}
+
+// Stato della commessa -> colore della barra di riepilogo (blu in corso, verde conclusa, arancio sospesa)
+const JOB_TO_TASK_STATUS: Record<string, JobTask['status']> = {
+    active: "in_progress",
+    completed: "completed",
+    suspended: "delayed",
+}
+
+const SUMMARY_PREFIX = "job-" // niente ":" negli id: frappe-gantt li usa nei selettori CSS
+const isSummaryId = (id: string) => id.startsWith(SUMMARY_PREFIX)
+
+const matchesStatus = (job: Job, filter: StatusFilter) =>
+    filter === "all" ? true : filter === "onsite" ? job.status === "active" && !!job.onSite : job.status === filter
+
+// Vuoto di presenze (in giorni) oltre il quale il lavoro si considera interrotto: la barra si spezza
+const GAP_DAYS = 7
+
+const daysBetween = (a: string, b: string) =>
+    Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000)
+
+const localToday = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const emptyForm = {
     jobId: "",
     name: "",
@@ -59,40 +99,38 @@ const emptyForm = {
 }
 
 export function CronoprogrammaGlobalView() {
+    const router = useRouter()
     const [tasks, setTasks] = useState<JobTask[]>([])
     const [jobs, setJobs] = useState<Job[]>([])
     const [attendance, setAttendance] = useState<Attendance[]>([])
     const [assignments, setAssignments] = useState<JobTaskAssignment[]>([])
     const [workers, setWorkers] = useState<Worker[]>([])
+    const [links, setLinks] = useState<Map<string, JobChainItem[]>>(new Map())
     const [loading, setLoading] = useState(true)
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("onsite")
     const [jobFilter, setJobFilter] = useState<string>("all")
+    const [showPhases, setShowPhases] = useState(true)
     const [isFormOpen, setIsFormOpen] = useState(false)
     const [editingTask, setEditingTask] = useState<JobTask | null>(null)
+    const [taskToDelete, setTaskToDelete] = useState<string | null>(null)
     const [form, setForm] = useState(emptyForm)
 
     const load = async () => {
         try {
             setLoading(true)
-            const [tasksData, jobsData, workersData] = await Promise.all([
+            const [tasksData, jobsData, workersData, linkRows] = await Promise.all([
                 jobTasksApi.getAll(),
                 jobsApi.getAll(),
                 workersApi.getAll(),
+                jobsApi.getLinkRows().catch(() => [] as JobChainItem[]),
             ])
             setTasks(tasksData)
             setJobs(jobsData)
             setWorkers(workersData)
+            setLinks(buildJobLinks(linkRows))
 
             const assignmentsData = await jobTaskAssignmentsApi.getByTaskIds(tasksData.map(t => t.id))
             setAssignments(assignmentsData)
-
-            const allDates = [
-                ...jobsData.flatMap(j => [j.startDate, j.endDate]),
-                ...tasksData.flatMap(t => [t.startDate, t.endDate]),
-            ].filter(Boolean).sort()
-            if (allDates.length > 0) {
-                const attendanceData = await attendanceApi.getByRange(allDates[0], allDates[allDates.length - 1])
-                setAttendance(attendanceData)
-            }
         } catch (err) {
             console.error("Errore caricamento cronoprogramma globale:", err)
             notify.error("Errore nel caricamento del cronoprogramma")
@@ -105,7 +143,120 @@ export function CronoprogrammaGlobalView() {
 
     const assignmentsByTask = (taskId: string) => assignments.filter(a => a.taskId === taskId)
 
+    const tasksByJob = useMemo(() => {
+        const map = new Map<string, JobTask[]>()
+        tasks.forEach(t => map.set(t.jobId, [...(map.get(t.jobId) ?? []), t]))
+        map.forEach(list => list.sort((x, y) => x.startDate.localeCompare(y.startDate)))
+        return map
+    }, [tasks])
+
+    // Commesse da mostrare: filtro per stato e per commessa; quelle dello stesso cantiere restano vicine
+    const visibleJobs = useMemo(() => {
+        const startOf = (j: Job) => (j.startDate || tasksByJob.get(j.id)?.[0]?.startDate || "").slice(0, 10)
+        const groupKey = (j: Job) => {
+            const members = [j, ...(links.get(j.id) ?? []).map(l => jobs.find(x => x.id === l.id)).filter((x): x is Job => !!x)]
+            const first = members.map(startOf).filter(Boolean).sort()[0] ?? ""
+            const root = members.map(m => m.id).sort()[0]
+            return `${first}|${members.length > 1 ? root : j.id}`
+        }
+        return jobs
+            .filter(j => matchesStatus(j, statusFilter) && (jobFilter === "all" || j.id === jobFilter))
+            .filter(j => startOf(j))
+            .sort((x, y) => groupKey(x).localeCompare(groupKey(y)) || startOf(x).localeCompare(startOf(y)))
+    }, [jobs, links, tasksByJob, statusFilter, jobFilter])
+
+    // Prima e ultima presenza registrate per commessa
+    const presenceSpanByJob = useMemo(() => {
+        const map = new Map<string, { first: string; last: string }>()
+        attendance.forEach(a => {
+            if (!a.jobId || (a.status !== 'presence' && a.status !== 'transfer')) return
+            const span = map.get(a.jobId)
+            if (!span) map.set(a.jobId, { first: a.date, last: a.date })
+            else {
+                if (a.date < span.first) span.first = a.date
+                if (a.date > span.last) span.last = a.date
+            }
+        })
+        return map
+    }, [attendance])
+
+    // Giorni con almeno una presenza, per commessa
+    const presenceDatesByJob = useMemo(() => {
+        const sets = new Map<string, Set<string>>()
+        attendance.forEach(a => {
+            if (!a.jobId || (a.status !== 'presence' && a.status !== 'transfer')) return
+            if (!sets.has(a.jobId)) sets.set(a.jobId, new Set())
+            sets.get(a.jobId)!.add(a.date)
+        })
+        return new Map(Array.from(sets, ([id, set]) => [id, Array.from(set).sort()]))
+    }, [attendance])
+
+    // Tratti di lavoro: giorni di presenza uniti finché il vuoto tra uno e l'altro non supera GAP_DAYS
+    const segmentsOf = (task: JobTask) => {
+        if (!isSummaryId(task.id)) return null
+        const dates = presenceDatesByJob.get(task.jobId)
+        if (!dates || dates.length === 0) return null
+        const out: { start: string; end: string }[] = []
+        let start = dates[0]
+        let prev = dates[0]
+        for (const d of dates.slice(1)) {
+            if (daysBetween(prev, d) > GAP_DAYS) { out.push({ start, end: prev }); start = d }
+            prev = d
+        }
+        out.push({ start, end: prev })
+        return out
+    }
+
+    // Riga di riepilogo: i giorni in cui si è davvero lavorato, dalla prima all'ultima presenza registrata (le date di
+    // inizio e fine della commessa restano nella scheda e nel popup). Senza presenze si usano le date della commessa
+    const summaryRow = (job: Job): JobTask => {
+        const jobTasks = tasksByJob.get(job.id) ?? []
+        const span = presenceSpanByJob.get(job.id)
+        const jobStart = (job.startDate || jobTasks[0]?.startDate || "").slice(0, 10)
+        const lastTaskEnd = jobTasks.map(t => t.endDate).sort().slice(-1)[0]
+        const jobEnd = (job.endDate || "").slice(0, 10)
+        const start = span ? span.first : jobStart
+        let end = span ? span.last : (jobEnd || (job.status === "active" && job.onSite ? localToday() : (lastTaskEnd || jobStart)))
+        if (end < start) end = start
+        return {
+            id: SUMMARY_PREFIX + job.id,
+            jobId: job.id,
+            jobCode: job.code,
+            jobName: job.name,
+            jobStatus: job.status,
+            name: `${job.code} · ${job.name}`,
+            startDate: start,
+            endDate: end,
+            progress: 0,
+            status: JOB_TO_TASK_STATUS[job.status] ?? "planned",
+            sortOrder: 0,
+            createdAt: "",
+        }
+    }
+
+    // Righe del diagramma: per ogni commessa il riepilogo e, sotto, le sue fasi
+    const rows = useMemo(
+        () => visibleJobs.flatMap(job => [summaryRow(job), ...(showPhases ? (tasksByJob.get(job.id) ?? []) : [])]),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [visibleJobs, tasksByJob, showPhases, presenceSpanByJob]
+    )
+
+    // Presenze: si leggono solo per il periodo che si sta guardando
+    const rangeFrom = visibleJobs.map(j => (j.startDate || tasksByJob.get(j.id)?.[0]?.startDate || "").slice(0, 10)).filter(Boolean).sort()[0]
+    const rangeTo = rangeFrom ? [localToday(), ...visibleJobs.map(j => (j.endDate || "").slice(0, 10))].sort().slice(-1)[0] : undefined
+    useEffect(() => {
+        if (!rangeFrom || !rangeTo) { setAttendance([]); return }
+        let cancelled = false
+        attendanceApi.getByRange(rangeFrom, rangeTo)
+            .then(data => { if (!cancelled) setAttendance(data) })
+            .catch(err => console.error("Errore caricamento presenze:", err))
+        return () => { cancelled = true }
+    }, [rangeFrom, rangeTo])
+
+    // Presenze del cantiere giorno per giorno. Sotto la riga di riepilogo solo se la commessa non ha fasi:
+    // è il modo di vedere dove si è lavorato anche senza un cronoprogramma inserito
     const rowPresence = (task: JobTask) => {
+        if (isSummaryId(task.id) && showPhases && (tasksByJob.get(task.jobId)?.length ?? 0) > 0) return new Map<string, number>()
         const workersByDate = new Map<string, Set<string>>()
         attendance.filter(a => a.jobId === task.jobId && (a.status === 'presence' || a.status === 'transfer')).forEach(a => {
             if (!workersByDate.has(a.date)) workersByDate.set(a.date, new Set())
@@ -121,6 +272,11 @@ export function CronoprogrammaGlobalView() {
         const planned = assignmentsByTask(task.id)
 
         const parts: string[] = []
+        if (isSummaryId(task.id)) {
+            const job = jobs.find(j => j.id === task.jobId)
+            parts.push(`<div class="text-xs mb-1">Presenze dal <strong>${task.startDate}</strong> al <strong>${task.endDate}</strong></div>`)
+            if (job) parts.push(`<div class="text-xs mb-1 text-slate-500">Commessa: inizio ${(job.startDate || '—').slice(0, 10)}, fine ${job.endDate ? job.endDate.slice(0, 10) : 'non indicata'}</div>`)
+        }
         if (planned.length > 0) {
             const rows = planned.map(p => {
                 const showedUp = presentWorkerIds.has(p.workerId)
@@ -139,15 +295,14 @@ export function CronoprogrammaGlobalView() {
         return parts.join('')
     }
 
-    const jobOptions = useMemo(() => {
-        const map = new Map<string, string>()
-        tasks.forEach(t => map.set(t.jobId, t.jobName || ''))
-        return Array.from(map.entries())
-    }, [tasks])
-
-    const filteredTasks = useMemo(
-        () => jobFilter === "all" ? tasks : tasks.filter(t => t.jobId === jobFilter),
-        [tasks, jobFilter]
+    const jobOptions = useMemo(
+        () => [
+            { value: "all", label: "Tutte le commesse" },
+            ...jobs
+                .filter(j => matchesStatus(j, statusFilter))
+                .map(j => ({ value: j.id, label: `${j.code} · ${j.name}`, description: j.clientName || undefined })),
+        ],
+        [jobs, statusFilter]
     )
 
     const openCreate = () => {
@@ -170,6 +325,13 @@ export function CronoprogrammaGlobalView() {
             assignedWorkerIds: assignmentsByTask(task.id).map(a => a.workerId),
         })
         setIsFormOpen(true)
+    }
+
+    // Clic su una barra: la fase si modifica qui, la riga della commessa apre la sua scheda
+    const handleTaskClick = (id: string) => {
+        if (isSummaryId(id)) { router.push(`/jobs/${id.slice(SUMMARY_PREFIX.length)}`); return }
+        const t = tasks.find(t => t.id === id)
+        if (t) openEdit(t)
     }
 
     const toggleAssignedWorker = (workerId: string) => {
@@ -213,10 +375,11 @@ export function CronoprogrammaGlobalView() {
         }
     }
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Eliminare questa fase del cronoprogramma?")) return
+    const handleDelete = async () => {
+        if (!taskToDelete) return
         try {
-            await jobTasksApi.delete(id)
+            await jobTasksApi.delete(taskToDelete)
+            setTaskToDelete(null)
             setIsFormOpen(false)
             await load()
         } catch (err) {
@@ -225,7 +388,11 @@ export function CronoprogrammaGlobalView() {
         }
     }
 
+    // La riga di riepilogo è il periodo della commessa: non si sposta da qui, la barra torna dov'era
+    const redraw = () => setTasks(prev => [...prev])
+
     const handleDateChange = async (taskId: string, start: Date, end: Date) => {
+        if (isSummaryId(taskId)) { redraw(); return }
         try {
             await jobTasksApi.update(taskId, {
                 startDate: start.toISOString().slice(0, 10),
@@ -239,6 +406,7 @@ export function CronoprogrammaGlobalView() {
     }
 
     const handleProgressChange = async (taskId: string, progress: number) => {
+        if (isSummaryId(taskId)) { redraw(); return }
         try {
             await jobTasksApi.update(taskId, { progress })
             await load()
@@ -258,73 +426,100 @@ export function CronoprogrammaGlobalView() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6 pb-20">
-            <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="w-full space-y-4 pb-4 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:pb-0">
+            <div className="flex shrink-0 items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                     <GanttChartSquare className="h-6 w-6 text-blue-600" />
                     <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Cronoprogramma Commesse</h1>
+                    <HelpTip
+                        wide
+                        title="Come leggere il cronoprogramma"
+                        lines={[
+                            "Barra scura = giorni di lavoro: si spezza dove la commessa è rimasta ferma più di una settimana, con un filo tratteggiato nel vuoto (senza presenze, il periodo della commessa). Passandoci sopra si vedono anche inizio e fine della commessa. Clic sulla barra per aprirla.",
+                            "↳ = fasi della commessa: trascina la barra per spostarle, clic per modificarle.",
+                            "Puntini verdi = numero di lavoratori presenti quel giorno sul cantiere (si vedono nelle scale Settimane e Giorni). Per le commesse senza fasi sono sotto la barra del periodo.",
+                            "Rotella = cambia la scala del tempo (anni, mesi, settimane, giorni).",
+                            "Trascina lo sfondo = spostati nel tempo e tra le commesse; le frecce scorrono a destra e a sinistra.",
+                            "Filtro «In cantiere» = commesse attive con la spunta «in cantiere»; «Attive» comprende anche quelle ferme.",
+                        ]}
+                    />
                 </div>
-                <div className="flex items-center gap-2">
-                    <Select value={jobFilter} onValueChange={setJobFilter}>
-                        <SelectTrigger className="w-64">
-                            <SelectValue placeholder="Tutte le commesse" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tutte le commesse</SelectItem>
-                            {jobOptions.map(([id, label]) => (
-                                <SelectItem key={id} value={id}>{label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button size="sm" onClick={openCreate}>
-                        <Plus className="h-4 w-4 mr-1" />Aggiungi fase
-                    </Button>
-                </div>
+                <Button size="sm" onClick={openCreate}>
+                    <Plus className="h-4 w-4 mr-1" />Aggiungi fase
+                </Button>
             </div>
 
-            {filteredTasks.length === 0 ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
+                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setJobFilter("all") }}>
+                    <SelectTrigger className="w-40" aria-label="Stato commesse"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {(Object.keys(STATUS_FILTER_LABEL) as StatusFilter[]).map(k => (
+                            <SelectItem key={k} value={k}>{STATUS_FILTER_LABEL[k]}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <div className="w-72 max-w-full">
+                    <SearchableSelect
+                        options={jobOptions}
+                        value={jobFilter}
+                        onValueChange={(v) => setJobFilter(v || "all")}
+                        placeholder="Tutte le commesse"
+                        searchPlaceholder="Cerca per codice, nome o committente..."
+                        emptyMessage="Nessuna commessa trovata."
+                    />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+                    <Checkbox checked={showPhases} onCheckedChange={(v) => setShowPhases(v === true)} />
+                    Mostra le fasi
+                </label>
+            </div>
+
+            {rows.length === 0 ? (
                 <div className="text-center py-16 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700">
                     <GanttChartSquare className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                    <p>Nessuna fase pianificata.</p>
-                    <p className="text-sm">Usa il pulsante &quot;Aggiungi fase&quot; per crearne una direttamente da qui.</p>
+                    <p>Nessuna commessa da mostrare con questi filtri.</p>
+                    <p className="text-sm">Cambia lo stato o scegli &quot;Tutte le commesse&quot;.</p>
                 </div>
             ) : (
                 <>
-                    {/* Unico diagramma di Gantt con tutte le commesse */}
-                    <Card>
-                        <CardContent className="py-4 space-y-4">
+                    {/* Un unico diagramma: per ogni commessa il suo periodo reale e, sotto, le fasi */}
+                    <Card className="lg:min-h-0 lg:flex-1">
+                        <CardContent className="py-3 lg:h-full">
                             <TimelineChart
-                                tasks={filteredTasks}
-                                taskLabel={(t) => `${t.jobName ? t.jobName + ' · ' : ''}${t.name}`}
+                                fill
+                                tasks={rows}
+                                taskLabel={(t) => isSummaryId(t.id) ? t.name : `↳ ${t.name}`}
+                                isSummary={(t) => isSummaryId(t.id)}
+                                segments={segmentsOf}
                                 barClass={(t) => jobColorClass(t.jobId)}
                                 popupContent={presencePopupContent}
                                 rowPresence={rowPresence}
                                 readonly={false}
-                                onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
+                                onTaskClick={handleTaskClick}
                                 onDateChange={handleDateChange}
                                 onProgressChange={handleProgressChange}
                             />
-                            <p className="text-[11px] text-slate-400">
-                                <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-emerald-500 text-white text-[8px] align-middle">n</span> sotto la barra = numero di lavoratori presenti quel giorno sul cantiere
-                            </p>
                         </CardContent>
                     </Card>
 
                     {/* Lista compatta per mobile, raggruppata per commessa */}
                     <div className="md:hidden space-y-4">
-                        {Array.from(new Set(filteredTasks.map(t => t.jobId))).map(jobId => {
-                            const jobTasks = filteredTasks.filter(t => t.jobId === jobId)
-                            const label = jobTasks[0].jobName || ''
+                        {visibleJobs.map(job => {
+                            const jobTasks = tasksByJob.get(job.id) ?? []
+                            const summary = summaryRow(job)
                             return (
-                                <Card key={jobId}>
+                                <Card key={job.id}>
                                     <CardContent className="py-3 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <h2 className="font-semibold text-sm text-slate-800 dark:text-slate-100">{label}</h2>
-                                            <Link href={`/jobs/${jobId}`} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <h2 className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{job.code} · {job.name}</h2>
+                                                <p className="text-xs text-slate-500">{summary.startDate} → {summary.endDate}</p>
+                                            </div>
+                                            <Link href={`/jobs/${job.id}`} className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">
                                                 Apri <ExternalLink className="h-3 w-3" />
                                             </Link>
                                         </div>
-                                        {jobTasks.map(task => (
+                                        {showPhases && jobTasks.map(task => (
                                             <button
                                                 key={task.id}
                                                 onClick={() => openEdit(task)}
@@ -380,7 +575,7 @@ export function CronoprogrammaGlobalView() {
                                 <SelectContent>
                                     {jobs.filter(job => job.status !== 'completed').map(job => (
                                         <SelectItem key={job.id} value={job.id}>
-                                            {job.name} ({JOB_STATUS_LABEL[job.status] || job.status})
+                                            {job.code} · {job.name} ({JOB_STATUS_LABEL[job.status] || job.status})
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -483,7 +678,7 @@ export function CronoprogrammaGlobalView() {
                     </div>
                     <DialogFooter className="flex items-center justify-between sm:justify-between">
                         {editingTask && (
-                            <Button variant="ghost" className="text-red-600" onClick={() => handleDelete(editingTask.id)}>
+                            <Button variant="ghost" className="text-red-600" onClick={() => setTaskToDelete(editingTask.id)}>
                                 <Trash2 className="h-4 w-4 mr-1" />Elimina
                             </Button>
                         )}
@@ -494,6 +689,14 @@ export function CronoprogrammaGlobalView() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDeleteDialog
+                open={!!taskToDelete}
+                onOpenChange={(o) => { if (!o) setTaskToDelete(null) }}
+                title="Elimina fase"
+                description="Eliminare questa fase del cronoprogramma?"
+                onConfirm={handleDelete}
+            />
         </div>
     )
 }
