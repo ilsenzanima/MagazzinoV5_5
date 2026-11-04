@@ -174,19 +174,16 @@ export function CronoprogrammaGlobalView() {
         return map
     }, [attendance])
 
-    // Riga di riepilogo con il periodo reale della commessa. Inizio: la data di inizio, o la prima presenza se viene prima.
-    // Fine: per una commessa conclusa la sua data di fine; per le altre l'ultima presenza registrata (la data di fine
-    // prevista non conta, altrimenti la barra supera i giorni davvero lavorati). Senza presenze: oggi se è in cantiere
+    // Riga di riepilogo: i giorni in cui si è davvero lavorato, dalla prima all'ultima presenza registrata (le date di
+    // inizio e fine della commessa restano nella scheda e nel popup). Senza presenze si usano le date della commessa
     const summaryRow = (job: Job): JobTask => {
         const jobTasks = tasksByJob.get(job.id) ?? []
         const span = presenceSpanByJob.get(job.id)
-        const plannedStart = (job.startDate || jobTasks[0]?.startDate || "").slice(0, 10)
-        const start = span && span.first < plannedStart ? span.first : plannedStart
+        const jobStart = (job.startDate || jobTasks[0]?.startDate || "").slice(0, 10)
         const lastTaskEnd = jobTasks.map(t => t.endDate).sort().slice(-1)[0]
         const jobEnd = (job.endDate || "").slice(0, 10)
-        let end: string
-        if (job.status === "completed") end = jobEnd || span?.last || lastTaskEnd || start
-        else end = span?.last || jobEnd || (job.status === "active" && job.onSite ? localToday() : (lastTaskEnd || start))
+        const start = span ? span.first : jobStart
+        let end = span ? span.last : (jobEnd || (job.status === "active" && job.onSite ? localToday() : (lastTaskEnd || jobStart)))
         if (end < start) end = start
         return {
             id: SUMMARY_PREFIX + job.id,
@@ -243,7 +240,9 @@ export function CronoprogrammaGlobalView() {
 
         const parts: string[] = []
         if (isSummaryId(task.id)) {
-            parts.push(`<div class="text-xs mb-1"><strong>${task.startDate}</strong> → <strong>${task.endDate}</strong></div>`)
+            const job = jobs.find(j => j.id === task.jobId)
+            parts.push(`<div class="text-xs mb-1">Presenze dal <strong>${task.startDate}</strong> al <strong>${task.endDate}</strong></div>`)
+            if (job) parts.push(`<div class="text-xs mb-1 text-slate-500">Commessa: inizio ${(job.startDate || '—').slice(0, 10)}, fine ${job.endDate ? job.endDate.slice(0, 10) : 'non indicata'}</div>`)
         }
         if (planned.length > 0) {
             const rows = planned.map(p => {
@@ -403,7 +402,7 @@ export function CronoprogrammaGlobalView() {
                         wide
                         title="Come leggere il cronoprogramma"
                         lines={[
-                            "Barra scura = periodo della commessa, dall'inizio all'ultima presenza registrata (per le concluse, fino alla data di fine). Clic sulla barra per aprire la commessa.",
+                            "Barra scura = giorni di lavoro, dalla prima all'ultima presenza registrata (senza presenze, il periodo della commessa). Passandoci sopra si vedono anche inizio e fine della commessa. Clic sulla barra per aprirla.",
                             "↳ = fasi della commessa: trascina la barra per spostarle, clic per modificarle.",
                             "Puntini verdi = numero di lavoratori presenti quel giorno sul cantiere (si vedono nelle scale Settimane e Giorni). Per le commesse senza fasi sono sotto la barra del periodo.",
                             "Rotella = cambia la scala del tempo (anni, mesi, settimane, giorni).",
