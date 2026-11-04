@@ -141,7 +141,7 @@ export function TimelineChart({ tasks, taskLabel, isSummary, segments, barClass,
 
     // Trascinando lo sfondo ci si sposta nel tempo (le barre e le maniglie restano trascinabili)
     const onPointerDown = (e: React.PointerEvent) => {
-        if (e.pointerType !== "mouse" || e.button !== 0) return;
+        if (e.pointerType === "mouse" && e.button !== 0) return;
         if ((e.target as HTMLElement).closest(".bar-wrapper, .handle, .popup-wrapper, .side-header, button, select")) return;
         const el = scroller();
         if (!el) return;
@@ -367,7 +367,7 @@ export function TimelineChart({ tasks, taskLabel, isSummary, segments, barClass,
             {/* Riquadro di altezza fissa (minimo 420px, cresce con lo schermo): dentro ci si muove in tutte le direzioni */}
             <div
                 ref={wrapperRef}
-                className={`gantt-chart-viewport w-full overflow-hidden border rounded-md bg-white dark:bg-slate-900 cursor-grab active:cursor-grabbing ${fill ? "min-h-[300px] flex-1" : ""}`}
+                className={`gantt-chart-viewport w-full overflow-hidden border rounded-md bg-white dark:bg-slate-900 cursor-grab active:cursor-grabbing touch-none ${fill ? "h-[65vh] min-h-[300px] lg:h-auto lg:flex-1" : ""}`}
                 style={fill ? undefined : { height: "clamp(420px, 68vh, 900px)" }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
