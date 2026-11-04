@@ -72,6 +72,8 @@ interface TimelineChartProps {
     taskLabel?: (task: JobTask) => string;
     /** Righe di riepilogo (es. il periodo di una commessa): colore diverso da quello delle fasi */
     isSummary?: (task: JobTask) => boolean;
+    /** Tratti di lavoro continuo di una riga (es. i periodi di presenze di una commessa): la barra si disegna a pezzi con una linea tratteggiata nei vuoti. Null = barra intera */
+    segments?: (task: JobTask) => { start: string; end: string }[] | null;
     /** Classe CSS aggiuntiva per barra (es. colore per commessa nella vista globale) */
     barClass?: (task: JobTask) => string;
     /** HTML mostrato nel popup al click/hover sulla barra (es. presenze registrate nel periodo) */
@@ -86,7 +88,7 @@ interface TimelineChartProps {
     fill?: boolean;
 }
 
-export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false, fill = false }: TimelineChartProps) {
+export function TimelineChart({ tasks, taskLabel, isSummary, segments, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false, fill = false }: TimelineChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     // Posizione di scorrimento tra un ridisegno e l'altro (il diagramma si rifà a ogni modifica)
     const savedScroll = useRef<{ left: number; top: number } | null>(null);
@@ -214,7 +216,7 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
                 if (today) el.scrollLeft = Math.max(0, today.offsetLeft - el.clientWidth * 0.66);
             });
 
-            if (cancelled || !showPresence || !rowPresence || !containerRef.current) return;
+            if (cancelled || (!segments && !(showPresence && rowPresence)) || !containerRef.current) return;
 
             // Disegna sotto ogni barra una striscia di puntini (uno per giorno della fase)
             // posizionata esattamente sulla geometria della barra renderizzata da frappe-gantt,
@@ -223,11 +225,9 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
                 if (cancelled || !containerRef.current) return;
                 const ganttContainer = containerRef.current.querySelector(".gantt-container") as HTMLElement | null;
                 if (!ganttContainer) return;
-                ganttContainer.querySelectorAll(".presence-row-overlay").forEach(el => el.remove());
+                ganttContainer.querySelectorAll(".presence-row-overlay, .segments-row-overlay").forEach(el => el.remove());
 
                 tasks.forEach(t => {
-                    const presenceCounts = rowPresence(t);
-                    if (!presenceCounts || presenceCounts.size === 0) return;
                     const wrapper = ganttContainer.querySelector(`.bar-wrapper[data-id="${t.id}"]`);
                     const bar = wrapper?.querySelector(".bar");
                     if (!bar) return;
@@ -237,6 +237,62 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
                     const height = parseFloat(bar.getAttribute("height") || "0");
                     const days = eachDate(t.startDate, t.endDate);
                     if (days.length === 0 || width <= 0) return;
+
+                    // Barra a tratti: si nasconde quella intera e si disegnano solo i periodi di lavoro, con un filo tratteggiato nei vuoti
+                    const segs = segments?.(t);
+                    if (segs && segs.length > 0) {
+                        const stroke = getComputedStyle(bar as Element).stroke;
+                        const barEl = bar as SVGElement;
+                        barEl.style.setProperty("fill", "transparent", "important");
+                        barEl.style.setProperty("stroke", "transparent", "important");
+                        barEl.style.setProperty("outline", "none", "important");
+                        const barLabel = wrapper?.querySelector(".bar-label") as SVGElement | null;
+                        if (barLabel) barLabel.style.display = "none";
+
+                        const dayIndex = new Map(days.map((d, i) => [d, i]));
+                        const dw = width / days.length;
+                        const layer = document.createElement("div");
+                        layer.className = "segments-row-overlay absolute pointer-events-none";
+                        layer.style.left = `${x}px`;
+                        layer.style.top = `${y}px`;
+                        layer.style.width = `${width}px`;
+                        layer.style.height = `${height}px`;
+                        layer.style.zIndex = "4";
+
+                        const line = document.createElement("div");
+                        line.className = "absolute left-0 right-0";
+                        line.style.top = "50%";
+                        line.style.borderTop = "2px dashed #94a3b8";
+                        layer.appendChild(line);
+
+                        segs.forEach(seg => {
+                            const a = dayIndex.get(seg.start);
+                            const b = dayIndex.get(seg.end);
+                            if (a === undefined || b === undefined) return;
+                            const piece = document.createElement("div");
+                            piece.className = "absolute rounded-[3px]";
+                            piece.style.left = `${a * dw}px`;
+                            piece.style.width = `${Math.max(3, (b - a + 1) * dw)}px`;
+                            piece.style.top = "0";
+                            piece.style.height = "100%";
+                            piece.style.boxSizing = "border-box";
+                            piece.style.background = "#475569";
+                            piece.style.border = `3px solid ${stroke && stroke !== "none" ? stroke : "#475569"}`;
+                            layer.appendChild(piece);
+                        });
+
+                        const label = document.createElement("div");
+                        label.className = "absolute whitespace-nowrap text-[11px] font-medium text-slate-700 dark:text-slate-200";
+                        label.style.left = "0";
+                        label.style.top = "-16px";
+                        label.textContent = taskLabel ? taskLabel(t) : t.name;
+                        layer.appendChild(label);
+                        ganttContainer.appendChild(layer);
+                    }
+
+                    if (!showPresence || !rowPresence) return;
+                    const presenceCounts = rowPresence(t);
+                    if (!presenceCounts || presenceCounts.size === 0) return;
 
                     const overlay = document.createElement("div");
                     overlay.className = "presence-row-overlay absolute pointer-events-none";
@@ -278,7 +334,7 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
             if (el) savedScroll.current = { left: el.scrollLeft, top: el.scrollTop };
             if (containerRef.current) containerRef.current.innerHTML = "";
         };
-    }, [viewMode, tasks, taskLabel, isSummary, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly]);
+    }, [viewMode, tasks, taskLabel, isSummary, segments, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly]);
 
     if (tasks.length === 0) {
         return (

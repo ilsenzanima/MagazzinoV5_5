@@ -75,6 +75,12 @@ const isSummaryId = (id: string) => id.startsWith(SUMMARY_PREFIX)
 const matchesStatus = (job: Job, filter: StatusFilter) =>
     filter === "all" ? true : filter === "onsite" ? job.status === "active" && !!job.onSite : job.status === filter
 
+// Vuoto di presenze (in giorni) oltre il quale il lavoro si considera interrotto: la barra si spezza
+const GAP_DAYS = 7
+
+const daysBetween = (a: string, b: string) =>
+    Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000)
+
 const localToday = () => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -173,6 +179,33 @@ export function CronoprogrammaGlobalView() {
         })
         return map
     }, [attendance])
+
+    // Giorni con almeno una presenza, per commessa
+    const presenceDatesByJob = useMemo(() => {
+        const sets = new Map<string, Set<string>>()
+        attendance.forEach(a => {
+            if (!a.jobId || (a.status !== 'presence' && a.status !== 'transfer')) return
+            if (!sets.has(a.jobId)) sets.set(a.jobId, new Set())
+            sets.get(a.jobId)!.add(a.date)
+        })
+        return new Map(Array.from(sets, ([id, set]) => [id, Array.from(set).sort()]))
+    }, [attendance])
+
+    // Tratti di lavoro: giorni di presenza uniti finché il vuoto tra uno e l'altro non supera GAP_DAYS
+    const segmentsOf = (task: JobTask) => {
+        if (!isSummaryId(task.id)) return null
+        const dates = presenceDatesByJob.get(task.jobId)
+        if (!dates || dates.length === 0) return null
+        const out: { start: string; end: string }[] = []
+        let start = dates[0]
+        let prev = dates[0]
+        for (const d of dates.slice(1)) {
+            if (daysBetween(prev, d) > GAP_DAYS) { out.push({ start, end: prev }); start = d }
+            prev = d
+        }
+        out.push({ start, end: prev })
+        return out
+    }
 
     // Riga di riepilogo: i giorni in cui si è davvero lavorato, dalla prima all'ultima presenza registrata (le date di
     // inizio e fine della commessa restano nella scheda e nel popup). Senza presenze si usano le date della commessa
@@ -402,7 +435,7 @@ export function CronoprogrammaGlobalView() {
                         wide
                         title="Come leggere il cronoprogramma"
                         lines={[
-                            "Barra scura = giorni di lavoro, dalla prima all'ultima presenza registrata (senza presenze, il periodo della commessa). Passandoci sopra si vedono anche inizio e fine della commessa. Clic sulla barra per aprirla.",
+                            "Barra scura = giorni di lavoro: si spezza dove la commessa è rimasta ferma più di una settimana, con un filo tratteggiato nel vuoto (senza presenze, il periodo della commessa). Passandoci sopra si vedono anche inizio e fine della commessa. Clic sulla barra per aprirla.",
                             "↳ = fasi della commessa: trascina la barra per spostarle, clic per modificarle.",
                             "Puntini verdi = numero di lavoratori presenti quel giorno sul cantiere (si vedono nelle scale Settimane e Giorni). Per le commesse senza fasi sono sotto la barra del periodo.",
                             "Rotella = cambia la scala del tempo (anni, mesi, settimane, giorni).",
@@ -457,6 +490,7 @@ export function CronoprogrammaGlobalView() {
                                 tasks={rows}
                                 taskLabel={(t) => isSummaryId(t.id) ? t.name : `↳ ${t.name}`}
                                 isSummary={(t) => isSummaryId(t.id)}
+                                segments={segmentsOf}
                                 barClass={(t) => jobColorClass(t.jobId)}
                                 popupContent={presencePopupContent}
                                 rowPresence={rowPresence}
