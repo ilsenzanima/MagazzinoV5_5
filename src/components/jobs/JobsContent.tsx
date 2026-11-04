@@ -1,10 +1,10 @@
 "use client"
 
 import { notify } from "@/lib/notify";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Briefcase, Calendar, Building, MapPin, Plus, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Briefcase, Calendar, Building, MapPin, Plus, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { JobOnSiteToggle } from "@/components/jobs/JobOnSiteToggle";
 import { ListPageHeader } from "@/components/ui/list-page-header";
@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
 import { Job, jobsApi, clientsApi } from "@/lib/api";
-import { JobCategory, JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
+import { JobCategory, JobChainItem, JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
+import { buildJobLinks } from "@/lib/utils/job-links";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { JobPortalDialog } from "@/components/guest-sites/JobPortalDialog";
@@ -29,6 +30,22 @@ interface JobsContentProps {
 }
 
 type SortKey = "status" | "code" | "name" | "date";
+
+// Numero di commesse collegate (stesso cantiere): cliccandolo l'elenco mostra solo quelle
+function LinkedCount({ count, onClick }: { count: number; onClick: () => void }) {
+  if (count === 0) return <span className="text-slate-300">—</span>;
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      title={`Mostra le ${count} commesse collegate`}
+      className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50/60 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-transparent dark:text-blue-300"
+    >
+      <Link2 className="h-3 w-3" />
+      {count}
+    </button>
+  );
+}
 
 const STATUS_ORDER: Record<string, number> = { active: 0, suspended: 1, completed: 2 };
 
@@ -74,6 +91,10 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const [category, setCategory] = useState<'all' | JobCategory>(isValidCategory(searchParams.get('category')) ? (searchParams.get('category') as JobCategory) : 'all');
   const [status, setStatus] = useState<'all' | JobStatus>(initialStatus && initialStatus in STATUS_CONFIG ? (initialStatus as JobStatus) : 'all');
   const [clientId, setClientId] = useState(searchParams.get('clientId') || "");
+  const [links, setLinks] = useState<Map<string, JobChainItem[]>>(new Map());
+  const [linksReady, setLinksReady] = useState(false);
+  // Se impostata, l'elenco mostra solo le commesse di quel cantiere (quella indicata più le collegate)
+  const [chainJobId, setChainJobId] = useState(searchParams.get('cantiere') || "");
   const [sortKey, setSortKey] = useState<SortKey>((searchParams.get('sort') as SortKey) || 'status');
   const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get('dir') === 'desc' ? 'desc' : 'asc');
   const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
@@ -88,6 +109,10 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const firstLoad = useRef(true);
 
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  const chainIds = useMemo(
+    () => chainJobId ? [chainJobId, ...(links.get(chainJobId)?.map(c => c.id) ?? [])] : undefined,
+    [chainJobId, links]
+  );
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -112,12 +137,13 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
     if (category !== "all") params.set("category", category);
     if (status !== "all") params.set("stato", status);
     if (clientId) params.set("clientId", clientId);
+    if (chainJobId) params.set("cantiere", chainJobId);
     if (sortKey !== "status") params.set("sort", sortKey);
     if (sortDir !== "asc") params.set("dir", sortDir);
     if (page !== 1) params.set("page", String(page));
     const query = params.toString();
     router.replace(query ? `/jobs?${query}` : "/jobs", { scroll: false });
-  }, [debouncedSearch, category, status, clientId, sortKey, sortDir, page, router]);
+  }, [debouncedSearch, category, status, clientId, chainJobId, sortKey, sortDir, page, router]);
 
   // Guards against out-of-order responses: changing page/filter quickly can fire loadJobs() more than once -
   // if an older request resolves after the newer one its result is discarded.
@@ -135,6 +161,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         category: category === 'all' ? undefined : category,
         sort: sortKey,
         dir: sortDir,
+        ids: chainIds,
       });
       if (requestId !== loadRequestId.current) return;
       setJobs(data);
@@ -149,15 +176,24 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   };
 
   useEffect(() => {
+    jobsApi.getLinkRows()
+      .then(rows => setLinks(buildJobLinks(rows)))
+      .catch(e => console.error("Commesse collegate:", e))
+      .finally(() => setLinksReady(true));
+  }, []);
+
+  useEffect(() => {
     // La prima pagina senza filtri arriva già dal server
-    const isDefault = page === 1 && !debouncedSearch && !clientId && category === 'all' && status === 'all' && sortKey === 'status' && sortDir === 'asc';
+    const isDefault = page === 1 && !debouncedSearch && !clientId && category === 'all' && status === 'all' && !chainJobId && sortKey === 'status' && sortDir === 'asc';
     if (firstLoad.current) {
       firstLoad.current = false;
       if (isDefault && initialJobs.length > 0) return;
     }
+    // con il filtro sul cantiere serve prima sapere quali sono le commesse collegate
+    if (chainJobId && !linksReady) return;
     loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, clientId, category, status, sortKey, sortDir]);
+  }, [page, debouncedSearch, clientId, category, status, sortKey, sortDir, chainJobId, linksReady]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -169,8 +205,10 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const changeCategory = (v: string) => { setCategory(v as 'all' | JobCategory); setPage(1); };
   const changeClient = (v: string) => { setClientId(v === "all" ? "" : v); setPage(1); };
 
-  const anyFilterActive = status !== 'all' || category !== 'all' || !!clientId || !!searchTerm;
-  const resetFilters = () => { setStatus('all'); setCategory('all'); setClientId(""); setSearchTerm(""); setPage(1); };
+  const anyFilterActive = status !== 'all' || category !== 'all' || !!clientId || !!searchTerm || !!chainJobId;
+  const resetFilters = () => { setStatus('all'); setCategory('all'); setClientId(""); setSearchTerm(""); setChainJobId(""); setPage(1); };
+  // Mostra solo le commesse dello stesso cantiere (azzera gli altri filtri, che le nasconderebbero)
+  const showChain = (jobId: string) => { setStatus('all'); setCategory('all'); setClientId(""); setSearchTerm(""); setDebouncedSearch(""); setChainJobId(jobId); setPage(1); };
 
   // Commessa appena completata: si propone il portale ospiti
   const [portalJobId, setPortalJobId] = useState<string | null>(null);
@@ -271,6 +309,15 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         </div>
       </ListPageHeader>
 
+      {chainJobId && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 text-sm dark:border-blue-900/40 dark:bg-blue-950/20">
+          <span className="flex items-center gap-1.5 font-medium text-blue-700 dark:text-blue-300">
+            <Link2 className="h-4 w-4" /> Commesse dello stesso cantiere{chainIds && chainIds.length > 1 ? `: ${chainIds.length}` : ""}
+          </span>
+          <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setChainJobId(""); setPage(1); }}>Mostra tutte le commesse</Button>
+        </div>
+      )}
+
       {loading && jobs.length === 0 ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -328,7 +375,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     </Select>
                   </TableHead>
                   <TableHead className={`w-44 ${headCls}`}>Indirizzo cantiere</TableHead>
-                  <TableHead className="w-32 text-xs font-semibold uppercase tracking-wide text-slate-600">{sortBtn("date", "Inizio")}</TableHead>
+                  <TableHead className="w-28 text-xs font-semibold uppercase tracking-wide text-slate-600" title="Commesse dello stesso cantiere: clicca il numero per vederle">Collegate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -361,6 +408,11 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <TableCell className="border-r py-2 font-mono text-xs text-slate-500">{job.code}</TableCell>
                     <TableCell className="border-r py-2">
                       <div className="line-clamp-2 font-medium text-slate-900 dark:text-white" title={job.name}>{job.name}</div>
+                      {(job.startDate || job.endDate) && (
+                        <div className="mt-0.5 truncate text-[11px] text-slate-400">
+                          {job.startDate ? `dal ${formatDate(job.startDate)}` : ""}{job.startDate && job.endDate && " "}{job.endDate ? `al ${formatDate(job.endDate)}` : ""}
+                        </div>
+                      )}
                       {(job.cig || job.cup) && (
                         <div className="mt-0.5 truncate text-[11px] text-slate-400">
                           {job.cig && <>CIG {job.cig}</>}{job.cig && job.cup && " · "}{job.cup && <>CUP {job.cup}</>}
@@ -376,9 +428,8 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <TableCell className="border-r py-2 text-xs text-slate-500 dark:text-slate-400">
                       <span className="line-clamp-2" title={job.siteAddress}>{job.siteAddress || <span className="text-slate-300">—</span>}</span>
                     </TableCell>
-                    <TableCell className="py-2 text-xs text-slate-600 dark:text-slate-300">
-                      {formatDate(job.startDate) || <span className="text-slate-300">—</span>}
-                      {job.endDate && <div className="text-slate-400">fino al {formatDate(job.endDate)}</div>}
+                    <TableCell className="py-2">
+                      <LinkedCount count={links.get(job.id)?.length ?? 0} onClick={() => showChain(job.id)} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -441,6 +492,12 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <div className="flex items-start gap-2 text-xs">
                       <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
                       <span>{job.siteAddress}</span>
+                    </div>
+                  )}
+                  {(links.get(job.id)?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-slate-500">Collegate:</span>
+                      <LinkedCount count={links.get(job.id)?.length ?? 0} onClick={() => showChain(job.id)} />
                     </div>
                   )}
                   <div className="mt-auto flex items-center gap-2 border-t pt-2 text-xs dark:border-slate-700">

@@ -144,7 +144,7 @@ export const jobsApi = {
         if (error) throw error;
         return data.map(mapDbToJob);
     },
-    getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '', category, sort = 'status', dir = 'asc' }: { page?: number; limit?: number; search?: string; clientId?: string; status?: string; category?: JobCategory; sort?: 'status' | 'code' | 'name' | 'date'; dir?: 'asc' | 'desc' } = {}) => {
+    getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '', category, sort = 'status', dir = 'asc', ids }: { ids?: string[]; page?: number; limit?: number; search?: string; clientId?: string; status?: string; category?: JobCategory; sort?: 'status' | 'code' | 'name' | 'date'; dir?: 'asc' | 'desc' } = {}) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -155,6 +155,10 @@ export const jobsApi = {
 
         if (clientId) {
             query = query.eq('client_id', clientId);
+        }
+
+        if (ids) {
+            query = query.in('id', ids);
         }
 
         if (status) {
@@ -275,6 +279,22 @@ export const jobsApi = {
             status: r.status,
             startDate: r.start_date,
         }));
+    },
+    /** Righe leggere delle sole commesse che fanno parte di una catena di "nuovo inizio" (per la colonna Collegate dell'elenco). */
+    getLinkRows: async (): Promise<JobChainItem[]> => {
+        const toItem = (r: any): JobChainItem => ({
+            id: r.id, originJobId: r.origin_job_id, code: r.code, name: r.name, status: r.status, startDate: r.start_date,
+        });
+        const cols = 'id, origin_job_id, code, name, status, start_date';
+        const { data: children, error } = await supabase.from('jobs').select(cols).not('origin_job_id', 'is', null).is('deleted_at', null);
+        if (error) throw error;
+        const kids = (children || []).map(toItem);
+        const kidIds = new Set(kids.map(k => k.id));
+        const rootIds = [...new Set(kids.map(k => k.originJobId as string))].filter(id => !kidIds.has(id));
+        if (rootIds.length === 0) return kids;
+        const { data: roots, error: rootsError } = await supabase.from('jobs').select(cols).in('id', rootIds).is('deleted_at', null);
+        if (rootsError) throw rootsError;
+        return [...kids, ...(roots || []).map(toItem)];
     },
     /** Verifica se una commessa esiste ancora (anche se soft-deleted), senza lanciare errore se è stata eliminata definitivamente. */
     getStatusById: async (id: string): Promise<{ exists: boolean; deletedAt: string | null }> => {
