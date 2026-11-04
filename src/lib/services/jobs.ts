@@ -144,7 +144,7 @@ export const jobsApi = {
         if (error) throw error;
         return data.map(mapDbToJob);
     },
-    getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '', category, sort = 'status', dir = 'asc' }: { page?: number; limit?: number; search?: string; clientId?: string; status?: string; category?: JobCategory; sort?: 'status' | 'code' | 'name' | 'date'; dir?: 'asc' | 'desc' } = {}) => {
+    getPaginated: async ({ page = 1, limit = 12, search = '', clientId = '', status = '', category, sort = 'status', dir = 'asc', ids }: { ids?: string[]; page?: number; limit?: number; search?: string; clientId?: string; status?: string; category?: JobCategory; sort?: 'status' | 'code' | 'name' | 'date'; dir?: 'asc' | 'desc' } = {}) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -155,6 +155,10 @@ export const jobsApi = {
 
         if (clientId) {
             query = query.eq('client_id', clientId);
+        }
+
+        if (ids) {
+            query = query.in('id', ids);
         }
 
         if (status) {
