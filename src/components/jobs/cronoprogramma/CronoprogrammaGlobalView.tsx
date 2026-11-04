@@ -158,25 +158,34 @@ export function CronoprogrammaGlobalView() {
             .sort((x, y) => groupKey(x).localeCompare(groupKey(y)) || startOf(x).localeCompare(startOf(y)))
     }, [jobs, links, tasksByJob, statusFilter, jobFilter])
 
-    const lastPresenceByJob = useMemo(() => {
-        const map = new Map<string, string>()
+    // Prima e ultima presenza registrate per commessa
+    const presenceSpanByJob = useMemo(() => {
+        const map = new Map<string, { first: string; last: string }>()
         attendance.forEach(a => {
             if (!a.jobId || (a.status !== 'presence' && a.status !== 'transfer')) return
-            const known = map.get(a.jobId)
-            if (!known || a.date > known) map.set(a.jobId, a.date)
+            const span = map.get(a.jobId)
+            if (!span) map.set(a.jobId, { first: a.date, last: a.date })
+            else {
+                if (a.date < span.first) span.first = a.date
+                if (a.date > span.last) span.last = a.date
+            }
         })
         return map
     }, [attendance])
 
-    // Riga di riepilogo con il periodo reale della commessa. Senza data di fine: se è in cantiere arriva a oggi,
-    // altrimenti si ferma all'ultima presenza registrata (una commessa attiva ma ferma non si allunga all'infinito)
+    // Riga di riepilogo con il periodo reale della commessa. Inizio: la data di inizio, o la prima presenza se viene prima.
+    // Fine: per una commessa conclusa la sua data di fine; per le altre l'ultima presenza registrata (la data di fine
+    // prevista non conta, altrimenti la barra supera i giorni davvero lavorati). Senza presenze: oggi se è in cantiere
     const summaryRow = (job: Job): JobTask => {
         const jobTasks = tasksByJob.get(job.id) ?? []
-        const start = (job.startDate || jobTasks[0]?.startDate || "").slice(0, 10)
+        const span = presenceSpanByJob.get(job.id)
+        const plannedStart = (job.startDate || jobTasks[0]?.startDate || "").slice(0, 10)
+        const start = span && span.first < plannedStart ? span.first : plannedStart
         const lastTaskEnd = jobTasks.map(t => t.endDate).sort().slice(-1)[0]
-        const lastPresence = lastPresenceByJob.get(job.id)
-        const idleEnd = lastPresence && lastPresence >= start ? lastPresence : (lastTaskEnd || start)
-        let end = (job.endDate || "").slice(0, 10) || (job.status === "active" && job.onSite ? localToday() : idleEnd)
+        const jobEnd = (job.endDate || "").slice(0, 10)
+        let end: string
+        if (job.status === "completed") end = jobEnd || span?.last || lastTaskEnd || start
+        else end = span?.last || jobEnd || (job.status === "active" && job.onSite ? localToday() : (lastTaskEnd || start))
         if (end < start) end = start
         return {
             id: SUMMARY_PREFIX + job.id,
@@ -198,7 +207,7 @@ export function CronoprogrammaGlobalView() {
     const rows = useMemo(
         () => visibleJobs.flatMap(job => [summaryRow(job), ...(showPhases ? (tasksByJob.get(job.id) ?? []) : [])]),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [visibleJobs, tasksByJob, showPhases, lastPresenceByJob]
+        [visibleJobs, tasksByJob, showPhases, presenceSpanByJob]
     )
 
     // Presenze: si leggono solo per il periodo che si sta guardando
@@ -384,7 +393,7 @@ export function CronoprogrammaGlobalView() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6 pb-20">
+        <div className="w-full space-y-6 pb-20">
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                     <GanttChartSquare className="h-6 w-6 text-blue-600" />
@@ -445,7 +454,7 @@ export function CronoprogrammaGlobalView() {
                             />
                             <div className="space-y-1 text-[11px] text-slate-400">
                                 <p>
-                                    Barra scura = periodo della commessa (dall&apos;inizio alla fine; senza data di fine arriva a oggi se è in cantiere, altrimenti all&apos;ultima presenza). Clic sulla barra per aprire la commessa. Per spostarti trascina lo sfondo del diagramma o usa le frecce.
+                                    Barra scura = periodo della commessa: dall&apos;inizio all&apos;ultima presenza registrata (per quelle concluse, fino alla data di fine). Clic sulla barra per aprire la commessa. Trascina lo sfondo per spostarti, la rotella per cambiare la scala del tempo (i puntini delle presenze si vedono nelle scale Giorno e Settimana).
                                 </p>
                                 <p>
                                     <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-emerald-500 text-white text-[8px] align-middle">n</span> sotto la barra = numero di lavoratori presenti quel giorno sul cantiere. Per le commesse senza fasi i puntini sono sotto la barra del periodo.
