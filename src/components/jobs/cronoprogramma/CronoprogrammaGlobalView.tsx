@@ -17,6 +17,7 @@ import { jobTasksApi, jobsApi, attendanceApi, jobTaskAssignmentsApi, workersApi,
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { HelpTip } from "@/components/ui/help-tip"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { buildJobLinks } from "@/lib/utils/job-links"
 import type { JobChainItem } from "@/lib/types"
@@ -393,18 +394,30 @@ export function CronoprogrammaGlobalView() {
     }
 
     return (
-        <div className="w-full space-y-6 pb-20">
-            <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="w-full space-y-4 pb-4 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:pb-0">
+            <div className="flex shrink-0 items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                     <GanttChartSquare className="h-6 w-6 text-blue-600" />
                     <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Cronoprogramma Commesse</h1>
+                    <HelpTip
+                        wide
+                        title="Come leggere il cronoprogramma"
+                        lines={[
+                            "Barra scura = periodo della commessa, dall'inizio all'ultima presenza registrata (per le concluse, fino alla data di fine). Clic sulla barra per aprire la commessa.",
+                            "↳ = fasi della commessa: trascina la barra per spostarle, clic per modificarle.",
+                            "Puntini verdi = numero di lavoratori presenti quel giorno sul cantiere (si vedono nelle scale Settimane e Giorni). Per le commesse senza fasi sono sotto la barra del periodo.",
+                            "Rotella = cambia la scala del tempo (anni, mesi, settimane, giorni).",
+                            "Trascina lo sfondo = spostati nel tempo e tra le commesse; le frecce scorrono a destra e a sinistra.",
+                            "Filtro «In cantiere» = commesse attive con la spunta «in cantiere»; «Attive» comprende anche quelle ferme.",
+                        ]}
+                    />
                 </div>
                 <Button size="sm" onClick={openCreate}>
                     <Plus className="h-4 w-4 mr-1" />Aggiungi fase
                 </Button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
                 <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setJobFilter("all") }}>
                     <SelectTrigger className="w-40" aria-label="Stato commesse"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -438,9 +451,10 @@ export function CronoprogrammaGlobalView() {
             ) : (
                 <>
                     {/* Un unico diagramma: per ogni commessa il suo periodo reale e, sotto, le fasi */}
-                    <Card>
-                        <CardContent className="py-4 space-y-4">
+                    <Card className="lg:min-h-0 lg:flex-1">
+                        <CardContent className="py-3 lg:h-full">
                             <TimelineChart
+                                fill
                                 tasks={rows}
                                 taskLabel={(t) => isSummaryId(t.id) ? t.name : `↳ ${t.name}`}
                                 isSummary={(t) => isSummaryId(t.id)}
@@ -452,14 +466,6 @@ export function CronoprogrammaGlobalView() {
                                 onDateChange={handleDateChange}
                                 onProgressChange={handleProgressChange}
                             />
-                            <div className="space-y-1 text-[11px] text-slate-400">
-                                <p>
-                                    Barra scura = periodo della commessa: dall&apos;inizio all&apos;ultima presenza registrata (per quelle concluse, fino alla data di fine). Clic sulla barra per aprire la commessa. Trascina lo sfondo per spostarti, la rotella per cambiare la scala del tempo (i puntini delle presenze si vedono nelle scale Giorno e Settimana).
-                                </p>
-                                <p>
-                                    <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-emerald-500 text-white text-[8px] align-middle">n</span> sotto la barra = numero di lavoratori presenti quel giorno sul cantiere. Per le commesse senza fasi i puntini sono sotto la barra del periodo.
-                                </p>
-                            </div>
                         </CardContent>
                     </Card>
 

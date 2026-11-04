@@ -82,9 +82,11 @@ interface TimelineChartProps {
     onDateChange?: (taskId: string, start: Date, end: Date) => void;
     onProgressChange?: (taskId: string, progress: number) => void;
     readonly?: boolean;
+    /** Occupa tutta l'altezza del contenitore (che deve averne una) invece di una altezza propria */
+    fill?: boolean;
 }
 
-export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
+export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false, fill = false }: TimelineChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     // Posizione di scorrimento tra un ridisegno e l'altro (il diagramma si rifà a ogni modifica)
     const savedScroll = useRef<{ left: number; top: number } | null>(null);
@@ -287,9 +289,8 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
     }
 
     return (
-        <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] text-slate-400">Rotella = cambia scala · trascina lo sfondo = spostati</p>
+        <div className={fill ? "flex h-full min-h-0 flex-col gap-2" : "space-y-2"}>
+            <div className="flex shrink-0 items-center justify-end gap-2">
                 <div className="flex items-center gap-1">
                     <button type="button" onClick={() => zoom(-1)} disabled={viewMode === VIEW_MODES[0]} aria-label="Scala più ampia" className="rounded-md border p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800">
                         <ZoomOut className="h-4 w-4" />
@@ -310,8 +311,8 @@ export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupCont
             {/* Riquadro di altezza fissa (minimo 420px, cresce con lo schermo): dentro ci si muove in tutte le direzioni */}
             <div
                 ref={wrapperRef}
-                className="gantt-chart-viewport w-full overflow-hidden border rounded-md bg-white dark:bg-slate-900 cursor-grab active:cursor-grabbing"
-                style={{ height: "clamp(420px, 68vh, 900px)" }}
+                className={`gantt-chart-viewport w-full overflow-hidden border rounded-md bg-white dark:bg-slate-900 cursor-grab active:cursor-grabbing ${fill ? "min-h-[300px] flex-1" : ""}`}
+                style={fill ? undefined : { height: "clamp(420px, 68vh, 900px)" }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={endDrag}

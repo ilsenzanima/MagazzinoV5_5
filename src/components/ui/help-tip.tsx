@@ -7,11 +7,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 interface HelpTipProps {
     title: string
     description?: string
+    // Righe di spiegazione fisse (per le legende), elencate sotto il titolo
+    lines?: string[]
+    wide?: boolean
     fetchItems?: () => Promise<string[]>
     emptyText?: string
 }
 
-export function HelpTip({ title, description, fetchItems, emptyText = "Nessun tipo configurato." }: HelpTipProps) {
+export function HelpTip({ title, description, lines, wide, fetchItems, emptyText = "Nessun tipo configurato." }: HelpTipProps) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const [items, setItems] = useState<string[] | null>(null)
@@ -45,12 +48,17 @@ export function HelpTip({ title, description, fetchItems, emptyText = "Nessun ti
                 </span>
             </PopoverTrigger>
             <PopoverContent
-                className="w-64 text-sm"
+                className={wide ? "w-80 text-sm" : "w-64 text-sm"}
                 onClick={e => e.stopPropagation()}
                 onPointerDown={e => e.stopPropagation()}
             >
                 <p className="font-medium mb-1">{title}</p>
                 {description && <p className="text-xs text-slate-500 mb-2">{description}</p>}
+                {lines && (
+                    <ul className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+                        {lines.map((l, i) => <li key={i}>{l}</li>)}
+                    </ul>
+                )}
                 {fetchItems && (
                     loading ? (
                         <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
