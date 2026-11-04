@@ -329,6 +329,8 @@ body.font-opendyslexic h6 {
 .gantt [class*="task-status-in-progress"] .bar { fill: #3b82f6 !important; }
 .gantt [class*="task-status-completed"] .bar { fill: #22c55e !important; }
 .gantt [class*="task-status-delayed"] .bar { fill: #f59e0b !important; }
+/* riga di riepilogo della commessa (periodo inizio-fine) */
+.gantt [class*="task-status-summary"] .bar { fill: #475569 !important; }
 
 /* Cronoprogramma - sfumatura leggera per distinguere le commesse nella vista globale (contorno, non sovrascrive il colore di stato) */
 .gantt [class*="job-color-0"] .bar { stroke: #2563eb !important; stroke-width: 3 !important; }

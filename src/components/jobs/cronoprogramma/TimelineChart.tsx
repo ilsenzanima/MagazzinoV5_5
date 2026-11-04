@@ -30,6 +30,8 @@ interface TimelineChartProps {
     tasks: JobTask[];
     /** Personalizza l'etichetta mostrata per ogni barra (es. con prefisso commessa) */
     taskLabel?: (task: JobTask) => string;
+    /** Righe di riepilogo (es. il periodo di una commessa): colore diverso da quello delle fasi */
+    isSummary?: (task: JobTask) => boolean;
     /** Classe CSS aggiuntiva per barra (es. colore per commessa nella vista globale) */
     barClass?: (task: JobTask) => string;
     /** HTML mostrato nel popup al click/hover sulla barra (es. presenze registrate nel periodo) */
@@ -42,7 +44,7 @@ interface TimelineChartProps {
     readonly?: boolean;
 }
 
-export function TimelineChart({ tasks, taskLabel, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
+export function TimelineChart({ tasks, taskLabel, isSummary, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false }: TimelineChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -58,7 +60,10 @@ export function TimelineChart({ tasks, taskLabel, barClass, popupContent, rowPre
                 start: t.startDate,
                 end: t.endDate,
                 progress: t.progress,
-                custom_class: barClass ? `${STATUS_CLASS[t.status]}--${barClass(t)}` : STATUS_CLASS[t.status],
+                custom_class: (() => {
+                    const statusClass = isSummary?.(t) ? "task-status-summary" : STATUS_CLASS[t.status];
+                    return barClass ? `${statusClass}--${barClass(t)}` : statusClass;
+                })(),
             }));
 
             new Gantt(containerRef.current!, ganttTasks, {
@@ -139,7 +144,7 @@ export function TimelineChart({ tasks, taskLabel, barClass, popupContent, rowPre
             cancelled = true;
             if (containerRef.current) containerRef.current.innerHTML = "";
         };
-    }, [tasks, taskLabel, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly]);
+    }, [tasks, taskLabel, isSummary, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly]);
 
     if (tasks.length === 0) {
         return (
