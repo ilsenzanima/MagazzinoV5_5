@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
 import { Job, jobsApi, clientsApi } from "@/lib/api";
-import { JobCategory, JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
+import { JobCategory, JobChainItem, JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
+import { buildJobLinks } from "@/lib/utils/job-links";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { JobPortalDialog } from "@/components/guest-sites/JobPortalDialog";
@@ -29,6 +30,23 @@ interface JobsContentProps {
 }
 
 type SortKey = "status" | "code" | "name" | "date";
+
+// Altre commesse dello stesso cantiere: codici cliccabili (i primi tre, poi «+N»)
+function LinkedJobs({ items }: { items: JobChainItem[] | undefined }) {
+  if (!items || items.length === 0) return <span className="text-slate-300">—</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      {items.slice(0, 3).map(c => (
+        <Link key={c.id} href={`/jobs/${c.id}`} title={c.name} className="rounded border border-blue-200 bg-blue-50/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-transparent dark:text-blue-300">
+          {c.code}
+        </Link>
+      ))}
+      {items.length > 3 && (
+        <span className="text-[11px] text-slate-500" title={items.slice(3).map(c => c.code).join(", ")}>+{items.length - 3}</span>
+      )}
+    </div>
+  );
+}
 
 const STATUS_ORDER: Record<string, number> = { active: 0, suspended: 1, completed: 2 };
 
@@ -74,6 +92,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
   const [category, setCategory] = useState<'all' | JobCategory>(isValidCategory(searchParams.get('category')) ? (searchParams.get('category') as JobCategory) : 'all');
   const [status, setStatus] = useState<'all' | JobStatus>(initialStatus && initialStatus in STATUS_CONFIG ? (initialStatus as JobStatus) : 'all');
   const [clientId, setClientId] = useState(searchParams.get('clientId') || "");
+  const [links, setLinks] = useState<Map<string, JobChainItem[]>>(new Map());
   const [sortKey, setSortKey] = useState<SortKey>((searchParams.get('sort') as SortKey) || 'status');
   const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get('dir') === 'desc' ? 'desc' : 'asc');
   const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
@@ -147,6 +166,10 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
       if (requestId === loadRequestId.current) setLoading(false);
     }
   };
+
+  useEffect(() => {
+    jobsApi.getLinkRows().then(rows => setLinks(buildJobLinks(rows))).catch(e => console.error("Commesse collegate:", e));
+  }, []);
 
   useEffect(() => {
     // La prima pagina senza filtri arriva già dal server
@@ -328,7 +351,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     </Select>
                   </TableHead>
                   <TableHead className={`w-44 ${headCls}`}>Indirizzo cantiere</TableHead>
-                  <TableHead className="w-32 text-xs font-semibold uppercase tracking-wide text-slate-600">{sortBtn("date", "Inizio")}</TableHead>
+                  <TableHead className="w-44 text-xs font-semibold uppercase tracking-wide text-slate-600" title="Altre commesse dello stesso cantiere">Collegate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -361,6 +384,11 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <TableCell className="border-r py-2 font-mono text-xs text-slate-500">{job.code}</TableCell>
                     <TableCell className="border-r py-2">
                       <div className="line-clamp-2 font-medium text-slate-900 dark:text-white" title={job.name}>{job.name}</div>
+                      {(job.startDate || job.endDate) && (
+                        <div className="mt-0.5 truncate text-[11px] text-slate-400">
+                          {job.startDate ? `dal ${formatDate(job.startDate)}` : ""}{job.startDate && job.endDate && " "}{job.endDate ? `al ${formatDate(job.endDate)}` : ""}
+                        </div>
+                      )}
                       {(job.cig || job.cup) && (
                         <div className="mt-0.5 truncate text-[11px] text-slate-400">
                           {job.cig && <>CIG {job.cig}</>}{job.cig && job.cup && " · "}{job.cup && <>CUP {job.cup}</>}
@@ -376,9 +404,8 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <TableCell className="border-r py-2 text-xs text-slate-500 dark:text-slate-400">
                       <span className="line-clamp-2" title={job.siteAddress}>{job.siteAddress || <span className="text-slate-300">—</span>}</span>
                     </TableCell>
-                    <TableCell className="py-2 text-xs text-slate-600 dark:text-slate-300">
-                      {formatDate(job.startDate) || <span className="text-slate-300">—</span>}
-                      {job.endDate && <div className="text-slate-400">fino al {formatDate(job.endDate)}</div>}
+                    <TableCell className="py-2">
+                      <LinkedJobs items={links.get(job.id)} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -441,6 +468,12 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <div className="flex items-start gap-2 text-xs">
                       <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
                       <span>{job.siteAddress}</span>
+                    </div>
+                  )}
+                  {(links.get(job.id)?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-slate-500">Collegate:</span>
+                      <LinkedJobs items={links.get(job.id)} />
                     </div>
                   )}
                   <div className="mt-auto flex items-center gap-2 border-t pt-2 text-xs dark:border-slate-700">
