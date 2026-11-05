@@ -32,6 +32,7 @@ import { UploadStatusBar } from "@/components/ui/upload-status-row"
 import { OldRevCheckboxes, OldRevBadges } from "@/components/documents/OldRevControls"
 import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/ui/photo-gallery"
 import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
+import { jobSiteTypeNotesApi } from "@/lib/services/job-site-type-notes"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { HelpTip } from "@/components/ui/help-tip"
 import { JobPhotoCollection, PhotoThumb } from "./JobPhotoCollection"
@@ -57,7 +58,7 @@ type SortKey = "name" | "type" | "folder" | "date" | "size"
 // Riga della tabella: un documento, oppure una raccolta di foto (un tipo, o una cartella di quel tipo)
 interface RowBase { id: string; name: string; typeId: string; typeName: string; folderId: string; folderName: string; date: string; size: number }
 interface DocRow extends RowBase { kind: "doc"; doc: SiteDocument }
-interface CollectionRow extends RowBase { kind: "collection"; type: JobSiteDocumentType; folder: JobSiteDocumentFolder | null; docs: SiteDocument[] }
+interface CollectionRow extends RowBase { kind: "collection"; type: JobSiteDocumentType; folder: JobSiteDocumentFolder | null; docs: SiteDocument[]; notes: string }
 type TableRowData = DocRow | CollectionRow
 
 function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
@@ -183,6 +184,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [folderToDelete, setFolderToDelete] = useState<JobSiteDocumentFolder | null>(null)
   const mergedFolderIds = useRef<Record<string, string[]>>({})
+  // Note delle raccolte senza cartella (per tipo)
+  const [typeNotes, setTypeNotes] = useState<Record<string, string>>({})
   const [moveFolderId, setMoveFolderId] = useState("root")
   const [moving, setMoving] = useState(false)
 
@@ -202,11 +205,13 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const loadDocuments = async () => {
     try {
       setLoading(true)
-      const [all, types, jobFolders] = await Promise.all([
+      const [all, types, jobFolders, notesByType] = await Promise.all([
         jobSiteDocumentsApi.getByJobId(jobId),
         jobSiteDocumentTypesApi.getAll(),
         jobSiteDocumentFoldersApi.getByJobId(jobId),
+        jobSiteTypeNotesApi.getByJobId(jobId).catch(() => ({} as Record<string, string>)),
       ])
+      setTypeNotes(notesByType)
       // I documenti sono condivisi con la proposta di origine: le loro cartelle possono appartenere
       // alla proposta e non alla commessa. Si caricano anche quelle e si uniscono le omonime
       // (stesso tipo e stesso nome) in una sola, per non perdere documenti né duplicare righe.
@@ -227,7 +232,12 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
       mergedFolderIds.current = merged
       setDocuments(all.map(d => (d.folderId ? { ...d, folderId: aliasOf(d.folderId) } : d)))
       setDocTypes(types)
-      setFolders(Array.from(keeper.values()).sort((a, b) => a.name.localeCompare(b.name, "it")))
+      // La nota di una cartella unita resta quella della prima copia che ne ha una
+      const withNotes = Array.from(keeper.values()).map(k => ({
+        ...k,
+        notes: k.notes || Array.from(everyFolder.values()).find(f => keyOf(f) === keyOf(k) && f.notes)?.notes || '',
+      }))
+      setFolders(withNotes.sort((a, b) => a.name.localeCompare(b.name, "it")))
     } catch (error) {
       console.error("Failed to load documents", error)
       toast.error("Errore nel caricamento dei documenti")
@@ -343,6 +353,23 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     } finally {
       setMoving(false)
       loadDocuments()
+    }
+  }
+
+  // Nota di una raccolta (cartella, oppure tipo senza cartella) modificata direttamente in tabella
+  const handleSaveCollectionNote = async (r: CollectionRow, notes: string) => {
+    if (notes === r.notes) return
+    try {
+      if (r.folder) {
+        const ids = mergedFolderIds.current[r.folder.id] ?? [r.folder.id]
+        for (const id of ids) await jobSiteDocumentFoldersApi.setNotes(id, notes)
+        setFolders(prev => prev.map(f => (f.id === r.folder!.id ? { ...f, notes } : f)))
+      } else {
+        await jobSiteTypeNotesApi.set(jobId, r.typeId, notes)
+        setTypeNotes(prev => ({ ...prev, [r.typeId]: notes }))
+      }
+    } catch {
+      toast.error("Errore nel salvataggio della nota")
     }
   }
 
@@ -606,6 +633,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         folderName: g.folder?.name ?? "",
         date: latest(g.docs),
         size: g.docs.reduce((n, d) => n + (d.fileSize ?? 0), 0),
+        notes: g.folder ? (g.folder.notes ?? '') : (typeNotes[t.id] ?? ''),
       }))
     }),
     ...documents.filter(d => !photoTypeIds.has(d.documentTypeId ?? "")).map((doc): DocRow => ({
@@ -631,7 +659,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     if (folderFilter === "root" ? r.folderId !== "" : folderFilter !== "all" && r.folderId !== folderFilter) return false
     const q = search.trim().toLowerCase()
     if (q) {
-      const inside = r.kind === "doc" ? r.doc.notes : r.docs.map(d => `${d.name} ${d.notes}`).join(" ")
+      const inside = r.kind === "doc" ? r.doc.notes : `${r.notes} ${r.docs.map(d => `${d.name} ${d.notes}`).join(" ")}`
       if (!`${r.name} ${r.typeName} ${r.folderName} ${inside}`.toLowerCase().includes(q)) return false
     }
     return true
@@ -898,7 +926,9 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                           {r.kind === "doc" ? (r.doc.fileSize != null ? formatFileSize(r.doc.fileSize) : '—') : (r.size > 0 ? formatFileSize(r.size) : '—')}
                         </TableCell>
                         <TableCell className="border-r py-1" onClick={e => e.stopPropagation()}>
-                          {r.kind === "doc" && <InlineNote value={r.doc.notes} onSave={v => handleSaveNote(r.doc, v)} />}
+                          {r.kind === "doc"
+                            ? <InlineNote value={r.doc.notes} onSave={v => handleSaveNote(r.doc, v)} />
+                            : <InlineNote value={r.notes} onSave={v => handleSaveCollectionNote(r, v)} />}
                         </TableCell>
                         <TableCell className="py-2 text-right">{r.kind === "doc" ? rowMenu(r.doc) : collectionMenu(r)}</TableCell>
                       </TableRow>
@@ -921,6 +951,9 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                         <span className="text-blue-600">{countLabel(r)}</span>
                         {r.folder && ` · ${r.typeName}`}
                       </p>
+                      <div className="mt-1" onClick={e => e.stopPropagation()}>
+                        <InlineNote value={r.notes} onSave={v => handleSaveCollectionNote(r, v)} />
+                      </div>
                     </div>
                     {collectionMenu(r)}
                   </div>
