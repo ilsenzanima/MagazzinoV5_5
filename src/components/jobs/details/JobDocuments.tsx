@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, Upload, Trash2, Loader2, Pencil, X, Download, FolderInput, FolderPlus } from "lucide-react"
+import { FileText, Upload, Trash2, Loader2, Pencil, X, Download, FolderInput, FolderPlus, MoreHorizontal, ExternalLink, Search } from "lucide-react"
 import { jobSiteDocumentsApi, SiteDocument } from "@/lib/services/job-site-documents"
 import { jobSiteDocumentTypesApi, JobSiteDocumentType } from "@/lib/services/job-site-document-types"
 import { jobSiteDocumentFoldersApi, JobSiteDocumentFolder } from "@/lib/services/job-site-document-folders"
@@ -24,8 +25,6 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { getFileIcon, formatFileSize } from "@/lib/file-icon"
-import { ViewToggle } from "@/components/ui/view-toggle"
-import { useViewMode } from "@/hooks/useViewMode"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { uploadFileToDrive } from "@/lib/drive-upload"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
@@ -50,6 +49,35 @@ interface PendingFile {
 const UNTYPED_KEY = "__untyped__"
 const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'])
 
+// Nota modificabile con un clic: si salva uscendo dal campo o con Invio, Esc annulla
+function InlineNote({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+  const commit = () => { setEditing(false); onSave(draft.trim()) }
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        className="h-7 w-full text-xs"
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false) }}
+      />
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="block w-full truncate rounded px-1 py-0.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
+      title={value || "Aggiungi una nota"}
+      onClick={() => { setDraft(value); setEditing(true) }}
+    >
+      {value || <span className="italic text-slate-300">Aggiungi nota</span>}
+    </button>
+  )
+}
+
 export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const [documents, setDocuments] = useState<SiteDocument[]>([])
   const [docTypes, setDocTypes] = useState<JobSiteDocumentType[]>([])
@@ -62,8 +90,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
-  const [viewMode, setViewMode] = useViewMode('job-documents', 'grid')
-  const [activeFolderByType, setActiveFolderByType] = useState<Record<string, string>>({})
+  // Filtri della tabella
+  const [search, setSearch] = useState("")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [folderFilter, setFolderFilter] = useState<string>("all")
 
   // Galleria foto
   const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([])
@@ -179,7 +209,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
       })
       setFolders(prev => [...prev, folder])
       if (upDocTypeId === newFolderTypeId) setUpFolderId(folder.id)
-      setActiveFolderByType(prev => ({ ...prev, [newFolderTypeId]: folder.id }))
+      setTypeFilter(newFolderTypeId)
+      setFolderFilter(folder.id)
       toast.success("Cartella creata")
       setNewFolderOpen(false)
     } catch {
@@ -374,6 +405,17 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     }
   }
 
+  // Nota modificata direttamente in tabella
+  const handleSaveNote = async (doc: SiteDocument, notes: string) => {
+    if (notes === doc.notes) return
+    try {
+      await jobSiteDocumentsApi.update(doc.id, { notes })
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, notes } : d))
+    } catch {
+      toast.error("Errore nel salvataggio della nota")
+    }
+  }
+
   const handleOpenDocument = async (fileUrl: string, fileName?: string) => {
     if (fileUrl && !fileUrl.includes('/')) {
       window.open(`/api/drive/download?fileId=${encodeURIComponent(fileUrl)}&fileName=${encodeURIComponent(fileName || 'documento')}`, '_blank');
@@ -408,109 +450,68 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     }
   }
 
-  const renderDocCard = (doc: SiteDocument, siblingDocs: SiteDocument[]) => (
-    <Card
-      key={doc.id}
-      className="group hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : handleOpenDocument(doc.fileUrl)}
-    >
-      <CardContent className="p-4 flex items-start gap-3">
-        <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-          {getFileIcon(doc.fileType)}
-        </div>
-        <div className="flex-1 overflow-hidden min-w-0">
-          <div className="flex justify-between items-start gap-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
-              <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
-            </div>
-            <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-              {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
-                  <Download className="h-3 w-3" />
-                </Button>
-              )}
-              {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Sposta in cartella" onClick={e => { e.stopPropagation(); openMove(doc) }}>
-                  <FolderInput className="h-3 w-3" />
-                </Button>
-              )}
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700" onClick={e => openEdit(doc, e)}>
-                <Pencil className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-          {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
-          <p className="text-xs text-slate-400 mt-1">
-            {format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}
-            {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  )
+  const typeName = (doc: SiteDocument) => docTypes.find(t => t.id === doc.documentTypeId)?.name || "Senza tipo"
+  const folderName = (doc: SiteDocument) => (doc.folderId ? folders.find(f => f.id === doc.folderId)?.name : undefined) || ""
+  const isDriveFile = (doc: SiteDocument) => !!doc.fileUrl && !doc.fileUrl.includes('/')
 
-  const renderDocRow = (doc: SiteDocument, siblingDocs: SiteDocument[]) => (
-    <div
-      key={doc.id}
-      className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer"
-      onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : handleOpenDocument(doc.fileUrl)}
-    >
-      <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
-        {getFileIcon(doc.fileType, "h-5 w-5")}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
-          <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
-        </div>
-        {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
-      </div>
-      <p className="text-xs text-slate-400 shrink-0">
-        {format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}
-        {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
-      </p>
-      <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-        {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
-          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
-            <Download className="h-3 w-3" />
-          </Button>
-        )}
-        {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
-          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Sposta in cartella" onClick={e => { e.stopPropagation(); openMove(doc) }}>
-            <FolderInput className="h-3 w-3" />
-          </Button>
-        )}
-        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700" onClick={e => openEdit(doc, e)}>
-          <Pencil className="h-3 w-3" />
+  const filterType = typeFilter !== "all" && typeFilter !== UNTYPED_KEY ? docTypes.find(t => t.id === typeFilter) : undefined
+  const filterFolders = filterType ? folders.filter(f => f.documentTypeId === filterType.id) : []
+  const shownDocs = documents.filter(d => {
+    if (typeFilter === UNTYPED_KEY ? !!d.documentTypeId : typeFilter !== "all" && d.documentTypeId !== typeFilter) return false
+    if (filterType?.allowsFolders && folderFilter !== "all") {
+      if (folderFilter === "root" ? !!d.folderId : d.folderId !== folderFilter) return false
+    }
+    const q = search.trim().toLowerCase()
+    if (q && !`${d.name} ${d.notes} ${typeName(d)} ${folderName(d)}`.toLowerCase().includes(q)) return false
+    return true
+  })
+
+  const openDoc = (doc: SiteDocument) =>
+    isImageFileType(doc.fileType) ? openGalleryForDoc(doc, shownDocs) : handleOpenDocument(doc.fileUrl, doc.name)
+
+  const askDelete = (doc: SiteDocument) => { setActiveDoc(doc); setDeleteOpen(true) }
+
+  const rowMenu = (doc: SiteDocument) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
+          <MoreHorizontal className="h-4 w-4" />
         </Button>
-      </div>
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+        <DropdownMenuItem onClick={() => openDoc(doc)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
+        {isDriveFile(doc) && (
+          <DropdownMenuItem onClick={() => window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank')}>
+            <Download className="mr-2 h-4 w-4" />Scarica
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={e => openEdit(doc, e as unknown as React.MouseEvent)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
+        {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
+          <DropdownMenuItem onClick={() => openMove(doc)}><FolderInput className="mr-2 h-4 w-4" />Sposta in cartella</DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => askDelete(doc)} className="text-red-600 focus:text-red-600">
+          <Trash2 className="mr-2 h-4 w-4" />Elimina
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
-
-  const groups: { key: string; label: string; docs: SiteDocument[] }[] = [
-    ...docTypes.map(t => ({ key: t.id, label: t.name, docs: documents.filter(d => d.documentTypeId === t.id) })),
-    ...(documents.some(d => !d.documentTypeId) ? [{ key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) }] : []),
-  ]
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Documenti Cantiere</h2>
-        <div className="flex items-center gap-2">
-          {documents.length > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
-            <Upload className="mr-2 h-4 w-4" />
-            Carica Documenti
-          </Button>
-        </div>
+        <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
+          <Upload className="mr-2 h-4 w-4" />
+          Carica Documenti
+        </Button>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
         </div>
-      ) : docTypes.length === 0 && documents.length === 0 ? (
+      ) : documents.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center text-slate-500">
             <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
@@ -518,77 +519,107 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
             <p className="text-slate-500 dark:text-slate-400">Carica progetti, permessi, o foto del cantiere.</p>
           </CardContent>
         </Card>
-      ) : docTypes.length === 0 ? (
-        viewMode === 'list' ? (
-          <div className="space-y-1.5">
-            {documents.map(d => renderDocRow(d, documents))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {documents.map(d => renderDocCard(d, documents))}
-          </div>
-        )
       ) : (
-        <Tabs defaultValue={groups[0]?.key}>
-          <TabsList className="flex-wrap h-auto gap-1">
-            {groups.map(g => (
-              <TabsTrigger key={g.key} value={g.key}>
-                {g.label}
-                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                  {g.docs.length}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {groups.map(g => {
-            const type = docTypes.find(t => t.id === g.key)
-            const typeFolders = type ? folders.filter(f => f.documentTypeId === type.id) : []
-            const activeFolder = activeFolderByType[g.key] || 'all'
-            const shownDocs = !type?.allowsFolders
-              ? g.docs
-              : activeFolder === 'all'
-                ? g.docs
-                : activeFolder === 'root'
-                  ? g.docs.filter(d => !d.folderId)
-                  : g.docs.filter(d => d.folderId === activeFolder)
-            return (
-              <TabsContent key={g.key} value={g.key} className="pt-4 space-y-3">
-                {type?.allowsFolders && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {[{ id: 'all', name: 'Tutte' }, { id: 'root', name: 'Senza cartella' }, ...typeFolders].map(f => (
-                      <button
-                        key={f.id}
-                        onClick={() => setActiveFolderByType(prev => ({ ...prev, [g.key]: f.id }))}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${activeFolder === f.id
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                          }`}
-                      >
-                        {f.name}
-                      </button>
+        <>
+          {/* Filtri */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca per nome o nota" className="pl-8" />
+            </div>
+            <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter("all") }}>
+              <SelectTrigger className="w-full sm:w-52"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti i tipi</SelectItem>
+                {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                {documents.some(d => !d.documentTypeId) && <SelectItem value={UNTYPED_KEY}>Senza tipo</SelectItem>}
+              </SelectContent>
+            </Select>
+            {filterType?.allowsFolders && (
+              <>
+                <Select value={folderFilter} onValueChange={setFolderFilter}>
+                  <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutte le cartelle</SelectItem>
+                    <SelectItem value="root">Senza cartella</SelectItem>
+                    {filterFolders.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" onClick={() => openNewFolder(filterType.id)}>
+                  <FolderPlus className="mr-1.5 h-4 w-4" />Nuova cartella
+                </Button>
+              </>
+            )}
+            <span className="ml-auto text-xs text-slate-500">{shownDocs.length} di {documents.length}</span>
+          </div>
+
+          {shownDocs.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">Nessun documento con questi filtri</p>
+          ) : (
+            <>
+              {/* Tabella (PC) */}
+              <div className="hidden rounded-md border bg-white dark:bg-slate-900 md:block">
+                <Table className="table-fixed [&_td]:px-3 [&_th]:px-3">
+                  <TableHeader>
+                    <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Documento</TableHead>
+                      <TableHead className="w-40 text-xs font-semibold uppercase tracking-wide text-slate-600">Tipo</TableHead>
+                      <TableHead className="w-32 text-xs font-semibold uppercase tracking-wide text-slate-600">Cartella</TableHead>
+                      <TableHead className="w-28 text-xs font-semibold uppercase tracking-wide text-slate-600">Data</TableHead>
+                      <TableHead className="w-24 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Dimensione</TableHead>
+                      <TableHead className="w-[22%] text-xs font-semibold uppercase tracking-wide text-slate-600">Nota</TableHead>
+                      <TableHead className="w-12" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {shownDocs.map(doc => (
+                      <TableRow key={doc.id} className="cursor-pointer" onClick={() => openDoc(doc)}>
+                        <TableCell>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</span>
+                            <span className="truncate text-sm font-medium" title={doc.name}>{doc.name}</span>
+                            <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="truncate text-sm text-slate-600 dark:text-slate-300" title={typeName(doc)}>{typeName(doc)}</TableCell>
+                        <TableCell className="truncate text-sm text-slate-600 dark:text-slate-300" title={folderName(doc)}>{folderName(doc) || <span className="text-slate-300">—</span>}</TableCell>
+                        <TableCell className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right text-sm text-slate-600 dark:text-slate-300">{doc.fileSize != null ? formatFileSize(doc.fileSize) : '—'}</TableCell>
+                        <TableCell onClick={e => e.stopPropagation()}>
+                          <InlineNote value={doc.notes} onSave={v => handleSaveNote(doc, v)} />
+                        </TableCell>
+                        <TableCell className="text-right">{rowMenu(doc)}</TableCell>
+                      </TableRow>
                     ))}
-                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openNewFolder(g.key)}>
-                      <FolderPlus className="h-3.5 w-3.5 mr-1" />Nuova cartella
-                    </Button>
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Elenco compatto (telefono) */}
+              <div className="space-y-2 md:hidden">
+                {shownDocs.map(doc => (
+                  <div key={doc.id} className="flex items-start gap-2 rounded-md border bg-white p-3 dark:bg-slate-900" onClick={() => openDoc(doc)}>
+                    <span className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="truncate text-sm font-medium">{doc.name}</p>
+                        <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        {typeName(doc)}{folderName(doc) && ` · ${folderName(doc)}`} · {format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })}
+                        {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
+                      </p>
+                      <div className="mt-1" onClick={e => e.stopPropagation()}>
+                        <InlineNote value={doc.notes} onSave={v => handleSaveNote(doc, v)} />
+                      </div>
+                    </div>
+                    {rowMenu(doc)}
                   </div>
-                )}
-                {shownDocs.length === 0 ? (
-                  <p className="text-sm text-slate-400 py-4 text-center">
-                    {type?.allowsFolders ? "Nessun documento in questa cartella" : "Nessun documento di questo tipo"}
-                  </p>
-                ) : viewMode === 'list' ? (
-                  <div className="space-y-1.5">
-                    {shownDocs.map(d => renderDocRow(d, shownDocs))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {shownDocs.map(d => renderDocCard(d, shownDocs))}
-                  </div>
-                )}
-              </TabsContent>
-            )
-          })}
-        </Tabs>
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
 
       {/* Upload dialog - step 1: tipo + file multipli */}
