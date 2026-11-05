@@ -557,6 +557,16 @@ export default function SettingsInventoryPage() {
         }
     };
 
+    const handleToggleJobDocTypePhotos = async (id: string, isPhotoGallery: boolean) => {
+        try {
+            const updated = await jobSiteDocumentTypesApi.setIsPhotoGallery(id, isPhotoGallery);
+            setJobDocTypes(prev => prev.map(t => t.id === id ? updated : t));
+        } catch (error) {
+            console.error("Failed to toggle isPhotoGallery", error);
+            notify.error("Errore nell'aggiornamento del tipo di documento");
+        }
+    };
+
     const handleDeleteJobDocType = async (id: string) => {
         if (!confirm("Sei sicuro di voler eliminare questo tipo di documento?")) return;
         try {
@@ -1199,6 +1209,13 @@ export default function SettingsInventoryPage() {
                                                         onCheckedChange={(v) => handleToggleJobDocTypeFolders(docType.id, v)}
                                                     />
                                                     <span className="text-xs text-slate-500">Consenti cartelle</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5" title="In tabella una riga per raccolta (e per ogni cartella), che apre la pagina delle miniature">
+                                                    <Switch
+                                                        checked={docType.isPhotoGallery}
+                                                        onCheckedChange={(v) => handleToggleJobDocTypePhotos(docType.id, v)}
+                                                    />
+                                                    <span className="text-xs text-slate-500">Raccolta foto</span>
                                                 </div>
                                                 <button
                                                     className="hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full p-1 transition-colors"
