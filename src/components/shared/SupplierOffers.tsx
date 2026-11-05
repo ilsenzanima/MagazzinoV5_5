@@ -7,9 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Upload, Loader2, FileText, Pencil, Trash2, X } from "lucide-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { PaginationControls } from "@/components/ui/pagination-controls"
+import { SortArrow, InlineNote, TABLE_HEAD_CLS, TABLE_SELECT_CLS } from "@/components/ui/table-bits"
+import { Upload, Loader2, FileText, Pencil, Trash2, X, Search, MoreHorizontal, ExternalLink, Download } from "lucide-react"
 import { supplierOffersApi, SupplierOffer } from "@/lib/services/supplier-offers"
 import { suppliersApi } from "@/lib/services/suppliers"
 import { supplierGroupsApi } from "@/lib/services/supplier-groups"
@@ -22,12 +24,12 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { getFileIcon } from "@/lib/file-icon"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { uploadFileToDrive } from "@/lib/drive-upload"
-import { ViewToggle } from "@/components/ui/view-toggle"
-import { useViewMode } from "@/hooks/useViewMode"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
 const NO_SUPPLIER = "_nessuno"
+const PAGE_SIZE = 50
+type SortKey = "name" | "supplier" | "date"
 
 interface PendingFile {
     file: File
@@ -52,8 +54,11 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
     const [activeDoc, setActiveDoc] = useState<SupplierOffer | null>(null)
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
-    const [viewMode, setViewMode] = useViewMode('supplier-offers', 'grid')
-    const [supplierTab, setSupplierTab] = useState("tutti")
+    const [search, setSearch] = useState("")
+    const [supplierFilter, setSupplierFilter] = useState("all")
+    const [sortKey, setSortKey] = useState<SortKey>("date")
+    const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+    const [page, setPage] = useState(1)
     const supabase = createClient()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -76,7 +81,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         return (id: string | null) => (id && map.get(id)) || null
     }, [allSuppliers])
 
-    // Sotto-tab per fornitore: solo i fornitori con almeno un documento, in ordine alfabetico
+    // Fornitori presenti nei documenti, in ordine alfabetico (per il filtro in intestazione)
     const supplierGroups = useMemo(() => {
         const present = new Map<string, string>()
         let hasUnassigned = false
@@ -84,15 +89,36 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
             if (doc.supplierId) present.set(doc.supplierId, supplierName(doc.supplierId) || "Fornitore")
             else hasUnassigned = true
         }
-        const groups = [...present.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+        const groups = [...present.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "it"))
         return { groups, hasUnassigned }
     }, [documents, supplierName])
 
-    const filteredDocuments = useMemo(() => {
-        if (supplierTab === "tutti") return documents
-        if (supplierTab === NO_SUPPLIER) return documents.filter(d => !d.supplierId)
-        return documents.filter(d => d.supplierId === supplierTab)
-    }, [documents, supplierTab])
+    const sorted = useMemo(() => {
+        const q = search.trim().toLowerCase()
+        const list = documents.filter(d => {
+            if (supplierFilter === NO_SUPPLIER ? !!d.supplierId : supplierFilter !== "all" && d.supplierId !== supplierFilter) return false
+            if (!q) return true
+            return `${d.name} ${d.notes} ${supplierName(d.supplierId) ?? ""}`.toLowerCase().includes(q)
+        })
+        const dir = sortDir === "asc" ? 1 : -1
+        return [...list].sort((x, y) => {
+            let r = 0
+            if (sortKey === "name") r = x.name.localeCompare(y.name, "it")
+            else if (sortKey === "supplier") r = (supplierName(x.supplierId) || "~").localeCompare(supplierName(y.supplierId) || "~", "it")
+            else r = x.createdAt.localeCompare(y.createdAt)
+            return r * dir
+        })
+    }, [documents, search, supplierFilter, sortKey, sortDir, supplierName])
+
+    const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+    const currentPage = Math.min(page, totalPages)
+    const rows = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    const toggleSort = (key: SortKey) => {
+        if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"))
+        else { setSortKey(key); setSortDir(key === "date" ? "desc" : "asc") }
+        setPage(1)
+    }
+    const anyFilter = !!search.trim() || supplierFilter !== "all"
 
     useEffect(() => {
         if (ownerId) load()
@@ -226,6 +252,16 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         }
     }
 
+    const handleSaveNote = async (doc: SupplierOffer, notes: string) => {
+        if (notes === doc.notes) return
+        try {
+            await supplierOffersApi.update(doc.id, { notes })
+            setDocuments(prev => prev.map(d => (d.id === doc.id ? { ...d, notes } : d)))
+        } catch {
+            notify.error("Errore nel salvataggio della nota")
+        }
+    }
+
     const handleOpenDocument = async (fileUrl: string) => {
         if (fileUrl && !fileUrl.includes('/')) {
             window.open(`/api/drive/download?fileId=${encodeURIComponent(fileUrl)}&fileName=documento`, '_blank')
@@ -259,90 +295,57 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
         }
     }
 
-    const renderDocCard = (doc: SupplierOffer) => (
-        <Card key={doc.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenDocument(doc.fileUrl)}>
-            <CardContent className="p-4 flex items-start gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-                    {getFileIcon(doc.fileType)}
-                </div>
-                <div className="flex-1 overflow-hidden min-w-0">
-                    <div className="flex justify-between items-start gap-1">
-                        <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-                            onClick={(e) => { e.stopPropagation(); openEdit(doc) }}
-                        >
-                            <Pencil className="h-3 w-3" />
-                        </Button>
-                    </div>
-                    {supplierName(doc.supplierId) && (
-                        <Badge variant="outline" className="mt-1 text-[10px] font-normal">{supplierName(doc.supplierId)}</Badge>
-                    )}
-                    {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
-                    <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
-                </div>
-            </CardContent>
-        </Card>
+    const isDrive = (doc: SupplierOffer) => !!doc.fileUrl && !doc.fileUrl.includes('/')
+    const dateOf = (doc: SupplierOffer) => format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })
+
+    const rowMenu = (doc: SupplierOffer) => (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
+                    <MoreHorizontal className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                <DropdownMenuItem onClick={() => handleOpenDocument(doc.fileUrl)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
+                {isDrive(doc) && (
+                    <DropdownMenuItem onClick={() => window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank')}>
+                        <Download className="mr-2 h-4 w-4" />Scarica
+                    </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => openEdit(doc)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setActiveDoc(doc); setDeleteOpen(true) }} className="text-red-600 focus:text-red-600">
+                    <Trash2 className="mr-2 h-4 w-4" />Elimina
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     )
 
-    const renderDocRow = (doc: SupplierOffer) => (
-        <div
-            key={doc.id}
-            className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-slate-800 hover:shadow-sm transition-shadow cursor-pointer"
-            onClick={() => handleOpenDocument(doc.fileUrl)}
-        >
-            <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-                {getFileIcon(doc.fileType)}
-            </div>
-            <div className="flex-1 overflow-hidden min-w-0">
-                <div className="flex items-center gap-2">
-                    <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
-                    {supplierName(doc.supplierId) && (
-                        <Badge variant="outline" className="text-[10px] font-normal shrink-0">{supplierName(doc.supplierId)}</Badge>
-                    )}
-                </div>
-                {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
-            </div>
-            <p className="text-xs text-slate-400 shrink-0">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700"
-                onClick={(e) => { e.stopPropagation(); openEdit(doc) }}
-            >
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
-        </div>
+    const supplierSelect = (cls?: string) => (
+        <Select value={supplierFilter} onValueChange={v => { setSupplierFilter(v); setPage(1) }}>
+            <SelectTrigger aria-label="Filtra per fornitore" className={cls}><SelectValue /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Tutti i fornitori</SelectItem>
+                {supplierGroups.groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                {supplierGroups.hasUnassigned && <SelectItem value={NO_SUPPLIER}>Senza fornitore</SelectItem>}
+            </SelectContent>
+        </Select>
+    )
+    const sortBtn = (key: SortKey, label: string) => (
+        <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+            {label}<SortArrow active={sortKey === key} dir={sortDir} />
+        </button>
     )
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Offerte Fornitori</h2>
-                <div className="flex items-center gap-2">
-                    <ViewToggle mode={viewMode} onChange={setViewMode} />
-                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Carica Documenti
-                    </Button>
-                </div>
+                <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Carica Documenti
+                </Button>
             </div>
-
-            {documents.length > 0 && (supplierGroups.groups.length > 0) && (
-                <Tabs value={supplierTab} onValueChange={setSupplierTab}>
-                    <TabsList className="flex-wrap h-auto">
-                        <TabsTrigger value="tutti">Tutti</TabsTrigger>
-                        {supplierGroups.groups.map(g => (
-                            <TabsTrigger key={g.id} value={g.id}>{g.name}</TabsTrigger>
-                        ))}
-                        {supplierGroups.hasUnassigned && (
-                            <TabsTrigger value={NO_SUPPLIER}>Senza fornitore</TabsTrigger>
-                        )}
-                    </TabsList>
-                </Tabs>
-            )}
 
             {loading ? (
                 <div className="flex justify-center py-12">
@@ -356,16 +359,86 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
                         <p className="text-slate-500 dark:text-slate-400">Carica le offerte ricevute dai fornitori.</p>
                     </CardContent>
                 </Card>
-            ) : filteredDocuments.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-12">Nessun documento per questo fornitore.</p>
-            ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredDocuments.map(renderDocCard)}
-                </div>
             ) : (
-                <div className="space-y-2">
-                    {filteredDocuments.map(renderDocRow)}
-                </div>
+                <>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+                            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                            <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per nome, fornitore o nota" className="pl-8" />
+                        </div>
+                        {anyFilter && (
+                            <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setSupplierFilter("all"); setPage(1) }}>Azzera filtri</Button>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 md:hidden">{supplierSelect()}</div>
+
+                    {/* Tabella (PC) */}
+                    <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+                        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
+                                    <TableHead className={`w-56 ${TABLE_HEAD_CLS}`}>
+                                        <div className="flex items-center gap-1">
+                                            <div className="min-w-0 flex-1">{supplierSelect(TABLE_SELECT_CLS)}</div>
+                                            <button type="button" aria-label="Ordina per fornitore" onClick={() => toggleSort("supplier")} className="shrink-0 text-slate-500 hover:text-slate-900">
+                                                <SortArrow active={sortKey === "supplier"} dir={sortDir} />
+                                            </button>
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
+                                    <TableHead className={`w-[28%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
+                                    <TableHead className="w-12" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rows.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell>
+                                    </TableRow>
+                                ) : rows.map(doc => (
+                                    <TableRow key={doc.id} className="cursor-pointer" onClick={() => handleOpenDocument(doc.fileUrl)}>
+                                        <TableCell className="border-r py-2">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <span className="shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</span>
+                                                <span className="truncate text-sm font-medium" title={doc.name}>{doc.name}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={supplierName(doc.supplierId) || ""}>
+                                            {supplierName(doc.supplierId) || <span className="text-slate-300">—</span>}
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{dateOf(doc)}</TableCell>
+                                        <TableCell className="border-r py-1" onClick={e => e.stopPropagation()}>
+                                            <InlineNote value={doc.notes} onSave={v => handleSaveNote(doc, v)} />
+                                        </TableCell>
+                                        <TableCell className="py-2 text-right">{rowMenu(doc)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* Elenco compatto (telefono) */}
+                    <div className="space-y-2 md:hidden">
+                        {rows.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Nessun documento con questi filtri</p>}
+                        {rows.map(doc => (
+                            <div key={doc.id} className="flex items-start gap-2 rounded-md border bg-white p-3 dark:bg-slate-900" onClick={() => handleOpenDocument(doc.fileUrl)}>
+                                <span className="mt-0.5 shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">{doc.name}</p>
+                                    <p className="text-xs text-slate-500">{supplierName(doc.supplierId) || "Senza fornitore"} · {dateOf(doc)}</p>
+                                    <div className="mt-1" onClick={e => e.stopPropagation()}>
+                                        <InlineNote value={doc.notes} onSave={v => handleSaveNote(doc, v)} />
+                                    </div>
+                                </div>
+                                {rowMenu(doc)}
+                            </div>
+                        ))}
+                    </div>
+
+                    <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={setPage} totalItems={sorted.length} itemLabel="documenti" />
+                </>
             )}
 
             {/* Upload dialog */}
