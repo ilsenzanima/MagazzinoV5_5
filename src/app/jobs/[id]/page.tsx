@@ -21,6 +21,7 @@ import { buildInternalJobZipPlan } from "@/lib/zip/internal-job-zip-plan";
 import { buildCoverPdfBlob } from "@/lib/pdf/job-documentation-cover-pdf";
 import { buildAndDownloadDocumentationZip } from "@/lib/zip/build-documentation-zip";
 import { JobSectionMenu, type SectionMenuGroup } from "@/components/jobs/JobSectionMenu";
+import { JobActionsMenu } from "@/components/jobs/JobActionsMenu";
 import { Badge } from "@/components/ui/badge";
 import { JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
 import { jobConformitaDocumentTypesApi } from "@/lib/services/job-conformita-document-types";
@@ -590,46 +591,32 @@ export default function JobDetailsPage() {
                             {JOB_CATEGORY_LABELS[job.category]}
                         </Badge>
                     </div>
-                    {(userRole === 'admin' || userRole === 'operativo') && (
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleDownloadFullZip}
-                                disabled={downloadingZip}
-                                className="px-2 md:px-4"
-                            >
-                                {downloadingZip ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
-                                        <span className="hidden sm:inline">
-                                            {zipProgress
-                                                ? zipProgress.done >= zipProgress.total
-                                                    ? "Comprimo lo zip..."
-                                                    : `File ${zipProgress.done}/${zipProgress.total}...`
-                                                : "Preparazione..."}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Archive className="h-4 w-4 md:mr-2" />
-                                        <span className="hidden sm:inline">Scarica documentazione</span>
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    )}
                 </div>
 
                 {/* Printable Area */}
                 <div ref={printRef}>
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                        {/* Menu unico delle pagine della commessa */}
-                        <div className="print:hidden">
+                        {/* Menu delle pagine | codice commessa | menu delle azioni */}
+                        <div className="print:hidden flex items-center justify-between gap-2">
                             <JobSectionMenu
                                 groups={buildMenuGroups(userRole === 'admin' || userRole === 'operativo')}
                                 activeKey={activeTab}
                                 onSelect={(group, tab) => { setActiveGroup(group as TabGroupKey); setActiveTab(tab); }}
+                            />
+                            <div className="min-w-0 flex-1 truncate text-center text-xs text-slate-500 dark:text-slate-400 md:text-sm">
+                                <span className="font-mono">#{job.code}</span>
+                                <span className="hidden md:inline"> • Creata il {new Date(job.createdAt || new Date()).toLocaleDateString()}</span>
+                            </div>
+                            <JobActionsMenu
+                                job={job}
+                                onJobUpdated={loadData}
+                                onDownloadDocumentation={handleDownloadFullZip}
+                                downloading={downloadingZip}
+                                downloadLabel={zipProgress
+                                    ? zipProgress.done >= zipProgress.total
+                                        ? "Comprimo lo zip..."
+                                        : `File ${zipProgress.done}/${zipProgress.total}...`
+                                    : null}
                             />
                         </div>
 
