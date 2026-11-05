@@ -174,9 +174,24 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         jobSiteDocumentTypesApi.getAll(),
         jobSiteDocumentFoldersApi.getByJobId(jobId),
       ])
-      setDocuments(all)
+      // I documenti sono condivisi con la proposta di origine: le loro cartelle possono appartenere
+      // alla proposta e non alla commessa. Si caricano anche quelle e si uniscono le omonime
+      // (stesso tipo e stesso nome) in una sola, per non perdere documenti né duplicare righe.
+      const proposalIds = Array.from(new Set(all.map(d => d.proposalId).filter((v): v is string => !!v)))
+      const proposalFolders = (await Promise.all(proposalIds.map(id => jobSiteDocumentFoldersApi.getByProposalId(id)))).flat()
+      const everyFolder = new Map([...jobFolders, ...proposalFolders].map(f => [f.id, f] as const))
+      const docsIn = new Map<string, number>()
+      all.forEach(d => { if (d.folderId) docsIn.set(d.folderId, (docsIn.get(d.folderId) ?? 0) + 1) })
+      const keyOf = (f: JobSiteDocumentFolder) => `${f.documentTypeId}|${f.name.trim().toLowerCase()}`
+      const keeper = new Map<string, JobSiteDocumentFolder>()
+      everyFolder.forEach(f => {
+        const cur = keeper.get(keyOf(f))
+        if (!cur || (docsIn.get(f.id) ?? 0) > (docsIn.get(cur.id) ?? 0)) keeper.set(keyOf(f), f)
+      })
+      const aliasOf = (id: string) => { const f = everyFolder.get(id); return f ? keeper.get(keyOf(f))!.id : null }
+      setDocuments(all.map(d => (d.folderId ? { ...d, folderId: aliasOf(d.folderId) } : d)))
       setDocTypes(types)
-      setFolders(jobFolders)
+      setFolders(Array.from(keeper.values()).sort((a, b) => a.name.localeCompare(b.name, "it")))
     } catch (error) {
       console.error("Failed to load documents", error)
       toast.error("Errore nel caricamento dei documenti")
