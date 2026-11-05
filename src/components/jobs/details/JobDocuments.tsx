@@ -116,6 +116,25 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   // Raccolta di foto aperta (pagina dedicata); null = tabella
   const [openCollection, setOpenCollection] = useState<{ typeId: string; folderId: string | null } | null>(null)
 
+  // La raccolta aperta è un passo della cronologia del browser: «indietro» torna alla tabella
+  // invece di uscire dalla commessa (e «avanti» la riapre).
+  type CollectionRef = { typeId: string; folderId: string | null }
+  useEffect(() => {
+    const saved = (window.history.state as { magCollection?: CollectionRef } | null)?.magCollection
+    if (saved) setOpenCollection(saved)
+    const onPop = (e: PopStateEvent) => setOpenCollection((e.state as { magCollection?: CollectionRef } | null)?.magCollection ?? null)
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [])
+  const showCollection = (c: CollectionRef) => {
+    window.history.pushState({ ...(window.history.state ?? {}), magCollection: c }, "")
+    setOpenCollection(c)
+  }
+  const closeCollection = () => {
+    if ((window.history.state as { magCollection?: CollectionRef } | null)?.magCollection) window.history.back()
+    else setOpenCollection(null)
+  }
+
   // Galleria foto
   const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([])
   const [galleryIndex, setGalleryIndex] = useState(0)
@@ -149,7 +168,9 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
 
   // Move to folder dialog
   const [moveOpen, setMoveOpen] = useState(false)
-  const [movingDoc, setMovingDoc] = useState<SiteDocument | null>(null)
+  const [movingDocs, setMovingDocs] = useState<SiteDocument[]>([])
+  const [bulkDeleteDocs, setBulkDeleteDocs] = useState<SiteDocument[]>([])
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [moveFolderId, setMoveFolderId] = useState("root")
   const [moving, setMoving] = useState(false)
 
@@ -256,24 +277,27 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     }
   }
 
-  const openMove = (doc: SiteDocument) => {
-    setMovingDoc(doc)
-    setMoveFolderId(doc.folderId || "root")
+  const openMove = (list: SiteDocument[]) => {
+    setMovingDocs(list)
+    setMoveFolderId(list.length === 1 ? (list[0].folderId || "root") : "root")
     setMoveOpen(true)
   }
 
   const handleMove = async () => {
-    if (!movingDoc) return
+    if (movingDocs.length === 0) return
     const targetFolderId = moveFolderId === "root" ? null : moveFolderId
-    if (targetFolderId === (movingDoc.folderId || null)) { setMoveOpen(false); return }
+    const toMove = movingDocs.filter(d => (d.folderId || null) !== targetFolderId)
+    if (toMove.length === 0) { setMoveOpen(false); return }
+    let done = 0
     try {
       setMoving(true)
-      const type = docTypes.find(t => t.id === movingDoc.documentTypeId)
+      const type = docTypes.find(t => t.id === toMove[0].documentTypeId)
       const targetFolder = targetFolderId ? folders.find(f => f.id === targetFolderId) : undefined
       const segments = targetFolder ? [...typeBaseSegments(type), targetFolder.name] : typeBaseSegments(type)
 
-      // Il file su Drive va spostato solo se è un vero id Drive (non un vecchio path Supabase)
-      if (movingDoc.fileUrl && !movingDoc.fileUrl.includes('/')) {
+      // I file su Drive vanno spostati solo se hanno un vero id Drive (non un vecchio path Supabase)
+      let driveFolderId: string | null = null
+      if (toMove.some(isDriveFile)) {
         const ensureRes = await fetch('/api/drive/ensure-folder', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -281,24 +305,51 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         })
         const ensured = await ensureRes.json()
         if (!ensureRes.ok) throw new Error(ensured.error || 'Errore risoluzione cartella')
-        const moveRes = await fetch('/api/drive/move-file', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileId: movingDoc.fileUrl, newParentId: ensured.folderId }),
-        })
-        const moved = await moveRes.json()
-        if (!moveRes.ok) throw new Error(moved.error || 'Errore spostamento file')
+        driveFolderId = ensured.folderId
       }
 
-      await jobSiteDocumentsApi.update(movingDoc.id, { folderId: targetFolderId })
-      toast.success("Documento spostato")
+      for (const doc of toMove) {
+        if (driveFolderId && isDriveFile(doc)) {
+          const moveRes = await fetch('/api/drive/move-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: doc.fileUrl, newParentId: driveFolderId }),
+          })
+          const moved = await moveRes.json()
+          if (!moveRes.ok) throw new Error(moved.error || 'Errore spostamento file')
+        }
+        await jobSiteDocumentsApi.update(doc.id, { folderId: targetFolderId })
+        done++
+      }
+      toast.success(toMove.length > 1 ? `${toMove.length} documenti spostati` : "Documento spostato")
       setMoveOpen(false)
-      loadDocuments()
     } catch {
-      toast.error("Errore durante lo spostamento")
+      toast.error(toMove.length > 1 ? `Spostati ${done} documenti su ${toMove.length}: errore durante lo spostamento` : "Errore durante lo spostamento")
     } finally {
       setMoving(false)
+      loadDocuments()
     }
+  }
+
+  // Eliminazione di piu' documenti insieme (selezione nella pagina delle foto)
+  const handleBulkDelete = async () => {
+    const list = bulkDeleteDocs
+    if (list.length === 0) return
+    const deleted = new Set<string>()
+    for (const doc of list) {
+      try {
+        const path = doc.fileUrl?.includes('/public/documents/') ? doc.fileUrl.split('/public/documents/')[1] : undefined
+        if (path) await supabase.storage.from('documents').remove([path])
+        await jobSiteDocumentsApi.delete(doc.id)
+        deleted.add(doc.id)
+      } catch (error) {
+        console.error("Delete failed", doc.id, error)
+      }
+    }
+    setDocuments(prev => prev.filter(d => !deleted.has(d.id)))
+    setBulkDeleteDocs([])
+    if (deleted.size === list.length) toast.success(list.length > 1 ? `${list.length} documenti eliminati` : "Documento eliminato")
+    else toast.error(`Eliminati ${deleted.size} documenti su ${list.length}`)
   }
 
   const handleFilesSelected = (files: FileList | null) => {
@@ -597,7 +648,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         )}
         <DropdownMenuItem onClick={e => openEdit(doc, e as unknown as React.MouseEvent)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
         {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
-          <DropdownMenuItem onClick={() => openMove(doc)}><FolderInput className="mr-2 h-4 w-4" />Sposta in cartella</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => openMove([doc])}><FolderInput className="mr-2 h-4 w-4" />Sposta in cartella</DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => askDelete(doc)} className="text-red-600 focus:text-red-600">
@@ -615,14 +666,14 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
-        <DropdownMenuItem onClick={() => setOpenCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Images className="mr-2 h-4 w-4" />Apri raccolta</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Images className="mr-2 h-4 w-4" />Apri raccolta</DropdownMenuItem>
         <DropdownMenuItem onClick={() => openUpload({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Upload className="mr-2 h-4 w-4" />Aggiungi foto</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 
   const openRow = (r: TableRowData) =>
-    r.kind === "collection" ? setOpenCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null }) : openDoc(r.doc)
+    r.kind === "collection" ? showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null }) : openDoc(r.doc)
 
   const countLabel = (r: CollectionRow) => `${r.docs.length} foto`
 
@@ -671,7 +722,9 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         <JobPhotoCollection
           title={collection.title}
           docs={collection.docs}
-          onBack={() => setOpenCollection(null)}
+          onBack={closeCollection}
+          onMoveSelected={docs => openMove(docs)}
+          onDeleteSelected={docs => { setBulkDeleteDocs(docs); setBulkDeleteOpen(true) }}
           onAdd={() => openUpload({ typeId: openCollection!.typeId, folderId: openCollection!.folderId })}
           onOpen={doc => openDoc(doc, collection.docs)}
           menu={doc => rowMenu(doc, collection.docs)}
@@ -1017,6 +1070,16 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         onConfirm={handleDelete}
       />
 
+      <ConfirmDeleteDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={bulkDeleteDocs.length > 1 ? `Elimina ${bulkDeleteDocs.length} documenti` : "Elimina documento"}
+        description={bulkDeleteDocs.length > 1
+          ? `I ${bulkDeleteDocs.length} documenti selezionati verranno eliminati definitivamente e non potranno essere recuperati.`
+          : `Il documento "${bulkDeleteDocs[0]?.name || 'selezionato'}" verrà eliminato definitivamente e non potrà essere recuperato.`}
+        onConfirm={handleBulkDelete}
+      />
+
       {/* Nuova cartella */}
       <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
         <DialogContent className="max-w-sm">
@@ -1053,14 +1116,14 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
       {/* Sposta in cartella */}
       <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Sposta in cartella</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{movingDocs.length > 1 ? `Sposta ${movingDocs.length} documenti` : "Sposta in cartella"}</DialogTitle></DialogHeader>
           <div className="space-y-1.5 py-2">
             <Label>Cartella di destinazione</Label>
             <Select value={moveFolderId} onValueChange={setMoveFolderId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="root">Nessuna cartella</SelectItem>
-                {folders.filter(f => f.documentTypeId === movingDoc?.documentTypeId).map(f => (
+                {folders.filter(f => f.documentTypeId === movingDocs[0]?.documentTypeId).map(f => (
                   <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                 ))}
               </SelectContent>
