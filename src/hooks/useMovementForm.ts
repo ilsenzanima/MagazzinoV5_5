@@ -95,6 +95,8 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
 
     const hasInitial = !!initialNote;
     const isEditing = hasInitial && !draftId;
+    // Righe della bolla che hanno già consumato i lotti (solo una bolla emessa; una bozza non muove il magazzino)
+    const consumedItems = isEditing ? (initialNote?.items ?? []) : [];
     const [savingDraft, setSavingDraft] = useState(false);
     const editingId = initialNote?.id;
 
@@ -346,17 +348,17 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
 
                 setJobBatchAvailability(combined);
 
-                if (isEditing && combined.length > 0) {
+                if (hasInitial && combined.length > 0) {
                     setLines((prev) =>
                         prev.map((line) => {
                             if (!line.itemId || line.availableBatches.length > 0) return line;
                             const itemBatches = combined
                                 .filter((b: any) => b.itemId === line.itemId && !!b.isFictitious === !!line.isFictitious)
                                 .map((b: any) => {
-                                    const totalQty = (initialNote?.items ?? [])
+                                    const totalQty = consumedItems
                                         .filter((item) => item.purchaseItemId === b.purchaseItemId)
                                         .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
-                                    const totalPieces = (initialNote?.items ?? [])
+                                    const totalPieces = consumedItems
                                         .filter((item) => item.purchaseItemId === b.purchaseItemId)
                                         .reduce((sum, item) => sum + (item.pieces ?? 0), 0);
                                     return {
@@ -378,12 +380,12 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
             setJobInventory([]);
             setJobBatchAvailability([]);
         }
-    }, [activeTab, selectedJob, isEditing]);
+    }, [activeTab, selectedJob, hasInitial]);
 
     // When editing exit/sale/transfer: load available batches for each existing line
     const exitSaleBatchesLoaded = useRef(false);
     useEffect(() => {
-        if (!isEditing || exitSaleBatchesLoaded.current) return;
+        if (!hasInitial || exitSaleBatchesLoaded.current) return;
         if (activeTab !== "exit" && activeTab !== "sale" && activeTab !== "transfer") return;
         exitSaleBatchesLoaded.current = true;
 
@@ -401,10 +403,10 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                 const batches: any[] = await inventoryApi.getAvailableBatches(line.itemId);
                 // Add back quantities that this bolla originally consumed from each lot
                 const adjustedBatches = batches.map((b) => {
-                    const totalQty = (initialNote?.items ?? [])
+                    const totalQty = consumedItems
                         .filter((item) => item.purchaseItemId === b.id)
                         .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
-                    const totalPieces = (initialNote?.items ?? [])
+                    const totalPieces = consumedItems
                         .filter((item) => item.purchaseItemId === b.id)
                         .reduce((sum, item) => sum + (item.pieces ?? 0), 0);
                     if (totalQty === 0 && totalPieces === 0) return b;
@@ -440,8 +442,8 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                         validBatches.unshift({
                             id: line.purchaseItemId,
                             purchaseRef,
-                            remainingQty: totalQty,
-                            remainingPieces: totalPieces > 0 ? totalPieces : null,
+                            remainingQty: draftId ? 0 : totalQty,
+                            remainingPieces: totalPieces > 0 ? (draftId ? 0 : totalPieces) : null,
                         });
                     }
                 }
@@ -461,7 +463,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
             }
         });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isEditing, activeTab]);
+    }, [hasInitial, activeTab]);
 
     useEffect(() => {
         const completedCount = lines.filter((l) => l.itemId && l.quantity).length;
