@@ -6,6 +6,7 @@ export interface JobDocumentFolder {
     documentTypeId: string;
     name: string;
     driveFolderId?: string;
+    notes?: string;
     createdBy?: string;
     createdAt: string;
 }
@@ -16,6 +17,7 @@ const map = (db: any): JobDocumentFolder => ({
     documentTypeId: db.document_type_id,
     name: db.name,
     driveFolderId: db.drive_folder_id ?? undefined,
+    notes: db.notes ?? undefined,
     createdBy: db.created_by,
     createdAt: db.created_at,
 });
@@ -75,6 +77,14 @@ export const jobDocumentFoldersApi = {
             .single();
         if (error) throw error;
         return map(data);
+    },
+
+    setNotes: async (id: string, notes: string): Promise<void> => {
+        const { error } = await supabase
+            .from('job_document_folders')
+            .update({ notes })
+            .eq('id', id);
+        if (error) throw error;
     },
 
     delete: async (id: string): Promise<void> => {

@@ -13,7 +13,7 @@ import { getFileIcon } from "@/lib/file-icon"
 export interface PhotoDocLike {
   id: string
   name: string
-  notes: string
+  notes?: string
   fileUrl: string
   fileType: string
   createdAt: string
@@ -47,6 +47,7 @@ interface JobPhotoCollectionProps<T extends PhotoDocLike> {
   title: string
   docs: T[]
   onBack: () => void
+  backLabel?: string
   onAdd: () => void
   onOpen: (doc: T) => void
   menu: (doc: T) => ReactNode
@@ -55,7 +56,7 @@ interface JobPhotoCollectionProps<T extends PhotoDocLike> {
 }
 
 // Pagina di una raccolta di foto (un tipo, o una cartella di quel tipo)
-export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack, onAdd, onOpen, menu, onMoveSelected, onDeleteSelected }: JobPhotoCollectionProps<T>) {
+export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack, backLabel = "Documenti Cantiere", onAdd, onOpen, menu, onMoveSelected, onDeleteSelected }: JobPhotoCollectionProps<T>) {
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -81,7 +82,7 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" className="-ml-2 text-slate-600" onClick={onBack}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" />Documenti Cantiere
+          <ArrowLeft className="mr-1.5 h-4 w-4" />{backLabel}
         </Button>
         <div className="ml-auto flex items-center gap-2">
           {docs.length > 0 && !selectMode && (

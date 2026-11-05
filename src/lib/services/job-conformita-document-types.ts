@@ -4,6 +4,7 @@ export interface JobConformitaDocumentType {
     id: string;
     name: string;
     allowsFolders: boolean;
+    isPhotoGallery: boolean;
     createdAt: string;
 }
 
@@ -11,6 +12,7 @@ const map = (db: any): JobConformitaDocumentType => ({
     id: db.id,
     name: db.name,
     allowsFolders: db.allows_folders === true,
+    isPhotoGallery: db.is_photo_gallery === true,
     createdAt: db.created_at,
 });
 
@@ -51,6 +53,17 @@ export const jobConformitaDocumentTypesApi = {
         const { data, error } = await supabase
             .from('job_conformita_document_types')
             .update({ allows_folders: allowsFolders })
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw error;
+        return map(data);
+    },
+
+    setIsPhotoGallery: async (id: string, isPhotoGallery: boolean): Promise<JobConformitaDocumentType> => {
+        const { data, error } = await supabase
+            .from('job_conformita_document_types')
+            .update({ is_photo_gallery: isPhotoGallery })
             .eq('id', id)
             .select()
             .single();
