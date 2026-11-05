@@ -20,6 +20,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { HelpTip } from "@/components/ui/help-tip"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { buildJobLinks } from "@/lib/utils/job-links"
+import { localIso, todayIso } from "@/lib/utils/local-date"
+import { presenceSegments } from "@/lib/utils/presence-segments"
 import type { JobChainItem } from "@/lib/types"
 
 const STATUS_LABEL: Record<JobTask['status'], string> = {
@@ -75,16 +77,7 @@ const isSummaryId = (id: string) => id.startsWith(SUMMARY_PREFIX)
 const matchesStatus = (job: Job, filter: StatusFilter) =>
     filter === "all" ? true : filter === "onsite" ? job.status === "active" && !!job.onSite : job.status === filter
 
-// Vuoto di presenze (in giorni) oltre il quale il lavoro si considera interrotto: la barra si spezza
-const GAP_DAYS = 7
-
-const daysBetween = (a: string, b: string) =>
-    Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000)
-
-const localToday = () => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const localToday = todayIso
 
 const emptyForm = {
     jobId: "",
@@ -196,15 +189,7 @@ export function CronoprogrammaGlobalView() {
         if (!isSummaryId(task.id)) return null
         const dates = presenceDatesByJob.get(task.jobId)
         if (!dates || dates.length === 0) return null
-        const out: { start: string; end: string }[] = []
-        let start = dates[0]
-        let prev = dates[0]
-        for (const d of dates.slice(1)) {
-            if (daysBetween(prev, d) > GAP_DAYS) { out.push({ start, end: prev }); start = d }
-            prev = d
-        }
-        out.push({ start, end: prev })
-        return out
+        return presenceSegments(dates)
     }
 
     // Riga di riepilogo: i giorni in cui si è davvero lavorato, dalla prima all'ultima presenza registrata (le date di
@@ -395,8 +380,8 @@ export function CronoprogrammaGlobalView() {
         if (isSummaryId(taskId)) { redraw(); return }
         try {
             await jobTasksApi.update(taskId, {
-                startDate: start.toISOString().slice(0, 10),
-                endDate: end.toISOString().slice(0, 10),
+                startDate: localIso(start),
+                endDate: localIso(end),
             })
             await load()
         } catch (err) {

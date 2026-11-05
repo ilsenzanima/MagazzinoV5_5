@@ -676,7 +676,7 @@ export default function JobDetailsPage() {
                         </TabsContent>
 
                         <TabsContent value="cronoprogramma" className="space-y-6 focus-visible:outline-none">
-                            <JobCronoprogramma jobId={job.id} />
+                            <JobCronoprogramma jobId={job.id} job={job} />
                         </TabsContent>
 
                         <TabsContent value="stock" className="space-y-6 focus-visible:outline-none">

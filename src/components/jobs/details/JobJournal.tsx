@@ -14,6 +14,7 @@ import { Plus, Calendar, User, Pencil, Trash2, CheckCircle2, Circle } from "luci
 import { useAuth } from "@/components/auth-provider"
 import { cn } from "@/lib/utils"
 import { notify } from "@/lib/notify"
+import { todayIso } from "@/lib/utils/local-date"
 
 interface JobJournalProps {
   jobId: string
@@ -29,7 +30,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
   const [logToDelete, setLogToDelete] = useState<string | null>(null)
 
   const [newLog, setNewLog] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: todayIso(),
     content: "",
     isCompleted: false,
   })
@@ -70,7 +71,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
         })
       }
       setIsDialogOpen(false)
-      setNewLog({ date: new Date().toISOString().split('T')[0], content: "", isCompleted: false })
+      setNewLog({ date: todayIso(), content: "", isCompleted: false })
       setEditingLog(null)
       loadLogs()
     } catch (error) {
@@ -114,7 +115,7 @@ export function JobJournal({ jobId }: JobJournalProps) {
 
   const openNew = () => {
     setEditingLog(null)
-    setNewLog({ date: new Date().toISOString().split('T')[0], content: "", isCompleted: false })
+    setNewLog({ date: todayIso(), content: "", isCompleted: false })
     setIsDialogOpen(true)
   }
 

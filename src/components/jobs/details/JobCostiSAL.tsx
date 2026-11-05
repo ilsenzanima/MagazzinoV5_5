@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
+import { todayIso } from "@/lib/utils/local-date"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Loader2, Tag, X, Clock, ChevronDown, ChevronRight, PlusCircle, Settings, Users, Package, Euro, ReceiptText, Download, Paperclip, ExternalLink, Pencil } from "lucide-react"
@@ -492,7 +494,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
         const wb = XLSX.utils.book_new()
         const fmtN = (n: number) => Math.round(n * 100) / 100
         const isAll = scope === 'all'
-        const today = new Date().toISOString().slice(0, 10)
+        const today = todayIso()
         const fileLabel = isAll ? 'Completo' : scope.replace(/\s+/g, '_')
 
         // Nome cantiere dalle prop
@@ -1096,8 +1098,12 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
             setManageSaving(null)
         }
     }
-    const handleDeleteSal = async (name: string) => {
-        if (!confirm(`Eliminare il TAG "${name}" e tutte le sue voci?`)) return
+    const [salToDelete, setSalToDelete] = useState<string | null>(null)
+    const handleDeleteSal = (name: string) => setSalToDelete(name)
+    const doDeleteSal = async () => {
+        const name = salToDelete
+        setSalToDelete(null)
+        if (!name) return
         try {
             setManageSaving(name)
             await Promise.all([
@@ -1992,6 +1998,14 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDeleteDialog
+                open={!!salToDelete}
+                onOpenChange={(o) => { if (!o) setSalToDelete(null) }}
+                title="Elimina TAG"
+                description={`Eliminare il TAG "${salToDelete ?? ''}" e tutte le sue voci?`}
+                onConfirm={doDeleteSal}
+            />
         </div>
     )
 }

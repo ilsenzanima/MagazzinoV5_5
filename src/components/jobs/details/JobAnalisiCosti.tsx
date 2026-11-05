@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info, Upload } from "lucide-react"
@@ -94,6 +95,8 @@ function MaterialTable({ rows, alerts, onUpdate, onDelete }: {
     onDelete: (id: string) => void
 }) {
     const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+    const [pendingNoteRow, setPendingNoteRow] = useState<string | null>(null)
+    const [pendingNote, setPendingNote] = useState("")
     const totalEst = rows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0)
 
     return (
@@ -134,11 +137,7 @@ function MaterialTable({ rows, alerts, onUpdate, onDelete }: {
                                                     </button>
                                                 )}
                                                 <button className="underline hover:no-underline"
-                                                    onClick={() => {
-                                                        const note = window.prompt('In attesa del prezzo: nota facoltativa (es. fornitore, ordine)') ?? null
-                                                        if (note === null) return
-                                                        onUpdate(row.id, { pricePending: true, pricePendingNote: note.trim() || null })
-                                                    }}>
+                                                    onClick={() => { setPendingNote(""); setPendingNoteRow(row.id) }}>
                                                     In attesa del prezzo
                                                 </button>
                                             </span>
@@ -205,6 +204,28 @@ function MaterialTable({ rows, alerts, onUpdate, onDelete }: {
                     </tfoot>
                 )}
             </table>
+
+            <Dialog open={!!pendingNoteRow} onOpenChange={(o) => { if (!o) setPendingNoteRow(null) }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>In attesa del prezzo</DialogTitle>
+                        <DialogDescription>Nota facoltativa (es. fornitore, ordine).</DialogDescription>
+                    </DialogHeader>
+                    <Input
+                        autoFocus
+                        value={pendingNote}
+                        onChange={e => setPendingNote(e.target.value)}
+                        placeholder="Nota"
+                    />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setPendingNoteRow(null)}>Annulla</Button>
+                        <Button onClick={() => {
+                            if (pendingNoteRow) onUpdate(pendingNoteRow, { pricePending: true, pricePendingNote: pendingNote.trim() || null })
+                            setPendingNoteRow(null)
+                        }}>Conferma</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
