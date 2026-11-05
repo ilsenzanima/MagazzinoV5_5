@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   description: "Gestione Magazzino Intelligente",
   manifest: "/manifest.json",
   icons: {
-    icon: '/icons/icon-192x192.png',
+    icon: [{ url: '/favicon.ico', sizes: 'any' }, { url: '/icons/flame.png', type: 'image/png' }],
     apple: '/icons/icon-192x192.png',
   },
   appleWebApp: {
