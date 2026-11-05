@@ -86,9 +86,11 @@ interface TimelineChartProps {
     readonly?: boolean;
     /** Occupa tutta l'altezza del contenitore (che deve averne una) invece di una altezza propria */
     fill?: boolean;
+    /** Altezza del riquadro (valore CSS) quando non si usa `fill`; di default si adatta allo schermo */
+    height?: string;
 }
 
-export function TimelineChart({ tasks, taskLabel, isSummary, segments, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false, fill = false }: TimelineChartProps) {
+export function TimelineChart({ tasks, taskLabel, isSummary, segments, barClass, popupContent, rowPresence, onTaskClick, onDateChange, onProgressChange, readonly = false, fill = false, height }: TimelineChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     // Posizione di scorrimento tra un ridisegno e l'altro (il diagramma si rifà a ogni modifica)
     const savedScroll = useRef<{ left: number; top: number } | null>(null);
@@ -368,7 +370,7 @@ export function TimelineChart({ tasks, taskLabel, isSummary, segments, barClass,
             <div
                 ref={wrapperRef}
                 className={`gantt-chart-viewport w-full overflow-hidden border rounded-md bg-white dark:bg-slate-900 cursor-grab active:cursor-grabbing touch-none ${fill ? "h-[65vh] min-h-[300px] lg:h-auto lg:flex-1" : ""}`}
-                style={fill ? undefined : { height: "clamp(420px, 68vh, 900px)" }}
+                style={fill ? undefined : { height: height ?? "clamp(420px, 68vh, 900px)" }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={endDrag}

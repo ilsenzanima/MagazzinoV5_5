@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Users, Tag, ExternalLink, X, Clock } from "lucide-react"
 import { purchasesApi, attendanceApi, correctionsApi, Movement, Purchase } from "@/lib/api"
@@ -316,8 +317,12 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
         }
     }
 
-    const handleDeleteSal = async (name: string) => {
-        if (!confirm(`Eliminare il SAL "${name}" e tutte le sue voci?`)) return
+    const [salToDelete, setSalToDelete] = useState<string | null>(null)
+    const handleDeleteSal = (name: string) => setSalToDelete(name)
+    const doDeleteSal = async () => {
+        const name = salToDelete
+        setSalToDelete(null)
+        if (!name) return
         try {
             setManageSaving(name)
             await salApi.deleteSal(jobId, name)
@@ -735,6 +740,14 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
                     {viewingWH && <WorkerHoursTable data={viewingWH} readOnly />}
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDeleteDialog
+                open={!!salToDelete}
+                onOpenChange={(o) => { if (!o) setSalToDelete(null) }}
+                title="Elimina SAL"
+                description={`Eliminare il SAL "${salToDelete ?? ''}" e tutte le sue voci?`}
+                onConfirm={doDeleteSal}
+            />
         </div>
     )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,12 +11,27 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, GanttChartSquare, Pencil, Trash2, Users } from "lucide-react"
-import { jobTasksApi, attendanceApi, jobTaskAssignmentsApi, workersApi, JobTask, Attendance, JobTaskAssignment, Worker } from "@/lib/api"
+import { jobTasksApi, attendanceApi, jobTaskAssignmentsApi, workersApi, Job, JobTask, Attendance, JobTaskAssignment, Worker } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
+import { HelpTip } from "@/components/ui/help-tip"
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
+import { localIso, todayIso } from "@/lib/utils/local-date"
+import { presenceSegments } from "@/lib/utils/presence-segments"
 
 interface JobCronoprogrammaProps {
     jobId: string
+    job: Job
+}
+
+const SUMMARY_PREFIX = "job-" // niente ":" negli id: frappe-gantt li usa nei selettori CSS
+const isSummaryId = (id: string) => id.startsWith(SUMMARY_PREFIX)
+
+// Stato della commessa -> colore della barra di riepilogo (blu in corso, verde conclusa, arancio sospesa)
+const JOB_TO_TASK_STATUS: Record<string, JobTask['status']> = {
+    active: "in_progress",
+    completed: "completed",
+    suspended: "delayed",
 }
 
 const STATUS_LABEL: Record<JobTask['status'], string> = {
@@ -44,7 +59,7 @@ const emptyForm = {
     assignedWorkerIds: [] as string[],
 }
 
-export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
+export function JobCronoprogramma({ jobId, job }: JobCronoprogrammaProps) {
     const [tasks, setTasks] = useState<JobTask[]>([])
     const [attendance, setAttendance] = useState<Attendance[]>([])
     const [assignments, setAssignments] = useState<JobTaskAssignment[]>([])
@@ -53,6 +68,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
     const [isFormOpen, setIsFormOpen] = useState(false)
     const [editingTask, setEditingTask] = useState<JobTask | null>(null)
     const [form, setForm] = useState(emptyForm)
+    const [taskToDelete, setTaskToDelete] = useState<string | null>(null)
 
     const load = async () => {
         try {
@@ -84,6 +100,10 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
         const planned = assignmentsByTask(task.id)
 
         const parts: string[] = []
+        if (isSummaryId(task.id)) {
+            parts.push(`<div class="text-xs mb-1">Presenze dal <strong>${task.startDate}</strong> al <strong>${task.endDate}</strong></div>`)
+            parts.push(`<div class="text-xs mb-1 text-slate-500">Commessa: inizio ${(job.startDate || '—').slice(0, 10)}, fine ${job.endDate ? job.endDate.slice(0, 10) : 'non indicata'}</div>`)
+        }
         if (planned.length > 0) {
             const rows = planned.map(p => {
                 const showedUp = presentWorkerIds.has(p.workerId)
@@ -108,7 +128,44 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
         workersByDate.get(a.date)!.add(a.workerId)
     })
     const presenceCounts = new Map(Array.from(workersByDate, ([date, workers]) => [date, workers.size]))
-    const rowPresence = () => presenceCounts
+    // Sotto la riga di riepilogo i puntini delle presenze si vedono solo se la commessa non ha fasi
+    const rowPresence = (task: JobTask) => (isSummaryId(task.id) && tasks.length > 0) ? new Map<string, number>() : presenceCounts
+
+    const presenceDates = useMemo(() => Array.from(presenceCounts.keys()).sort(), [attendance]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Riga di riepilogo: i giorni in cui si è davvero lavorato, dalla prima all'ultima presenza registrata.
+    // Senza presenze si usano le date della commessa
+    const summary = useMemo<JobTask | null>(() => {
+        const jobStart = (job.startDate || tasks.map(t => t.startDate).sort()[0] || "").slice(0, 10)
+        const start = presenceDates[0] ?? jobStart
+        if (!start) return null
+        const lastTaskEnd = tasks.map(t => t.endDate).sort().slice(-1)[0]
+        let end = presenceDates.length > 0
+            ? presenceDates[presenceDates.length - 1]
+            : ((job.endDate || "").slice(0, 10) || (job.status === "active" && job.onSite ? todayIso() : (lastTaskEnd || jobStart)))
+        if (end < start) end = start
+        return {
+            id: SUMMARY_PREFIX + job.id,
+            jobId: job.id,
+            jobCode: job.code,
+            jobName: job.name,
+            jobStatus: job.status,
+            name: `${job.code} · ${job.name}`,
+            startDate: start,
+            endDate: end,
+            progress: 0,
+            status: JOB_TO_TASK_STATUS[job.status] ?? "planned",
+            sortOrder: 0,
+            createdAt: "",
+        }
+    }, [job, tasks, presenceDates])
+
+    const rows = useMemo(() => (summary ? [summary, ...tasks] : tasks), [summary, tasks])
+
+    // Tratti di lavoro: la barra di riepilogo si spezza dove la commessa è rimasta ferma più di una settimana
+    const segmentsOf = (task: JobTask) => (isSummaryId(task.id) && presenceDates.length > 0 ? presenceSegments(presenceDates) : null)
+
+    const redraw = () => setTasks(prev => [...prev])
 
     useEffect(() => { load() }, [jobId])
 
@@ -170,8 +227,10 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
         }
     }
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Eliminare questa fase del cronoprogramma?")) return
+    const handleDelete = async () => {
+        const id = taskToDelete
+        setTaskToDelete(null)
+        if (!id) return
         try {
             await jobTasksApi.delete(id)
             await load()
@@ -182,10 +241,11 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
     }
 
     const handleDateChange = async (taskId: string, start: Date, end: Date) => {
+        if (isSummaryId(taskId)) { redraw(); return }
         try {
             await jobTasksApi.update(taskId, {
-                startDate: start.toISOString().slice(0, 10),
-                endDate: end.toISOString().slice(0, 10),
+                startDate: localIso(start),
+                endDate: localIso(end),
             })
             await load()
         } catch (err) {
@@ -195,6 +255,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
     }
 
     const handleProgressChange = async (taskId: string, progress: number) => {
+        if (isSummaryId(taskId)) { redraw(); return }
         try {
             await jobTasksApi.update(taskId, { progress })
             await load()
@@ -219,39 +280,54 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                 <div className="flex items-center gap-2">
                     <GanttChartSquare className="h-5 w-5 text-blue-600" />
                     <h3 className="font-semibold text-slate-800 dark:text-slate-100">Cronoprogramma</h3>
+                    <HelpTip
+                        wide
+                        title="Come leggere il cronoprogramma"
+                        lines={[
+                            "Barra scura = giorni di lavoro, dalla prima all'ultima presenza registrata: si spezza dove la commessa è rimasta ferma più di una settimana, con un filo tratteggiato nel vuoto. Senza presenze, mostra il periodo della commessa.",
+                            "↳ = fasi della commessa: trascina la barra per spostarle, clic per modificarle.",
+                            "Puntini verdi = numero di lavoratori presenti quel giorno (si vedono nelle scale Settimane e Giorni). Per le commesse senza fasi sono sotto la barra del periodo.",
+                            "Rotella = cambia la scala del tempo (anni, mesi, settimane, giorni). Trascina lo sfondo = spostati nel tempo.",
+                        ]}
+                    />
                 </div>
                 <Button size="sm" onClick={openCreate}>
                     <Plus className="h-4 w-4 mr-1" />Aggiungi fase
                 </Button>
             </div>
 
-            {/* Diagramma di Gantt - sempre visibile e ben leggibile */}
-            <Card>
-                <CardContent className="py-4">
-                    <TimelineChart
-                        tasks={tasks}
-                        popupContent={presencePopupContent}
-                        rowPresence={rowPresence}
-                        onTaskClick={(id) => { const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
-                        onDateChange={handleDateChange}
-                        onProgressChange={handleProgressChange}
-                    />
-                    {tasks.length > 0 && (
-                        <p className="text-[11px] text-slate-400 mt-2">
-                            <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-emerald-500 text-white text-[8px] align-middle">n</span> sotto la barra = numero di lavoratori presenti quel giorno
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
+            {rows.length > 0 ? (
+                <Card>
+                    <CardContent className="py-4">
+                        <TimelineChart
+                            tasks={rows}
+                            taskLabel={(t) => isSummaryId(t.id) ? t.name : `↳ ${t.name}`}
+                            isSummary={(t) => isSummaryId(t.id)}
+                            segments={segmentsOf}
+                            height={`clamp(260px, ${rows.length * 40 + 130}px, 68vh)`}
+                            popupContent={presencePopupContent}
+                            rowPresence={rowPresence}
+                            onTaskClick={(id) => { if (isSummaryId(id)) return; const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
+                            onDateChange={handleDateChange}
+                            onProgressChange={handleProgressChange}
+                        />
+                        {tasks.length === 0 && (
+                            <p className="text-xs text-slate-500 mt-2">
+                                Nessuna fase inserita: la barra mostra i giorni di presenza. Con «Aggiungi fase» puoi pianificare le lavorazioni.
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="text-center py-10 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700">
+                    <GanttChartSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p>Nessuna fase pianificata e nessuna presenza registrata.</p>
+                </div>
+            )}
 
             {/* Lista fasi (fallback compatto per mobile) */}
             <div className="space-y-2">
-                {tasks.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700 md:hidden">
-                        <GanttChartSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                        <p>Nessuna fase pianificata.</p>
-                    </div>
-                ) : (
+                {tasks.length === 0 ? null : (
                     tasks.map(task => (
                         <Card key={task.id} className="md:hidden">
                             <CardContent className="py-3 flex items-center justify-between gap-3">
@@ -278,7 +354,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                                     <Button variant="ghost" size="icon" onClick={() => openEdit(task)}>
                                         <Pencil className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(task.id)}>
+                                    <Button variant="ghost" size="icon" onClick={() => setTaskToDelete(task.id)}>
                                         <Trash2 className="h-4 w-4 text-red-500" />
                                     </Button>
                                 </div>
@@ -395,7 +471,7 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                     </div>
                     <DialogFooter className="flex items-center justify-between sm:justify-between">
                         {editingTask && (
-                            <Button variant="ghost" className="text-red-600" onClick={() => { handleDelete(editingTask.id); setIsFormOpen(false) }}>
+                            <Button variant="ghost" className="text-red-600" onClick={() => { setTaskToDelete(editingTask.id); setIsFormOpen(false) }}>
                                 <Trash2 className="h-4 w-4 mr-1" />Elimina
                             </Button>
                         )}
@@ -406,6 +482,14 @@ export function JobCronoprogramma({ jobId }: JobCronoprogrammaProps) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDeleteDialog
+                open={!!taskToDelete}
+                onOpenChange={(o) => { if (!o) setTaskToDelete(null) }}
+                title="Elimina fase"
+                description="Eliminare questa fase del cronoprogramma?"
+                onConfirm={handleDelete}
+            />
         </div>
     )
 }

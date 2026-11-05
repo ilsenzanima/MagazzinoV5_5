@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
+import { todayIso } from "@/lib/utils/local-date"
 import { Loader2, Plus, Pencil, Trash2, Paperclip, Euro, TrendingUp, X } from "lucide-react"
 import { jobSalApprovatiApi, jobFattureCommittenteApi } from "@/lib/services/job-billing"
 import { jobsApi } from "@/lib/api"
@@ -33,7 +35,7 @@ interface EntryFormData {
 const emptyForm = (): EntryFormData => ({
     name: "",
     amount: "",
-    date: new Date().toISOString().split("T")[0],
+    date: todayIso(),
     notes: "",
 })
 
@@ -337,9 +339,18 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
         }
         setSalDialogOpen(false); load()
     }
-    const deleteSal = async (id: string) => {
-        if (!confirm("Eliminare questo SAL?")) return
-        await jobSalApprovatiApi.delete(id); notify.success("SAL eliminato"); load()
+    const [toDelete, setToDelete] = useState<{ kind: 'sal' | 'fattura'; id: string } | null>(null)
+    const deleteSal = (id: string) => setToDelete({ kind: 'sal', id })
+    const doDelete = async () => {
+        const target = toDelete
+        setToDelete(null)
+        if (!target) return
+        if (target.kind === 'sal') {
+            await jobSalApprovatiApi.delete(target.id); notify.success("SAL eliminato")
+        } else {
+            await jobFattureCommittenteApi.delete(target.id); notify.success("Fattura eliminata")
+        }
+        load()
     }
 
     // ── Fattura handlers ────────────────────────────────────────────────────
@@ -371,10 +382,7 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
         }
         setFatturaDialogOpen(false); load()
     }
-    const deleteFattura = async (id: string) => {
-        if (!confirm("Eliminare questa fattura?")) return
-        await jobFattureCommittenteApi.delete(id); notify.success("Fattura eliminata"); load()
-    }
+    const deleteFattura = (id: string) => setToDelete({ kind: 'fattura', id })
 
     // ── Totals ──────────────────────────────────────────────────────────────
     const totalSal = sals.reduce((s, x) => s + x.amount, 0)
@@ -565,6 +573,14 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 onFileChange={handleFatturaFile}
                 fileRef={fatturaFileRef}
                 existingDocUrl={fatturaDocUrl}
+            />
+
+            <ConfirmDeleteDialog
+                open={!!toDelete}
+                onOpenChange={(o) => { if (!o) setToDelete(null) }}
+                title={toDelete?.kind === 'sal' ? "Elimina SAL" : "Elimina fattura"}
+                description={toDelete?.kind === 'sal' ? "Eliminare questo SAL?" : "Eliminare questa fattura?"}
+                onConfirm={doDelete}
             />
         </div>
     )
