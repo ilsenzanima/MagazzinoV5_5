@@ -33,6 +33,7 @@ import { OldRevCheckboxes, OldRevBadges } from "@/components/documents/OldRevCon
 import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/ui/photo-gallery"
 import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
 import { PaginationControls } from "@/components/ui/pagination-controls"
+import { HelpTip } from "@/components/ui/help-tip"
 import { JobPhotoCollection, PhotoThumb } from "./JobPhotoCollection"
 
 interface JobDocumentsProps {
@@ -180,6 +181,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const [movingDocs, setMovingDocs] = useState<SiteDocument[]>([])
   const [bulkDeleteDocs, setBulkDeleteDocs] = useState<SiteDocument[]>([])
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [folderToDelete, setFolderToDelete] = useState<JobSiteDocumentFolder | null>(null)
+  const mergedFolderIds = useRef<Record<string, string[]>>({})
   const [moveFolderId, setMoveFolderId] = useState("root")
   const [moving, setMoving] = useState(false)
 
@@ -219,6 +222,9 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
         if (!cur || (docsIn.get(f.id) ?? 0) > (docsIn.get(cur.id) ?? 0)) keeper.set(keyOf(f), f)
       })
       const aliasOf = (id: string) => { const f = everyFolder.get(id); return f ? keeper.get(keyOf(f))!.id : null }
+      const merged: Record<string, string[]> = {}
+      everyFolder.forEach(f => { const k = keeper.get(keyOf(f))!.id; (merged[k] ||= []).push(f.id) })
+      mergedFolderIds.current = merged
       setDocuments(all.map(d => (d.folderId ? { ...d, folderId: aliasOf(d.folderId) } : d)))
       setDocTypes(types)
       setFolders(Array.from(keeper.values()).sort((a, b) => a.name.localeCompare(b.name, "it")))
@@ -337,6 +343,32 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     } finally {
       setMoving(false)
       loadDocuments()
+    }
+  }
+
+  // Una cartella si elimina solo se è vuota: le foto vanno prima spostate o eliminate
+  const askDeleteFolder = (folder: JobSiteDocumentFolder) => {
+    const n = documents.filter(d => d.folderId === folder.id).length
+    if (n > 0) {
+      toast.error(`La cartella contiene ${n} ${n === 1 ? "documento" : "documenti"}: spostali o eliminali prima di eliminare la cartella`)
+      return
+    }
+    setFolderToDelete(folder)
+  }
+
+  const handleDeleteFolder = async () => {
+    const folder = folderToDelete
+    if (!folder) return
+    const ids = mergedFolderIds.current[folder.id] ?? [folder.id]
+    try {
+      for (const id of ids) await jobSiteDocumentFoldersApi.delete(id)
+      setFolders(prev => prev.filter(f => f.id !== folder.id))
+      if (folderFilter === folder.id) setFolderFilter("all")
+      toast.success("Cartella eliminata")
+    } catch {
+      toast.error("Errore durante l'eliminazione della cartella")
+    } finally {
+      setFolderToDelete(null)
     }
   }
 
@@ -677,6 +709,14 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
       <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Images className="mr-2 h-4 w-4" />Apri raccolta</DropdownMenuItem>
         <DropdownMenuItem onClick={() => openUpload({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Upload className="mr-2 h-4 w-4" />Aggiungi foto</DropdownMenuItem>
+        {r.folder && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => askDeleteFolder(r.folder!)} className="text-red-600 focus:text-red-600">
+              <Trash2 className="mr-2 h-4 w-4" />Elimina cartella
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -741,7 +781,15 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Documenti Cantiere</h2>
+            <h2 className="flex items-center text-xl font-semibold text-slate-800 dark:text-slate-100">
+              Documenti Cantiere
+              <HelpTip
+                title="Documenti Cantiere"
+                description="Tipi di documento che puoi inserire in questa sezione."
+                fetchItems={async () => (await jobSiteDocumentTypesApi.getAll()).map(t => (t.isPhotoGallery ? `${t.name} (raccolta foto)` : t.name))}
+                emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Cantiere per crearne uno."
+              />
+            </h2>
             <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => openUpload()}>
               <Upload className="mr-2 h-4 w-4" />
               Carica Documenti
@@ -1087,6 +1135,14 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
           ? `I ${bulkDeleteDocs.length} documenti selezionati verranno eliminati definitivamente e non potranno essere recuperati.`
           : `Il documento "${bulkDeleteDocs[0]?.name || 'selezionato'}" verrà eliminato definitivamente e non potrà essere recuperato.`}
         onConfirm={handleBulkDelete}
+      />
+
+      <ConfirmDeleteDialog
+        open={!!folderToDelete}
+        onOpenChange={open => { if (!open) setFolderToDelete(null) }}
+        title="Elimina cartella"
+        description={`La cartella "${folderToDelete?.name ?? ''}" è vuota e verrà eliminata.`}
+        onConfirm={handleDeleteFolder}
       />
 
       {/* Nuova cartella */}

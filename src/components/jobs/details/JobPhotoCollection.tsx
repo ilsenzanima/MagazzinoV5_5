@@ -6,12 +6,21 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeft, Upload, Images, CheckSquare, FolderInput, Trash2, X } from "lucide-react"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
-import { SiteDocument } from "@/lib/services/job-site-documents"
 import { isImageFileType } from "@/components/ui/photo-gallery"
 import { getFileIcon } from "@/lib/file-icon"
 
+// Campi minimi di un documento per mostrarlo come foto (valido per ogni tipo di documento)
+export interface PhotoDocLike {
+  id: string
+  name: string
+  notes: string
+  fileUrl: string
+  fileType: string
+  createdAt: string
+}
+
 // Miniatura di una foto su Drive: il server la genera (e la conserva) al primo accesso
-export function PhotoThumb({ doc, className = "" }: { doc: SiteDocument; className?: string }) {
+export function PhotoThumb({ doc, className = "" }: { doc: PhotoDocLike; className?: string }) {
   const [failed, setFailed] = useState(false)
   const isDrive = !!doc.fileUrl && !doc.fileUrl.includes("/")
   if (!isDrive || !isImageFileType(doc.fileType) || failed) {
@@ -34,19 +43,19 @@ export function PhotoThumb({ doc, className = "" }: { doc: SiteDocument; classNa
   )
 }
 
-interface JobPhotoCollectionProps {
+interface JobPhotoCollectionProps<T extends PhotoDocLike> {
   title: string
-  docs: SiteDocument[]
+  docs: T[]
   onBack: () => void
   onAdd: () => void
-  onOpen: (doc: SiteDocument) => void
-  menu: (doc: SiteDocument) => ReactNode
-  onMoveSelected: (docs: SiteDocument[]) => void
-  onDeleteSelected: (docs: SiteDocument[]) => void
+  onOpen: (doc: T) => void
+  menu: (doc: T) => ReactNode
+  onMoveSelected: (docs: T[]) => void
+  onDeleteSelected: (docs: T[]) => void
 }
 
 // Pagina di una raccolta di foto (un tipo, o una cartella di quel tipo)
-export function JobPhotoCollection({ title, docs, onBack, onAdd, onOpen, menu, onMoveSelected, onDeleteSelected }: JobPhotoCollectionProps) {
+export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack, onAdd, onOpen, menu, onMoveSelected, onDeleteSelected }: JobPhotoCollectionProps<T>) {
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 

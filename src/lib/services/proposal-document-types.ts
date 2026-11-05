@@ -4,6 +4,8 @@ export interface ProposalDocumentType {
     id: string;
     name: string;
     allowsFolders: boolean;
+    // Solo i tipi dei Documenti Cantiere possono essere raccolte di foto
+    isPhotoGallery?: boolean;
     createdAt: string;
 }
 
