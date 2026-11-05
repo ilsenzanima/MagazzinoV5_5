@@ -27,6 +27,7 @@ import {
     Download,
     FolderInput,
     FolderPlus,
+    MoreHorizontal,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -62,6 +63,11 @@ import { compressImageIfNeeded } from "@/lib/image-compress"
 import { uploadFileToDrive } from "@/lib/drive-upload"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { PaginationControls } from "@/components/ui/pagination-controls"
+import { SortArrow, InlineNote, TABLE_HEAD_CLS, TABLE_SELECT_CLS } from "@/components/ui/table-bits"
+import { HelpTip } from "@/components/ui/help-tip"
 import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/ui/photo-gallery"
 import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
 
@@ -78,6 +84,21 @@ interface PendingFile {
 }
 
 const UNTYPED_KEY = "__untyped__"
+const OWN_PAGE_SIZE = 50
+type OwnSortKey = "name" | "type" | "folder" | "date" | "size"
+type AssocSortKey = "name" | "type" | "brand" | "origin"
+interface AssocRow {
+    id: string
+    kind: "manual" | "ddt"
+    name: string
+    original: string
+    typeName: string
+    brand: string
+    origin: string
+    notes: string
+    fileUrl: string
+    assoc?: JobComplianceAssociation
+}
 const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'])
 
 // ─── Upload sezione ──────────────────────────────────────────────────────────
@@ -94,8 +115,13 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const [saving, setSaving] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [activeDoc, setActiveDoc] = useState<JobDocument | null>(null)
-    const [viewMode, setViewMode] = useViewMode('job-conformita-own-documents', 'grid')
-    const [activeFolderByType, setActiveFolderByType] = useState<Record<string, string>>({})
+    // Filtri e ordinamento della tabella
+    const [search, setSearch] = useState("")
+    const [typeFilter, setTypeFilter] = useState("all")
+    const [folderFilter, setFolderFilter] = useState("all")
+    const [sortKey, setSortKey] = useState<OwnSortKey>("date")
+    const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+    const [page, setPage] = useState(1)
 
     // Galleria foto
     const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([])
@@ -206,7 +232,8 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
             })
             setFolders(prev => [...prev, folder])
             if (upDocTypeId === newFolderTypeId) setUpFolderId(folder.id)
-            setActiveFolderByType(prev => ({ ...prev, [newFolderTypeId]: folder.id }))
+            setTypeFilter(newFolderTypeId)
+            setFolderFilter(folder.id)
             toast.success("Cartella creata")
             setNewFolderOpen(false)
         } catch {
@@ -405,6 +432,16 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         }
     }
 
+    const handleSaveNote = async (doc: JobDocument, notes: string) => {
+        if (notes === (doc.notes ?? "")) return
+        try {
+            await jobDocumentsApi.update(doc.id, { notes })
+            setDocs(prev => prev.map(d => (d.id === doc.id ? { ...d, notes } : d)))
+        } catch {
+            toast.error("Errore nel salvataggio della nota")
+        }
+    }
+
     const openDoc = async (url: string) => {
         if (url && !url.includes('/')) {
             window.open(`/api/drive/download?fileId=${encodeURIComponent(url)}&fileName=documento`, '_blank')
@@ -419,164 +456,205 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         } catch { window.open(url, "_blank") }
     }
 
-    const renderDocCard = (doc: JobDocument, siblingDocs: JobDocument[]) => (
-        <Card key={doc.id} className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : openDoc(doc.fileUrl)}>
-            <CardContent className="p-3 flex items-start gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">
-                    {getFileIcon(doc.fileType, "h-7 w-7")}
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
-                    {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
-                    <p className="text-xs text-slate-400 mt-0.5">
-                        {format(new Date(doc.createdAt), "dd MMM yyyy", { locale: it })}
-                        {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
-                    </p>
-                </div>
-                <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                    {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
-                            <Download className="h-3 w-3 text-slate-500" />
-                        </Button>
-                    )}
-                    {docTypes.find(t => t.id === doc.conformitaDocumentTypeId)?.allowsFolders && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Sposta in cartella" onClick={e => { e.stopPropagation(); openMove(doc) }}>
-                            <FolderInput className="h-3 w-3 text-slate-500" />
-                        </Button>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); openEdit(doc) }}>
-                        <Pencil className="h-3 w-3 text-slate-500" />
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
+    const typeNameOf = (d: JobDocument) => docTypes.find(t => t.id === d.conformitaDocumentTypeId)?.name || "Senza tipo"
+    const folderNameOf = (d: JobDocument) => (d.folderId ? folders.find(f => f.id === d.folderId)?.name : undefined) || ""
+    const filterType = typeFilter !== "all" && typeFilter !== UNTYPED_KEY ? docTypes.find(t => t.id === typeFilter) : undefined
+    const folderOptions = folders.filter(f => !filterType || f.documentTypeId === filterType.id)
+    const anyFilter = !!search.trim() || typeFilter !== "all" || folderFilter !== "all"
+
+    const sorted = (() => {
+        const q = search.trim().toLowerCase()
+        const list = docs.filter(d => {
+            if (typeFilter === UNTYPED_KEY ? !!d.conformitaDocumentTypeId : typeFilter !== "all" && d.conformitaDocumentTypeId !== typeFilter) return false
+            if (folderFilter === "root" ? !!d.folderId : folderFilter !== "all" && d.folderId !== folderFilter) return false
+            return !q || `${d.name} ${d.notes ?? ""} ${typeNameOf(d)} ${folderNameOf(d)}`.toLowerCase().includes(q)
+        })
+        const dir = sortDir === "asc" ? 1 : -1
+        return [...list].sort((x, y) => {
+            let r = 0
+            if (sortKey === "name") r = x.name.localeCompare(y.name, "it")
+            else if (sortKey === "type") r = typeNameOf(x).localeCompare(typeNameOf(y), "it") || x.name.localeCompare(y.name, "it")
+            else if (sortKey === "folder") r = (folderNameOf(x) || "~").localeCompare(folderNameOf(y) || "~", "it")
+            else if (sortKey === "size") r = (x.fileSize ?? 0) - (y.fileSize ?? 0)
+            else r = x.createdAt.localeCompare(y.createdAt)
+            return r * dir
+        })
+    })()
+    const totalPages = Math.max(1, Math.ceil(sorted.length / OWN_PAGE_SIZE))
+    const currentPage = Math.min(page, totalPages)
+    const rows = sorted.slice((currentPage - 1) * OWN_PAGE_SIZE, currentPage * OWN_PAGE_SIZE)
+    const toggleSort = (key: OwnSortKey) => {
+        if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"))
+        else { setSortKey(key); setSortDir(key === "date" || key === "size" ? "desc" : "asc") }
+        setPage(1)
+    }
+    const openRow = (d: JobDocument) => (isImageFileType(d.fileType) ? openGalleryForDoc(d, sorted) : openDoc(d.fileUrl))
+    const isDriveFile = (d: JobDocument) => !!d.fileUrl && !d.fileUrl.includes('/')
+
+    const sortBtn = (key: OwnSortKey, label: string) => (
+        <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+            {label}<SortArrow active={sortKey === key} dir={sortDir} />
+        </button>
+    )
+    const typeSelect = (cls?: string) => (
+        <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter("all"); setPage(1) }}>
+            <SelectTrigger aria-label="Filtra per tipo" className={cls}><SelectValue /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Tutti i tipi</SelectItem>
+                {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                {docs.some(d => !d.conformitaDocumentTypeId) && <SelectItem value={UNTYPED_KEY}>Senza tipo</SelectItem>}
+            </SelectContent>
+        </Select>
+    )
+    const folderSelect = (cls?: string) => (
+        <Select value={folderFilter} onValueChange={v => { setFolderFilter(v); setPage(1) }}>
+            <SelectTrigger aria-label="Filtra per cartella" className={cls}><SelectValue /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Tutte le cartelle</SelectItem>
+                <SelectItem value="root">Senza cartella</SelectItem>
+                {folderOptions.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+            </SelectContent>
+        </Select>
     )
 
-    const renderDocRow = (doc: JobDocument, siblingDocs: JobDocument[]) => (
-        <div key={doc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : openDoc(doc.fileUrl)}>
-            <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
-                {getFileIcon(doc.fileType, "h-5 w-5")}
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
-                {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
-            </div>
-            <p className="text-xs text-slate-400 shrink-0">
-                {format(new Date(doc.createdAt), "dd MMM yyyy", { locale: it })}
-                {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
-            </p>
-            <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                {doc.fileUrl && !doc.fileUrl.includes('/') && OFFICE_EXTENSIONS.has(doc.fileType?.toLowerCase() || '') && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Scarica" onClick={e => { e.stopPropagation(); window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank') }}>
-                        <Download className="h-3 w-3 text-slate-500" />
-                    </Button>
-                )}
-                {docTypes.find(t => t.id === doc.conformitaDocumentTypeId)?.allowsFolders && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Sposta in cartella" onClick={e => { e.stopPropagation(); openMove(doc) }}>
-                        <FolderInput className="h-3 w-3 text-slate-500" />
-                    </Button>
-                )}
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); openEdit(doc) }}>
-                    <Pencil className="h-3 w-3 text-slate-500" />
+    const rowMenu = (doc: JobDocument) => (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
+                    <MoreHorizontal className="h-4 w-4" />
                 </Button>
-            </div>
-        </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                <DropdownMenuItem onClick={() => openRow(doc)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
+                {isDriveFile(doc) && (
+                    <DropdownMenuItem onClick={() => window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank')}>
+                        <Download className="mr-2 h-4 w-4" />Scarica
+                    </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => openEdit(doc)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
+                {docTypes.find(t => t.id === doc.conformitaDocumentTypeId)?.allowsFolders && (
+                    <DropdownMenuItem onClick={() => openMove(doc)}><FolderInput className="mr-2 h-4 w-4" />Sposta in cartella</DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setActiveDoc(doc); setDeleteOpen(true) }} className="text-red-600 focus:text-red-600">
+                    <Trash2 className="mr-2 h-4 w-4" />Elimina
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     )
-
-    const groups: { key: string; label: string; docs: JobDocument[] }[] = [
-        ...docTypes.map(t => ({ key: t.id, label: t.name, docs: docs.filter(d => d.conformitaDocumentTypeId === t.id) })),
-        ...(docs.some(d => !d.conformitaDocumentTypeId) ? [{ key: UNTYPED_KEY, label: "Senza tipo", docs: docs.filter(d => !d.conformitaDocumentTypeId) }] : []),
-    ]
 
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                     Conformità Personalizzata
+                    <HelpTip
+                        title="Conformità Personalizzata"
+                        description="Tipi di documento che puoi inserire in questa sezione."
+                        fetchItems={async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => t.name)}
+                        emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
+                    />
                 </h3>
-                <div className="flex items-center gap-2">
-                    {docs.length > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
-                    <Button size="sm" variant="outline" onClick={openUpload}>
-                        <Upload className="h-3.5 w-3.5 mr-1.5" />Carica
-                    </Button>
-                </div>
+                <Button size="sm" variant="outline" onClick={openUpload}>
+                    <Upload className="h-3.5 w-3.5 mr-1.5" />Carica
+                </Button>
             </div>
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
-            ) : docTypes.length === 0 && docs.length === 0 ? (
+            ) : docs.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento caricato</p>
-            ) : docTypes.length === 0 ? (
-                viewMode === 'list' ? (
-                    <div className="space-y-1.5">
-                        {docs.map(d => renderDocRow(d, docs))}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {docs.map(d => renderDocCard(d, docs))}
-                    </div>
-                )
             ) : (
-                <Tabs defaultValue={groups[0]?.key}>
-                    <TabsList className="flex-wrap h-auto gap-1">
-                        {groups.map(g => (
-                            <TabsTrigger key={g.key} value={g.key}>
-                                {g.label}
-                                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                                    {g.docs.length}
-                                </span>
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
-                    {groups.map(g => {
-                        const type = docTypes.find(t => t.id === g.key)
-                        const typeFolders = type ? folders.filter(f => f.documentTypeId === type.id) : []
-                        const activeFolder = activeFolderByType[g.key] || 'all'
-                        const shownDocs = !type?.allowsFolders
-                            ? g.docs
-                            : activeFolder === 'all'
-                                ? g.docs
-                                : activeFolder === 'root'
-                                    ? g.docs.filter(d => !d.folderId)
-                                    : g.docs.filter(d => d.folderId === activeFolder)
-                        return (
-                            <TabsContent key={g.key} value={g.key} className="pt-4 space-y-3">
-                                {type?.allowsFolders && (
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                        {[{ id: 'all', name: 'Tutte' }, { id: 'root', name: 'Senza cartella' }, ...typeFolders].map(f => (
-                                            <button
-                                                key={f.id}
-                                                onClick={() => setActiveFolderByType(prev => ({ ...prev, [g.key]: f.id }))}
-                                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${activeFolder === f.id
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                                    }`}
-                                            >
-                                                {f.name}
-                                            </button>
-                                        ))}
-                                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openNewFolder(g.key)}>
-                                            <FolderPlus className="h-3.5 w-3.5 mr-1" />Nuova cartella
-                                        </Button>
-                                    </div>
-                                )}
-                                {shownDocs.length === 0 ? (
-                                    <p className="text-sm text-slate-400 py-4 text-center">
-                                        {type?.allowsFolders ? "Nessun documento in questa cartella" : "Nessun documento di questo tipo"}
+                <>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+                            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                            <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per nome o nota" className="pl-8" />
+                        </div>
+                        {anyFilter && (
+                            <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setTypeFilter("all"); setFolderFilter("all"); setPage(1) }}>Azzera filtri</Button>
+                        )}
+                        {docTypes.some(t => t.allowsFolders) && (
+                            <Button variant="outline" size="sm" onClick={() => openNewFolder(filterType?.allowsFolders ? filterType.id : (docTypes.find(t => t.allowsFolders)?.id ?? ""))}>
+                                <FolderPlus className="mr-1.5 h-4 w-4" />Nuova cartella
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 md:hidden">{typeSelect()}{folderSelect()}</div>
+
+                    {/* Tabella (PC) */}
+                    <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+                        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
+                                    <TableHead className={`w-44 ${TABLE_HEAD_CLS}`}>
+                                        <div className="flex items-center gap-1">
+                                            <div className="min-w-0 flex-1">{typeSelect(TABLE_SELECT_CLS)}</div>
+                                            <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "type"} dir={sortDir} /></button>
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className={`w-44 ${TABLE_HEAD_CLS}`}>
+                                        <div className="flex items-center gap-1">
+                                            <div className="min-w-0 flex-1">{folderSelect(TABLE_SELECT_CLS)}</div>
+                                            <button type="button" aria-label="Ordina per cartella" onClick={() => toggleSort("folder")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "folder"} dir={sortDir} /></button>
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
+                                    <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("size", "Dimensione")}</TableHead>
+                                    <TableHead className={`w-[20%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
+                                    <TableHead className="w-12" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rows.length === 0 ? (
+                                    <TableRow><TableCell colSpan={7} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell></TableRow>
+                                ) : rows.map(d => (
+                                    <TableRow key={d.id} className="cursor-pointer" onClick={() => openRow(d)}>
+                                        <TableCell className="border-r py-2">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <span className="shrink-0">{getFileIcon(d.fileType, "h-5 w-5")}</span>
+                                                <span className="truncate text-sm font-medium" title={d.name}>{d.name}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={typeNameOf(d)}>{typeNameOf(d)}</TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={folderNameOf(d)}>{folderNameOf(d) || <span className="text-slate-300">—</span>}</TableCell>
+                                        <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(d.createdAt), "dd/MM/yyyy", { locale: it })}</TableCell>
+                                        <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{d.fileSize != null ? formatFileSize(d.fileSize) : "—"}</TableCell>
+                                        <TableCell className="border-r py-1" onClick={e => e.stopPropagation()}>
+                                            <InlineNote value={d.notes ?? ""} onSave={v => handleSaveNote(d, v)} />
+                                        </TableCell>
+                                        <TableCell className="py-2 text-right">{rowMenu(d)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* Elenco compatto (telefono) */}
+                    <div className="space-y-2 md:hidden">
+                        {rows.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Nessun documento con questi filtri</p>}
+                        {rows.map(d => (
+                            <div key={d.id} className="flex items-start gap-2 rounded-md border bg-white p-3 dark:bg-slate-900" onClick={() => openRow(d)}>
+                                <span className="mt-0.5 shrink-0">{getFileIcon(d.fileType, "h-5 w-5")}</span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">{d.name}</p>
+                                    <p className="text-xs text-slate-500">
+                                        {typeNameOf(d)}{folderNameOf(d) && ` · ${folderNameOf(d)}`} · {format(new Date(d.createdAt), "dd/MM/yyyy", { locale: it })}
+                                        {d.fileSize != null && ` · ${formatFileSize(d.fileSize)}`}
                                     </p>
-                                ) : viewMode === 'list' ? (
-                                    <div className="space-y-1.5">
-                                        {shownDocs.map(d => renderDocRow(d, shownDocs))}
+                                    <div className="mt-1" onClick={e => e.stopPropagation()}>
+                                        <InlineNote value={d.notes ?? ""} onSave={v => handleSaveNote(d, v)} />
                                     </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {shownDocs.map(d => renderDocCard(d, shownDocs))}
-                                    </div>
-                                )}
-                            </TabsContent>
-                        )
-                    })}
-                </Tabs>
+                                </div>
+                                {rowMenu(d)}
+                            </div>
+                        ))}
+                    </div>
+
+                    <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={setPage} totalItems={sorted.length} itemLabel="documenti" />
+                </>
             )}
 
             {/* Upload dialog - step 1: tipo + file multipli */}
@@ -808,7 +886,13 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     const [editNotes, setEditNotes] = useState("")
     const [saving, setSaving] = useState(false)
     const [toDisassociate, setToDisassociate] = useState<JobComplianceAssociation | null>(null)
-    const [viewMode, setViewMode] = useViewMode('job-conformita-associated', 'list')
+    // Filtri e ordinamento della tabella
+    const [search, setSearch] = useState("")
+    const [typeFilter, setTypeFilter] = useState("all")
+    const [originFilter, setOriginFilter] = useState("all")
+    const [sortKey, setSortKey] = useState<AssocSortKey>("name")
+    const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+    const [page, setPage] = useState(1)
 
     // Conf. Ass. DDT: documenti di conformità tracciati automaticamente dai DDT associati manualmente
     const [ddtDocs, setDdtDocs] = useState<ComplianceDocument[]>([])
@@ -829,68 +913,6 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
         } finally {
             setLoading(false)
         }
-    }
-
-    const renderDdtCard = (doc: ComplianceDocument) => {
-        return (
-            <Card key={doc.id} className="hover:shadow-sm transition-shadow">
-                <CardContent className="p-3 flex items-start gap-3">
-                    <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
-                        <ShieldCheck className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{doc.name}</p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                            {doc.documentTypeName && (
-                                <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                    {doc.documentTypeName}
-                                </span>
-                            )}
-                            {doc.purchaseNumber && (
-                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
-                                    DDT {doc.purchaseNumber}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    {doc.fileUrl && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => openDoc(doc.fileUrl)} title="Apri documento">
-                            <ExternalLink className="h-4 w-4" />
-                        </Button>
-                    )}
-                </CardContent>
-            </Card>
-        )
-    }
-
-    const renderDdtRow = (doc: ComplianceDocument) => {
-        return (
-            <div key={doc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
-                <div className="bg-green-50 dark:bg-green-950/30 p-1 rounded shrink-0">
-                    <ShieldCheck className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate" title={doc.name}>{doc.name}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    {doc.documentTypeName && (
-                        <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                            {doc.documentTypeName}
-                        </span>
-                    )}
-                    {doc.purchaseNumber && (
-                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
-                            DDT {doc.purchaseNumber}
-                        </span>
-                    )}
-                </div>
-                {doc.fileUrl && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => openDoc(doc.fileUrl)} title="Apri documento">
-                        <ExternalLink className="h-3 w-3 text-slate-500" />
-                    </Button>
-                )}
-            </div>
-        )
     }
 
     const openDoc = async (url: string) => {
@@ -939,184 +961,225 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
         }
     }
 
+    const handleSaveAssocNote = async (assoc: JobComplianceAssociation, notes: string) => {
+        if (notes === (assoc.customNotes ?? "")) return
+        try {
+            await jobComplianceApi.update(assoc.id, { customNotes: notes || null })
+            setAssociations(prev => prev.map(x => (x.id === assoc.id ? { ...x, customNotes: notes || undefined } : x)))
+        } catch {
+            toast.error("Errore nel salvataggio della nota")
+        }
+    }
+
+    const openEditAssoc = (assoc: JobComplianceAssociation) => {
+        setEditing(assoc)
+        setEditName(assoc.customName || "")
+        setEditNotes(assoc.customNotes || "")
+        setEditOpen(true)
+    }
+
     const handleAssociated = () => {
         load()
     }
 
-    const renderAssocCard = (assoc: JobComplianceAssociation) => {
-        const doc = assoc.document
-        const displayName = assoc.customName || doc?.name || "—"
-        return (
-            <Card key={assoc.id} className="group hover:shadow-sm transition-shadow">
-                <CardContent className="p-3 flex items-start gap-3">
-                    <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
-                        <ShieldCheck className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{displayName}</p>
-                        {assoc.customName && doc?.name && (
-                            <p className="text-xs text-slate-400">Originale: {doc.name}</p>
-                        )}
-                        {assoc.customNotes && (
-                            <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap">{assoc.customNotes}</p>
-                        )}
-                        {doc && (
-                            <div className="flex flex-wrap gap-2 mt-1">
-                                {doc.brandName && (
-                                    <span className="text-[10px] uppercase tracking-wide bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-semibold">
-                                        {doc.brandName}
-                                    </span>
-                                )}
-                                <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                    {doc.documentTypeName}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                        {doc?.fileUrl && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDoc(doc.fileUrl)}>
-                                <ExternalLink className="h-3 w-3 text-slate-500" />
-                            </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                            setEditing(assoc)
-                            setEditName(assoc.customName || "")
-                            setEditNotes(assoc.customNotes || "")
-                            setEditOpen(true)
-                        }}>
-                            <Pencil className="h-3 w-3 text-slate-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }}>
-                            <Unlink className="h-3 w-3 text-red-500" />
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-        )
-    }
-
-    const renderAssocRow = (assoc: JobComplianceAssociation) => {
-        const doc = assoc.document
-        const displayName = assoc.customName || doc?.name || "—"
-        return (
-            <div key={assoc.id} className="group flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
-                <div className="bg-green-50 dark:bg-green-950/30 p-1 rounded shrink-0">
-                    <ShieldCheck className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate" title={displayName}>{displayName}</p>
-                    {assoc.customNotes && <p className="text-xs text-slate-500 italic truncate">{assoc.customNotes}</p>}
-                </div>
-                {doc && (
-                    <div className="flex flex-wrap gap-2 shrink-0">
-                        {doc.brandName && (
-                            <span className="text-[10px] uppercase tracking-wide bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-semibold">
-                                {doc.brandName}
-                            </span>
-                        )}
-                        <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                            {doc.documentTypeName}
-                        </span>
-                    </div>
-                )}
-                <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                    {doc?.fileUrl && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDoc(doc.fileUrl)}>
-                            <ExternalLink className="h-3 w-3 text-slate-500" />
-                        </Button>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                        setEditing(assoc)
-                        setEditName(assoc.customName || "")
-                        setEditNotes(assoc.customNotes || "")
-                        setEditOpen(true)
-                    }}>
-                        <Pencil className="h-3 w-3 text-slate-500" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }}>
-                        <Unlink className="h-3 w-3 text-red-500" />
-                    </Button>
-                </div>
-            </div>
-        )
-    }
-
-    type AssocGroup =
-        | { key: string; label: string; kind: 'manual'; items: JobComplianceAssociation[] }
-        | { key: string; label: string; kind: 'ddt'; items: ComplianceDocument[] }
-
-    const assocGroups: AssocGroup[] = [
-        ...Object.values(
-            associations.reduce((acc, assoc) => {
-                const label = assoc.document?.documentTypeName || "Senza tipo"
-                const key = label
-                if (!acc[key]) acc[key] = { key, label, kind: 'manual', items: [] }
-                acc[key].items.push(assoc)
-                return acc
-            }, {} as Record<string, { key: string; label: string; kind: 'manual'; items: JobComplianceAssociation[] }>)
-        ),
-        { key: '__ddt__', label: 'Conf. Ass. DDT', kind: 'ddt', items: ddtDocs },
+    // Una riga per ogni documento: associato a mano dalla gestione conformità, oppure tracciato dai DDT
+    const allRows: AssocRow[] = [
+        ...associations.map((assoc): AssocRow => ({
+            id: assoc.id,
+            kind: "manual",
+            name: assoc.customName || assoc.document?.name || "—",
+            original: assoc.customName && assoc.document?.name ? assoc.document.name : "",
+            typeName: assoc.document?.documentTypeName || "Senza tipo",
+            brand: assoc.document?.brandName || "",
+            origin: "Associato",
+            notes: assoc.customNotes || "",
+            fileUrl: assoc.document?.fileUrl || "",
+            assoc,
+        })),
+        ...ddtDocs.map((d): AssocRow => ({
+            id: `ddt-${d.id}`,
+            kind: "ddt",
+            name: d.name,
+            original: "",
+            typeName: d.documentTypeName || "Senza tipo",
+            brand: "",
+            origin: d.purchaseNumber ? `Da DDT ${d.purchaseNumber}` : "Da DDT",
+            notes: d.notes || "",
+            fileUrl: d.fileUrl || "",
+        })),
     ]
+    const typeOptions = Array.from(new Set(allRows.map(r => r.typeName))).sort((x, y) => x.localeCompare(y, "it"))
+    const anyFilter = !!search.trim() || typeFilter !== "all" || originFilter !== "all"
+
+    const sorted = (() => {
+        const q = search.trim().toLowerCase()
+        const list = allRows.filter(r => {
+            if (typeFilter !== "all" && r.typeName !== typeFilter) return false
+            if (originFilter !== "all" && r.kind !== originFilter) return false
+            return !q || `${r.name} ${r.original} ${r.typeName} ${r.brand} ${r.origin} ${r.notes}`.toLowerCase().includes(q)
+        })
+        const dir = sortDir === "asc" ? 1 : -1
+        return [...list].sort((x, y) => {
+            const key = sortKey === "name" ? "name" : sortKey === "type" ? "typeName" : sortKey === "brand" ? "brand" : "origin"
+            const xv = x[key] || "~"
+            const yv = y[key] || "~"
+            return xv.localeCompare(yv, "it") * dir || x.name.localeCompare(y.name, "it")
+        })
+    })()
+    const totalPages = Math.max(1, Math.ceil(sorted.length / OWN_PAGE_SIZE))
+    const currentPage = Math.min(page, totalPages)
+    const rows = sorted.slice((currentPage - 1) * OWN_PAGE_SIZE, currentPage * OWN_PAGE_SIZE)
+    const toggleSort = (key: AssocSortKey) => {
+        if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"))
+        else { setSortKey(key); setSortDir("asc") }
+        setPage(1)
+    }
+    const sortBtn = (key: AssocSortKey, label: string) => (
+        <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+            {label}<SortArrow active={sortKey === key} dir={sortDir} />
+        </button>
+    )
+    const typeSelect = (cls?: string) => (
+        <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setPage(1) }}>
+            <SelectTrigger aria-label="Filtra per tipo" className={cls}><SelectValue /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Tutti i tipi</SelectItem>
+                {typeOptions.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+        </Select>
+    )
+    const originSelect = (cls?: string) => (
+        <Select value={originFilter} onValueChange={v => { setOriginFilter(v); setPage(1) }}>
+            <SelectTrigger aria-label="Filtra per origine" className={cls}><SelectValue /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Ogni origine</SelectItem>
+                <SelectItem value="manual">Associati</SelectItem>
+                <SelectItem value="ddt">Da DDT</SelectItem>
+            </SelectContent>
+        </Select>
+    )
+    const rowMenu = (r: AssocRow) => (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
+                    <MoreHorizontal className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                {r.fileUrl && <DropdownMenuItem onClick={() => openDoc(r.fileUrl)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>}
+                {r.assoc && (
+                    <>
+                        <DropdownMenuItem onClick={() => openEditAssoc(r.assoc!)}><Pencil className="mr-2 h-4 w-4" />Personalizza</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => { setToDisassociate(r.assoc!); setDisassociateOpen(true) }} className="text-red-600 focus:text-red-600">
+                            <Unlink className="mr-2 h-4 w-4" />Disassocia
+                        </DropdownMenuItem>
+                    </>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
+    const hasMenu = (r: AssocRow) => !!r.fileUrl || !!r.assoc
 
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                     Documenti associati dalla gestione conformità
                 </h3>
-                <div className="flex items-center gap-2">
-                {associations.length > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
                 <Button size="sm" variant="outline" onClick={() => setSearchOpen(true)}>
                     <Link2 className="h-3.5 w-3.5 mr-1.5" />Associa
                 </Button>
-                </div>
             </div>
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+            ) : allRows.length === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center">Nessun documento associato</p>
             ) : (
-                <Tabs defaultValue={assocGroups[0]?.key}>
-                    <TabsList className="flex-wrap h-auto gap-1">
-                        {assocGroups.map(g => (
-                            <TabsTrigger key={g.key} value={g.key}>
-                                {g.label}
-                                <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                                    {g.items.length}
-                                </span>
-                            </TabsTrigger>
+                <>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+                            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                            <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per nome, marca o nota" className="pl-8" />
+                        </div>
+                        {anyFilter && (
+                            <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setTypeFilter("all"); setOriginFilter("all"); setPage(1) }}>Azzera filtri</Button>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 md:hidden">{typeSelect()}{originSelect()}</div>
+
+                    {/* Tabella (PC) */}
+                    <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+                        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
+                                    <TableHead className={`w-48 ${TABLE_HEAD_CLS}`}>
+                                        <div className="flex items-center gap-1">
+                                            <div className="min-w-0 flex-1">{typeSelect(TABLE_SELECT_CLS)}</div>
+                                            <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "type"} dir={sortDir} /></button>
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className={`w-36 ${TABLE_HEAD_CLS}`}>{sortBtn("brand", "Marca")}</TableHead>
+                                    <TableHead className={`w-44 ${TABLE_HEAD_CLS}`}>
+                                        <div className="flex items-center gap-1">
+                                            <div className="min-w-0 flex-1">{originSelect(TABLE_SELECT_CLS)}</div>
+                                            <button type="button" aria-label="Ordina per origine" onClick={() => toggleSort("origin")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "origin"} dir={sortDir} /></button>
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className={`w-[24%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
+                                    <TableHead className="w-12" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rows.length === 0 ? (
+                                    <TableRow><TableCell colSpan={6} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell></TableRow>
+                                ) : rows.map(r => (
+                                    <TableRow key={r.id} className={r.fileUrl ? "cursor-pointer" : ""} onClick={() => r.fileUrl && openDoc(r.fileUrl)}>
+                                        <TableCell className="border-r py-2">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <ShieldCheck className="h-5 w-5 shrink-0 text-green-600" />
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium" title={r.name}>{r.name}</p>
+                                                    {r.original && <p className="truncate text-[11px] text-slate-400" title={`Originale: ${r.original}`}>Originale: {r.original}</p>}
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={r.typeName}>{r.typeName}</TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={r.brand}>{r.brand || <span className="text-slate-300">—</span>}</TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={r.origin}>{r.origin}</TableCell>
+                                        <TableCell className="border-r py-1" onClick={e => e.stopPropagation()}>
+                                            <InlineNote value={r.notes} disabled={!r.assoc} onSave={v => handleSaveAssocNote(r.assoc!, v)} />
+                                        </TableCell>
+                                        <TableCell className="py-2 text-right">{hasMenu(r) && rowMenu(r)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* Elenco compatto (telefono) */}
+                    <div className="space-y-2 md:hidden">
+                        {rows.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Nessun documento con questi filtri</p>}
+                        {rows.map(r => (
+                            <div key={r.id} className="flex items-start gap-2 rounded-md border bg-white p-3 dark:bg-slate-900" onClick={() => r.fileUrl && openDoc(r.fileUrl)}>
+                                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">{r.name}</p>
+                                    <p className="text-xs text-slate-500">{r.typeName}{r.brand && ` · ${r.brand}`} · {r.origin}</p>
+                                    <div className="mt-1" onClick={e => e.stopPropagation()}>
+                                        <InlineNote value={r.notes} disabled={!r.assoc} onSave={v => handleSaveAssocNote(r.assoc!, v)} />
+                                    </div>
+                                </div>
+                                {hasMenu(r) && rowMenu(r)}
+                            </div>
                         ))}
-                    </TabsList>
-                    {assocGroups.map(g => (
-                        <TabsContent key={g.key} value={g.key} className="pt-4">
-                            {g.items.length === 0 ? (
-                                <p className="text-sm text-slate-400 py-4 text-center">
-                                    {g.kind === 'ddt'
-                                        ? "Nessun documento di conformità proveniente da DDT per questa commessa"
-                                        : "Nessun documento associato"}
-                                </p>
-                            ) : g.kind === 'ddt' ? (
-                                viewMode === 'list' ? (
-                                    <div className="space-y-1.5">
-                                        {g.items.map(renderDdtRow)}
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {g.items.map(renderDdtCard)}
-                                    </div>
-                                )
-                            ) : viewMode === 'list' ? (
-                                <div className="space-y-1.5">
-                                    {g.items.map(renderAssocRow)}
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {g.items.map(renderAssocCard)}
-                                </div>
-                            )}
-                        </TabsContent>
-                    ))}
-                </Tabs>
+                    </div>
+
+                    <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={setPage} totalItems={sorted.length} itemLabel="documenti" />
+                </>
             )}
 
             {/* Edit dialog */}

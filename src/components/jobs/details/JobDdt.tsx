@@ -4,15 +4,18 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { FileText, Loader2, Truck, Building2, ArrowRightLeft } from "lucide-react"
+import { FileText, Loader2, Truck, Building2, ArrowRightLeft, Search } from "lucide-react"
 import { deliveryNotesApi, purchasesApi } from "@/lib/api"
 import { DeliveryNote, DeliveryNoteItem, Purchase } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
-import { ViewToggle } from "@/components/ui/view-toggle"
-import { useViewMode } from "@/hooks/useViewMode"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { PaginationControls } from "@/components/ui/pagination-controls"
+import { SortArrow, TABLE_HEAD_CLS, TABLE_SELECT_CLS } from "@/components/ui/table-bits"
 import { mapDbToPurchase } from "@/lib/services/purchases"
 import {
   Dialog,
@@ -31,6 +34,274 @@ interface JobDdtProps {
 
 type SupplierDoc = { purchase: Purchase; url: string; index: number }
 
+const DDT_PAGE_SIZE = 50
+const NOTE_TYPE_LABEL: Record<string, string> = { exit: "Uscita", sale: "Vendita" }
+// Materiali di una bolla interna: dalle righe, senza doppioni
+const materialsOf = (n: DeliveryNote): string[] =>
+  n.itemNames?.length ? n.itemNames : Array.from(new Set((n.items ?? []).map(i => i.inventoryName).filter((v): v is string => !!v)))
+const fmtDate = (d?: string) => (d ? format(new Date(d), 'dd/MM/yyyy', { locale: it }) : '')
+
+function useTableControls<K extends string>(initialKey: K, initialDir: "asc" | "desc") {
+  const [sortKey, setSortKey] = useState<K>(initialKey)
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(initialDir)
+  const [page, setPage] = useState(1)
+  const toggle = (key: K, defaultDir: "asc" | "desc" = "asc") => {
+    if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"))
+    else { setSortKey(key); setSortDir(defaultDir) }
+    setPage(1)
+  }
+  return { sortKey, sortDir, page, setPage, toggle }
+}
+
+// Tabella dei DDT interni (uscite e vendite di magazzino verso la commessa)
+function OpiTable({ notes, onOpen }: { notes: DeliveryNote[]; onOpen: (n: DeliveryNote) => void }) {
+  type K = "number" | "type" | "date"
+  const [search, setSearch] = useState("")
+  const [typeFilter, setTypeFilter] = useState("all")
+  const { sortKey, sortDir, page, setPage, toggle } = useTableControls<K>("date", "desc")
+
+  const sorted = (() => {
+    const q = search.trim().toLowerCase()
+    const list = notes.filter(n => {
+      if (typeFilter !== "all" && n.type !== typeFilter) return false
+      return !q || `${n.number} ${n.causal ?? ""} ${n.notes ?? ""} ${materialsOf(n).join(" ")}`.toLowerCase().includes(q)
+    })
+    const dir = sortDir === "asc" ? 1 : -1
+    return [...list].sort((a, b) => {
+      let r = 0
+      if (sortKey === "number") r = a.number.localeCompare(b.number, "it", { numeric: true })
+      else if (sortKey === "type") r = a.type.localeCompare(b.type)
+      else r = new Date(a.date).getTime() - new Date(b.date).getTime()
+      return r * dir
+    })
+  })()
+  const totalPages = Math.max(1, Math.ceil(sorted.length / DDT_PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const rows = sorted.slice((currentPage - 1) * DDT_PAGE_SIZE, currentPage * DDT_PAGE_SIZE)
+  const sortBtn = (key: K, label: string, d: "asc" | "desc" = "asc") => (
+    <button type="button" onClick={() => toggle(key, d)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+      {label}<SortArrow active={sortKey === key} dir={sortDir} />
+    </button>
+  )
+  const typeSelect = (cls?: string) => (
+    <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setPage(1) }}>
+      <SelectTrigger aria-label="Filtra per tipo" className={cls}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Tutti i tipi</SelectItem>
+        <SelectItem value="exit">Uscita</SelectItem>
+        <SelectItem value="sale">Vendita</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per numero, causale o materiale" className="pl-8" />
+        </div>
+        {(search.trim() || typeFilter !== "all") && (
+          <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setTypeFilter("all"); setPage(1) }}>Azzera filtri</Button>
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-2 md:hidden">{typeSelect()}</div>
+
+      <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+          <TableHeader>
+            <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+              <TableHead className={`w-40 ${TABLE_HEAD_CLS}`}>{sortBtn("number", "DDT")}</TableHead>
+              <TableHead className={`w-40 ${TABLE_HEAD_CLS}`}>
+                <div className="flex items-center gap-1">
+                  <div className="min-w-0 flex-1">{typeSelect(TABLE_SELECT_CLS)}</div>
+                  <button type="button" aria-label="Ordina per tipo" onClick={() => toggle("type")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "type"} dir={sortDir} /></button>
+                </div>
+              </TableHead>
+              <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data", "desc")}</TableHead>
+              <TableHead className={`w-40 ${TABLE_HEAD_CLS}`}>Causale</TableHead>
+              <TableHead className={TABLE_HEAD_CLS}>Materiali</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-400">Nessun DDT con questi filtri</TableCell></TableRow>
+            ) : rows.map(n => (
+              <TableRow key={n.id} className="cursor-pointer" onClick={() => onOpen(n)}>
+                <TableCell className="border-r py-2">
+                  <div className="flex items-center gap-2"><Truck className="h-4 w-4 shrink-0 text-blue-500" /><span className="truncate text-sm font-semibold">DDT {n.number}</span></div>
+                </TableCell>
+                <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{NOTE_TYPE_LABEL[n.type] ?? n.type}</TableCell>
+                <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{fmtDate(n.date)}</TableCell>
+                <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={n.causal}>{n.causal || <span className="text-slate-300">—</span>}</TableCell>
+                <TableCell className="py-2 text-xs text-slate-600 dark:text-slate-300">
+                  <span className="line-clamp-2" title={materialsOf(n).join(", ")}>{materialsOf(n).join(", ") || <span className="text-slate-300">—</span>}</span>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="space-y-2 md:hidden">
+        {rows.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Nessun DDT con questi filtri</p>}
+        {rows.map(n => (
+          <div key={n.id} className="flex items-start gap-2 rounded-md border bg-white p-3 dark:bg-slate-900" onClick={() => onOpen(n)}>
+            <Truck className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">DDT {n.number}</p>
+              <p className="text-xs text-slate-500">{NOTE_TYPE_LABEL[n.type] ?? n.type} · {fmtDate(n.date)}</p>
+              {materialsOf(n).length > 0 && <p className="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">{materialsOf(n).join(", ")}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={setPage} totalItems={sorted.length} itemLabel="DDT" />
+    </div>
+  )
+}
+
+// Tabella dei DDT fornitori (documenti allegati agli acquisti): presso cantiere oppure associati a mano
+function SupplierDocsTable({ docs, isAssociatedTab, getLabel, onOpen, onDisassociate }: {
+  docs: SupplierDoc[]
+  isAssociatedTab: boolean
+  getLabel: (p: Purchase, index: number) => string
+  onOpen: (url: string) => void
+  onDisassociate: (purchaseId: string) => void
+}) {
+  type K = "supplier" | "number" | "date"
+  const [search, setSearch] = useState("")
+  const [supplierFilter, setSupplierFilter] = useState("all")
+  const { sortKey, sortDir, page, setPage, toggle } = useTableControls<K>("date", "desc")
+
+  const suppliers = Array.from(new Set(docs.map(d => d.purchase.supplierName || "Fornitore"))).sort((a, b) => a.localeCompare(b, "it"))
+  const sorted = (() => {
+    const q = search.trim().toLowerCase()
+    const list = docs.filter(d => {
+      const sup = d.purchase.supplierName || "Fornitore"
+      if (supplierFilter !== "all" && sup !== supplierFilter) return false
+      return !q || `${sup} ${d.purchase.deliveryNoteNumber} ${getLabel(d.purchase, d.index)}`.toLowerCase().includes(q)
+    })
+    const dir = sortDir === "asc" ? 1 : -1
+    return [...list].sort((a, b) => {
+      let r = 0
+      if (sortKey === "supplier") r = (a.purchase.supplierName || "").localeCompare(b.purchase.supplierName || "", "it")
+      else if (sortKey === "number") r = a.purchase.deliveryNoteNumber.localeCompare(b.purchase.deliveryNoteNumber, "it", { numeric: true })
+      else r = (a.purchase.deliveryNoteDate || "").localeCompare(b.purchase.deliveryNoteDate || "")
+      return r * dir
+    })
+  })()
+  const totalPages = Math.max(1, Math.ceil(sorted.length / DDT_PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const rows = sorted.slice((currentPage - 1) * DDT_PAGE_SIZE, currentPage * DDT_PAGE_SIZE)
+  const sortBtn = (key: K, label: string, d: "asc" | "desc" = "asc") => (
+    <button type="button" onClick={() => toggle(key, d)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+      {label}<SortArrow active={sortKey === key} dir={sortDir} />
+    </button>
+  )
+  const supplierSelect = (cls?: string) => (
+    <Select value={supplierFilter} onValueChange={v => { setSupplierFilter(v); setPage(1) }}>
+      <SelectTrigger aria-label="Filtra per fornitore" className={cls}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Tutti i fornitori</SelectItem>
+        {suppliers.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  )
+  const colCount = isAssociatedTab ? 5 : 4
+
+  if (docs.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="py-12 text-center text-slate-500">
+          <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">
+            {isAssociatedTab ? "Nessun DDT associato" : "Nessun DDT fornitore"}
+          </h3>
+          <p className="text-slate-500 dark:text-slate-400">
+            {isAssociatedTab ? "Nessun DDT associato alle bolle interne." : "Nessun documento allegato direttamente in cantiere."}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per fornitore, numero o materiale" className="pl-8" />
+        </div>
+        {(search.trim() || supplierFilter !== "all") && (
+          <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setSupplierFilter("all"); setPage(1) }}>Azzera filtri</Button>
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-2 md:hidden">{supplierSelect()}</div>
+
+      <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+          <TableHeader>
+            <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+              <TableHead className={`w-56 ${TABLE_HEAD_CLS}`}>
+                <div className="flex items-center gap-1">
+                  <div className="min-w-0 flex-1">{supplierSelect(TABLE_SELECT_CLS)}</div>
+                  <button type="button" aria-label="Ordina per fornitore" onClick={() => toggle("supplier")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "supplier"} dir={sortDir} /></button>
+                </div>
+              </TableHead>
+              <TableHead className={`w-36 ${TABLE_HEAD_CLS}`}>{sortBtn("number", "DDT")}</TableHead>
+              <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data", "desc")}</TableHead>
+              <TableHead className={TABLE_HEAD_CLS}>Materiali</TableHead>
+              {isAssociatedTab && <TableHead className="w-32" />}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow><TableCell colSpan={colCount} className="py-10 text-center text-slate-400">Nessun DDT con questi filtri</TableCell></TableRow>
+            ) : rows.map(d => (
+              <TableRow key={`${d.purchase.id}_${d.url}_${d.index}`} className="cursor-pointer" onClick={() => onOpen(d.url)}>
+                <TableCell className="border-r py-2">
+                  <div className="flex min-w-0 items-center gap-2"><FileText className="h-4 w-4 shrink-0 text-red-500" /><span className="truncate text-sm font-medium" title={d.purchase.supplierName}>{d.purchase.supplierName || "Fornitore"}</span></div>
+                </TableCell>
+                <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={d.purchase.deliveryNoteNumber}>{d.purchase.deliveryNoteNumber}</TableCell>
+                <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{fmtDate(d.purchase.deliveryNoteDate)}</TableCell>
+                <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">
+                  <span className="line-clamp-2" title={getLabel(d.purchase, d.index)}>{getLabel(d.purchase, d.index)}</span>
+                </TableCell>
+                {isAssociatedTab && (
+                  <TableCell className="py-2 text-right" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="sm" onClick={() => onDisassociate(d.purchase.id)} className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30">Disassocia</Button>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="space-y-2 md:hidden">
+        {rows.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Nessun DDT con questi filtri</p>}
+        {rows.map(d => (
+          <div key={`${d.purchase.id}_${d.url}_${d.index}`} className="flex items-start gap-2 rounded-md border bg-white p-3 dark:bg-slate-900" onClick={() => onOpen(d.url)}>
+            <FileText className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{d.purchase.supplierName || "Fornitore"} - {d.purchase.deliveryNoteNumber}</p>
+              <p className="text-xs text-slate-500">{fmtDate(d.purchase.deliveryNoteDate)}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">{getLabel(d.purchase, d.index)}</p>
+            </div>
+            {isAssociatedTab && (
+              <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); onDisassociate(d.purchase.id) }} className="h-7 shrink-0 text-xs text-red-600 hover:bg-red-50 hover:text-red-700">Disassocia</Button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={setPage} totalItems={sorted.length} itemLabel="DDT" />
+    </div>
+  )
+}
+
 export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const [subTab, setSubTab] = useState<"opi" | "fornitori">("opi")
   const [loading, setLoading] = useState(true)
@@ -40,7 +311,6 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
   const [sitePurchases, setSitePurchases] = useState<Purchase[]>([])
   const [openAssociateModal, setOpenAssociateModal] = useState(false)
   const supabase = createClient()
-  const [viewMode, setViewMode] = useViewMode('job-ddt', 'grid')
 
   useEffect(() => {
     if (jobId) load()
@@ -311,94 +581,6 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
     return matchedNames.join(', ')
   }
 
-  const renderDocsList = (docs: SupplierDoc[], isAssociatedTab = false) => {
-    if (docs.length === 0) {
-      return (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-slate-500">
-            <Building2 className="h-12 w-12 mx-auto mb-2 opacity-20" />
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">
-              {isAssociatedTab ? "Nessun DDT associato" : "Nessun DDT fornitore"}
-            </h3>
-            <p className="text-slate-500 dark:text-slate-400">
-              {isAssociatedTab 
-                ? "Nessun DDT associato alle bolle interne." 
-                : "Nessun documento allegato direttamente in cantiere."}
-            </p>
-          </CardContent>
-        </Card>
-      )
-    }
-    if (viewMode === 'list') {
-      return (
-        <div className="space-y-1.5">
-          {docs.map((doc) => {
-            const label = getMatchedMaterialsLabel(doc.purchase, doc.index)
-            return (
-              <div key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow">
-                <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-                  <FileText className="h-5 w-5 text-red-500" />
-                </div>
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-                  <p className="font-medium truncate text-sm">
-                    {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
-                  </p>
-                  <p className="text-xs text-slate-500 truncate">{label}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <p className="text-xs text-slate-400 mr-2">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
-                  {isAssociatedTab && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleDisassociatePurchase(doc.purchase.id)}
-                      className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
-                    >
-                      Disassocia
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )
-    }
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {docs.map((doc) => {
-          const label = getMatchedMaterialsLabel(doc.purchase, doc.index)
-          return (
-            <Card key={`${doc.purchase.id}_${doc.url}_${doc.index}`} className="hover:shadow-md transition-shadow relative">
-              <CardContent className="p-4 flex items-start gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-                  <FileText className="h-8 w-8 text-red-500" />
-                </div>
-                <div className="flex-1 overflow-hidden min-w-0 cursor-pointer" onClick={() => openSupplierDoc(doc.url)}>
-                  <p className="font-medium truncate text-sm">
-                    {doc.purchase.supplierName || "Fornitore"} - {doc.purchase.deliveryNoteNumber}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">{label}</p>
-                  <p className="text-xs text-slate-400 mt-1">{doc.purchase.deliveryNoteDate ? format(new Date(doc.purchase.deliveryNoteDate), 'dd MMM yyyy', { locale: it }) : ''}</p>
-                </div>
-                {isAssociatedTab && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleDisassociatePurchase(doc.purchase.id)}
-                    className="absolute top-2 right-2 h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
-                  >
-                    Disassocia
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-    )
-  }
-
   const associatedPurchaseIds = new Set<string>(
     associatedDocs.map(doc => doc.purchase.id)
   )
@@ -418,9 +600,6 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        {((subTab === "opi" && opiNotes.length > 0) || (subTab === "fornitori" && (supplierDocs.length > 0 || associatedDocs.length > 0))) && (
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
-        )}
       </div>
 
       {loading ? (
@@ -436,34 +615,8 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
               <p className="text-slate-500 dark:text-slate-400">Nessuna uscita di magazzino destinata a questa commessa.</p>
             </CardContent>
           </Card>
-        ) : viewMode === 'list' ? (
-          <div className="space-y-1.5">
-            {opiNotes.map(note => (
-              <div key={note.id} className="flex items-center gap-3 px-3 py-2 rounded border bg-white dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openOpiNote(note)}>
-                <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded shrink-0">
-                  <Truck className="h-5 w-5 text-blue-500" />
-                </div>
-                <p className="font-medium text-sm flex-1 min-w-0 truncate">DDT {note.number}</p>
-                <p className="text-xs text-slate-400 shrink-0">{format(new Date(note.date), 'dd MMM yyyy', { locale: it })}</p>
-              </div>
-            ))}
-          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {opiNotes.map(note => (
-              <Card key={note.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => openOpiNote(note)}>
-                <CardContent className="p-4 flex items-start gap-3">
-                  <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-                    <Truck className="h-8 w-8 text-blue-500" />
-                  </div>
-                  <div className="flex-1 overflow-hidden min-w-0">
-                    <p className="font-medium truncate text-sm">DDT {note.number}</p>
-                    <p className="text-xs text-slate-400 mt-1">{format(new Date(note.date), 'dd MMM yyyy', { locale: it })}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <OpiTable notes={opiNotes} onOpen={openOpiNote} />
         )
       ) : (
         <div className="space-y-4">
@@ -485,10 +638,10 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
               </Button>
             </div>
             <TabsContent value="cantiere" className="pt-2">
-              {renderDocsList(supplierDocs, false)}
+              <SupplierDocsTable docs={supplierDocs} isAssociatedTab={false} getLabel={getMatchedMaterialsLabel} onOpen={openSupplierDoc} onDisassociate={handleDisassociatePurchase} />
             </TabsContent>
             <TabsContent value="associati" className="pt-2">
-              {renderDocsList(associatedDocs, true)}
+              <SupplierDocsTable docs={associatedDocs} isAssociatedTab getLabel={getMatchedMaterialsLabel} onOpen={openSupplierDoc} onDisassociate={handleDisassociatePurchase} />
             </TabsContent>
           </Tabs>
         </div>
