@@ -20,7 +20,7 @@ import { fetchInternalJobDocumentTree } from "@/lib/zip/internal-job-zip-data";
 import { buildInternalJobZipPlan } from "@/lib/zip/internal-job-zip-plan";
 import { buildCoverPdfBlob } from "@/lib/pdf/job-documentation-cover-pdf";
 import { buildAndDownloadDocumentationZip } from "@/lib/zip/build-documentation-zip";
-import { HelpTip } from "@/components/ui/help-tip";
+import { JobSectionMenu, type SectionMenuGroup } from "@/components/jobs/JobSectionMenu";
 import { Badge } from "@/components/ui/badge";
 import { JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
 import { jobConformitaDocumentTypesApi } from "@/lib/services/job-conformita-document-types";
@@ -49,6 +49,63 @@ const TAB_GROUPS: { key: TabGroupKey; label: string; adminOnly?: boolean; tabs: 
     { key: 'documenti', label: 'Documenti', tabs: ['conformita', 'documents', 'commessa-documents', 'ordini'] },
     { key: 'economico', label: 'Economico', adminOnly: true, tabs: ['costi-sal', 'analisi-costi', 'fatturazione'] },
 ];
+
+function buildMenuGroups(canSeeAll: boolean): SectionMenuGroup[] {
+    const icon = "h-4 w-4"
+    const groups: SectionMenuGroup[] = [
+        {
+            key: 'generale', label: 'Generale', items: [
+                { key: 'overview', label: 'Dettagli', icon: <Info className={icon} /> },
+                { key: 'cronoprogramma', label: 'Cronoprogramma', icon: <GanttChartSquare className={icon} /> },
+                { key: 'stock', label: 'Materiali', icon: <Package className={icon} /> },
+                { key: 'attendance', label: 'Ore', icon: <Clock className={icon} /> },
+                { key: 'eccedenze', label: 'Eccedenze', icon: <Recycle className={`${icon} text-violet-500`} /> },
+            ],
+        },
+        {
+            key: 'documenti', label: 'Documenti', items: [
+                {
+                    key: 'conformita', label: 'Conformità', icon: <ShieldCheck className={`${icon} text-green-600`} />,
+                    help: {
+                        title: "Documenti Conformità Cantiere",
+                        description: "Tipi disponibili per i documenti caricati direttamente sulla commessa.",
+                        fetchItems: async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => t.name),
+                        emptyText: "Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno.",
+                    },
+                },
+                {
+                    key: 'documents', label: 'Documenti Cantiere', icon: <FileText className={icon} />,
+                    help: {
+                        title: "Documenti Cantiere",
+                        description: "Tipi disponibili per i documenti caricati in questa sezione.",
+                        fetchItems: async () => (await jobSiteDocumentTypesApi.getAll()).map(t => t.name),
+                        emptyText: "Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Cantiere per crearne uno.",
+                    },
+                },
+                ...(canSeeAll ? [{
+                    key: 'commessa-documents', label: 'Documenti Commessa', icon: <Folder className={icon} />,
+                    help: {
+                        title: "Documenti Commessa",
+                        description: "Tipi disponibili per i documenti caricati in questa sezione (condivisi con le proposte).",
+                        fetchItems: async () => (await proposalDocumentTypesApi.getAll()).map(t => t.name),
+                        emptyText: "Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno.",
+                    },
+                }] : []),
+                { key: 'ordini', label: 'Ordini', icon: <ClipboardList className={`${icon} text-orange-500`} /> },
+            ],
+        },
+    ]
+    if (canSeeAll) {
+        groups.push({
+            key: 'economico', label: 'Economico', items: [
+                { key: 'costi-sal', label: 'Costi', icon: <Euro className={icon} /> },
+                { key: 'analisi-costi', label: 'Analisi Costi', icon: <BarChart2 className={`${icon} text-emerald-600`} /> },
+                { key: 'fatturazione', label: 'Fatturazione', icon: <Receipt className={`${icon} text-teal-600`} /> },
+            ],
+        })
+    }
+    return groups
+}
 
 function groupOfTab(tab: string): TabGroupKey {
     return TAB_GROUPS.find(g => g.tabs.includes(tab))?.key || 'generale';
@@ -567,95 +624,14 @@ export default function JobDetailsPage() {
                 {/* Printable Area */}
                 <div ref={printRef}>
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                        {/* Selettore di gruppo */}
-                        <div className="print:hidden flex gap-2">
-                            {TAB_GROUPS.filter(g => !g.adminOnly || userRole === 'admin' || userRole === 'operativo').map(g => (
-                                <button
-                                    key={g.key}
-                                    type="button"
-                                    onClick={() => { setActiveGroup(g.key); setActiveTab(g.tabs[0]); }}
-                                    className={`flex-1 rounded-md px-2 py-2 text-xs sm:text-sm font-medium transition-colors ${
-                                        activeGroup === g.key
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                    }`}
-                                >
-                                    {g.label}
-                                </button>
-                            ))}
+                        {/* Menu unico delle pagine della commessa */}
+                        <div className="print:hidden">
+                            <JobSectionMenu
+                                groups={buildMenuGroups(userRole === 'admin' || userRole === 'operativo')}
+                                activeKey={activeTab}
+                                onSelect={(group, tab) => { setActiveGroup(group as TabGroupKey); setActiveTab(tab); }}
+                            />
                         </div>
-
-                        {/* Tab del gruppo selezionato (max 5 voci, sempre con etichetta visibile) */}
-                        <TabsList className="print:hidden w-full justify-start border-b rounded-none p-0 h-auto bg-transparent flex-nowrap overflow-x-auto overflow-y-hidden">
-                            {activeGroup === 'generale' && (
-                                <>
-                                    <TabsTrigger value="overview" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <Info className="h-4 w-4 mr-1" />Dettagli
-                                    </TabsTrigger>
-                                    <TabsTrigger value="cronoprogramma" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <GanttChartSquare className="h-4 w-4 mr-1" />Cronoprogramma
-                                    </TabsTrigger>
-                                    <TabsTrigger value="stock" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <Package className="h-4 w-4 mr-1" />Materiali
-                                    </TabsTrigger>
-                                    <TabsTrigger value="attendance" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <Clock className="h-4 w-4 mr-1" />Ore
-                                    </TabsTrigger>
-                                    <TabsTrigger value="eccedenze" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <Recycle className="h-4 w-4 mr-1 text-violet-500" />Eccedenze
-                                    </TabsTrigger>
-                                </>
-                            )}
-                            {activeGroup === 'documenti' && (
-                                <>
-                                    <TabsTrigger value="conformita" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-green-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <ShieldCheck className="h-4 w-4 mr-1 text-green-600" />Conformità
-                                        <HelpTip
-                                            title="Documenti Conformità Cantiere"
-                                            description="Tipi disponibili per i documenti caricati direttamente sulla commessa."
-                                            fetchItems={async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => t.name)}
-                                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
-                                        />
-                                    </TabsTrigger>
-                                    <TabsTrigger value="documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <FileText className="h-4 w-4 mr-1" />Documenti Cantiere
-                                        <HelpTip
-                                            title="Documenti Cantiere"
-                                            description="Tipi disponibili per i documenti caricati in questa sezione."
-                                            fetchItems={async () => (await jobSiteDocumentTypesApi.getAll()).map(t => t.name)}
-                                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Cantiere per crearne uno."
-                                        />
-                                    </TabsTrigger>
-                                    {(userRole === 'admin' || userRole === 'operativo') && (
-                                        <TabsTrigger value="commessa-documents" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                            <Folder className="h-4 w-4 mr-1" />Documenti Commessa
-                                            <HelpTip
-                                                title="Documenti Commessa"
-                                                description="Tipi disponibili per i documenti caricati in questa sezione (condivisi con le proposte)."
-                                                fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => t.name)}
-                                                emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
-                                            />
-                                        </TabsTrigger>
-                                    )}
-                                    <TabsTrigger value="ordini" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <ClipboardList className="h-4 w-4 mr-1 text-orange-500" />Ordini
-                                    </TabsTrigger>
-                                </>
-                            )}
-                            {activeGroup === 'economico' && (userRole === 'admin' || userRole === 'operativo') && (
-                                <>
-                                    <TabsTrigger value="costi-sal" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <Euro className="h-4 w-4 mr-1" />Costi
-                                    </TabsTrigger>
-                                    <TabsTrigger value="analisi-costi" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-emerald-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <BarChart2 className="h-4 w-4 mr-1 text-emerald-600" />Analisi Costi
-                                    </TabsTrigger>
-                                    <TabsTrigger value="fatturazione" className="rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-b-2 data-[state=active]:border-teal-600 data-[state=active]:shadow-none px-2 py-2 text-xs sm:text-sm shrink-0 whitespace-nowrap">
-                                        <Receipt className="h-4 w-4 mr-1 text-teal-600" />Fatturazione
-                                    </TabsTrigger>
-                                </>
-                            )}
-                        </TabsList>
 
                         <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">
                             <JobOverview job={job} totalCost={totalCost} totalHours={totalHours} onJobUpdated={loadData} />
