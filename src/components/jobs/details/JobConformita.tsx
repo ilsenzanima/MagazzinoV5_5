@@ -60,6 +60,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { NotchTabs } from "@/components/ui/notch-tabs"
 import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
@@ -1746,13 +1747,18 @@ function AssociateDialog({
 // ─── Componente principale ───────────────────────────────────────────────────
 
 export function JobConformita({ jobId, jobLabel, jobName }: JobConformitaProps) {
+    const [tab, setTab] = useState("own")
     return (
-        <Tabs defaultValue="own" className="space-y-4">
-            <TabsList>
-                <TabsTrigger value="own"><ShieldCheck />Conformità Personalizzata</TabsTrigger>
-                <TabsTrigger value="associated"><Link2 />Documenti associati</TabsTrigger>
-                <TabsTrigger value="ddt-bolle"><FileText />DDT/bolle</TabsTrigger>
-            </TabsList>
+        <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+            <NotchTabs
+                value={tab}
+                onValueChange={setTab}
+                items={[
+                    { value: "own", label: "Conformità Personalizzata", icon: <ShieldCheck /> },
+                    { value: "associated", label: "Documenti associati", icon: <Link2 /> },
+                    { value: "ddt-bolle", label: "DDT/bolle", icon: <FileText /> },
+                ]}
+            />
             <TabsContent value="own">
                 <OwnDocuments jobId={jobId} jobLabel={jobLabel} />
             </TabsContent>

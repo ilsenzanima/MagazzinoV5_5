@@ -1,6 +1,9 @@
 "use client"
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState } from "react"
+import { FileText, ShoppingCart } from "lucide-react"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { NotchTabs } from "@/components/ui/notch-tabs"
 import { SupplierOffers } from "@/components/shared/SupplierOffers"
 import { JobOrdini } from "@/components/jobs/details/JobOrdini"
 
@@ -11,12 +14,17 @@ interface Props {
 }
 
 export function JobOrdiniDocumenti({ jobId, jobCode, jobLabel }: Props) {
+    const [tab, setTab] = useState("offerte")
     return (
-        <Tabs defaultValue="offerte" className="space-y-4">
-            <TabsList>
-                <TabsTrigger value="offerte">Offerte Fornitori</TabsTrigger>
-                <TabsTrigger value="conferme">Conferme d&apos;ordine</TabsTrigger>
-            </TabsList>
+        <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+            <NotchTabs
+                value={tab}
+                onValueChange={setTab}
+                items={[
+                    { value: "offerte", label: "Offerte Fornitori", icon: <FileText /> },
+                    { value: "conferme", label: "Conferme d'ordine", icon: <ShoppingCart /> },
+                ]}
+            />
 
             <TabsContent value="offerte" className="space-y-4">
                 <SupplierOffers jobId={jobId} jobLabel={jobLabel} />
