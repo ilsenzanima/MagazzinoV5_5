@@ -29,6 +29,7 @@ import {
     FolderPlus,
     MoreHorizontal,
     Images,
+    FileText,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -1748,9 +1749,9 @@ export function JobConformita({ jobId, jobLabel, jobName }: JobConformitaProps) 
     return (
         <Tabs defaultValue="own" className="space-y-4">
             <TabsList>
-                <TabsTrigger value="own">Conformità Personalizzata</TabsTrigger>
-                <TabsTrigger value="associated">Documenti associati</TabsTrigger>
-                <TabsTrigger value="ddt-bolle">DDT/bolle</TabsTrigger>
+                <TabsTrigger value="own"><ShieldCheck />Conformità Personalizzata</TabsTrigger>
+                <TabsTrigger value="associated"><Link2 />Documenti associati</TabsTrigger>
+                <TabsTrigger value="ddt-bolle"><FileText />DDT/bolle</TabsTrigger>
             </TabsList>
             <TabsContent value="own">
                 <OwnDocuments jobId={jobId} jobLabel={jobLabel} />
