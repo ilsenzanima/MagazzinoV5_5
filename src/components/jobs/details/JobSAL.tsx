@@ -65,7 +65,7 @@ export function JobSAL({ jobId, movements }: JobSALProps) {
                 purchasesApi.getByJobId(jobId),
                 salApi.getByJobId(jobId),
             ])
-            setPurchases(purData)
+            setPurchases(purData.filter(p => p.orderType !== 'order'))
             setSalItems(salData)
         } catch (e) {
             console.error('Failed to load SAL data', e)

@@ -268,7 +268,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                 attendanceApi.getWorkerCostsByJobId(jobId),
                 salNamesApi.getByJobId(jobId),
             ])
-            setPurchases(purData)
+            setPurchases(purData.filter(p => p.orderType !== 'order'))
             setSalItems(salData)
             setSalCosts(costData)
             setWorkerCosts(wcData.rows)
@@ -1247,7 +1247,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                                     {filteredMaterialGroups.map(group => {
                                         const isOpen = expandedGroups.has(group.groupId)
                                         const gIds = group.children.map(c => c.id)
-                                        const gAllSel = gIds.every(id => selectedIds.has(id))
+                                        const gAllSel = gIds.length > 0 && gIds.every(id => selectedIds.has(id))
                                         const gSomeSel = !gAllSel && gIds.some(id => selectedIds.has(id))
                                         // aggregate SAL names from children
                                         const groupSalNames = [...new Set(group.children.flatMap(c => c.salNames))]
