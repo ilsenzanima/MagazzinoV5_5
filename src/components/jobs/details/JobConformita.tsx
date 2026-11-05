@@ -60,7 +60,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { NotchTabs } from "@/components/ui/notch-tabs"
+import { NotchTabs, NotchActions } from "@/components/ui/notch-tabs"
 import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
@@ -754,20 +754,17 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 />
             ) : (
             <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="flex items-center text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                    Conformità Personalizzata
-                    <HelpTip
-                        title="Conformità Personalizzata"
-                        description="Tipi di documento che puoi inserire in questa sezione."
-                        fetchItems={async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => (t.isPhotoGallery ? `${t.name} (raccolta foto)` : t.name))}
-                        emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
-                    />
-                </h3>
+            <NotchActions>
+                <HelpTip
+                    title="Conformità Personalizzata"
+                    description="Tipi di documento che puoi inserire in questa sezione."
+                    fetchItems={async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => (t.isPhotoGallery ? `${t.name} (raccolta foto)` : t.name))}
+                    emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
+                />
                 <Button size="sm" variant="outline" onClick={() => openUpload()}>
                     <Upload className="h-3.5 w-3.5 mr-1.5" />Carica
                 </Button>
-            </div>
+            </NotchActions>
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
@@ -1355,14 +1352,11 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
 
     return (
         <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                    Documenti associati dalla gestione conformità
-                </h3>
+            <NotchActions>
                 <Button size="sm" variant="outline" onClick={() => setSearchOpen(true)}>
                     <Link2 className="h-3.5 w-3.5 mr-1.5" />Associa
                 </Button>
-            </div>
+            </NotchActions>
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
@@ -1751,6 +1745,7 @@ export function JobConformita({ jobId, jobLabel, jobName }: JobConformitaProps) 
     return (
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
             <NotchTabs
+                title="Conformità"
                 value={tab}
                 onValueChange={setTab}
                 items={[
@@ -1758,7 +1753,7 @@ export function JobConformita({ jobId, jobLabel, jobName }: JobConformitaProps) 
                     { value: "associated", label: "Documenti associati", icon: <Link2 /> },
                     { value: "ddt-bolle", label: "DDT/bolle", icon: <FileText /> },
                 ]}
-            />
+            >
             <TabsContent value="own">
                 <OwnDocuments jobId={jobId} jobLabel={jobLabel} />
             </TabsContent>
@@ -1768,6 +1763,7 @@ export function JobConformita({ jobId, jobLabel, jobName }: JobConformitaProps) 
             <TabsContent value="ddt-bolle">
                 <JobDdt jobId={jobId} jobName={jobName || jobLabel || jobId} />
             </TabsContent>
+            </NotchTabs>
         </Tabs>
     )
 }

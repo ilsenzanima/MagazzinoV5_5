@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { NotchActions } from "@/components/ui/notch-tabs"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { SortArrow, TABLE_HEAD_CLS, TABLE_SELECT_CLS } from "@/components/ui/table-bits"
 import { mapDbToPurchase } from "@/lib/services/purchases"
@@ -534,13 +535,12 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">DDT/bolle</h3>
+      <NotchActions>
         <Button onClick={() => setOpenAssociateModal(true)} size="sm" className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700">
           <ArrowRightLeft className="h-4 w-4" />
           Associa DDT da Acquisti
         </Button>
-      </div>
+      </NotchActions>
 
       {loading ? (
         <div className="flex justify-center py-12">
