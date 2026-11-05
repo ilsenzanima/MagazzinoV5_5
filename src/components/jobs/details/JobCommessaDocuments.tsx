@@ -34,7 +34,7 @@ import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/u
 import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
 import { jobSiteTypeNotesApi } from "@/lib/services/job-site-type-notes"
 import { PaginationControls } from "@/components/ui/pagination-controls"
-import { HelpTip } from "@/components/ui/help-tip"
+import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs"
 import { JobPhotoCollection, PhotoThumb } from "./JobPhotoCollection"
 
 interface JobCommessaDocumentsProps {
@@ -807,22 +807,18 @@ export function JobCommessaDocuments({ jobId, jobLabel }: JobCommessaDocumentsPr
           menu={doc => rowMenu(doc, collection.docs)}
         />
       ) : (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center text-xl font-semibold text-slate-800 dark:text-slate-100">
-              Documenti Commessa
-              <HelpTip
-                title="Documenti Commessa"
-                description="Tipi di documento che puoi inserire in questa sezione (condivisi con le proposte)."
-                fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => (t.isPhotoGallery ? `${t.name} (raccolta foto)` : t.name))}
-                emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
-              />
-            </h2>
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => openUpload()}>
-              <Upload className="mr-2 h-4 w-4" />
-              Carica Documenti
-            </Button>
-          </div>
+        <NotchTabs title="Documenti Commessa">
+          <NotchHelp
+            title="Documenti Commessa"
+            description="Tipi di documento che puoi inserire in questa sezione (condivisi con le proposte)."
+            fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => (t.isPhotoGallery ? `${t.name} (raccolta foto)` : t.name))}
+            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
+          />
+          <NotchActions>
+            <NotchButton onClick={() => openUpload()}>
+              <Upload />Carica documenti
+            </NotchButton>
+          </NotchActions>
 
           {loading ? (
             <div className="flex justify-center py-12">
@@ -987,7 +983,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: JobCommessaDocumentsPr
               />
             </>
           )}
-        </>
+        </NotchTabs>
       )}
 
       {/* Upload dialog - step 1: tipo + file multipli */}

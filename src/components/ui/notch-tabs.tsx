@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { HelpTip } from "@/components/ui/help-tip"
 
 export interface NotchTabItem {
   value: string
@@ -11,9 +13,10 @@ export interface NotchTabItem {
 }
 
 interface NotchTabsProps {
-  items: NotchTabItem[]
-  value: string
-  onValueChange: (value: string) => void
+  // Senza voci la striscia è una barra piatta con solo titolo, aiuto e pulsanti (pagine senza sotto-schede)
+  items?: NotchTabItem[]
+  value?: string
+  onValueChange?: (value: string) => void
   // Nome della pagina, a sinistra nella striscia
   title?: ReactNode
   className?: string
@@ -48,19 +51,39 @@ function barGeometry(w: number, x: number) {
   return { d, cx }
 }
 
-const ActionsCtx = createContext<HTMLElement | null>(null)
+interface Slots { actions: HTMLElement | null; help: HTMLElement | null }
+const SlotsCtx = createContext<Slots>({ actions: null, help: null })
+
+// Stile unico dei pulsanti nella striscia, uguale in ogni pagina
+export function NotchButton({ className, ...props }: React.ComponentProps<typeof Button>) {
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className={cn("h-8 gap-1.5 border-slate-300 bg-white px-3 text-slate-800 shadow-sm hover:bg-slate-100 hover:text-slate-900 [&_svg]:size-4 [&_svg]:text-blue-600", className)}
+      {...props}
+    />
+  )
+}
+
+// Punto di domanda con l'elenco dei tipi inseribili: sta a sinistra, dopo il nome della pagina
+export function NotchHelp(props: React.ComponentProps<typeof HelpTip>) {
+  const { help } = useContext(SlotsCtx)
+  return help ? createPortal(<HelpTip {...props} tone="inherit" />, help) : <HelpTip {...props} />
+}
 
 // Pulsanti della scheda mostrati a destra nella striscia dei tab. Fuori da <NotchTabs> si vedono dove sono scritti.
 export function NotchActions({ children }: { children: ReactNode }) {
-  const el = useContext(ActionsCtx)
-  return el ? createPortal(children, el) : <>{children}</>
+  const { actions } = useContext(SlotsCtx)
+  return actions ? createPortal(children, actions) : <>{children}</>
 }
 
 // Striscia unica: nome della pagina a sinistra, tab con tacca animata al centro, pulsanti a destra.
 // Se lo spazio non basta, titolo e pulsanti passano sopra la barra. Su telefono le voci non attive mostrano solo l'icona.
-export function NotchTabs({ items, value, onValueChange, title, className, children }: NotchTabsProps) {
+export function NotchTabs({ items = [], value = "", onValueChange, title, className, children }: NotchTabsProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null)
+  const [helpEl, setHelpEl] = useState<HTMLElement | null>(null)
   const [width, setWidth] = useState(0)
   const [x, setX] = useState(0)
   const xRef = useRef(0)
@@ -107,11 +130,37 @@ export function NotchTabs({ items, value, onValueChange, title, className, child
     return () => cancelAnimationFrame(raf.current)
   }, [idx, width, colW, ox])
 
-  const { d, cx } = barGeometry(barW, x)
   const sideMax = inline ? Math.max(0, sideRoom - 24) : undefined
+  const { d, cx } = barGeometry(barW, x)
+  const slots: Slots = { actions: actionsEl, help: helpEl }
+  const titleBlock = (
+    <div className="pointer-events-auto flex min-w-0 items-center gap-1" style={{ maxWidth: items.length ? sideMax : undefined }}>
+      <span className="truncate text-sm font-semibold uppercase tracking-wide">{title}</span>
+      <span ref={setHelpEl} className="flex shrink-0 items-center empty:hidden" />
+    </div>
+  )
+  const actionsBlock = (
+    <div
+      ref={setActionsEl}
+      className="pointer-events-auto flex shrink-0 flex-wrap items-center justify-end gap-2 empty:hidden"
+      style={{ maxWidth: items.length ? sideMax : undefined }}
+    />
+  )
+
+  if (items.length === 0) {
+    return (
+      <SlotsCtx.Provider value={slots}>
+        <div className={cn("flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-slate-800 px-4 py-2 text-white shadow-md dark:bg-slate-700", className)}>
+          {titleBlock}
+          {actionsBlock}
+        </div>
+        {children}
+      </SlotsCtx.Provider>
+    )
+  }
 
   return (
-    <ActionsCtx.Provider value={actionsEl}>
+    <SlotsCtx.Provider value={slots}>
       <div ref={wrapRef} role="tablist" className={cn("relative w-full select-none", className)}>
         <div
           className={cn(
@@ -120,14 +169,8 @@ export function NotchTabs({ items, value, onValueChange, title, className, child
           )}
           style={inline ? { height: H } : undefined}
         >
-          <div className="pointer-events-auto min-w-0 truncate text-sm font-semibold uppercase tracking-wide" style={{ maxWidth: sideMax }}>
-            {title}
-          </div>
-          <div
-            ref={setActionsEl}
-            className="pointer-events-auto flex shrink-0 items-center justify-end gap-2 empty:hidden"
-            style={{ maxWidth: sideMax }}
-          />
+          {titleBlock}
+          {actionsBlock}
         </div>
 
         <div className="relative mx-auto" style={{ height: H + 28, width: barW || undefined }}>
@@ -152,7 +195,7 @@ export function NotchTabs({ items, value, onValueChange, title, className, child
                     role="tab"
                     aria-selected={active}
                     title={it.label}
-                    onClick={() => onValueChange(it.value)}
+                    onClick={() => onValueChange?.(it.value)}
                     className={cn(
                       "absolute top-7 flex flex-col items-center justify-end px-1 pb-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-400",
                       active ? "text-white" : "text-slate-300 hover:text-white"
@@ -177,6 +220,6 @@ export function NotchTabs({ items, value, onValueChange, title, className, child
         </div>
       </div>
       {children}
-    </ActionsCtx.Provider>
+    </SlotsCtx.Provider>
   )
 }

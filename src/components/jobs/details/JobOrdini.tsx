@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { NotchActions, NotchButton } from "@/components/ui/notch-tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -130,17 +131,15 @@ export function JobOrdini({ jobId }: JobOrdiniProps) {
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Conferme d&apos;ordine</h2>
-                {canEdit && (
+            {canEdit && (
+                <NotchActions>
                     <Link href={`/purchases/new?type=order&jobId=${jobId}`}>
-                        <Button className="bg-blue-600 hover:bg-blue-700">
-                            <Plus className="h-4 w-4 mr-2" />
-                            Nuovo Ordine
-                        </Button>
+                        <NotchButton>
+                            <Plus />Nuovo ordine
+                        </NotchButton>
                     </Link>
-                )}
-            </div>
+                </NotchActions>
+            )}
 
             {orders.length === 0 ? (
                 <div className="text-center py-12 text-slate-400 dark:text-slate-500">

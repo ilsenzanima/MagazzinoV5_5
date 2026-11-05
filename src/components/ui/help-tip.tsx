@@ -12,9 +12,11 @@ interface HelpTipProps {
     wide?: boolean
     fetchItems?: () => Promise<string[]>
     emptyText?: string
+    // "inherit": icona più grande che prende il colore del testo attorno (es. dentro la striscia dei tab)
+    tone?: "default" | "inherit"
 }
 
-export function HelpTip({ title, description, lines, wide, fetchItems, emptyText = "Nessun tipo configurato." }: HelpTipProps) {
+export function HelpTip({ title, description, lines, wide, fetchItems, emptyText = "Nessun tipo configurato.", tone = "default" }: HelpTipProps) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const [items, setItems] = useState<string[] | null>(null)
@@ -42,9 +44,11 @@ export function HelpTip({ title, description, lines, wide, fetchItems, emptyText
                     onClick={e => e.stopPropagation()}
                     onPointerDown={e => e.stopPropagation()}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation() }}
-                    className="inline-flex items-center justify-center h-4 w-4 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 ml-1 shrink-0"
+                    className={tone === "inherit"
+                        ? "inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full opacity-70 hover:bg-white/15 hover:opacity-100"
+                        : "inline-flex items-center justify-center h-4 w-4 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 ml-1 shrink-0"}
                 >
-                    <HelpCircle className="h-3.5 w-3.5" />
+                    <HelpCircle className={tone === "inherit" ? "h-5 w-5" : "h-3.5 w-3.5"} />
                 </span>
             </PopoverTrigger>
             <PopoverContent

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
+import { NotchActions, NotchButton } from "@/components/ui/notch-tabs"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -41,9 +42,11 @@ interface Props {
     jobId?: string
     proposalId?: string
     jobLabel?: string
+    // Dentro la striscia dei tab della commessa: titolo e pulsante stanno nella striscia
+    inStrip?: boolean
 }
 
-export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
+export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) {
     const [documents, setDocuments] = useState<SupplierOffer[]>([])
     const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([])
     const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -339,13 +342,21 @@ export function SupplierOffers({ jobId, proposalId, jobLabel }: Props) {
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Offerte Fornitori</h2>
-                <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Carica Documenti
-                </Button>
-            </div>
+            {inStrip ? (
+                <NotchActions>
+                    <NotchButton onClick={openUpload}>
+                        <Upload />Carica documenti
+                    </NotchButton>
+                </NotchActions>
+            ) : (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Offerte Fornitori</h2>
+                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Carica Documenti
+                    </Button>
+                </div>
+            )}
 
             {loading ? (
                 <div className="flex justify-center py-12">

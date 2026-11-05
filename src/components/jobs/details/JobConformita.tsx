@@ -60,7 +60,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { NotchTabs, NotchActions } from "@/components/ui/notch-tabs"
+import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs"
 import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
@@ -755,15 +755,15 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
             ) : (
             <>
             <NotchActions>
-                <HelpTip
+                <NotchHelp
                     title="Conformità Personalizzata"
                     description="Tipi di documento che puoi inserire in questa sezione."
                     fetchItems={async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => (t.isPhotoGallery ? `${t.name} (raccolta foto)` : t.name))}
                     emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
                 />
-                <Button size="sm" variant="outline" onClick={() => openUpload()}>
-                    <Upload className="h-3.5 w-3.5 mr-1.5" />Carica
-                </Button>
+                <NotchButton onClick={() => openUpload()}>
+                    <Upload />Carica
+                </NotchButton>
             </NotchActions>
 
             {loading ? (
@@ -1353,9 +1353,9 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     return (
         <div className="space-y-3">
             <NotchActions>
-                <Button size="sm" variant="outline" onClick={() => setSearchOpen(true)}>
-                    <Link2 className="h-3.5 w-3.5 mr-1.5" />Associa
-                </Button>
+                <NotchButton onClick={() => setSearchOpen(true)}>
+                    <Link2 />Associa
+                </NotchButton>
             </NotchActions>
 
             {loading ? (

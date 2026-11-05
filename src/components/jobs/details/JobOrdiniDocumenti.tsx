@@ -18,21 +18,22 @@ export function JobOrdiniDocumenti({ jobId, jobCode, jobLabel }: Props) {
     return (
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
             <NotchTabs
+                title="Ordini"
                 value={tab}
                 onValueChange={setTab}
                 items={[
                     { value: "offerte", label: "Offerte Fornitori", icon: <FileText /> },
                     { value: "conferme", label: "Conferme d'ordine", icon: <ShoppingCart /> },
                 ]}
-            />
+            >
+                <TabsContent value="offerte" className="space-y-4">
+                    <SupplierOffers jobId={jobId} jobLabel={jobLabel} inStrip />
+                </TabsContent>
 
-            <TabsContent value="offerte" className="space-y-4">
-                <SupplierOffers jobId={jobId} jobLabel={jobLabel} />
-            </TabsContent>
-
-            <TabsContent value="conferme" className="space-y-4">
-                <JobOrdini jobId={jobId} jobCode={jobCode} />
-            </TabsContent>
+                <TabsContent value="conferme" className="space-y-4">
+                    <JobOrdini jobId={jobId} jobCode={jobCode} />
+                </TabsContent>
+            </NotchTabs>
         </Tabs>
     )
 }
