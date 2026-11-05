@@ -60,7 +60,8 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs"
+import { NotchTabs, NotchHelp, NotchSearch } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { useViewMode } from "@/hooks/useViewMode"
@@ -754,17 +755,13 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 />
             ) : (
             <>
-            <NotchActions>
-                <NotchHelp
+            <NotchHelp
                     title="Conformità Personalizzata"
                     description="Tipi di documento che puoi inserire in questa sezione."
                     fetchItems={async () => (await jobConformitaDocumentTypesApi.getAll()).map(t => (t.isPhotoGallery ? `${t.name} (raccolta foto)` : t.name))}
                     emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
-                />
-                <NotchButton onClick={() => openUpload()}>
-                    <Upload />Carica
-                </NotchButton>
-            </NotchActions>
+            />
+            <FloatingAddButton onClick={() => openUpload()} label="Carica documenti" icon={<Upload className="h-6 w-6" />} showOnMobile />
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
@@ -772,18 +769,10 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento caricato</p>
             ) : (
                 <>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
-                            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                            <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per nome o nota" className="pl-8" />
-                        </div>
+                    <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                        <NotchSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="Cerca per nome o nota" />
                         {anyFilter && (
                             <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setTypeFilter("all"); setFolderFilter("all"); setPage(1) }}>Azzera filtri</Button>
-                        )}
-                        {docTypes.some(t => t.allowsFolders) && (
-                            <Button variant="outline" size="sm" onClick={() => openNewFolder(filterType?.allowsFolders ? filterType.id : (docTypes.find(t => t.allowsFolders)?.id ?? ""))}>
-                                <FolderPlus className="mr-1.5 h-4 w-4" />Nuova cartella
-                            </Button>
                         )}
                     </div>
 
@@ -1352,11 +1341,7 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
 
     return (
         <div className="space-y-3">
-            <NotchActions>
-                <NotchButton onClick={() => setSearchOpen(true)}>
-                    <Link2 />Associa
-                </NotchButton>
-            </NotchActions>
+            <FloatingAddButton onClick={() => setSearchOpen(true)} label="Associa documento" icon={<Link2 className="h-6 w-6" />} showOnMobile />
 
             {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
@@ -1364,11 +1349,8 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                 <p className="text-sm text-slate-400 py-4 text-center">Nessun documento associato</p>
             ) : (
                 <>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
-                            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                            <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per nome, marca o nota" className="pl-8" />
-                        </div>
+                    <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                        <NotchSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="Cerca per nome, marca o nota" />
                         {anyFilter && (
                             <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setTypeFilter("all"); setOriginFilter("all"); setPage(1) }}>Azzera filtri</Button>
                         )}

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
+import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
 
@@ -31,8 +32,8 @@ const CY = 4 // centro della tacca rispetto al bordo alto della barra
 const FR = 14 // raggio del raccordo tra barra e tacca
 const CR = 16 // raggio degli angoli della barra
 const SPAN = Math.sqrt((R + FR) ** 2 - (FR - CY) ** 2) // distanza orizzontale centro tacca → inizio raccordo
-const TAB_W = 190 // larghezza massima di ogni voce
-const SIDE_MIN = 170 // spazio minimo a lato dei tab per titolo e pulsanti dentro la striscia
+const TAB_W = 170 // larghezza massima di ogni voce
+const SIDE_MIN = 250 // spazio minimo a lato dei tab per titolo e pulsanti dentro la striscia
 
 // Contorno della barra con la tacca centrata in x e i raccordi morbidi
 function barGeometry(w: number, x: number) {
@@ -64,6 +65,26 @@ export function NotchButton({ className, ...props }: React.ComponentProps<typeof
       {...props}
     />
   )
+}
+
+// Barra di ricerca a destra nella striscia. Fuori da <NotchTabs> resta una normale casella di ricerca nella pagina.
+export function NotchSearch({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const { actions } = useContext(SlotsCtx)
+  const field = (
+    <div className={actions ? "relative w-52 max-w-full" : "relative min-w-[12rem] flex-1 sm:max-w-xs"}>
+      <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+      <input
+        type="search"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        title={placeholder}
+        className="h-9 w-full rounded-full border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-800 shadow-sm outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400"
+      />
+    </div>
+  )
+  return actions ? createPortal(field, actions) : field
 }
 
 // Punto di domanda con l'elenco dei tipi inseribili: sta a sinistra, dopo il nome della pagina

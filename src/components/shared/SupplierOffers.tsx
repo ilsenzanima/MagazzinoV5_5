@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { NotchActions, NotchButton } from "@/components/ui/notch-tabs"
+import { NotchSearch } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -343,11 +344,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
     return (
         <div className="space-y-4">
             {inStrip ? (
-                <NotchActions>
-                    <NotchButton onClick={openUpload}>
-                        <Upload />Carica documenti
-                    </NotchButton>
-                </NotchActions>
+                <FloatingAddButton onClick={openUpload} label="Carica documenti" icon={<Upload className="h-6 w-6" />} showOnMobile />
             ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Offerte Fornitori</h2>
@@ -372,11 +369,8 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
                 </Card>
             ) : (
                 <>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
-                            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                            <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per nome, fornitore o nota" className="pl-8" />
-                        </div>
+                    <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                        <NotchSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="Cerca per nome, fornitore o nota" />
                         {anyFilter && (
                             <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setSupplierFilter("all"); setPage(1) }}>Azzera filtri</Button>
                         )}

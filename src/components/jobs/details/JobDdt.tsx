@@ -13,7 +13,8 @@ import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { NotchActions, NotchButton } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
+import { NotchSearch } from "@/components/ui/notch-tabs"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { SortArrow, TABLE_HEAD_CLS, TABLE_SELECT_CLS } from "@/components/ui/table-bits"
 import { mapDbToPurchase } from "@/lib/services/purchases"
@@ -132,11 +133,8 @@ function DdtTable({ rows: allRows, onOpenNote, onOpenUrl, onDisassociate }: {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per numero, fornitore o materiale" className="pl-8" />
-        </div>
+      <div className="flex flex-wrap items-center gap-2 empty:hidden">
+        <NotchSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="Cerca per numero, fornitore o materiale" />
         {anyFilter && (
           <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setOriginFilter("all"); setSupplierFilter("all"); setPage(1) }}>Azzera filtri</Button>
         )}
@@ -535,12 +533,7 @@ export function JobDdt({ jobId, jobName }: JobDdtProps) {
 
   return (
     <div className="space-y-4">
-      <NotchActions>
-        <NotchButton onClick={() => setOpenAssociateModal(true)}>
-          <ArrowRightLeft />
-          Associa DDT da Acquisti
-        </NotchButton>
-      </NotchActions>
+      <FloatingAddButton onClick={() => setOpenAssociateModal(true)} label="Associa DDT" icon={<ArrowRightLeft className="h-6 w-6" />} showOnMobile />
 
       {loading ? (
         <div className="flex justify-center py-12">

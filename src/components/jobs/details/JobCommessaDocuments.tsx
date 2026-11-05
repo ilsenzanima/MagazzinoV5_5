@@ -34,7 +34,8 @@ import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/u
 import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
 import { jobSiteTypeNotesApi } from "@/lib/services/job-site-type-notes"
 import { PaginationControls } from "@/components/ui/pagination-controls"
-import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs"
+import { NotchTabs, NotchHelp, NotchSearch } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { JobPhotoCollection, PhotoThumb } from "./JobPhotoCollection"
 
 interface JobCommessaDocumentsProps {
@@ -814,11 +815,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: JobCommessaDocumentsPr
             fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => (t.isPhotoGallery ? `${t.name} (raccolta foto)` : t.name))}
             emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
           />
-          <NotchActions>
-            <NotchButton onClick={() => openUpload()}>
-              <Upload />Carica documenti
-            </NotchButton>
-          </NotchActions>
+          <FloatingAddButton onClick={() => openUpload()} label="Carica documenti" icon={<Upload className="h-6 w-6" />} showOnMobile />
 
           {loading ? (
             <div className="flex justify-center py-12">
@@ -835,11 +832,8 @@ export function JobCommessaDocuments({ jobId, jobLabel }: JobCommessaDocumentsPr
           ) : (
             <>
               {/* Ricerca e comandi */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
-                  <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                  <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per nome o nota" className="pl-8" />
-                </div>
+              <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                <NotchSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="Cerca per nome o nota" />
                 {anyFilterActive && (
                   <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={resetFilters}>Azzera filtri</Button>
                 )}

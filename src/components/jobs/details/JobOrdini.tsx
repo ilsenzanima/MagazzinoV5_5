@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { NotchActions, NotchButton } from "@/components/ui/notch-tabs"
+import { NotchSearch } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -132,13 +133,7 @@ export function JobOrdini({ jobId }: JobOrdiniProps) {
     return (
         <div className="space-y-4">
             {canEdit && (
-                <NotchActions>
-                    <Link href={`/purchases/new?type=order&jobId=${jobId}`}>
-                        <NotchButton>
-                            <Plus />Nuovo ordine
-                        </NotchButton>
-                    </Link>
-                </NotchActions>
+                <FloatingAddButton href={`/purchases/new?type=order&jobId=${jobId}`} label="Nuovo ordine" showOnMobile />
             )}
 
             {orders.length === 0 ? (
@@ -149,11 +144,8 @@ export function JobOrdini({ jobId }: JobOrdiniProps) {
                 </div>
             ) : (
                 <>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
-                            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                            <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Cerca per numero, fornitore, articolo o nota" className="pl-8" />
-                        </div>
+                    <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                        <NotchSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="Cerca per numero, fornitore, articolo o nota" />
                         {anyFilter && (
                             <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={() => { setSearch(""); setSupplierFilter("all"); setPage(1) }}>Azzera filtri</Button>
                         )}
