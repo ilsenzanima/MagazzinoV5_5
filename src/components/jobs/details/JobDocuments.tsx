@@ -124,7 +124,16 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
     if (saved) setOpenCollection(saved)
     const onPop = (e: PopStateEvent) => setOpenCollection((e.state as { magCollection?: CollectionRef } | null)?.magCollection ?? null)
     window.addEventListener("popstate", onPop)
-    return () => window.removeEventListener("popstate", onPop)
+    return () => {
+      window.removeEventListener("popstate", onPop)
+      // Uscendo dalla scheda (es. Dettagli o Costi) la raccolta non deve restare scritta nella voce
+      // corrente della cronologia, altrimenti al ritorno sui documenti si riaprirebbe da sola
+      const st = window.history.state as Record<string, unknown> | null
+      if (st && "magCollection" in st) {
+        const { magCollection: _removed, ...rest } = st
+        window.history.replaceState(rest, "")
+      }
+    }
   }, [])
   const showCollection = (c: CollectionRef) => {
     window.history.pushState({ ...(window.history.state ?? {}), magCollection: c }, "")
