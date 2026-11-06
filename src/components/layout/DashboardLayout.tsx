@@ -41,11 +41,14 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { MobileNavBar } from "./MobileNavBar";
 import { NotificationBell } from "./NotificationBell";
 import { inventoryApi } from "@/lib/services/inventory";
-import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
+import { RailSidebar } from "./RailSidebar";
+
+// Una pagina può contenerne altre (es. «Strumenti admin»): dentro un layout già presente non se ne apre un secondo
+const LayoutContext = createContext(false);
 
 // Voci che restano nel menu ridotto a sole icone
 const COLLAPSED_HREFS = new Set([
@@ -408,13 +411,15 @@ export default function DashboardLayout({
   const { session, loading, userRole, realRole, simulatedRole, setSimulatedRole } = useAuth();
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [collapsed, toggleCollapsed] = useSidebarCollapsed();
+  const nested = useContext(LayoutContext);
 
   useEffect(() => {
     if (!loading && !session) {
       router.push("/login");
     }
   }, [loading, session, router]);
+
+  if (nested) return <>{children}</>;
 
   if (loading) {
     return (
@@ -430,6 +435,7 @@ export default function DashboardLayout({
 
 
   return (
+    <LayoutContext.Provider value={true}>
     <div className="flex min-h-screen bg-background">
       {/* Simulation Banner */}
       {simulatedRole && (
@@ -448,19 +454,13 @@ export default function DashboardLayout({
         </div>
       )}
 
-      {/* Sidebar Desktop */}
-      <div className={cn(
-        "hidden lg:flex h-screen flex-col fixed left-0 border-r border-sidebar-border z-50 transition-all",
-        collapsed ? "w-16" : "w-64",
-        simulatedRole ? "top-10 h-[calc(100vh-40px)]" : "top-0"
-      )}>
-        <Sidebar collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
-      </div>
+      {/* Menu laterale desktop: colonna di icone che si apre in primo piano */}
+      <RailSidebar />
 
       {/* Main Content */}
       <div className={cn(
         "flex-1 flex flex-col min-h-screen transition-all pb-24 lg:pb-0 min-w-0", // min-w-0 prevents flex expansion
-        collapsed ? "lg:pl-16" : "lg:pl-64",
+        "lg:pl-20",
         simulatedRole ? "pt-10" : ""
       )}>
 
@@ -482,5 +482,6 @@ export default function DashboardLayout({
         <MobileNavBar onOpenMenu={() => setIsSheetOpen(true)} />
       </div>
     </div>
+    </LayoutContext.Provider>
   );
 }
