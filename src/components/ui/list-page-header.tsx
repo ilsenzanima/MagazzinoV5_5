@@ -31,7 +31,7 @@ export function ListPageHeader({ title, actions, search, searchActions, children
     return (
         <div className={cn(
             "bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border",
-            strip && "md:flex md:items-center md:gap-4 md:space-y-0 md:rounded-2xl md:border-0 md:bg-slate-800 md:px-4 md:py-3 md:text-white md:shadow-md md:dark:bg-slate-800"
+            strip && "md:flex md:items-center md:gap-4 md:space-y-0 md:mt-7 md:min-h-[68px] md:rounded-2xl md:border-0 md:bg-slate-800 md:px-4 md:py-0 md:text-white md:shadow-md md:dark:bg-slate-800"
         )}>
             <div className={cn("flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4", strip && "md:justify-start")}>
                 <div className="flex items-center gap-3 w-full sm:w-auto">
