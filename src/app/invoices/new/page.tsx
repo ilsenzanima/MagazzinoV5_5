@@ -12,9 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Save, Loader2, Upload, FileText, Calendar } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { suppliersApi, invoicesApi, supplierGroupsApi, Supplier } from "@/lib/api";
+import { suppliersApi, invoicesApi, purchasesApi, supplierGroupsApi, Supplier } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { useBatchUpload } from "@/hooks/useBatchUpload";
 import { UploadStatusBar } from "@/components/ui/upload-status-row";
@@ -31,6 +31,54 @@ interface UnlinkedPurchase {
     supplierName?: string;
     totalAmount: number;
     selected: boolean;
+    items: { id: string; itemName?: string; itemModel?: string; quantity: number; price: number; returned: number }[];
+}
+
+// Riga di una bolla con il prezzo da inserire: prezzo unitario o totale riga (l'altro si calcola da solo)
+function PriceLine({ item, onPrice }: { item: UnlinkedPurchase["items"][number]; onPrice: (price: number) => void }) {
+    const [unit, setUnit] = useState(item.price > 0 ? item.price.toFixed(5) : "");
+    const [total, setTotal] = useState(item.price > 0 ? (item.price * item.quantity).toFixed(2) : "");
+    return (
+        <tr className="border-b border-slate-100 last:border-0 dark:border-slate-700/50">
+            <td className="py-1.5 pr-2 text-xs">
+                <span className="font-medium text-slate-700 dark:text-slate-300">{item.itemName || "—"}</span>
+                {item.itemModel && <span className="ml-1 text-slate-400">({item.itemModel})</span>}
+            </td>
+            <td className="w-16 py-1.5 text-right text-xs text-slate-600 dark:text-slate-400">{item.quantity}</td>
+            <td className="w-32 py-1 pl-2">
+                <div className="flex items-center gap-1">
+                    <span className="shrink-0 text-xs text-slate-400">€</span>
+                    <Input
+                        type="number" inputMode="decimal" min="0" step="0.00001"
+                        value={unit} placeholder="0.00000" aria-label="Prezzo unitario"
+                        onChange={e => {
+                            setUnit(e.target.value);
+                            const p = parseFloat(e.target.value);
+                            if (!isNaN(p)) { setTotal((p * item.quantity).toFixed(2)); onPrice(p); }
+                        }}
+                        className="h-7 w-24 px-1 text-right text-xs"
+                    />
+                </div>
+            </td>
+            <td className="w-32 py-1 pl-2">
+                <div className="flex items-center gap-1">
+                    <span className="shrink-0 text-xs text-slate-400">€</span>
+                    <Input
+                        type="number" inputMode="decimal" min="0" step="0.01"
+                        value={total} placeholder="0.00" aria-label="Totale riga"
+                        onChange={e => setTotal(e.target.value)}
+                        onBlur={() => {
+                            const t = parseFloat(total);
+                            if (isNaN(t) || !item.quantity) return;
+                            const p = parseFloat((t / item.quantity).toFixed(5));
+                            setUnit(p.toFixed(5)); setTotal(t.toFixed(2)); onPrice(p);
+                        }}
+                        className="h-7 w-24 px-1 text-right text-xs"
+                    />
+                </div>
+            </td>
+        </tr>
+    );
 }
 
 export default function NewInvoicePage() {
@@ -50,6 +98,9 @@ export default function NewInvoicePage() {
         invoiceDate: new Date().toISOString().split('T')[0],
         notes: "",
     });
+
+    // Prezzi inseriti qui per le righe delle bolle (id riga → prezzo unitario); si salvano insieme alla fattura
+    const [prices, setPrices] = useState<Record<string, number>>({});
 
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
@@ -93,7 +144,10 @@ export default function NewInvoicePage() {
     };
 
     const selectedPurchases = unlinkedPurchases.filter(p => p.selected);
-    const totalAmount = selectedPurchases.reduce((s, p) => s + p.totalAmount, 0);
+    // Importo di una bolla con i prezzi appena inseriti al posto di quelli già registrati (resi sempre detratti)
+    const purchaseTotal = (p: UnlinkedPurchase) =>
+        p.items.reduce((s, i) => s + (prices[i.id] ?? i.price) * i.quantity - i.returned, 0);
+    const totalAmount = selectedPurchases.reduce((s, p) => s + purchaseTotal(p), 0);
     const isSharedBilling = new Set(unlinkedPurchases.map(p => p.supplierId)).size > 1;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -133,6 +187,10 @@ export default function NewInvoicePage() {
 
             // Link selected purchases
             await Promise.all(selectedPurchases.map(p => invoicesApi.linkPurchase(invoice.id, p.id)));
+
+            // Prezzi inseriti qui sulle righe delle bolle
+            const edits = selectedPurchases.flatMap(p => p.items).filter(i => prices[i.id] !== undefined && prices[i.id] !== i.price);
+            await Promise.all(edits.map(i => purchasesApi.updateItem(i.id, { price: prices[i.id] })));
 
             // Save total
             await invoicesApi.updateTotal(invoice.id, totalAmount);
@@ -272,7 +330,7 @@ export default function NewInvoicePage() {
                                 Bolle da Collegare
                                 <HelpTip
                                     title="Bolle da Collegare"
-                                    description="Solo le bolle d'acquisto (mai gli ordini) del fornitore selezionato che non hanno già un'altra fattura collegata. Il totale della fattura è la somma delle bolle che spunti qui."
+                                    description="Solo le bolle d'acquisto (mai gli ordini) del fornitore selezionato che non hanno già un'altra fattura collegata. Per ogni bolla spuntata si aprono le righe: inserisci il prezzo unitario oppure il totale riga. Il totale della fattura è la somma delle bolle spuntate."
                                 />
                             </CardTitle>
                             <CardDescription>
@@ -282,7 +340,7 @@ export default function NewInvoicePage() {
                                         ? "Caricamento bolle..."
                                         : unlinkedPurchases.length === 0
                                             ? "Nessuna bolla senza fattura per questo fornitore"
-                                            : "Seleziona le bolle da associare a questa fattura"
+                                            : "Spunta le bolle della fattura: sotto ogni bolla spuntata puoi inserire i prezzi delle righe"
                                 }
                             </CardDescription>
                         </CardHeader>
@@ -314,7 +372,8 @@ export default function NewInvoicePage() {
                                         </TableHeader>
                                         <TableBody>
                                             {unlinkedPurchases.map((purchase) => (
-                                                <TableRow key={purchase.id} className={purchase.selected ? "bg-blue-50 dark:bg-blue-900/10" : ""}>
+                                                <Fragment key={purchase.id}>
+                                                <TableRow className={purchase.selected ? "bg-blue-50 dark:bg-blue-900/10" : ""}>
                                                     <TableCell colSpan={4} className="p-0">
                                                         <label className="flex items-center gap-3 px-4 py-3 cursor-pointer w-full">
                                                             <Checkbox
@@ -329,11 +388,33 @@ export default function NewInvoicePage() {
                                                                 {new Date(purchase.deliveryNoteDate).toLocaleDateString('it-IT')}
                                                             </span>
                                                             <span className="font-medium text-right min-w-[80px]">
-                                                                {formatCurrency(purchase.totalAmount ?? 0)}
+                                                                {formatCurrency(purchaseTotal(purchase))}
                                                             </span>
                                                         </label>
                                                     </TableCell>
                                                 </TableRow>
+                                                {purchase.selected && purchase.items.length > 0 && (
+                                                    <TableRow key={`${purchase.id}-lines`} className="bg-slate-50 hover:bg-slate-50 dark:bg-slate-800/50">
+                                                        <TableCell colSpan={4} className="px-4 py-2">
+                                                            <table className="w-full">
+                                                                <thead>
+                                                                    <tr className="border-b border-slate-200 text-xs text-slate-400 dark:border-slate-700">
+                                                                        <th className="py-1 text-left font-normal">Articolo</th>
+                                                                        <th className="w-16 py-1 text-right font-normal">Qtà</th>
+                                                                        <th className="w-32 py-1 pl-2 text-left font-normal">Prezzo unit.</th>
+                                                                        <th className="w-32 py-1 pl-2 text-left font-normal">Totale riga</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {purchase.items.map(it => (
+                                                                        <PriceLine key={it.id} item={it} onPrice={price => setPrices(prev => ({ ...prev, [it.id]: price }))} />
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                                </Fragment>
                                             ))}
 
                                             {selectedPurchases.length > 0 && (

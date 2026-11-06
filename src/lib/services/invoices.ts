@@ -182,7 +182,7 @@ export const invoicesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('id, delivery_note_number, delivery_note_date, supplier_id, suppliers(name), purchase_items(price, quantity, returned_quantity, returned_price, returned_at)')
+                .select('id, delivery_note_number, delivery_note_date, supplier_id, suppliers(name), purchase_items(id, price, quantity, returned_quantity, returned_price, returned_at, inventory(name, model))')
                 .in('supplier_id', supplierIds)
                 .eq('order_type', 'purchase')
                 .is('invoice_id', null)
@@ -200,6 +200,14 @@ export const invoicesApi = {
                 (s: number, i: any) => s + (i.price || 0) * (i.quantity || 1) - returnAmount(i),
                 0
             ) ?? 0,
+            items: (p.purchase_items ?? []).map((i: any) => ({
+                id: i.id as string,
+                itemName: i.inventory?.name as string | undefined,
+                itemModel: i.inventory?.model as string | undefined,
+                quantity: (i.quantity || 1) as number,
+                price: (i.price || 0) as number,
+                returned: returnAmount(i),
+            })),
         }));
     },
 
