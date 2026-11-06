@@ -7,7 +7,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -181,38 +182,30 @@ export default function ClientDetailPage() {
 
   return (
     <DashboardLayout>
-      {/* Header */}
-      <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 rounded-lg mb-6 border dark:border-border">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/clients">
-              <Button variant="ghost" size="icon" className="shrink-0"><ArrowLeft className="h-4 w-4" /></Button>
-            </Link>
-            <div className="flex items-center gap-2 min-w-0">
-              <Building2 className="h-5 w-5 text-blue-600 shrink-0" />
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white truncate">{client.name}</h1>
-            </div>
-          </div>
-          {canEdit && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
-                <Pencil className="h-4 w-4 mr-2" />Modifica
-              </Button>
-              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:border-red-300" onClick={() => setIsDeleteDialogOpen(true)}>
-                <Trash2 className="h-4 w-4 mr-2" />Elimina
-              </Button>
-            </div>
-          )}
-        </div>
+      <div className="mb-3">
+        <Link href="/clients" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+          <ArrowLeft className="mr-1 h-4 w-4" /> Committenti
+        </Link>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="anagrafica"><Building2 className="h-4 w-4 mr-2" />Anagrafica</TabsTrigger>
-          {canEdit && <TabsTrigger value="proposte"><Plus className="h-4 w-4 mr-2" />Offerte generali</TabsTrigger>}
-          <TabsTrigger value="commesse"><Briefcase className="h-4 w-4 mr-2" />Commesse</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <NotchTabs
+          title={client.name}
+          items={[
+            { value: "anagrafica", label: "Anagrafica", icon: <Building2 /> },
+            ...(canEdit ? [{ value: "proposte", label: "Offerte generali", icon: <Plus /> }] : []),
+            { value: "commesse", label: "Commesse", icon: <Briefcase /> },
+          ]}
+          value={activeTab}
+          onValueChange={setActiveTab}
+        >
+          {canEdit && (
+            <NotchActions>
+              <NotchButton type="button" onClick={() => setIsEditDialogOpen(true)}><Pencil /> Modifica</NotchButton>
+              <NotchButton type="button" onClick={() => setIsDeleteDialogOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"><Trash2 /> Elimina</NotchButton>
+            </NotchActions>
+          )}
+        </NotchTabs>
 
         {/* ── ANAGRAFICA ──────────────────────────────────────────────── */}
         <TabsContent value="anagrafica">

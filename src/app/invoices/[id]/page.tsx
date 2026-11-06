@@ -2,6 +2,7 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -563,30 +564,38 @@ export default function InvoiceDetailPage() {
     return (
         <>
         <DashboardLayout>
-            <div className="max-w-3xl mx-auto pb-10">
-                {/* Header */}
-                <div className="mb-6 flex items-start justify-between">
-                    <div>
-                        <Link href="/purchases?tab=fatture" className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
-                            <ArrowLeft className="h-4 w-4 mr-1" />
-                            Torna alle Fatture
-                        </Link>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-                            Fattura {invoice.invoiceNumber}
-                        </h1>
-                    </div>
-                    <div className="flex gap-2">
-                        {canEdit && !isEditing && (
-                            <Button variant="outline" size="sm" onClick={startEdit}>
-                                <Pencil className="h-4 w-4 mr-1" />Modifica
-                            </Button>
-                        )}
-                        {(userRole === 'admin' || userRole === 'operativo') && !isEditing && (
-                            <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)} disabled={deleting}>
-                                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" />Elimina</>}
-                            </Button>
-                        )}
-                    </div>
+            <div className="w-full pb-10">
+                {/* Intestazione: striscia scura con azioni */}
+                <div className="mb-6 space-y-2">
+                    <Link href="/purchases?tab=fatture" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+                        <ArrowLeft className="h-4 w-4 mr-1" />
+                        Fatture
+                    </Link>
+                    <NotchTabs title={`Fattura ${invoice.invoiceNumber}`}>
+                        <NotchActions>
+                            {isEditing ? (
+                                <>
+                                    <NotchButton type="button" onClick={() => setIsEditing(false)} disabled={saving || savingLinks}>
+                                        <X /> Annulla
+                                    </NotchButton>
+                                    <NotchButton type="button" className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white" onClick={async () => { await handleSaveHeader(); await handleSaveLinks(); }} disabled={saving || savingLinks}>
+                                        {(saving || savingLinks) ? <Loader2 className="animate-spin" /> : <Save />} Salva
+                                    </NotchButton>
+                                </>
+                            ) : (
+                                <>
+                                    {canEdit && (
+                                        <NotchButton type="button" onClick={startEdit}><Pencil /> Modifica</NotchButton>
+                                    )}
+                                    {(userRole === 'admin' || userRole === 'operativo') && (
+                                        <NotchButton type="button" className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white" onClick={() => setDeleteDialogOpen(true)} disabled={deleting}>
+                                            {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />} Elimina
+                                        </NotchButton>
+                                    )}
+                                </>
+                            )}
+                        </NotchActions>
+                    </NotchTabs>
                 </div>
 
                 <div className="space-y-6">
@@ -594,16 +603,6 @@ export default function InvoiceDetailPage() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between py-4">
                             <CardTitle>Dati Fattura</CardTitle>
-                            {isEditing && (
-                                <div className="flex gap-2">
-                                    <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} disabled={saving || savingLinks}>
-                                        <X className="h-4 w-4 mr-1" />Annulla
-                                    </Button>
-                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={async () => { await handleSaveHeader(); await handleSaveLinks(); }} disabled={saving || savingLinks}>
-                                        {(saving || savingLinks) ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-1" />Salva</>}
-                                    </Button>
-                                </div>
-                            )}
                         </CardHeader>
                         <CardContent>
                             {isEditing ? (

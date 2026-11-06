@@ -1,6 +1,8 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import Link from "next/link";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -338,30 +340,28 @@ Note: Questo link consente di visualizzare in sola lettura i certificati di conf
 
     return (
         <div className="space-y-6">
-            {/* Navigation back and header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5">
-                <div className="space-y-2">
-                    <Button variant="ghost" size="sm" onClick={() => router.push("/guest-sites")} className="pl-0 text-slate-500">
-                        <ArrowLeft className="mr-1.5 h-4 w-4" /> Torna ai cantieri ospiti
-                    </Button>
-                    <div className="flex items-start gap-3">
-                        <Building2 className="h-6 w-6 text-primary mt-1 shrink-0" />
-                        <div>
-                            <h1 className="text-2xl font-bold">{site.name}</h1>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                                <MapPin className="h-3.5 w-3.5" /> {site.address}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setEditingDetails(true)}>
-                        <Pencil className="mr-2 h-4 w-4" /> Modifica Info
-                    </Button>
-                    <Button variant="outline" size="sm" className="hover:bg-destructive/10 hover:text-destructive text-slate-500" onClick={() => setDeleteOpen(true)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Elimina Portale
-                    </Button>
-                </div>
+            {/* Intestazione: striscia scura con nome del cantiere e azioni */}
+            <div className="space-y-2">
+                <Link href="/guest-sites" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
+                    <ArrowLeft className="mr-1 h-4 w-4" /> Cantieri ospiti
+                </Link>
+                <NotchTabs
+                    title={
+                        <span className="flex flex-wrap items-baseline gap-x-3">
+                            <span>{site.name}</span>
+                            {site.address && (
+                                <span className="inline-flex items-center gap-1 text-xs font-normal normal-case tracking-normal text-slate-300">
+                                    <MapPin className="h-3 w-3" /> {site.address}
+                                </span>
+                            )}
+                        </span>
+                    }
+                >
+                    <NotchActions>
+                        <NotchButton type="button" onClick={() => setEditingDetails(true)}><Pencil /> Modifica Info</NotchButton>
+                        <NotchButton type="button" onClick={() => setDeleteOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"><Trash2 /> Elimina Portale</NotchButton>
+                    </NotchActions>
+                </NotchTabs>
             </div>
 
             {/* Layout a 2 colonne */}

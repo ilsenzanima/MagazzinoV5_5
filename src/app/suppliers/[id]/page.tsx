@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Save, Pencil, X, Trash2, Plus, Mail, Phone, Globe, FileText } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Pencil, X, Trash2, Plus, Mail, Phone, Globe, FileText, Building2, Users, BarChart3 } from "lucide-react";
 import { suppliersApi, SupplierOverview, SupplierContact } from "@/lib/api";
 import type { SupplierYearSpend, SupplierTopItem } from "@/lib/services/suppliers";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -53,6 +54,7 @@ export default function SupplierDetailPage() {
   const [saving, setSaving] = useState(false);
   const [supplier, setSupplier] = useState<SupplierOverview | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [tab, setTab] = useState("anagrafica");
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -228,37 +230,33 @@ export default function SupplierDetailPage() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <Link href="/suppliers" className="mb-2 flex items-center text-slate-500 hover:text-slate-900">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Torna ai Fornitori
-            </Link>
-            <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold text-slate-900 dark:text-white">
-              {isEditing ? "Modifica Fornitore" : supplier.name}
-              {supplier.isTechnical && (
-                <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium uppercase text-slate-500">Tecnico</span>
-              )}
-            </h1>
-            {supplier.isTechnical && (
-              <p className="mt-1 text-sm text-slate-500">Voce di servizio per inserire dati incompleti di fornitori vecchi.</p>
+      <div className="w-full">
+        <div className="mb-3">
+          <Link href="/suppliers" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+            <ArrowLeft className="mr-1 h-4 w-4" /> Fornitori
+          </Link>
+        </div>
+
+        <div className="mb-6">
+          <NotchTabs
+            title={
+              <span className="flex flex-wrap items-center gap-2">
+                {isEditing ? "Modifica Fornitore" : supplier.name}
+                {supplier.isTechnical && (
+                  <span className="rounded-md bg-slate-600 px-2 py-0.5 text-xs font-medium uppercase normal-case tracking-normal text-slate-100" title="Voce di servizio per inserire dati incompleti di fornitori vecchi.">Tecnico</span>
+                )}
+              </span>
+            }
+          >
+            {!isEditing && (
+              <NotchActions>
+                <NotchButton type="button" onClick={() => setIsEditing(true)}><Pencil /> Modifica</NotchButton>
+                {!supplier.isTechnical && (
+                  <NotchButton type="button" onClick={() => setDeleteOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"><Trash2 /> Elimina</NotchButton>
+                )}
+              </NotchActions>
             )}
-          </div>
-          {!isEditing && (
-            <div className="flex w-full gap-2 sm:w-auto">
-              <Button onClick={() => setIsEditing(true)} variant="outline" className="flex-1 sm:flex-none">
-                <Pencil className="mr-2 h-4 w-4" />
-                Modifica
-              </Button>
-              {!supplier.isTechnical && (
-                <Button onClick={() => setDeleteOpen(true)} variant="outline" className="flex-1 text-red-600 hover:text-red-700 sm:flex-none">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Elimina
-                </Button>
-              )}
-            </div>
-          )}
+          </NotchTabs>
         </div>
 
         <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -268,13 +266,18 @@ export default function SupplierDetailPage() {
           <Kpi label="Speso in totale" value={formatCurrency(supplier.spentTotal)} />
         </div>
 
-        <Tabs defaultValue="anagrafica">
-          <TabsList>
-            <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
-            <TabsTrigger value="contatti">Contatti{contacts.length > 0 ? ` (${contacts.length})` : ""}</TabsTrigger>
-            <TabsTrigger value="documenti">Acquisti e fatture</TabsTrigger>
-            <TabsTrigger value="statistiche">Statistiche</TabsTrigger>
-          </TabsList>
+        <Tabs value={tab} onValueChange={setTab}>
+          <NotchTabs
+            title="Dettaglio fornitore"
+            items={[
+              { value: "anagrafica", label: "Anagrafica", icon: <Building2 /> },
+              { value: "contatti", label: contacts.length > 0 ? `Contatti (${contacts.length})` : "Contatti", icon: <Users /> },
+              { value: "documenti", label: "Acquisti e fatture", icon: <FileText /> },
+              { value: "statistiche", label: "Statistiche", icon: <BarChart3 /> },
+            ]}
+            value={tab}
+            onValueChange={setTab}
+          />
 
           <TabsContent value="anagrafica" className="mt-4">
             <Card>

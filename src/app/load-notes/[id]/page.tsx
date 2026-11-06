@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, Edit, Trash2, Archive, RotateCcw, Loader2, Package, CheckCircle2, User } from "lucide-react";
@@ -113,52 +114,43 @@ export default function LoadNoteDetailPage() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-3xl mx-auto pb-10">
+            <div className="w-full pb-10">
                 {/* Header */}
-                <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <Link href="/load-notes" className="flex items-center text-muted-foreground hover:text-foreground mb-2">
-                            <ArrowLeft className="h-4 w-4 mr-1" />
-                            Torna alle Note
-                        </Link>
-                        <h1 className="text-2xl font-bold flex items-center gap-3">
-                            Dettaglio Nota
-                            {note.status === 'pending' ? (
-                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                                    DA PROCESSARE
-                                </Badge>
-                            ) : (
-                                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    COMPLETATA
-                                </Badge>
-                            )}
-                        </h1>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                        <Link href={`/load-notes/${noteId}/edit`}>
-                            <Button variant="outline" size="sm">
-                                <Edit className="mr-2 h-4 w-4" />
-                                Modifica
-                            </Button>
-                        </Link>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleToggleStatus}
-                            title={note.status === 'pending' ? "Cambia solo lo stato della nota, puoi sempre riaprirla" : undefined}
-                        >
-                            {note.status === 'pending' ? (
-                                <><Archive className="mr-2 h-4 w-4" /> Archivia</>
-                            ) : (
-                                <><RotateCcw className="mr-2 h-4 w-4" /> Riapri</>
-                            )}
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={handleDelete}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Elimina
-                        </Button>
-                    </div>
+                <div className="mb-6 space-y-2">
+                    <Link href="/load-notes" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+                        <ArrowLeft className="h-4 w-4 mr-1" />
+                        Note di carico
+                    </Link>
+                    <NotchTabs
+                        title={
+                            <span className="flex items-center gap-3">
+                                Dettaglio Nota
+                                {note.status === 'pending' ? (
+                                    <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-yellow-800">DA PROCESSARE</span>
+                                ) : (
+                                    <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-green-700">
+                                        <CheckCircle2 className="h-3 w-3 mr-1" />COMPLETATA
+                                    </span>
+                                )}
+                            </span>
+                        }
+                    >
+                        <NotchActions>
+                            <Link href={`/load-notes/${noteId}/edit`}>
+                                <NotchButton type="button"><Edit /> Modifica</NotchButton>
+                            </Link>
+                            <NotchButton
+                                type="button"
+                                onClick={handleToggleStatus}
+                                title={note.status === 'pending' ? "Cambia solo lo stato della nota, puoi sempre riaprirla" : undefined}
+                            >
+                                {note.status === 'pending' ? (<><Archive /> Archivia</>) : (<><RotateCcw /> Riapri</>)}
+                            </NotchButton>
+                            <NotchButton type="button" onClick={handleDelete} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white">
+                                <Trash2 /> Elimina
+                            </NotchButton>
+                        </NotchActions>
+                    </NotchTabs>
                 </div>
 
                 {/* Info Card */}
