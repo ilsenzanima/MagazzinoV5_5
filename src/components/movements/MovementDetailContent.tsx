@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search, MoveRight, Repeat } from "lucide-react";
 import Link from "next/link";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -296,106 +297,67 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
     }
 
     return (
-        <div className="space-y-6 pb-20 max-w-5xl mx-auto">
+        <div className="space-y-6 pb-20 w-full">
             {/* Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                    <Link href="/movements">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
-                            <div className="flex items-center gap-2">
-                                {movement.type === 'entry' && <ArrowDownRight className="h-6 w-6 text-green-600" />}
-                                {movement.type === 'exit' && <ArrowUpRight className="h-6 w-6 text-orange-600" />}
-                                {movement.type === 'sale' && <ShoppingBag className="h-6 w-6 text-blue-600" />}
-                                {movement.type === 'transfer' && <Repeat className="h-6 w-6 text-teal-600" />}
+            <div className="space-y-2">
+                <Link href="/movements" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+                    <ArrowLeft className="mr-1 h-4 w-4" /> Movimentazione
+                </Link>
+                <NotchTabs
+                    title={
+                        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="flex items-center gap-2">
+                                {movement.type === 'entry' && <ArrowDownRight className="h-5 w-5 text-green-400" />}
+                                {movement.type === 'exit' && <ArrowUpRight className="h-5 w-5 text-amber-400" />}
+                                {movement.type === 'sale' && <ShoppingBag className="h-5 w-5 text-blue-400" />}
+                                {movement.type === 'transfer' && <Repeat className="h-5 w-5 text-teal-400" />}
                                 <span className="break-all">DDT {movement.number}</span>
-                            </div>
-                        </h1>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Data: {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
-                        </p>
-                    </div>
-                </div>
-                <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                    {!isEditing ? (
-                        <>
-                            <Button
-                                variant="default"
-                                className="bg-[#003366] hover:bg-[#002244] flex-1 md:flex-none"
-                                onClick={handlePrint}
-                            >
-                                <FileText className="h-4 w-4 md:mr-2" />
-                                <span className="hidden md:inline">Stampa Bolla</span>
-                                <span className="md:hidden">Stampa</span>
-                            </Button>
-                            {(userRole === 'admin' || userRole === 'operativo') && (
-                                <>
-                                    {items.length > 0 && movement.jobId && (
-                                        isMoveMode ? (
-                                            <>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={handleCancelMoveMode}
-                                                    className="flex-1 md:flex-none px-2"
-                                                >
-                                                    <span className="hidden md:inline">Annulla selezione</span>
-                                                    <span className="md:hidden">Annulla</span>
-                                                </Button>
-                                                <Button
-                                                    onClick={handleToggleMoveMode}
-                                                    disabled={selectedItemIds.size === 0}
-                                                    className="flex-1 md:flex-none bg-amber-600 hover:bg-amber-700"
-                                                >
-                                                    <MoveRight className="h-4 w-4 md:mr-2" />
-                                                    <span className="hidden md:inline">
-                                                        Conferma selezione{selectedItemIds.size > 0 ? ` (${selectedItemIds.size})` : ""}
-                                                    </span>
-                                                    <span className="md:hidden">
-                                                        {selectedItemIds.size > 0 ? `Sposta (${selectedItemIds.size})` : "Sposta"}
-                                                    </span>
-                                                </Button>
-                                            </>
-                                        ) : (
-                                            <Button
-                                                variant="outline"
-                                                onClick={handleToggleMoveMode}
-                                                className="flex-1 md:flex-none px-2"
-                                            >
-                                                <MoveRight className="h-4 w-4 md:mr-2" />
-                                                <span className="hidden md:inline">Sposta Articoli</span>
-                                                <span className="md:hidden">Sposta</span>
-                                            </Button>
-                                        )
-                                    )}
-                                    <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} className="flex-1 md:flex-none px-2">
-                                        <Trash2 className="h-4 w-4 md:mr-2" />
-                                        <span className="hidden md:inline">Elimina</span>
-                                    </Button>
-                                    <Link href={`/movements/${initialMovement.id}/edit`}>
-                                        <Button className="flex-1 md:flex-none">
-                                            <span className="hidden md:inline">Modifica Movimento</span>
-                                            <span className="md:hidden">Modifica</span>
-                                        </Button>
-                                    </Link>
-                                </>
-                            )}
-                        </>
-                    ) : (
-                        <div className="flex gap-2 w-full">
-                            <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1">
-                                Annulla
-                            </Button>
-                            <Button onClick={handleSaveChanges} className="flex-1">
-                                <Save className="h-4 w-4 mr-2" />
-                                Salva
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                            </span>
+                            <span className="text-xs font-normal normal-case tracking-normal text-slate-300">
+                                Data: {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
+                            </span>
+                        </span>
+                    }
+                >
+                    <NotchActions>
+                        {!isEditing ? (
+                            <>
+                                <NotchButton type="button" onClick={handlePrint}>
+                                    <FileText /> Stampa Bolla
+                                </NotchButton>
+                                {(userRole === 'admin' || userRole === 'operativo') && (
+                                    <>
+                                        {items.length > 0 && movement.jobId && (
+                                            isMoveMode ? (
+                                                <>
+                                                    <NotchButton type="button" onClick={handleCancelMoveMode}>Annulla selezione</NotchButton>
+                                                    <NotchButton type="button" onClick={handleToggleMoveMode} disabled={selectedItemIds.size === 0} className="border-amber-600 bg-amber-600 text-white hover:bg-amber-700 hover:text-white [&_svg]:text-white">
+                                                        <MoveRight /> Conferma selezione{selectedItemIds.size > 0 ? ` (${selectedItemIds.size})` : ""}
+                                                    </NotchButton>
+                                                </>
+                                            ) : (
+                                                <NotchButton type="button" onClick={handleToggleMoveMode}>
+                                                    <MoveRight /> Sposta Articoli
+                                                </NotchButton>
+                                            )
+                                        )}
+                                        <Link href={`/movements/${initialMovement.id}/edit`}>
+                                            <NotchButton type="button">Modifica</NotchButton>
+                                        </Link>
+                                        <NotchButton type="button" onClick={() => setDeleteDialogOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white">
+                                            <Trash2 /> Elimina
+                                        </NotchButton>
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <NotchButton type="button" onClick={() => setIsEditing(false)}>Annulla</NotchButton>
+                                <NotchButton type="button" onClick={handleSaveChanges} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white"><Save /> Salva</NotchButton>
+                            </>
+                        )}
+                    </NotchActions>
+                </NotchTabs>
             </div>
 
             {/* Details Cards */}

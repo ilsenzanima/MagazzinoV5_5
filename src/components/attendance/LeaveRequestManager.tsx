@@ -7,6 +7,7 @@ import { Worker, LeaveRequest, leaveRequestsApi } from "@/lib/api"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
+import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { notify } from "@/lib/notify"
@@ -33,18 +34,13 @@ export function LeaveRequestManager({ workers, initialRequests }: LeaveRequestMa
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center gap-4">
-                <Link href="/attendance">
-                    <Button variant="ghost" size="icon">
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
+            <div className="space-y-2">
+                <Link href="/attendance" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
+                    <ArrowLeft className="mr-1 h-4 w-4" /> Presenze
                 </Link>
-                <div className="space-y-1">
-                    <h2 className="text-2xl font-bold tracking-tight">Richiesta Permesso</h2>
-                    <p className="text-muted-foreground">
-                        Inserisci una nuova richiesta di ferie o permesso per un dipendente.
-                    </p>
-                </div>
+                <NotchTabs title="Richiesta Permesso">
+                    <NotchHelp title="Richiesta permesso" lines={["Inserisci una nuova richiesta di ferie o permesso per un dipendente."]} />
+                </NotchTabs>
             </div>
 
             <LeaveRequestForm

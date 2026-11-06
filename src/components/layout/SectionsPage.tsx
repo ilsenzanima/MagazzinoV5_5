@@ -3,7 +3,7 @@
 import { Suspense, type ReactNode } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import DashboardLayout from "./DashboardLayout"
-import { JobSectionMenu } from "@/components/jobs/JobSectionMenu"
+import { NotchTabs } from "@/components/ui/notch-tabs"
 
 export interface SectionDef {
   key: string
@@ -23,13 +23,12 @@ function Inner({ title, sections }: { title: string; sections: SectionDef[] }) {
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        {visible.length > 1 && (
-          <JobSectionMenu
-            groups={[{ key: "sections", label: title, items: visible.map(s => ({ key: s.key, label: s.label, icon: s.icon })) }]}
-            activeKey={current?.key ?? ""}
-            onSelect={(_g, key) => router.replace(`${pathname}?v=${key}`)}
-          />
-        )}
+        <NotchTabs
+          title={title}
+          items={visible.length > 1 ? visible.map(s => ({ value: s.key, label: s.label, icon: s.icon })) : []}
+          value={current?.key ?? ""}
+          onValueChange={key => router.replace(`${pathname}?v=${key}`)}
+        />
         <div key={current?.key}>{current?.render()}</div>
       </div>
     </DashboardLayout>

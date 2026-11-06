@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,15 +88,10 @@ export default function ConfezioniPage() {
                 </Alert>
             ) : (
                 <div className="space-y-4">
+                    <NotchTabs title="Quantità per confezione">
+                        <NotchHelp wide title="Quantità per confezione" lines={["Quanti pezzi, metri o chili ci sono normalmente in una confezione, nell'unità dell'articolo. Si salva da solo uscendo dal campo o premendo Invio. Serve al Controllo Acquisti per segnalare prezzi o quantità che non tornano con la confezione."]} />
+                    </NotchTabs>
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Quantità per confezione</CardTitle>
-                            <CardDescription>
-                                Quanti pezzi, metri o chili ci sono normalmente in una confezione, nell&apos;unità dell&apos;articolo.
-                                Si salva da solo uscendo dal campo o premendo Invio. Serve al Controllo Acquisti per segnalare
-                                prezzi o quantità che non tornano con la confezione.
-                            </CardDescription>
-                        </CardHeader>
                         <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                             <Input
                                 className="sm:w-72"
