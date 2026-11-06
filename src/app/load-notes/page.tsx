@@ -279,6 +279,7 @@ function LoadNotesContent() {
     return (
         <DashboardLayout>
             <ListPageHeader
+        strip
                 title="Note di Carico"
                 actions={
                     <Link href="/load-notes/new" className="w-full sm:w-auto md:hidden">
@@ -292,9 +293,9 @@ function LoadNotesContent() {
                 searchActions={
                     <>
                         <div className="hidden items-center gap-2 md:flex">
-                            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Dal</span>
+                            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400 md:text-slate-300">Dal</span>
                             <Input type="date" aria-label="Dal" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-                            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Al</span>
+                            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400 md:text-slate-300">Al</span>
                             <Input type="date" aria-label="Al" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
                         </div>
                         {selectedIds.size > 0 && (
@@ -304,7 +305,7 @@ function LoadNotesContent() {
                             </Button>
                         )}
                         {anyFilterActive && (
-                            <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+                            <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
                                 Azzera filtri
                             </Button>
                         )}
