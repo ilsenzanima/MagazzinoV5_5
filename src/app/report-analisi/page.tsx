@@ -1,20 +1,6 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { BarChart3, TrendingUp } from "lucide-react"
-import { SectionsPage } from "@/components/layout/SectionsPage"
-import { useAuth } from "@/components/auth-provider"
-import ReportsPage from "../reports/page"
-import AnalyticsPage from "../analytics/page"
-
+// La pagina "Report e analisi" non esiste più: i report sono in /reports, l'analisi spostamenti è negli Strumenti admin
 export default function ReportAnalisiPage() {
-  const { userRole } = useAuth()
-  return (
-    <SectionsPage
-      title="Report e analisi"
-      sections={[
-        { key: "report", label: "Report", icon: <BarChart3 className="h-4 w-4" />, hidden: userRole !== "admin" && userRole !== "operativo", render: () => <ReportsPage /> },
-        { key: "spostamenti", label: "Analisi spostamenti", icon: <TrendingUp className="h-4 w-4" />, render: () => <AnalyticsPage /> },
-      ]}
-    />
-  )
+  redirect("/reports")
 }

@@ -13,6 +13,7 @@ import { getInventoryCountData, InventoryCountData, InventoryCountItem } from "@
 import { generateInventoryCountReport } from "./inventory-report-generator";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
+import { NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 
 const PAGE_SIZE = 50;
 const NO_TYPE = "Senza Categoria";
@@ -198,10 +199,12 @@ export default function InventoryReport() {
                     <p className="text-lg font-bold dark:text-white">{filtered.length}</p>
                 </Card>
                 <div className="flex-1" />
-                <Button onClick={handleExportPDF} disabled={generating || filtered.length === 0} className="gap-2">
-                    {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                    Stampa Foglio Conta{isFiltered ? ` (${filtered.length})` : ""}
-                </Button>
+                <NotchActions>
+                    <NotchButton type="button" onClick={handleExportPDF} disabled={generating || filtered.length === 0} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                        {generating ? <Loader2 className="animate-spin" /> : <FileDown />}
+                        Stampa Foglio Conta{isFiltered ? ` (${filtered.length})` : ""}
+                    </NotchButton>
+                </NotchActions>
             </div>
 
             <Card className="bg-slate-50 dark:bg-slate-900">

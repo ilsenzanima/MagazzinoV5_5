@@ -119,7 +119,7 @@ function RailSidebar() {
       { key: "anagrafiche", label: "Committenti e fornitori", icon: Users, href: "/anagrafiche", active: is("/anagrafiche", "/clients", "/suppliers") },
       ...(staff ? [{ key: "proposals", label: "Offerte generali", icon: FileText, href: "/proposals", active: pathname === "/proposals" }] : []),
     ],
-    [{ key: "report", label: "Report e analisi", icon: BarChart3, href: "/report-analisi", active: is("/report-analisi", "/reports", "/analytics") }],
+    [{ key: "report", label: "Report", icon: BarChart3, href: "/reports", active: is("/report-analisi", "/reports") }],
   ]
   const items = groups.flat()
   // Le voci si stringono se la finestra è bassa, così stanno tutte senza barra di scorrimento
@@ -354,7 +354,7 @@ function TopBar() {
   if (!user) return null
 
   const is = (...bases: string[]) => bases.some(b => pathname === b || pathname.startsWith(b + "/"))
-  const inAdminPages = is("/settings", "/strumenti", "/anomalie", "/controllo-acquisti", "/schede-varianti", "/confezioni", "/cestino") || pathname === "/inventory/verifica"
+  const inAdminPages = is("/settings", "/strumenti", "/analytics", "/anomalie", "/controllo-acquisti", "/schede-varianti", "/confezioni", "/cestino") || pathname === "/inventory/verifica"
   const time = now ? now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : ""
   const cw = CURVE_W
   // la curva è 2px più larga e si sovrappone alla linea e alla fascia: niente fessura chiara tra i pezzi

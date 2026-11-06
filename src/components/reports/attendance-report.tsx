@@ -10,6 +10,7 @@ import { generateMonthlyReport } from "@/components/attendance/report-generator"
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 
 const ABSENCE_LABELS: Record<string, string> = {
     holiday: 'Ferie',
@@ -227,18 +228,12 @@ export default function AttendanceReport() {
                             </Select>
                         </div>
 
-                        <Button
-                            onClick={handleGeneratePDF}
-                            disabled={generating || workers.length === 0}
-                            className="gap-2"
-                        >
-                            {generating ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <FileDown className="h-4 w-4" />
-                            )}
-                            Genera PDF
-                        </Button>
+                        <NotchActions>
+                            <NotchButton type="button" onClick={handleGeneratePDF} disabled={generating || workers.length === 0} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                                {generating ? <Loader2 className="animate-spin" /> : <FileDown />}
+                                Genera PDF
+                            </NotchButton>
+                        </NotchActions>
                     </div>
                 </CardContent>
             </Card>

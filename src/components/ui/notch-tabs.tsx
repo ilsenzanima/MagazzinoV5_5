@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
-import { Search } from "lucide-react"
+import { Search, Menu, Check } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
 
@@ -101,6 +102,32 @@ export function NotchSearch({ value, onChange, placeholder }: { value: string; o
 export function NotchHelp(props: React.ComponentProps<typeof HelpTip>) {
   const { help } = useContext(SlotsCtx)
   return help ? createPortal(<HelpTip {...props} tone="inherit" />, help) : <HelpTip {...props} />
+}
+
+// Menu a tendina (hamburger) nella striscia, dopo il nome della pagina: una voce per ogni sotto-pagina
+export function NotchMenu({ items, value, onValueChange }: { items: { value: string; label: string; icon: ReactNode }[]; value: string; onValueChange: (v: string) => void }) {
+  const { help } = useContext(SlotsCtx)
+  const current = items.find(i => i.value === value)
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="ml-2 inline-flex h-8 items-center gap-2 rounded-full bg-white/10 px-3 text-xs font-medium normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-blue-400">
+          <Menu className="h-4 w-4" />
+          {current?.label}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {items.map(it => (
+          <DropdownMenuItem key={it.value} onClick={() => onValueChange(it.value)} className="gap-2">
+            <span className="[&_svg]:size-4">{it.icon}</span>
+            <span className="flex-1">{it.label}</span>
+            {it.value === value && <Check className="h-4 w-4 text-blue-600" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+  return help ? createPortal(menu, help) : menu
 }
 
 // Pulsanti della scheda mostrati a destra nella striscia dei tab. Fuori da <NotchTabs> si vedono dove sono scritti.

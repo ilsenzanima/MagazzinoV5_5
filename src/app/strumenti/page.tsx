@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, Boxes, ListChecks, PackageCheck, ScanSearch, Trash2 } from "lucide-react"
+import { AlertTriangle, Boxes, ListChecks, PackageCheck, ScanSearch, Trash2, TrendingUp } from "lucide-react"
 import { SectionsPage } from "@/components/layout/SectionsPage"
 import { useAuth } from "@/components/auth-provider"
 import VerificaPage from "../inventory/verifica/page"
@@ -9,6 +9,7 @@ import ControlloAcquistiPage from "../controllo-acquisti/page"
 import SchedeVariantiPage from "../schede-varianti/page"
 import ConfezioniPage from "../confezioni/page"
 import CestinoPage from "../cestino/page"
+import AnalyticsPage from "../analytics/page"
 
 export default function StrumentiAdminPage() {
   const { userRole } = useAuth()
@@ -23,6 +24,7 @@ export default function StrumentiAdminPage() {
         { key: "controllo-acquisti", label: "Controllo Acquisti", icon: <ScanSearch className={icon} />, hidden: !admin, render: () => <ControlloAcquistiPage /> },
         { key: "schede-varianti", label: "Schede Varianti", icon: <ListChecks className={icon} />, hidden: !admin, render: () => <SchedeVariantiPage /> },
         { key: "confezioni", label: "Quantità Confezioni", icon: <Boxes className={icon} />, hidden: !admin, render: () => <ConfezioniPage /> },
+        { key: "spostamenti", label: "Analisi Spostamenti", icon: <TrendingUp className={icon} />, hidden: !admin, render: () => <AnalyticsPage /> },
         { key: "cestino", label: "Cestino", icon: <Trash2 className={icon} />, hidden: !admin, render: () => <CestinoPage /> },
       ]}
     />

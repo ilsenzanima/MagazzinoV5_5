@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils/format";
+import { NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 
 const PAGE_SIZE = 50;
 const NO_TYPE = "Senza Categoria";
@@ -226,10 +227,12 @@ export default function ArticlesReport() {
                     <p className="text-xs text-emerald-600 dark:text-emerald-400">Valore {filtered.length === data.articles.length ? "totale" : "filtrato"}</p>
                     <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(filtered.length === data.articles.length ? data.totalValue : filteredValue)}</p>
                 </Card>
-                <Button onClick={() => generateArticlesReport(data)} className="gap-2">
-                    <FileDown className="h-4 w-4" />
-                    Esporta PDF
-                </Button>
+                <NotchActions>
+                    <NotchButton type="button" onClick={() => generateArticlesReport(data)} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                        <FileDown />
+                        Esporta PDF
+                    </NotchButton>
+                </NotchActions>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
