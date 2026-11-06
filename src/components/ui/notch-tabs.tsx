@@ -105,15 +105,15 @@ export function NotchHelp(props: React.ComponentProps<typeof HelpTip>) {
 }
 
 // Menu a tendina (hamburger) nella striscia, dopo il nome della pagina: una voce per ogni sotto-pagina
-export function NotchMenu({ items, value, onValueChange }: { items: { value: string; label: string; icon: ReactNode }[]; value: string; onValueChange: (v: string) => void }) {
+export function NotchMenu({ items, value, onValueChange, prefix, disabled, title }: { items: { value: string; label: string; icon: ReactNode }[]; value: string; onValueChange: (v: string) => void; prefix?: string; disabled?: boolean; title?: string }) {
   const { help } = useContext(SlotsCtx)
   const current = items.find(i => i.value === value)
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="ml-2 inline-flex h-8 items-center gap-2 rounded-full bg-white/10 px-3 text-xs font-medium normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-blue-400">
-          <Menu className="h-4 w-4" />
-          {current?.label}
+        <button type="button" disabled={disabled} title={title} className="ml-2 inline-flex h-8 max-w-[18rem] items-center gap-2 rounded-full bg-white/10 px-3 text-xs font-medium normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50">
+          <Menu className="h-4 w-4 shrink-0" />
+          <span className="truncate">{prefix && <span className="text-slate-300">{prefix} </span>}{current?.label}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">

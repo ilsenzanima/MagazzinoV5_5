@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { NotchTabs, NotchMenu } from "@/components/ui/notch-tabs";
+import { NotchTabs } from "@/components/ui/notch-tabs";
 import { useAuth } from "@/components/auth-provider";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Package, Users, ClipboardList, QrCode, Loader2 } from "lucide-react";
@@ -50,19 +50,17 @@ function ReportsContent() {
     <DashboardLayout>
       <div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          {/* Striscia unica: titolo, menu hamburger con le sotto-pagine e (a destra) i pulsanti del report */}
-          <NotchTabs title="Report">
-            <NotchMenu
-              items={[
-                { value: "articles", label: "Articoli", icon: <Package /> },
-                { value: "attendance", label: "Presenze", icon: <Users /> },
-                { value: "inventory", label: "Inventario", icon: <ClipboardList /> },
-                { value: "qr", label: "QR / Codici", icon: <QrCode /> },
-              ]}
-              value={activeTab}
-              onValueChange={setActiveTab}
-            />
-
+          <NotchTabs
+            title="Report"
+            items={[
+              { value: "articles", label: "Articoli", icon: <Package /> },
+              { value: "attendance", label: "Presenze", icon: <Users /> },
+              { value: "inventory", label: "Inventario", icon: <ClipboardList /> },
+              { value: "qr", label: "QR / Codici", icon: <QrCode /> },
+            ]}
+            value={activeTab}
+            onValueChange={setActiveTab}
+          >
             <TabsContent value="articles" className="mt-6">
               <ArticlesReport />
             </TabsContent>

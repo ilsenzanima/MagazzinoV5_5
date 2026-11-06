@@ -8,14 +8,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PaginationControls } from "@/components/ui/pagination-controls";
-import { FileDown, Loader2, Package, Calendar, RotateCcw, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Warehouse as WarehouseIcon, FileDown, Loader2, Package, Calendar, RotateCcw, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { getArticlesWithStock, ArticlesReportData, ArticleLot } from "@/lib/services/reports";
 import { generateArticlesReport } from "./articles-report-generator";
 import { format } from "date-fns";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils/format";
-import { NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { NotchActions, NotchButton, NotchMenu } from "@/components/ui/notch-tabs";
 
 const PAGE_SIZE = 50;
 const NO_TYPE = "Senza Categoria";
@@ -150,20 +150,17 @@ export default function ArticlesReport() {
 
     // Il filtro per sede si basa sulla posizione attuale del lotto: non ha senso
     // per lo storico per data (non tracciato), quindi lo disabilitiamo in quel caso.
+    // Il filtro per sede sta in un menu hamburger nella striscia in alto.
+    // Si basa sulla posizione attuale del lotto: per lo storico per data (non tracciato) è disabilitato.
     const warehouseTabs = stockWarehouses.length > 1 && (
-        <div title={isHistorical ? "Il filtro per sede non è disponibile per lo storico per data" : undefined}>
-            <Tabs value={selectedWarehouse} onValueChange={handleWarehouseChange}>
-                <TabsList
-                    className={`bg-slate-100 dark:bg-slate-800 ${isHistorical ? "opacity-50 pointer-events-none" : ""}`}
-                    style={{ display: "grid", gridTemplateColumns: `repeat(${stockWarehouses.length + 1}, minmax(0, 1fr))` }}
-                >
-                    <TabsTrigger value="all">Tutti</TabsTrigger>
-                    {stockWarehouses.map((w) => (
-                        <TabsTrigger key={w.id} value={w.id} className="truncate" title={w.name}>{w.name}</TabsTrigger>
-                    ))}
-                </TabsList>
-            </Tabs>
-        </div>
+        <NotchMenu
+            prefix="Sede:"
+            items={[{ value: "all", label: "Tutti i magazzini", icon: <WarehouseIcon /> }, ...stockWarehouses.map(w => ({ value: w.id, label: w.name, icon: <WarehouseIcon /> }))]}
+            value={selectedWarehouse}
+            onValueChange={handleWarehouseChange}
+            disabled={isHistorical}
+            title={isHistorical ? "Il filtro per sede non è disponibile per lo storico per data" : undefined}
+        />
     );
 
     const dateSelector = (
@@ -211,42 +208,39 @@ export default function ArticlesReport() {
     return (
         <div className="space-y-4">
             {warehouseTabs}
-            <div className="flex flex-wrap gap-2 items-center">
+            {/* Una sola barra: ricerca, data dello stock, totali */}
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="relative min-w-[16rem] flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                        type="search"
+                        placeholder="Cerca per codice, articolo, marca o lotto..."
+                        className="h-10 rounded-full border-none bg-white pl-9 shadow-sm dark:bg-muted"
+                        value={search}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                    />
+                </div>
                 {dateSelector}
                 {isHistorical && (
-                    <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-2 py-1 rounded">
-                        ⚠️ Stock al {format(new Date(selectedDate), 'dd/MM/yyyy')}
+                    <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                        Stock al {format(new Date(selectedDate), 'dd/MM/yyyy')}
                     </span>
                 )}
-                <div className="flex-1" />
-                <Card className="px-3 py-1.5">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{filtered.length === data.articles.length ? "Lotti" : "Lotti filtrati"}</p>
-                    <p className="text-lg font-bold dark:text-white">{filtered.length}</p>
-                </Card>
-                <Card className="px-3 py-1.5 bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">Valore {filtered.length === data.articles.length ? "totale" : "filtrato"}</p>
-                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(filtered.length === data.articles.length ? data.totalValue : filteredValue)}</p>
-                </Card>
+                <div className="flex items-baseline gap-2 rounded-full bg-white px-4 py-1.5 shadow-sm dark:bg-card">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{filtered.length === data.articles.length ? "Lotti" : "Lotti filtrati"}</span>
+                    <span className="text-lg font-bold dark:text-white">{filtered.length}</span>
+                </div>
+                <div className="flex items-baseline gap-2 rounded-full bg-emerald-50 px-4 py-1.5 shadow-sm dark:bg-emerald-950">
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400">Valore {filtered.length === data.articles.length ? "totale" : "filtrato"}</span>
+                    <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(filtered.length === data.articles.length ? data.totalValue : filteredValue)}</span>
+                </div>
                 <NotchActions>
                     <NotchButton type="button" onClick={() => generateArticlesReport(data)} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
                         <FileDown />
                         Esporta PDF
                     </NotchButton>
                 </NotchActions>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                        type="search"
-                        placeholder="Cerca per codice, articolo, marca o lotto..."
-                        className="pl-9 bg-slate-100 dark:bg-muted border-none"
-                        value={search}
-                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                    />
-                </div>
-                <div className="md:hidden">
+                <div className="w-full md:hidden">
                     <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
                         <SelectTrigger className="w-full"><SelectValue placeholder="Tipologia" /></SelectTrigger>
                         <SelectContent>{typeFilterItems}</SelectContent>
