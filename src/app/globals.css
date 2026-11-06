@@ -344,3 +344,21 @@ body.font-opendyslexic h6 {
 .gantt [class*="job-color-5"] .bar { stroke: #ea580c !important; stroke-width: 3 !important; }
 .gantt [class*="job-color-6"] .bar { stroke: #0891b2 !important; stroke-width: 3 !important; }
 .gantt [class*="job-color-7"] .bar { stroke: #db2777 !important; stroke-width: 3 !important; }
+
+/* Orologio a pannelli girevoli (barra in alto) */
+.flip-leaf-top {
+  transform-origin: bottom;
+  animation: flip-top 0.28s ease-in forwards;
+}
+.flip-leaf-bottom {
+  transform-origin: top;
+  animation: flip-bottom 0.28s 0.28s ease-out both;
+}
+@keyframes flip-top {
+  from { transform: rotateX(0deg); }
+  to { transform: rotateX(-90deg); }
+}
+@keyframes flip-bottom {
+  from { transform: rotateX(90deg); }
+  to { transform: rotateX(0deg); }
+}

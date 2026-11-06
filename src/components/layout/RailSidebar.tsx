@@ -305,7 +305,7 @@ function RailSidebar() {
 
 // Barra in alto a destra: una linea sottile che da sinistra si allarga con una curva dolce
 // fino a fare spazio a ora, campanella e profilo
-const BAND_W = 230
+const BAND_W = 250
 const CURVE_W = 150
 const BAND_H = 54
 const LINE_H = 4
@@ -317,7 +317,7 @@ function TopBar() {
 
   useEffect(() => {
     setNow(new Date())
-    const t = setInterval(() => setNow(new Date()), 15000)
+    const t = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
 
@@ -341,19 +341,20 @@ function TopBar() {
   const is = (...bases: string[]) => bases.some(b => pathname === b || pathname.startsWith(b + "/"))
   const inAdminPages = is("/settings", "/strumenti", "/anomalie", "/controllo-acquisti", "/schede-varianti", "/confezioni", "/cestino") || pathname === "/inventory/verifica"
   const time = now ? now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : ""
-  const date = now ? now.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }) : ""
   const cw = CURVE_W
-  const curve = `M0,0 H${cw} V${BAND_H} C${cw * 0.55},${BAND_H} ${cw * 0.45},${LINE_H} 0,${LINE_H} Z`
+  // la curva è 2px più larga e si sovrappone alla linea e alla fascia: niente fessura chiara tra i pezzi
+  const sw = cw + 2
+  const curve = `M0,0 H${sw} V${BAND_H} C${sw * 0.55},${BAND_H} ${sw * 0.45},${LINE_H} 0,${LINE_H} Z`
 
   return (
     <div className="pointer-events-none absolute left-0 right-0 z-40 hidden lg:block" style={{ top: simulatedRole ? 40 : 0, paddingLeft: 80 }}>
       <div className="flex items-start">
         <div className="flex-1 bg-slate-800" style={{ height: LINE_H }} />
-        <svg width={cw} height={BAND_H} className="shrink-0 fill-slate-800" aria-hidden="true"><path d={curve} /></svg>
+        <svg width={sw} height={BAND_H} className="shrink-0 fill-slate-800" style={{ marginLeft: -1, marginRight: -1 }} aria-hidden="true"><path d={curve} /></svg>
         <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-4 bg-slate-800 pr-5 text-white" style={{ width: BAND_W, height: BAND_H }}>
-          <div className="flex flex-col items-end leading-tight" aria-label="Data e ora">
-            <span className="text-sm font-semibold tabular-nums">{time}</span>
-            <span className="text-[10px] capitalize text-slate-400">{date}</span>
+          <div className="flex items-center gap-2" role="timer" aria-label={`Ore ${time}`}>
+            <FlipPair value={time.slice(0, 2)} />
+            <FlipPair value={time.slice(3, 5)} />
           </div>
           <span className="[&_button]:!text-slate-200"><NotificationBell /></span>
           <DropdownMenu>
@@ -388,6 +389,51 @@ function TopBar() {
           </DropdownMenu>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Orologio a pannelli girevoli (stile tabellone di aeroporto) ──
+function FlipPair({ value }: { value: string }) {
+  const v = value.padEnd(2, "0")
+  return (
+    <div className="flex gap-[3px]">
+      <FlipDigit value={v[0]} />
+      <FlipDigit value={v[1]} />
+    </div>
+  )
+}
+
+function FlipHalf({ d, bottom, className, onAnimationEnd }: { d: string; bottom?: boolean; className?: string; onAnimationEnd?: () => void }) {
+  return (
+    <div onAnimationEnd={onAnimationEnd} className={cn("absolute inset-x-0 overflow-hidden", bottom ? "bottom-0 h-1/2 rounded-b-[4px] bg-neutral-800" : "top-0 h-1/2 rounded-t-[4px] border-b border-black bg-neutral-900", className)}>
+      <div className={cn("absolute inset-x-0 flex h-[200%] items-center justify-center text-[22px] font-bold leading-none text-white", bottom ? "-top-full" : "top-0")}>{d}</div>
+    </div>
+  )
+}
+
+function FlipDigit({ value }: { value: string }) {
+  const [prev, setPrev] = useState(value)
+  const [cur, setCur] = useState(value)
+
+  useEffect(() => {
+    if (value !== cur) {
+      setPrev(cur)
+      setCur(value)
+    }
+  }, [value, cur])
+
+  const flipping = prev !== cur
+  return (
+    <div className="relative h-9 w-6 [perspective:200px]" aria-hidden="true">
+      <FlipHalf d={cur} />
+      <FlipHalf d={prev} bottom />
+      {flipping && (
+        <>
+          <FlipHalf key={`t${cur}`} d={prev} className="flip-leaf-top z-10 [backface-visibility:hidden]" />
+          <FlipHalf key={`b${cur}`} d={cur} bottom onAnimationEnd={() => setPrev(cur)} className="flip-leaf-bottom z-10 [backface-visibility:hidden]" />
+        </>
+      )}
     </div>
   )
 }
