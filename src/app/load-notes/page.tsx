@@ -83,8 +83,6 @@ function LoadNotesContent() {
     );
     const [type, setType] = useState(searchParams.get("tipo") || "all");
     const [jobId, setJobId] = useState(searchParams.get("jobId") || "");
-    const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") || "");
-    const [dateTo, setDateTo] = useState(searchParams.get("dateTo") || "");
     const [sortKey, setSortKey] = useState<SortKey>((searchParams.get("sort") as SortKey) || "date");
     const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get("dir") === "asc" ? "asc" : "desc");
     const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
@@ -97,14 +95,12 @@ function LoadNotesContent() {
         if (status !== "pending") params.set("stato", status);
         if (type !== "all") params.set("tipo", type);
         if (jobId) params.set("jobId", jobId);
-        if (dateFrom) params.set("dateFrom", dateFrom);
-        if (dateTo) params.set("dateTo", dateTo);
         if (sortKey !== "date") params.set("sort", sortKey);
         if (sortDir !== "desc") params.set("dir", sortDir);
         if (page !== 1) params.set("page", String(page));
         const query = params.toString();
         router.replace(query ? `/load-notes?${query}` : "/load-notes", { scroll: false });
-    }, [searchTerm, status, type, jobId, dateFrom, dateTo, sortKey, sortDir, page, router]);
+    }, [searchTerm, status, type, jobId, sortKey, sortDir, page, router]);
 
     const fetchNotes = async () => {
         try {
@@ -129,8 +125,6 @@ function LoadNotesContent() {
             (status === "all" || (status === "pending" ? n.status === "pending" : n.status !== "pending")) &&
             (type === "all" || n.noteType === type) &&
             (!jobId || n.jobId === jobId) &&
-            (!dateFrom || n.date >= dateFrom) &&
-            (!dateTo || n.date <= dateTo) &&
             matches(n, searchTerm)
         );
         const dir = sortDir === "asc" ? 1 : -1;
@@ -145,7 +139,7 @@ function LoadNotesContent() {
             }
         };
         return rows.sort((a, b) => key(a).localeCompare(key(b)) * dir || byDate(a, b));
-    }, [notes, status, type, jobId, dateFrom, dateTo, searchTerm, sortKey, sortDir]);
+    }, [notes, status, type, jobId, searchTerm, sortKey, sortDir]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -161,11 +155,10 @@ function LoadNotesContent() {
     const changeStatus = (v: string) => { setStatus(v as StatusFilter); setPage(1); };
     const changeType = (v: string) => { setType(v); setPage(1); };
     const changeJob = (v: string) => { setJobId(v === "all" ? "" : v); setPage(1); };
-    const changeDate = (setter: (v: string) => void) => (v: string) => { setter(v); setPage(1); };
 
-    const anyFilterActive = status !== "pending" || type !== "all" || !!jobId || !!dateFrom || !!dateTo || !!searchTerm;
+    const anyFilterActive = status !== "pending" || type !== "all" || !!jobId || !!searchTerm;
     const resetFilters = () => {
-        setStatus("pending"); setType("all"); setJobId(""); setDateFrom(""); setDateTo(""); setSearchTerm(""); setPage(1);
+        setStatus("pending"); setType("all"); setJobId(""); setSearchTerm(""); setPage(1);
     };
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -292,12 +285,6 @@ function LoadNotesContent() {
                 search={{ id: "load-notes-search", label: "Cerca note", value: searchTerm, onChange: (v) => { setSearchTerm(v); setPage(1); }, placeholder: "Cerca per commessa, note, materiale o autore... (virgola = OR)" }}
                 searchActions={
                     <>
-                        <div className="hidden items-center gap-2 md:flex">
-                            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400 md:text-slate-300">Dal</span>
-                            <Input type="date" aria-label="Dal" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-                            <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400 md:text-slate-300">Al</span>
-                            <Input type="date" aria-label="Al" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
-                        </div>
                         {selectedIds.size > 0 && (
                             <Button variant="destructive" className="hidden shrink-0 md:inline-flex" onClick={handleBulkDelete}>
                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -316,8 +303,6 @@ function LoadNotesContent() {
                 <div className="grid grid-cols-2 gap-2 md:hidden">
                     {statusSelect(false)}
                     {typeSelect(false)}
-                    <Input type="date" aria-label="Dal" className="border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-                    <Input type="date" aria-label="Al" className="border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
                     <div className="col-span-2">
                         <SearchableSelect
                             options={jobOptions}

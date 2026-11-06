@@ -117,8 +117,6 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
-  const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") || "");
-  const [dateTo, setDateTo] = useState(searchParams.get("dateTo") || "");
   const [type, setType] = useState(searchParams.get("tipo") || "all");
   const [jobId, setJobId] = useState(searchParams.get("jobId") || "");
   const [sortKey, setSortKey] = useState<SortKey>((searchParams.get("sort") as SortKey) || "date");
@@ -149,8 +147,6 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   const draftMatches = (d: DeliveryNote) => {
     if (type !== "all" && type !== "draft" && d.type !== type) return false;
     if (jobId && d.jobId !== jobId) return false;
-    if (dateFrom && d.date < dateFrom) return false;
-    if (dateTo && d.date > dateTo) return false;
     if (!debouncedSearch) return true;
     const hay = [d.number, d.causal, d.notes, d.pickupLocation, d.deliveryLocation, d.jobCode, jobLabel(d), ...(d.itemNames ?? [])]
       .join(" ").toLowerCase();
@@ -192,8 +188,6 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
   useEffect(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("q", debouncedSearch);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
     if (type !== "all") params.set("tipo", type);
     if (jobId) params.set("jobId", jobId);
     if (sortKey !== "date") params.set("sort", sortKey);
@@ -201,7 +195,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
     if (page !== 1) params.set("page", String(page));
     const query = params.toString();
     router.replace(query ? `/movements?${query}` : "/movements", { scroll: false });
-  }, [debouncedSearch, dateFrom, dateTo, type, jobId, sortKey, sortDir, page, router]);
+  }, [debouncedSearch, type, jobId, sortKey, sortDir, page, router]);
 
   const loadMovements = async () => {
     const id = ++requestId.current;
@@ -209,7 +203,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
       setLoading(true);
       setError(null);
       const { data, total } = await deliveryNotesApi.getPaginated({
-        page, limit: PAGE_SIZE, search: debouncedSearch, dateFrom, dateTo,
+        page, limit: PAGE_SIZE, search: debouncedSearch,
         type: type === "all" ? "" : type, jobId, sort: sortKey, dir: sortDir,
       });
       if (id !== requestId.current) return;
@@ -225,14 +219,14 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
 
   useEffect(() => {
     // La prima pagina senza filtri arriva già dal server
-    const isDefault = page === 1 && !debouncedSearch && !dateFrom && !dateTo && type === "all" && !jobId && sortKey === "date" && sortDir === "desc";
+    const isDefault = page === 1 && !debouncedSearch && type === "all" && !jobId && sortKey === "date" && sortDir === "desc";
     if (firstLoad.current) {
       firstLoad.current = false;
       if (isDefault) return;
     }
     loadMovements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, dateFrom, dateTo, type, jobId, sortKey, sortDir]);
+  }, [page, debouncedSearch, type, jobId, sortKey, sortDir]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -242,11 +236,10 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
 
   const changeType = (v: string) => { setType(v); setPage(1); };
   const changeJob = (v: string) => { setJobId(v === "all" ? "" : v); setPage(1); };
-  const changeDate = (setter: (v: string) => void) => (v: string) => { setter(v); setPage(1); };
 
-  const anyFilterActive = type !== "all" || !!jobId || !!dateFrom || !!dateTo || !!searchTerm;
+  const anyFilterActive = type !== "all" || !!jobId || !!searchTerm;
   const resetFilters = () => {
-    setType("all"); setJobId(""); setDateFrom(""); setDateTo(""); setSearchTerm(""); setPage(1);
+    setType("all"); setJobId(""); setSearchTerm(""); setPage(1);
   };
 
   const jobOptions = [{ value: "all", label: "Tutte le commesse" }, ...jobs];
@@ -284,12 +277,6 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
         search={{ id: "movements-search", label: "Cerca movimenti", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca per bolla, commessa, causale, articolo, note... (virgola = OR)" }}
         searchActions={
           <>
-            <div className="hidden items-center gap-2 md:flex">
-              <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400 md:text-slate-300">Dal</span>
-              <Input type="date" aria-label="Dal" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-              <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400 md:text-slate-300">Al</span>
-              <Input type="date" aria-label="Al" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
-            </div>
             {anyFilterActive && (
               <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
                 Azzera filtri
@@ -300,8 +287,6 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
       >
         {/* Telefono: date, tipo e commessa */}
         <div className="grid grid-cols-2 gap-2 md:hidden">
-          <Input type="date" aria-label="Dal" className="border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-          <Input type="date" aria-label="Al" className="border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
           <Select value={type} onValueChange={changeType}>
             <SelectTrigger aria-label="Tipo"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
