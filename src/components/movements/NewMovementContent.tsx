@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs";
 import {
     ArrowLeft,
     Save,
@@ -18,7 +18,6 @@ import Link from "next/link";
 import { InventoryItem, Job, DeliveryNote } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { useMovementForm } from "@/hooks/useMovementForm";
-import { HelpTip } from "@/components/ui/help-tip";
 
 import { MovementHeader } from "./form/MovementHeader";
 import { MovementJobSelector } from "./form/MovementJobSelector";
@@ -63,132 +62,82 @@ export default function NewMovementContent({
 
     const completedLines = form.lines.filter((l) => l.itemId && l.quantity);
 
+    const tabs = [
+        { value: "exit", label: "Uscita", icon: <ArrowUpRight />, bubbleClass: "bg-amber-500" },
+        { value: "entry", label: "Entrata / Reso", icon: <ArrowDownRight />, bubbleClass: "bg-green-600" },
+        { value: "sale", label: "Vendita", icon: <ShoppingBag />, bubbleClass: "bg-blue-600" },
+        { value: "waste", label: "Eccedenze", icon: <Recycle />, bubbleClass: "bg-violet-600" },
+        { value: "transfer", label: "Trasferimento", icon: <Repeat />, bubbleClass: "bg-teal-600" },
+    ];
+    const submitLabel = form.draftId ? "Crea bolla" : "Salva";
+
     return (
         <div className="space-y-6 pb-20 max-w-6xl mx-auto">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                    <Link href="/movements">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                    </Link>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <NotchTabs
+                title={
+                    <span className="flex items-center gap-2">
                         {form.draftId ? "Bozza di movimento" : form.isEditing ? "Modifica Movimento" : "Nuovo Movimento"}
-                    </h1>
+                        {form.draftId && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase text-amber-800">Bozza</span>}
+                    </span>
+                }
+                items={tabs}
+                value={form.activeTab}
+                onValueChange={(v) => form.setActiveTab(v as any)}
+                tabWidth={130}
+            >
+                <NotchHelp
+                    title="Tipi di movimento"
+                    lines={[
+                        "Uscita: materiale che esce dal magazzino verso un cantiere o una destinazione esterna, scalando lo stock.",
+                        "Entrata / Reso: ingressi normali e resi da cantiere, lo stock disponibile aumenta.",
+                        "Vendita: come un'uscita, ma il materiale è ceduto a un cliente.",
+                        "Eccedenze: materiale di scarto registrato in peso (kg), sempre fittizio, con nota legale sul deposito temporaneo.",
+                        "Trasferimento: allinea uno spostamento tra magazzini; righe sempre fittizie, lo stock non cambia.",
+                    ]}
+                />
+                <NotchActions>
                     {form.draftId && (
-                        <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase text-amber-800">Bozza</span>
-                    )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    {form.draftId && (
-                        <Button
-                            variant="ghost"
+                        <NotchButton
+                            type="button"
+                            title="Elimina bozza"
+                            aria-label="Elimina bozza"
                             onClick={() => {
                                 if (window.confirm("Eliminare questa bozza? Non è ancora una bolla e il magazzino non cambia.")) form.handleDeleteDraft();
                             }}
                             disabled={form.loading || form.savingDraft}
-                            className="text-red-600 hover:text-red-700"
+                            className="px-2 text-red-600 [&_svg]:text-red-600"
                         >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Elimina bozza
-                        </Button>
+                            <Trash2 />
+                        </NotchButton>
                     )}
                     {!form.isEditing && (
-                        <Button
-                            variant="outline"
+                        <NotchButton
+                            type="button"
+                            title={form.draftId ? "Salva bozza" : "Salva come bozza"}
+                            aria-label={form.draftId ? "Salva bozza" : "Salva come bozza"}
                             onClick={form.handleSaveDraft}
                             disabled={form.loading || form.savingDraft}
+                            className="px-2"
                         >
-                            {form.savingDraft ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <FileClock className="mr-2 h-4 w-4" />
-                            )}
-                            {form.draftId ? "Salva bozza" : "Salva come bozza"}
-                        </Button>
+                            {form.savingDraft ? <Loader2 className="animate-spin" /> : <FileClock />}
+                        </NotchButton>
                     )}
-                    <Button
+                    <Link href="/movements">
+                        <NotchButton type="button">Annulla</NotchButton>
+                    </Link>
+                    <NotchButton
+                        type="button"
+                        title={form.draftId ? "Conferma e crea bolla" : form.isEditing ? "Salva Modifiche" : "Salva Documento"}
                         onClick={form.handleSubmit}
                         disabled={form.loading || form.savingDraft}
-                        className="bg-[#003366] hover:bg-[#002244]"
+                        className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white"
                     >
-                        {form.loading ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Save className="mr-2 h-4 w-4" />
-                        )}
-                        {form.draftId ? "Conferma e crea bolla" : form.isEditing ? "Salva Modifiche" : "Salva Documento"}
-                    </Button>
-                </div>
-            </div>
+                        {form.loading ? <Loader2 className="animate-spin" /> : <Save />}
+                        {submitLabel}
+                    </NotchButton>
+                </NotchActions>
 
-            {/* Type Tabs */}
-            <Tabs
-                value={form.activeTab}
-                onValueChange={(v: any) => form.setActiveTab(v)}
-                className="w-full"
-            >
-                {/* Su smartphone le 5 schede vanno su più righe (2 colonne), su tablet 3, da schermo largo 5 in fila */}
-                <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5 mb-6">
-                    <TabsTrigger
-                        value="exit"
-                        className="h-10 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800"
-                    >
-                        <ArrowUpRight className="mr-2 h-4 w-4" />
-                        Uscita
-                        <HelpTip
-                            title="Uscita"
-                            description="Materiale che esce dal magazzino verso un cantiere o una destinazione esterna, scalando lo stock disponibile."
-                        />
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="entry"
-                        className="h-10 data-[state=active]:bg-green-100 data-[state=active]:text-green-800"
-                    >
-                        <ArrowDownRight className="mr-2 h-4 w-4" />
-                        Entrata / Reso
-                        <HelpTip
-                            title="Entrata / Reso"
-                            description="Copre sia gli ingressi normali di materiale sia i resi da cantiere: in entrambi i casi lo stock disponibile aumenta."
-                        />
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="sale"
-                        className="h-10 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800"
-                    >
-                        <ShoppingBag className="mr-2 h-4 w-4" />
-                        Vendita
-                        <HelpTip
-                            title="Vendita"
-                            description="Come un'uscita, ma il materiale viene ceduto a un cliente invece che portato in cantiere."
-                        />
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="waste"
-                        className="h-10 data-[state=active]:bg-violet-100 data-[state=active]:text-violet-800"
-                    >
-                        <Recycle className="mr-2 h-4 w-4" />
-                        Eccedenze
-                        <HelpTip
-                            title="Eccedenze"
-                            description="Per materiale di scarto/eccedenza: si registra in peso (kg) invece che a pezzi o quantità, è sempre un movimento fittizio e aggiunge automaticamente una nota legale sul deposito temporaneo."
-                        />
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="transfer"
-                        className="h-10 col-span-2 sm:col-span-1 data-[state=active]:bg-teal-100 data-[state=active]:text-teal-800"
-                    >
-                        <Repeat className="mr-2 h-4 w-4" />
-                        Trasferimento
-                        <HelpTip
-                            title="Trasferimento Magazzino"
-                            description="Formalità documentale per allineare uno spostamento tra magazzini: stessa ricerca materiali dell'Uscita, ma le righe sono sempre fittizie e non modificano lo stock. Il rientro è sempre nello stesso magazzino."
-                        />
-                    </TabsTrigger>
-                </TabsList>
-
-                <div className="space-y-6">
+                <div className="mt-6 space-y-6">
                     <MovementHeader
                         numberPart={form.numberPart}
                         setNumberPart={form.setNumberPart}
@@ -252,7 +201,7 @@ export default function NewMovementContent({
                         linesCount={completedLines.length}
                     />
                 </div>
-            </Tabs>
+            </NotchTabs>
         </div>
     );
 }

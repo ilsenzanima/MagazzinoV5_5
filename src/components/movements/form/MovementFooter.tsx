@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FieldTip } from "@/components/ui/field-tip";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface MovementFooterProps {
     transportMean: string;
@@ -38,7 +39,8 @@ export function MovementFooter({
     }, [linesCount]);
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <Card className="mt-6">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
             <div className="space-y-4">
                 <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Trasporto</h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -95,7 +97,8 @@ export function MovementFooter({
                     placeholder="Note aggiuntive..."
                 />
             </div>
-        </div>
+        </CardContent>
+        </Card>
     );
 }
 

@@ -11,6 +11,8 @@ export interface NotchTabItem {
   value: string
   label: string
   icon: ReactNode
+  // Colore della bolla quando la voce è attiva (default blu), es. "bg-amber-500"
+  bubbleClass?: string
 }
 
 interface NotchTabsProps {
@@ -21,6 +23,8 @@ interface NotchTabsProps {
   // Nome della pagina, a sinistra nella striscia
   title?: ReactNode
   className?: string
+  // Larghezza massima di ogni voce (default 170)
+  tabWidth?: number
   // Il contenuto delle schede: può mettere i pulsanti della scheda a destra nella striscia con <NotchActions>
   children?: ReactNode
 }
@@ -101,7 +105,7 @@ export function NotchActions({ children }: { children: ReactNode }) {
 
 // Striscia unica: nome della pagina a sinistra, tab con tacca animata al centro, pulsanti a destra.
 // Se lo spazio non basta, titolo e pulsanti passano sopra la barra. Su telefono le voci non attive mostrano solo l'icona.
-export function NotchTabs({ items = [], value = "", onValueChange, title, className, children }: NotchTabsProps) {
+export function NotchTabs({ items = [], value = "", onValueChange, title, className, tabWidth = TAB_W, children }: NotchTabsProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null)
   const [helpEl, setHelpEl] = useState<HTMLElement | null>(null)
@@ -111,7 +115,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
   const raf = useRef(0)
   const idx = Math.max(0, items.findIndex(i => i.value === value))
 
-  const tw = Math.min(items.length * TAB_W, width)
+  const tw = Math.min(items.length * tabWidth, width)
   const sideRoom = (width - tw) / 2
   const inline = sideRoom >= SIDE_MIN
   const barW = inline ? width : tw
@@ -201,7 +205,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
                 <path d={d} className="fill-slate-800 dark:fill-slate-700" />
               </svg>
               <div
-                className="pointer-events-none absolute top-1 -ml-7 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg [&_svg]:size-6"
+                className={cn("pointer-events-none absolute top-1 -ml-7 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-colors [&_svg]:size-6", items[idx]?.bubbleClass ?? "bg-blue-600")}
                 style={{ left: cx }}
                 aria-hidden="true"
               >

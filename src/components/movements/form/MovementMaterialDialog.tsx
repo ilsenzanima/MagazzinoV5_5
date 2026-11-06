@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,7 @@ import { NoteImportReview, NotePlanEntry, NO_BATCH } from "./NoteImportReview";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { HelpTip } from "@/components/ui/help-tip";
+import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
 import { notify } from "@/lib/notify";
 
 interface MovementMaterialDialogProps {
@@ -563,10 +564,21 @@ export function MovementMaterialDialog({
         return purchasesData.filter((p) => p.deliveryNoteDate.startsWith(purchaseDateFilter));
     }, [purchasesData, purchaseDateFilter]);
 
+    const tabItems = isEntryWithJob
+        ? [
+            { value: "cantiere", label: "In Cantiere", icon: <Package />, help: "materiale già portato in questo cantiere, disponibile per un reso. «Fittizio» significa scaricato senza aggancio a un lotto." },
+            { value: "note", label: "Note di Carico", icon: <FileText />, help: "importa materiale già elencato in una nota di carico registrata." },
+        ]
+        : [
+            { value: "magazzino", label: "Magazzino", icon: <Search />, help: "cerca tra tutti gli articoli a magazzino, indipendentemente dal cantiere." },
+            { value: "note", label: "Note di Carico", icon: <FileText />, help: "importa materiale già elencato in una nota di carico registrata." },
+            ...(showPurchaseTab ? [{ value: "acquisti", label: "Da Acquisto", icon: <ShoppingCart />, help: "importa righe direttamente da una bolla d'acquisto già registrata." }] : []),
+        ];
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
-                <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
+            <DialogContent className="flex h-[85vh] max-h-[720px] max-w-3xl flex-col gap-0 p-0">
+                <DialogHeader className="sr-only">
                     <DialogTitle>Seleziona Materiale</DialogTitle>
                 </DialogHeader>
 
@@ -575,75 +587,16 @@ export function MovementMaterialDialog({
                     onValueChange={setDialogTab}
                     className="flex flex-col flex-1 overflow-hidden"
                 >
-                    <div className="px-6 pt-4 shrink-0">
-                        <TabsList className="w-full">
-                            {isEntryWithJob ? (
-                                <>
-                                    <TabsTrigger value="cantiere" className="flex-1">
-                                        <Package className="h-4 w-4 mr-2" />
-                                        In Cantiere
-                                        <HelpTip
-                                            title="In Cantiere"
-                                            description="Materiale già portato in questo cantiere in precedenza, disponibile per un reso. Se compare come 'Fittizio' significa che era stato scaricato senza aggancio a un lotto specifico."
-                                        />
-                                    </TabsTrigger>
-                                    <TabsTrigger value="note" className="flex-1">
-                                        <FileText className="h-4 w-4 mr-2" />
-                                        Note di Carico
-                                        <HelpTip
-                                            title="Note di Carico"
-                                            description="Importa materiale già elencato in una nota di carico registrata, senza doverlo ricercare manualmente."
-                                        />
-                                    </TabsTrigger>
-                                </>
-                            ) : showPurchaseTab ? (
-                                <>
-                                    <TabsTrigger value="magazzino" className="flex-1">
-                                        <Search className="h-4 w-4 mr-2" />
-                                        Magazzino
-                                        <HelpTip
-                                            title="Magazzino"
-                                            description="Cerca tra tutti gli articoli disponibili a magazzino, indipendentemente dal cantiere."
-                                        />
-                                    </TabsTrigger>
-                                    <TabsTrigger value="note" className="flex-1">
-                                        <FileText className="h-4 w-4 mr-2" />
-                                        Note di Carico
-                                        <HelpTip
-                                            title="Note di Carico"
-                                            description="Importa materiale già elencato in una nota di carico registrata, senza doverlo ricercare manualmente."
-                                        />
-                                    </TabsTrigger>
-                                    <TabsTrigger value="acquisti" className="flex-1">
-                                        <ShoppingCart className="h-4 w-4 mr-2" />
-                                        Da Acquisto
-                                        <HelpTip
-                                            title="Da Acquisto"
-                                            description="Importa una o più righe direttamente da una bolla d'acquisto già registrata, invece di cercare gli articoli uno per uno."
-                                        />
-                                    </TabsTrigger>
-                                </>
-                            ) : (
-                                <>
-                                    <TabsTrigger value="magazzino" className="flex-1">
-                                        <Search className="h-4 w-4 mr-2" />
-                                        Magazzino
-                                        <HelpTip
-                                            title="Magazzino"
-                                            description="Cerca tra tutti gli articoli disponibili a magazzino, indipendentemente dal cantiere."
-                                        />
-                                    </TabsTrigger>
-                                    <TabsTrigger value="note" className="flex-1">
-                                        <FileText className="h-4 w-4 mr-2" />
-                                        Note di Carico
-                                        <HelpTip
-                                            title="Note di Carico"
-                                            description="Importa materiale già elencato in una nota di carico registrata, senza doverlo ricercare manualmente."
-                                        />
-                                    </TabsTrigger>
-                                </>
-                            )}
-                        </TabsList>
+                    <div className="px-6 pt-5 shrink-0">
+                        <NotchTabs
+                            title="Seleziona Materiale"
+                            items={tabItems}
+                            value={dialogTab}
+                            onValueChange={setDialogTab}
+                            tabWidth={150}
+                        >
+                            <NotchHelp title="Dove cercare il materiale" lines={tabItems.map(t => `${t.label}: ${t.help}`)} />
+                        </NotchTabs>
                     </div>
 
                     {/* ---- IN CANTIERE (entry + job) ---- */}
