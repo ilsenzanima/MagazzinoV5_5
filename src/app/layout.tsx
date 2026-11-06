@@ -7,6 +7,7 @@ import { ConnectionManager } from "@/components/ConnectionManager";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { RailHost } from "@/components/layout/RailSidebar";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
 const geistMono = Geist_Mono({
@@ -65,6 +66,7 @@ export default function RootLayout({
             <ConnectionManager />
             <ServiceWorkerRegistration />
             {children}
+            <RailHost />
             <Toaster />
             <SonnerToaster richColors position="top-center" />
           </AuthProvider>

@@ -45,7 +45,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { MobileNavBar } from "./MobileNavBar";
 import { NotificationBell } from "./NotificationBell";
 import { inventoryApi } from "@/lib/services/inventory";
-import { RailSidebar } from "./RailSidebar";
+import { useRailRequest } from "./RailSidebar";
 
 // Una pagina può contenerne altre (es. «Strumenti admin»): dentro un layout già presente non se ne apre un secondo
 const LayoutContext = createContext(false);
@@ -412,6 +412,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const nested = useContext(LayoutContext);
+  useRailRequest(!nested && !!session);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -455,7 +456,6 @@ export default function DashboardLayout({
       )}
 
       {/* Menu laterale desktop: colonna di icone che si apre in primo piano */}
-      <RailSidebar />
 
       {/* Main Content */}
       <div className={cn(

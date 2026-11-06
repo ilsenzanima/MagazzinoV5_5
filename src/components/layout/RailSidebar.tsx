@@ -3,7 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { useCallback, useEffect, useRef, useState, type ComponentType } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react"
 import {
   LayoutDashboard, Package, ClipboardList, BarChart3, Settings, ShoppingCart, Truck, Users, Building2, HardHat,
   Calendar, FileText, ShieldCheck, GanttChartSquare, UserCircle, LogOut, Wrench, Briefcase,
@@ -55,7 +55,30 @@ function panelPath(w: number, h: number, cx: number, cy: number) {
 const slotPath = (w: number, cx: number, cy: number) =>
   `M${cx},${cy - R} H${w} V${cy + R} H${cx} A${R},${R} 0 0 1 ${cx},${cy - R} Z`
 
-export function RailSidebar() {
+// Il menu vive nel layout principale e resta montato tra una pagina e l'altra:
+// le pagine lo "richiedono" con useRailRequest e così non si richiude al cambio pagina.
+let railWanted = false
+let railTimer: ReturnType<typeof setTimeout> | undefined
+const railListeners = new Set<() => void>()
+const setRail = (v: boolean) => { if (railWanted !== v) { railWanted = v; railListeners.forEach(l => l()) } }
+export function useRailRequest(on: boolean) {
+  useEffect(() => {
+    if (!on) return
+    clearTimeout(railTimer)
+    setRail(true)
+    return () => { railTimer = setTimeout(() => setRail(false), 400) }
+  }, [on])
+}
+export function RailHost() {
+  const wanted = useSyncExternalStore(
+    cb => { railListeners.add(cb); return () => { railListeners.delete(cb) } },
+    () => railWanted,
+    () => false
+  )
+  return wanted ? <RailSidebar /> : null
+}
+
+function RailSidebar() {
   const pathname = usePathname()
   const { user, signOut, userRole, fullName, simulatedRole } = useAuth()
   const [expanded, setExpanded] = useState(false)
@@ -140,10 +163,10 @@ export function RailSidebar() {
     raf.current = 0
     const a = anim.current
     const t = target.current
-    const k = 0.22
+    const k = 0.11
     a.w += (t.w - a.w) * k
     a.cx += (t.cx - a.cx) * k
-    a.cy += (t.cy - a.cy) * (a.cy < -100 || t.cy < -100 ? 1 : 0.3)
+    a.cy += (t.cy - a.cy) * (a.cy < -100 || t.cy < -100 ? 1 : 0.16)
     let moving = false
     if (Math.abs(t.w - a.w) < 0.3) a.w = t.w; else moving = true
     if (Math.abs(t.cx - a.cx) < 0.3) a.cx = t.cx; else moving = true
@@ -240,7 +263,7 @@ export function RailSidebar() {
 
         {/* Testata */}
         <Link href="/dashboard" className="absolute left-0 top-0 z-10 flex items-center" style={{ height: HEAD }} title="OPI Firesafe">
-          <span className="flex items-center justify-center" style={{ width: W0 }}>
+          <span className="flex shrink-0 items-center justify-center" style={{ width: W0 }}>
             <Image src="/icons/flame.png" alt="OPI Firesafe" width={34} height={34} className="h-[34px] w-[34px] object-contain" priority />
           </span>
           <span className={cn("whitespace-nowrap text-sm font-semibold text-white transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>OPI Firesafe</span>
@@ -285,13 +308,13 @@ export function RailSidebar() {
         {user && (
           <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end pb-2" style={{ height: FOOT }}>
             <div className="flex items-center" style={{ height: 44 }}>
-              <span className="flex items-center justify-center" style={{ width: W0 }}><NotificationBell /></span>
+              <span className="flex shrink-0 items-center justify-center [&_button]:!text-slate-200" style={{ width: W0 }}><NotificationBell /></span>
               <span className={cn("whitespace-nowrap text-sm text-slate-300 transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>Notifiche</span>
             </div>
             <DropdownMenu open={menuOpen} onOpenChange={o => { setMenuOpen(o); if (!o) { setExpanded(false); setHoverIdx(null) } }}>
               <DropdownMenuTrigger asChild>
                 <button type="button" title={expanded ? undefined : (fullName || user.email || "Profilo")} className="flex items-center text-left outline-none" style={{ height: 48 }}>
-                  <span className="relative flex items-center justify-center" style={{ width: W0 }}>
+                  <span className="relative flex shrink-0 items-center justify-center" style={{ width: W0 }}>
                     <Avatar className={cn("h-8 w-8", inAdminPages && "ring-2 ring-sidebar-accent ring-offset-2 ring-offset-slate-800")}>
                       <AvatarImage src={`/avatars/${userRole || "user"}.png`} />
                       <AvatarFallback>{(fullName || user.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
