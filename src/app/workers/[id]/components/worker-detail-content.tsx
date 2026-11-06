@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { NotchTabs } from "@/components/ui/notch-tabs";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
     ArrowLeft, Pencil, Trash2, HardHat, Save, Euro,
     Clock, Stethoscope, AlertTriangle, Umbrella, BookOpen,
-    Building2, UserX, Activity, Loader2,
+    Building2, UserX, Activity, Loader2, Plus, Settings, FileText,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/ui/use-toast";
@@ -80,6 +82,10 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
     const [worker, setWorker] = useState<Worker>(initialWorker);
     const [loading, setLoading] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [tab, setTab] = useState("info");
+    // Ogni clic sul pulsante tondo aumenta il numero: la lista di corsi o visite apre l'inserimento
+    const [addCourse, setAddCourse] = useState(0);
+    const [addExam, setAddExam] = useState(0);
 
     // Stats state
     const [stats, setStats] = useState<YearlyStats | null>(null);
@@ -176,53 +182,34 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
         setIsEditOpen(false);
     };
 
-    const tabCount = canEdit ? 4 : 3;
+    const tabItems = [
+        { value: "info", label: "Informazioni", icon: <FileText /> },
+        { value: "certs", label: "Corsi", icon: <BookOpen /> },
+        { value: "medical", label: "Visite Mediche", icon: <Stethoscope /> },
+        ...(canEdit ? [{ value: "settings", label: "Impostazioni", icon: <Settings /> }] : []),
+    ];
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="bg-white dark:bg-card p-4 shadow-sm rounded-lg border dark:border-border">
-                <div className="flex items-center gap-3 mb-4">
-                    <Button variant="ghost" size="sm" onClick={() => router.push('/workers')} className="text-slate-500 hover:text-slate-900">
-                        <ArrowLeft className="h-4 w-4 mr-1" />
-                        Operai
-                    </Button>
-                </div>
+        <div className="w-full space-y-6">
+            <Button variant="ghost" size="sm" onClick={() => router.push('/workers')} className="-ml-2 text-slate-500 hover:text-slate-900">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Operai
+            </Button>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                            <HardHat className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-slate-900 dark:text-white capitalize">
-                                {worker.firstName} {worker.lastName}
-                            </h1>
-                            <p className="text-sm text-slate-500">{worker.email || "Nessuna email"}</p>
-                        </div>
-                        <Badge className={cn("ml-2", worker.isActive ? "bg-green-100 text-green-700 border-green-200" : "bg-slate-100 text-slate-500")}>
-                            {worker.isActive ? "Attivo" : "Inattivo"}
-                        </Badge>
-                    </div>
-
-                    {canEdit && (
-                        <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Modifica Dati
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <Tabs defaultValue="info" className="w-full">
-                <TabsList className={cn("grid w-full", tabCount === 4 ? "grid-cols-4" : "grid-cols-3")}>
-                    <TabsTrigger value="info">Informazioni</TabsTrigger>
-                    <TabsTrigger value="certs">Corsi</TabsTrigger>
-                    <TabsTrigger value="medical">Visite Mediche</TabsTrigger>
-                    {canEdit && <TabsTrigger value="settings">Impostazioni</TabsTrigger>}
-                </TabsList>
-
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+                <NotchTabs
+                    title={
+                        <span className="flex items-center gap-2 capitalize">
+                            {worker.firstName} {worker.lastName}
+                            <Badge className={cn("normal-case", worker.isActive ? "bg-green-100 text-green-700 border-green-200" : "bg-slate-100 text-slate-500")}>
+                                {worker.isActive ? "Attivo" : "Inattivo"}
+                            </Badge>
+                        </span>
+                    }
+                    items={tabItems}
+                    value={tab}
+                    onValueChange={setTab}
+                >
                 {/* ── INFO ── */}
                 <TabsContent value="info" className="mt-4 space-y-4">
                     {/* Dati anagrafici */}
@@ -278,14 +265,14 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                 {/* ── CORSI ── */}
                 <TabsContent value="certs" className="mt-4">
                     <div className="bg-white dark:bg-card p-6 rounded-lg border dark:border-border">
-                        <WorkerCoursesList workerId={worker.id} workerName={worker.firstName} />
+                        <WorkerCoursesList workerId={worker.id} workerName={worker.firstName} addSignal={canEdit ? addCourse : undefined} />
                     </div>
                 </TabsContent>
 
                 {/* ── VISITE MEDICHE ── */}
                 <TabsContent value="medical" className="mt-4">
                     <div className="bg-white dark:bg-card p-6 rounded-lg border dark:border-border">
-                        <WorkerMedicalExamsList workerId={worker.id} workerName={worker.firstName} />
+                        <WorkerMedicalExamsList workerId={worker.id} workerName={worker.firstName} addSignal={canEdit ? addExam : undefined} />
                     </div>
                 </TabsContent>
 
@@ -434,7 +421,12 @@ export default function WorkerDetailContent({ worker: initialWorker }: WorkerDet
                         )}
                     </TabsContent>
                 )}
+                </NotchTabs>
             </Tabs>
+
+            {canEdit && tab === "info" && <FloatingAddButton showOnMobile icon={<Pencil className="h-6 w-6" />} label="Modifica dati" onClick={() => setIsEditOpen(true)} />}
+            {canEdit && tab === "certs" && <FloatingAddButton showOnMobile label="Aggiungi corso" onClick={() => setAddCourse(n => n + 1)} />}
+            {canEdit && tab === "medical" && <FloatingAddButton showOnMobile label="Aggiungi visita" onClick={() => setAddExam(n => n + 1)} />}
 
             <WorkerDialog
                 open={isEditOpen}

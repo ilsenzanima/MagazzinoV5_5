@@ -23,11 +23,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface WorkerMedicalExamsListProps {
+    // Se presente, il pulsante «aggiungi» sta fuori (nel pulsante tondo della pagina): ogni cambio del numero apre l\'inserimento
+    addSignal?: number;
     workerId: string;
     workerName: string;
 }
 
-export function WorkerMedicalExamsList({ workerId, workerName }: WorkerMedicalExamsListProps) {
+export function WorkerMedicalExamsList({ workerId, workerName, addSignal }: WorkerMedicalExamsListProps) {
     const { userRole } = useAuth();
     const { toast } = useToast();
     const [exams, setExams] = useState<WorkerMedicalExam[]>([]);
@@ -75,6 +77,11 @@ export function WorkerMedicalExamsList({ workerId, workerName }: WorkerMedicalEx
         setEditingExam(null);
         setDialogOpen(true);
     };
+
+    useEffect(() => {
+        if (addSignal) handleAddExam();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [addSignal]);
 
     const handleEditExam = (exam: WorkerMedicalExam) => {
         setEditingExam(exam);
@@ -128,7 +135,7 @@ export function WorkerMedicalExamsList({ workerId, workerName }: WorkerMedicalEx
 
     return (
         <div className="space-y-4">
-            {canEdit && (
+            {canEdit && addSignal === undefined && (
                 <div className="flex justify-end">
                     <Button size="sm" onClick={handleAddExam}>
                         <Plus className="h-4 w-4 mr-2" />

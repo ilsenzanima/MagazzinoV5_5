@@ -23,11 +23,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface WorkerCoursesListProps {
+    // Se presente, il pulsante «aggiungi» sta fuori (nel pulsante tondo della pagina): ogni cambio del numero apre l\'inserimento
+    addSignal?: number;
     workerId: string;
     workerName: string;
 }
 
-export function WorkerCoursesList({ workerId, workerName }: WorkerCoursesListProps) {
+export function WorkerCoursesList({ workerId, workerName, addSignal }: WorkerCoursesListProps) {
     const { userRole } = useAuth();
     const { toast } = useToast();
     const [courses, setCourses] = useState<WorkerCourse[]>([]);
@@ -92,6 +94,11 @@ export function WorkerCoursesList({ workerId, workerName }: WorkerCoursesListPro
         setDialogOpen(true);
     };
 
+    useEffect(() => {
+        if (addSignal) handleAddCourse();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [addSignal]);
+
     const handleEditCourse = (course: WorkerCourse) => {
         setEditingCourse(course);
         setDialogOpen(true);
@@ -144,7 +151,7 @@ export function WorkerCoursesList({ workerId, workerName }: WorkerCoursesListPro
 
     return (
         <div className="space-y-4">
-            {canEdit && (
+            {canEdit && addSignal === undefined && (
                 <div className="flex justify-end">
                     <Button size="sm" onClick={handleAddCourse}>
                         <Plus className="h-4 w-4 mr-2" />

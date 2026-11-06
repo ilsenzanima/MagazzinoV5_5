@@ -145,6 +145,7 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
     return (
         <>
             <ListPageHeader
+                strip
                 title="Gestione Operai"
                 actions={canEdit && (
                     <Button onClick={() => setIsCreateOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto md:hidden">
@@ -154,7 +155,7 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                 )}
                 search={{ id: "workers-search", label: "Cerca operai", value: search, onChange: (v) => { setSearch(v); setPage(1); }, placeholder: "Cerca Operaio (Nome, Email...)" }}
                 searchActions={anyFilterActive && (
-                    <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+                    <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
                         Azzera filtri
                     </Button>
                 )}
@@ -214,7 +215,6 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                                 {canEdit && <TableCell className="border-r py-2 text-right text-sm text-slate-700 dark:text-slate-300">{euro(worker.trasfertaRate)}</TableCell>}
                                 <TableCell className="border-r py-2" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-2">
-                                        <StatusBadge active={worker.isActive} />
                                         {canEdit && (
                                             <Switch
                                                 checked={worker.isActive}
@@ -223,6 +223,7 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                                                 aria-label="Attivo / inattivo"
                                             />
                                         )}
+                                        <StatusBadge active={worker.isActive} />
                                     </div>
                                 </TableCell>
                                 <TableCell className={`py-2 text-sm text-slate-600 dark:text-slate-300 ${canEdit ? "border-r" : ""}`}>{new Date(worker.createdAt).toLocaleDateString('it-IT')}</TableCell>
