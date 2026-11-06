@@ -61,7 +61,9 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs";
+import { Layers, History, BarChart3 } from "lucide-react";
 import { ItemLots } from "@/components/inventory/ItemLots";
 import { ItemStats } from "@/components/inventory/ItemStats";
 import { PageControls, paginate } from "@/components/ui/page-controls";
@@ -584,47 +586,52 @@ export default function InventoryDetailPage() {
         title="Ritaglia Foto Articolo"
       />
       <div className="mx-auto max-w-[1700px] space-y-6 pb-20">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Link href="/inventory">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                {item.name} {item.model && <span className="font-normal text-slate-500 dark:text-slate-400">({item.model})</span>}
-              </h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-mono">{item.code}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+        {/* Intestazione: striscia scura con nome, codice e azioni */}
+        <div className="space-y-2">
+          <Link href="/inventory" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+            <ArrowLeft className="mr-1 h-4 w-4" /> Inventario
+          </Link>
+          <NotchTabs
+            title={
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span>{item.name}</span>
+                {item.model && <span className="font-normal normal-case text-slate-300">({item.model})</span>}
+                <span className="font-mono text-xs font-normal normal-case tracking-normal text-slate-400">{item.code}</span>
+              </span>
+            }
+          >
             {(userRole === 'admin' || userRole === 'operativo') && (
-              isEditing ? (
-                <>
-                  <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={isSaving}>
-                    <X className="mr-2 h-4 w-4" /> Annulla
-                  </Button>
-                  <Button variant="default" size="sm" onClick={handleSaveEdit} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Salva
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="default" size="sm" onClick={handleEdit}>
-                    <Pencil className="mr-2 h-4 w-4" /> Modifica
-                  </Button>
-                  {userRole === 'admin' && (
-                    <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Elimina
-                    </Button>
-                  )}
-                </>
-              )
+              <NotchActions>
+                {isEditing ? (
+                  <>
+                    <NotchButton type="button" onClick={handleCancelEdit} disabled={isSaving}>
+                      <X /> Annulla
+                    </NotchButton>
+                    <NotchButton
+                      type="button" onClick={handleSaveEdit} disabled={isSaving}
+                      className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white"
+                    >
+                      {isSaving ? <Loader2 className="animate-spin" /> : <Save />} Salva
+                    </NotchButton>
+                  </>
+                ) : (
+                  <>
+                    <NotchButton type="button" onClick={handleEdit}>
+                      <Pencil /> Modifica
+                    </NotchButton>
+                    {userRole === 'admin' && (
+                      <NotchButton
+                        type="button" onClick={() => setDeleteDialogOpen(true)}
+                        className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"
+                      >
+                        <Trash2 /> Elimina
+                      </NotchButton>
+                    )}
+                  </>
+                )}
+              </NotchActions>
             )}
-          </div>
+          </NotchTabs>
         </div>
 
         {/* Numeri principali */}
@@ -1148,25 +1155,25 @@ export default function InventoryDetailPage() {
 
             {/* Tabs: Lotti / Storico Movimenti */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
-                <TabsTrigger value="lots" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
-                  Lotti
-                  <HelpTip
-                    title="Lotti"
-                    description="Lo stock è tracciato per lotto d'acquisto con logica FIFO: si consuma prima il lotto più vecchio. Se una quantità non risulta assegnata a nessun lotto, puoi riassegnarla da qui."
-                  />
-                </TabsTrigger>
-                <TabsTrigger value="movements" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
-                  Storico Movimenti
-                  <HelpTip
-                    title="Storico Movimenti"
-                    description="Ogni riga è un movimento di magazzino: Carico/Entrata aumentano lo stock, Scarico/Uscita/Vendita/Reso al Fornitore lo diminuiscono. Un movimento 'Fittizio' è registrato per pareggiare i conti senza spostare merce reale."
-                  />
-                </TabsTrigger>
-                <TabsTrigger value="stats" className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 data-[state=active]:shadow-none dark:data-[state=active]:text-blue-400">
-                  Statistiche
-                </TabsTrigger>
-              </TabsList>
+              <NotchTabs
+                title="Dettaglio articolo"
+                items={[
+                  { value: "lots", label: "Lotti", icon: <Layers /> },
+                  { value: "movements", label: "Storico Movimenti", icon: <History /> },
+                  { value: "stats", label: "Statistiche", icon: <BarChart3 /> },
+                ]}
+                value={activeTab}
+                onValueChange={setActiveTab}
+              >
+                <NotchHelp
+                  title="Lotti e movimenti"
+                  lines={[
+                    "Lotti: lo stock è tracciato per lotto d'acquisto con logica FIFO, si consuma prima il lotto più vecchio. Se una quantità non risulta assegnata a nessun lotto, puoi riassegnarla da qui.",
+                    "Storico Movimenti: ogni riga è un movimento di magazzino. Carico/Entrata aumentano lo stock, Scarico/Uscita/Vendita/Reso al Fornitore lo diminuiscono. Un movimento «Fittizio» pareggia i conti senza spostare merce reale.",
+                    "Statistiche: andamento e consumi dell'articolo.",
+                  ]}
+                />
+              </NotchTabs>
 
               <TabsContent value="lots" className="mt-4">
                 {lotsData ? (
