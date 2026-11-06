@@ -150,6 +150,20 @@ export const invoicesApi = {
         if (error) throw error;
     },
 
+    // Collega la bolla solo se è ancora libera: se nel frattempo l'ha presa un'altra fattura, errore
+    linkPurchaseIfFree: async (invoiceId: string, purchaseId: string, label?: string) => {
+        const { data, error } = await supabase
+            .from('purchases')
+            .update({ invoice_id: invoiceId })
+            .eq('id', purchaseId)
+            .is('invoice_id', null)
+            .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            throw new Error(`La bolla${label ? ` ${label}` : ''} è già stata collegata a un'altra fattura`);
+        }
+    },
+
     unlinkPurchase: async (purchaseId: string) => {
         const { error } = await supabase
             .from('purchases')
@@ -182,7 +196,7 @@ export const invoicesApi = {
         const { data, error } = await fetchWithTimeout(
             supabase
                 .from('purchases')
-                .select('id, delivery_note_number, delivery_note_date, supplier_id, suppliers(name), purchase_items(id, price, quantity, returned_quantity, returned_price, returned_at, inventory(name, model))')
+                .select('id, delivery_note_number, delivery_note_date, supplier_id, suppliers(name), transport_cost, purchase_items(id, price, quantity, transport_applied, returned_quantity, returned_price, returned_at, inventory(name, model))')
                 .in('supplier_id', supplierIds)
                 .eq('order_type', 'purchase')
                 .is('invoice_id', null)
@@ -207,7 +221,9 @@ export const invoicesApi = {
                 quantity: (i.quantity || 1) as number,
                 price: (i.price || 0) as number,
                 returned: returnAmount(i),
+                transportApplied: !!i.transport_applied,
             })),
+            transportCost: (p.transport_cost ?? 0) as number,
         }));
     },
 

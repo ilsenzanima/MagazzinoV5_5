@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Save, Loader2, Upload, FileText, Calendar } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Upload, FileText, Calendar, Truck } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
@@ -31,7 +31,8 @@ interface UnlinkedPurchase {
     supplierName?: string;
     totalAmount: number;
     selected: boolean;
-    items: { id: string; itemName?: string; itemModel?: string; quantity: number; price: number; returned: number }[];
+    items: { id: string; itemName?: string; itemModel?: string; quantity: number; price: number; returned: number; transportApplied: boolean }[];
+    transportCost: number;
 }
 
 // Riga di una bolla con il prezzo da inserire: prezzo unitario o totale riga (l'altro si calcola da solo)
@@ -102,6 +103,11 @@ export default function NewInvoicePage() {
     // Prezzi inseriti qui per le righe delle bolle (id riga → prezzo unitario); si salvano insieme alla fattura
     const [prices, setPrices] = useState<Record<string, number>>({});
 
+    // Trasporto per bolla (id bolla → importo), spalmato sulle righe al salvataggio come «Applica trasporto»
+    const [transport, setTransport] = useState<Record<string, string>>({});
+    // Importo riportato sulla fattura del fornitore, solo per controllo
+    const [printedTotal, setPrintedTotal] = useState("");
+
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const batchUpload = useBatchUpload();
@@ -145,8 +151,10 @@ export default function NewInvoicePage() {
 
     const selectedPurchases = unlinkedPurchases.filter(p => p.selected);
     // Importo di una bolla con i prezzi appena inseriti al posto di quelli già registrati (resi sempre detratti)
+    const transportOf = (p: UnlinkedPurchase) =>
+        p.items.some(i => i.transportApplied) ? 0 : Math.max(0, parseFloat((transport[p.id] ?? "").replace(",", ".")) || 0);
     const purchaseTotal = (p: UnlinkedPurchase) =>
-        p.items.reduce((s, i) => s + (prices[i.id] ?? i.price) * i.quantity - i.returned, 0);
+        p.items.reduce((s, i) => s + (prices[i.id] ?? i.price) * i.quantity - i.returned, 0) + transportOf(p);
     const totalAmount = selectedPurchases.reduce((s, p) => s + purchaseTotal(p), 0);
     const isSharedBilling = new Set(unlinkedPurchases.map(p => p.supplierId)).size > 1;
 
@@ -162,6 +170,18 @@ export default function NewInvoicePage() {
             notify.warning("Seleziona almeno una bolla da collegare alla fattura");
             return;
         }
+
+        // Importo stampato sulla fattura: se non coincide con le bolle si chiede conferma
+        const printed = parseFloat(printedTotal.replace(",", "."));
+        if (!isNaN(printed) && Math.abs(printed - totalAmount) > 0.01) {
+            if (!confirm(`Il totale delle bolle (${formatCurrency(totalAmount)}) è diverso dall'importo in fattura (${formatCurrency(printed)}). Salvare comunque?`)) return;
+        }
+
+        // Tutto o niente: se un passo fallisce si annulla quanto già fatto
+        let createdId: string | null = null;
+        const linkedIds: string[] = [];
+        const priceBackups: { id: string; price: number }[] = [];
+        const transportDone: { purchaseId: string; prevCost: number; items: { id: string; quantity: number; price: number; transportApplied: boolean; transportUnitCost: number }[] }[] = [];
 
         try {
             setLoading(true);
@@ -185,21 +205,58 @@ export default function NewInvoicePage() {
                 documentUrls,
             });
 
-            // Link selected purchases
-            await Promise.all(selectedPurchases.map(p => invoicesApi.linkPurchase(invoice.id, p.id)));
+            createdId = invoice.id;
+
+            // Link selected purchases (una bolla già presa da un'altra fattura blocca tutto)
+            for (const p of selectedPurchases) {
+                await invoicesApi.linkPurchaseIfFree(invoice.id, p.id, p.deliveryNoteNumber);
+                linkedIds.push(p.id);
+            }
 
             // Prezzi inseriti qui sulle righe delle bolle
             const edits = selectedPurchases.flatMap(p => p.items).filter(i => prices[i.id] !== undefined && prices[i.id] !== i.price);
-            await Promise.all(edits.map(i => purchasesApi.updateItem(i.id, { price: prices[i.id] })));
+            for (const i of edits) {
+                await purchasesApi.updateItem(i.id, { price: prices[i.id] });
+                priceBackups.push({ id: i.id, price: i.price });
+            }
 
-            // Save total
-            await invoicesApi.updateTotal(invoice.id, totalAmount);
+            // Trasporto: come «Applica trasporto» nella scheda fattura, spalmato sulle righe della sua bolla
+            for (const p of selectedPurchases) {
+                const cost = transportOf(p);
+                if (cost <= 0) continue;
+                const rows = p.items.map(i => ({ id: i.id, quantity: i.quantity, price: prices[i.id] ?? i.price }));
+                await purchasesApi.applyTransportToAllItems(p.id, cost, rows.map(r => ({ ...r, purchaseId: p.id, itemId: "", createdAt: "" })));
+                const perUnit = (q: number) => (q > 0 ? cost / rows.length / q : 0);
+                transportDone.push({
+                    purchaseId: p.id,
+                    prevCost: p.transportCost,
+                    items: rows.map(r => ({ ...r, price: parseFloat((r.price + perUnit(r.quantity)).toFixed(5)), transportApplied: true, transportUnitCost: perUnit(r.quantity) })),
+                });
+            }
+
+            // Il totale salvato è quello reale delle bolle collegate, dopo prezzi e trasporto
+            const saved = await invoicesApi.getById(invoice.id);
+            await invoicesApi.updateTotal(invoice.id, saved.purchases?.reduce((s, p) => s + (p.totalAmount ?? 0), 0) ?? totalAmount);
 
             notify.success("Fattura salvata con successo");
             router.push(`/invoices/${invoice.id}`);
         } catch (error: any) {
             console.error("Failed to save invoice", error);
-            notify.error(`Errore durante il salvataggio: ${error.message || error.toString()}`);
+            // Annulla quanto già scritto, così non resta una fattura a metà
+            let undone = true;
+            try {
+                for (const t of transportDone) {
+                    await purchasesApi.reverseTransportOnItems(t.items.map(i => ({ ...i, purchaseId: t.purchaseId, itemId: "", createdAt: "" })));
+                    await purchasesApi.saveTransportCost(t.purchaseId, t.prevCost);
+                }
+                for (const b of priceBackups) await purchasesApi.updateItem(b.id, { price: b.price });
+                for (const id of linkedIds) await invoicesApi.unlinkPurchase(id);
+                if (createdId) await invoicesApi.delete(createdId);
+            } catch (undoError) {
+                undone = false;
+                console.error("Rollback failed", undoError);
+            }
+            notify.error(`Errore durante il salvataggio: ${error.message || error.toString()}${undone ? ". Nessuna modifica è stata salvata." : ". Attenzione: l'annullamento non è riuscito, controlla la fattura e le bolle."}`);
         } finally {
             setLoading(false);
         }
@@ -411,6 +468,24 @@ export default function NewInvoicePage() {
                                                                     ))}
                                                                 </tbody>
                                                             </table>
+                                                            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2 dark:border-slate-700">
+                                                                <Truck className="h-4 w-4 shrink-0 text-amber-500" />
+                                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Costo trasporto:</span>
+                                                                {purchase.items.some(i => i.transportApplied) ? (
+                                                                    <span className="text-xs text-green-600">già applicato a questa bolla ({formatCurrency(purchase.transportCost)})</span>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-xs text-slate-400">€</span>
+                                                                        <Input
+                                                                            type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
+                                                                            aria-label="Costo trasporto" className="h-7 w-24 px-1 text-right text-xs"
+                                                                            value={transport[purchase.id] ?? ""}
+                                                                            onChange={e => setTransport(prev => ({ ...prev, [purchase.id]: e.target.value }))}
+                                                                        />
+                                                                        <span className="text-xs text-slate-400">si divide sulle righe di questa bolla</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
                                                         </TableCell>
                                                     </TableRow>
                                                 )}
@@ -430,6 +505,25 @@ export default function NewInvoicePage() {
                                         </TableBody>
                                     </Table>
                                 </div>
+                                {selectedPurchases.length > 0 && (
+                                    <div className="mt-4 flex flex-wrap items-center gap-3 px-4 sm:px-0">
+                                        <Label htmlFor="printed-total" className="text-sm">Importo riportato in fattura</Label>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-sm text-slate-400">€</span>
+                                            <Input
+                                                id="printed-total" type="number" inputMode="decimal" step="0.01" min="0" placeholder="0.00"
+                                                className="h-8 w-32 text-right" value={printedTotal} onChange={e => setPrintedTotal(e.target.value)}
+                                            />
+                                        </div>
+                                        {printedTotal !== "" && !isNaN(parseFloat(printedTotal)) && (
+                                            Math.abs(parseFloat(printedTotal) - totalAmount) <= 0.01
+                                                ? <span className="text-sm font-medium text-green-600">Coincide con le bolle</span>
+                                                : <span className="text-sm font-medium text-amber-600">
+                                                    Differenza: {formatCurrency(parseFloat(printedTotal) - totalAmount)} rispetto al totale bolle
+                                                </span>
+                                        )}
+                                    </div>
+                                )}
                             </CardContent>
                         )}
                         {purchasesLoading && (
