@@ -2,6 +2,7 @@
 
 import { notify } from "@/lib/notify";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -172,10 +173,19 @@ export default function NewInvoicePage() {
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         Torna alle Fatture
                     </Link>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Registrazione Fattura</h1>
+                    <NotchTabs title="Registrazione Fattura">
+                        <NotchActions>
+                            <Link href="/purchases?tab=fatture">
+                                <NotchButton type="button">Annulla</NotchButton>
+                            </Link>
+                            <NotchButton type="submit" form="invoice-form" disabled={loading} className="min-w-28 border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save /> Salva Fattura</>}
+                            </NotchButton>
+                        </NotchActions>
+                    </NotchTabs>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form id="invoice-form" onSubmit={handleSubmit} className="space-y-6">
                     {/* Header */}
                     <Card>
                         <CardHeader>
@@ -213,7 +223,7 @@ export default function NewInvoicePage() {
                             <div className="space-y-2 md:col-span-3 border-t pt-2">
                                 <Label>Copia Documento (PDF, Immagine)</Label>
                                 <div
-                                    className={`relative border-2 border-dashed rounded-md p-4 transition-colors text-center ${isDragging
+                                    className={`relative border-2 border-dashed rounded-md p-3 transition-colors text-center ${isDragging
                                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                                         : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                                         }`}
@@ -347,15 +357,6 @@ export default function NewInvoicePage() {
                             </CardContent>
                         )}
                     </Card>
-
-                    <div className="flex justify-end gap-4">
-                        <Link href="/invoices">
-                            <Button variant="outline" type="button">Annulla</Button>
-                        </Link>
-                        <Button type="submit" disabled={loading} className="bg-blue-600 w-36">
-                            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Salva Fattura</>}
-                        </Button>
-                    </div>
                 </form>
             </div>
         </DashboardLayout>
