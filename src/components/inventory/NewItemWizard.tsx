@@ -1,5 +1,6 @@
 "use client"
 
+import { Stepper } from "@/components/ui/stepper";
 import dynamic from "next/dynamic";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2, Pencil, Plus, Search, Upload, X } from "lucide-react";
@@ -488,11 +489,7 @@ export const NewItemWizard = forwardRef<NewItemWizardHandle, NewItemWizardProps>
                                 {closeLabel}
                             </Button>
                         </div>
-                        <div className="mt-2 flex gap-1">
-                            {STEPS.map((_, i) => (
-                                <div key={i} className={`h-1.5 flex-1 rounded ${i <= step ? "bg-blue-600" : "bg-slate-200"}`} />
-                            ))}
-                        </div>
+                        <Stepper steps={STEPS} current={step} />
                     </DialogHeader>
 
                     <div className="flex-1 space-y-4 overflow-y-auto py-2">

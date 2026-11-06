@@ -1,5 +1,6 @@
 "use client"
 
+import { Stepper } from "@/components/ui/stepper";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, Check, CheckCircle2, Info, Loader2, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -123,11 +124,7 @@ export function PurchaseLineDialog({ open, onClose, asOfDate, items, onSearch, l
                         <DialogDescription>
                             Passo {step} di 2: {step === 1 ? "scegli il materiale" : editing ? "correggi quantità e prezzo" : "quantità e prezzo"}
                         </DialogDescription>
-                        <div className="mt-2 flex gap-1">
-                            {[1, 2].map(i => (
-                                <div key={i} className={`h-1.5 flex-1 rounded ${i <= step ? "bg-blue-600" : "bg-slate-200"}`} />
-                            ))}
-                        </div>
+                        <Stepper steps={["Materiale", "Quantità e prezzo"]} current={step - 1} />
                     </DialogHeader>
 
                     {step === 1 && (

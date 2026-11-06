@@ -1,5 +1,6 @@
 "use client"
 
+import { Stepper } from "@/components/ui/stepper";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -78,9 +79,7 @@ export function NoteLineDialog({ open, onClose, items, onSearch, loading, onConf
                 <DialogHeader>
                     <DialogTitle>Aggiungi materiale alla nota</DialogTitle>
                     <DialogDescription>Passo {step} di 2: {step === 1 ? "scegli il materiale" : "pezzi e quantità"}</DialogDescription>
-                    <div className="mt-2 flex gap-1">
-                        {[1, 2].map(i => <div key={i} className={`h-1.5 flex-1 rounded ${i <= step ? "bg-blue-600" : "bg-slate-200"}`} />)}
-                    </div>
+                    <Stepper steps={["Materiale", "Pezzi e quantità"]} current={step - 1} />
                 </DialogHeader>
 
                 {step === 1 && (
