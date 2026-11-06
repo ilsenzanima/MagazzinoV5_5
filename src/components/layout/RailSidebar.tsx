@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 const W0 = 72 // larghezza a riposo: sole icone
 const W1 = 264 // larghezza aperta
 const HEAD = 64 // testata con il logo
-const FOOT = 112 // piede con campanella e profilo
+const FOOT = 16 // margine in fondo
 const RH = 38 // altezza di una voce
 const GAP = 10 // spazio tra gruppi di voci
 const R = 26 // raggio dello scavo attorno alla voce evidenziata
@@ -75,31 +75,22 @@ export function RailHost() {
     () => railWanted,
     () => false
   )
-  return wanted ? <RailSidebar /> : null
+  return wanted ? <><TopBar /><RailSidebar /></> : null
 }
 
 function RailSidebar() {
   const pathname = usePathname()
-  const { user, signOut, userRole, fullName, simulatedRole } = useAuth()
+  const { userRole, simulatedRole } = useAuth()
   const [expanded, setExpanded] = useState(false)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
-  const [menuOpen, setMenuOpen] = useState(false)
   const [scrollTop, setScrollTop] = useState(0)
-
-  // Avvisi sulla voce Strumenti admin: articoli da verificare e anomalie
-  const [alerts, setAlerts] = useState(0)
+  const [vh, setVh] = useState(900)
   useEffect(() => {
-    if (userRole !== "admin") return
-    let cancelled = false
-    const check = () => {
-      Promise.all([inventoryApi.getUnverifiedCount(), inventoryApi.getNegativeLotMovements(), inventoryApi.getOrphanedJobReferences()])
-        .then(([unverified, negative, orphaned]) => { if (!cancelled) setAlerts(unverified + negative.length + orphaned.length) })
-        .catch(err => console.error("Failed to load alerts", err))
-    }
-    check()
-    const t = setInterval(check, 60000)
-    return () => { cancelled = true; clearInterval(t) }
-  }, [userRole])
+    const f = () => setVh(window.innerHeight)
+    f()
+    window.addEventListener("resize", f)
+    return () => window.removeEventListener("resize", f)
+  }, [])
 
   const is = (...bases: string[]) => bases.some(b => pathname === b || pathname.startsWith(b + "/"))
   const staff = userRole === "admin" || userRole === "operativo"
@@ -128,10 +119,15 @@ function RailSidebar() {
     [{ key: "report", label: "Report e analisi", icon: BarChart3, href: "/report-analisi", active: is("/report-analisi", "/reports", "/analytics") }],
   ]
   const items = groups.flat()
+  // Le voci si stringono se la finestra è bassa, così stanno tutte senza barra di scorrimento
+  const availH = vh - (simulatedRole ? 48 : 8) - 8 - HEAD - FOOT - GAP * (groups.length - 1)
+  const rh = Math.max(28, Math.min(RH, Math.floor(availH / items.length)))
+  const rhRef = useRef(rh)
+  rhRef.current = rh
   const ys: number[] = []
   let acc = 0
   groups.forEach((g, gi) => {
-    g.forEach(() => { ys.push(acc); acc += RH })
+    g.forEach(() => { ys.push(acc); acc += rh })
     if (gi < groups.length - 1) acc += GAP
   })
   const listHeight = acc
@@ -139,7 +135,6 @@ function RailSidebar() {
   // Lo scavo segue il mouse quando il menu è aperto, altrimenti sta sulla pagina in cui si è
   const holeIdx = expanded && hoverIdx !== null ? hoverIdx : activeIdx
   const HoleIcon = holeIdx >= 0 ? items[holeIdx].icon : null
-  const inAdminPages = is("/settings", "/strumenti", "/anomalie", "/controllo-acquisti", "/schede-varianti", "/confezioni", "/cestino") || pathname === "/inventory/verifica"
 
   const panelRef = useRef<HTMLDivElement>(null)
   const pathRef = useRef<SVGPathElement>(null)
@@ -154,7 +149,7 @@ function RailSidebar() {
   const ysRef = useRef(ys)
   ysRef.current = ys
 
-  const holeY = holeIdx >= 0 ? HEAD + ys[holeIdx] + RH / 2 - scrollTop : null
+  const holeY = holeIdx >= 0 ? HEAD + ys[holeIdx] + rh / 2 - scrollTop : null
   target.current.w = expanded ? W1 : W0
   target.current.cx = expanded ? BUB / 2 + 16 : W0 - FR
   target.current.cy = holeY ?? -200
@@ -191,7 +186,7 @@ function RailSidebar() {
         const st = navRef.current?.scrollTop ?? 0
         rowRefs.current.forEach((row, i) => {
           if (!row) return
-          const rowY = HEAD + ysRef.current[i] + RH / 2 - st
+          const rowY = HEAD + ysRef.current[i] + rhRef.current / 2 - st
           const d = (rowY - a.my) / 75
           row.style.transform = `scale(${(0.88 + 0.3 * Math.exp(-d * d)).toFixed(3)})`
         })
@@ -209,7 +204,6 @@ function RailSidebar() {
   useEffect(() => () => cancelAnimationFrame(raf.current), [])
 
   const close = () => {
-    if (menuOpen) return
     setExpanded(false)
     setHoverIdx(null)
     anim.current.my = -999
@@ -224,7 +218,7 @@ function RailSidebar() {
     if (my >= HEAD && my <= e.currentTarget.clientHeight - FOOT) {
       let best = Infinity
       ys.forEach((y, i) => {
-        const d = Math.abs(HEAD + y + RH / 2 - st - my)
+        const d = Math.abs(HEAD + y + rh / 2 - st - my)
         if (d < best) { best = d; idx = i }
       })
     }
@@ -292,7 +286,7 @@ function RailSidebar() {
                     "absolute left-0 flex origin-left items-center whitespace-nowrap text-sm outline-none",
                     inHole ? "font-semibold text-sidebar-accent" : it.active ? "font-semibold text-red-300" : "text-slate-300 hover:text-white"
                   )}
-                  style={{ top: ys[i], height: RH, width: W1 }}
+                  style={{ top: ys[i], height: rh, width: W1 }}
                 >
                   <span className="flex shrink-0 items-center justify-center" style={{ width: W0 }}>
                     <it.icon className={cn("h-5 w-5 transition-opacity", inHole && "opacity-0")} />
@@ -304,51 +298,95 @@ function RailSidebar() {
           </div>
         </div>
 
-        {/* Piede: campanella e profilo (con Impostazioni e Strumenti admin) */}
-        {user && (
-          <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end pb-2" style={{ height: FOOT }}>
-            <div className="flex items-center" style={{ height: 44 }}>
-              <span className="flex shrink-0 items-center justify-center [&_button]:!text-slate-200" style={{ width: W0 }}><NotificationBell /></span>
-              <span className={cn("whitespace-nowrap text-sm text-slate-300 transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>Notifiche</span>
-            </div>
-            <DropdownMenu open={menuOpen} onOpenChange={o => { setMenuOpen(o); if (!o) { setExpanded(false); setHoverIdx(null) } }}>
-              <DropdownMenuTrigger asChild>
-                <button type="button" title={expanded ? undefined : (fullName || user.email || "Profilo")} className="flex items-center text-left outline-none" style={{ height: 48 }}>
-                  <span className="relative flex shrink-0 items-center justify-center" style={{ width: W0 }}>
-                    <Avatar className={cn("h-8 w-8", inAdminPages && "ring-2 ring-sidebar-accent ring-offset-2 ring-offset-slate-800")}>
-                      <AvatarImage src={`/avatars/${userRole || "user"}.png`} />
-                      <AvatarFallback>{(fullName || user.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    {alerts > 0 && <span className="absolute right-4 top-0 h-2.5 w-2.5 rounded-full bg-red-500" aria-hidden="true" />}
-                  </span>
-                  <span className={cn("min-w-0 pr-3 transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>
-                    <span className="block max-w-[170px] truncate text-sm font-medium text-white">{fullName || user.email}</span>
-                    <span className="block text-xs capitalize text-slate-400">{userRole || "User"}</span>
-                  </span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="end" sideOffset={10} className="w-60">
-                <DropdownMenuLabel className="font-normal">
-                  <span className="block truncate text-sm font-medium">{fullName || user.email}</span>
-                  <span className="block truncate text-xs capitalize text-muted-foreground">{user.email} · {userRole || "User"}</span>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild><Link href="/settings/profile"><UserCircle className="mr-2 h-4 w-4" />Vai al profilo</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="/settings"><Settings className="mr-2 h-4 w-4" />Impostazioni</Link></DropdownMenuItem>
-                {userRole === "admin" && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/strumenti">
-                      <Wrench className="mr-2 h-4 w-4" />Strumenti admin
-                      {alerts > 0 && <span className="ml-auto h-2 w-2 rounded-full bg-red-500" aria-label="Elementi da controllare" />}
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive"><LogOut className="mr-2 h-4 w-4" />Esci</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+      </div>
+    </div>
+  )
+}
+
+// Barra in alto a destra: una linea sottile che da sinistra si allarga con una curva dolce
+// fino a fare spazio a ora, campanella e profilo
+const BAND_W = 230
+const CURVE_W = 150
+const BAND_H = 54
+const LINE_H = 4
+
+function TopBar() {
+  const pathname = usePathname()
+  const { user, signOut, userRole, fullName, simulatedRole } = useAuth()
+  const [now, setNow] = useState<Date | null>(null)
+
+  useEffect(() => {
+    setNow(new Date())
+    const t = setInterval(() => setNow(new Date()), 15000)
+    return () => clearInterval(t)
+  }, [])
+
+  // Avvisi sulla voce Strumenti admin: articoli da verificare e anomalie
+  const [alerts, setAlerts] = useState(0)
+  useEffect(() => {
+    if (userRole !== "admin") return
+    let cancelled = false
+    const check = () => {
+      Promise.all([inventoryApi.getUnverifiedCount(), inventoryApi.getNegativeLotMovements(), inventoryApi.getOrphanedJobReferences()])
+        .then(([unverified, negative, orphaned]) => { if (!cancelled) setAlerts(unverified + negative.length + orphaned.length) })
+        .catch(err => console.error("Failed to load alerts", err))
+    }
+    check()
+    const t = setInterval(check, 60000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [userRole])
+
+  if (!user) return null
+
+  const is = (...bases: string[]) => bases.some(b => pathname === b || pathname.startsWith(b + "/"))
+  const inAdminPages = is("/settings", "/strumenti", "/anomalie", "/controllo-acquisti", "/schede-varianti", "/confezioni", "/cestino") || pathname === "/inventory/verifica"
+  const time = now ? now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : ""
+  const date = now ? now.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }) : ""
+  const cw = CURVE_W
+  const curve = `M0,0 H${cw} V${BAND_H} C${cw * 0.55},${BAND_H} ${cw * 0.45},${LINE_H} 0,${LINE_H} Z`
+
+  return (
+    <div className="pointer-events-none absolute left-0 right-0 z-40 hidden lg:block" style={{ top: simulatedRole ? 40 : 0, paddingLeft: 80 }}>
+      <div className="flex items-start">
+        <div className="flex-1 bg-slate-800" style={{ height: LINE_H }} />
+        <svg width={cw} height={BAND_H} className="shrink-0 fill-slate-800" aria-hidden="true"><path d={curve} /></svg>
+        <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-4 bg-slate-800 pr-5 text-white" style={{ width: BAND_W, height: BAND_H }}>
+          <div className="flex flex-col items-end leading-tight" aria-label="Data e ora">
+            <span className="text-sm font-semibold tabular-nums">{time}</span>
+            <span className="text-[10px] capitalize text-slate-400">{date}</span>
           </div>
-        )}
+          <span className="[&_button]:!text-slate-200"><NotificationBell /></span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" title={fullName || user.email || "Profilo"} className="relative rounded-full outline-none">
+                <Avatar className={cn("h-9 w-9", inAdminPages && "ring-2 ring-sidebar-accent ring-offset-2 ring-offset-slate-800")}>
+                  <AvatarImage src={`/avatars/${userRole || "user"}.png`} />
+                  <AvatarFallback>{(fullName || user.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                {alerts > 0 && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500" aria-hidden="true" />}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="bottom" align="end" sideOffset={8} className="w-60">
+              <DropdownMenuLabel className="font-normal">
+                <span className="block truncate text-sm font-medium">{fullName || user.email}</span>
+                <span className="block truncate text-xs capitalize text-muted-foreground">{user.email} · {userRole || "User"}</span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild><Link href="/settings/profile"><UserCircle className="mr-2 h-4 w-4" />Vai al profilo</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="/settings"><Settings className="mr-2 h-4 w-4" />Impostazioni</Link></DropdownMenuItem>
+              {userRole === "admin" && (
+                <DropdownMenuItem asChild>
+                  <Link href="/strumenti">
+                    <Wrench className="mr-2 h-4 w-4" />Strumenti admin
+                    {alerts > 0 && <span className="ml-auto h-2 w-2 rounded-full bg-red-500" aria-label="Elementi da controllare" />}
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive"><LogOut className="mr-2 h-4 w-4" />Esci</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   )

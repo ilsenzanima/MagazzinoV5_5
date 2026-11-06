@@ -475,7 +475,7 @@ export default function DashboardLayout({
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 p-2 lg:p-8 overflow-y-auto overflow-x-hidden min-w-0">
+        <main className="flex-1 p-2 lg:p-8 lg:pt-[66px] overflow-y-auto overflow-x-hidden min-w-0">
           {children}
         </main>
 
