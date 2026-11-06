@@ -3,6 +3,7 @@
 import { notify } from "@/lib/notify";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -610,9 +611,16 @@ function NewPurchaseContent() {
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         {fromOrderIds.length > 0 ? "Torna agli Ordini" : isOrder ? "Torna agli Ordini" : "Torna agli Acquisti"}
                     </Link>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-                        {fromOrderIds.length > 0 ? "Converti Ordini in Acquisto" : isOrder ? "Registrazione Ordine" : "Registrazione Acquisto / Bolla"}
-                    </h1>
+                    <NotchTabs title={fromOrderIds.length > 0 ? "Converti Ordini in Acquisto" : isOrder ? "Registrazione Ordine" : "Registrazione Acquisto / Bolla"}>
+                        <NotchActions>
+                            <Link href={isOrder ? "/purchases?tab=ordini" : "/purchases"}>
+                                <NotchButton type="button">Annulla</NotchButton>
+                            </Link>
+                            <NotchButton type="submit" form="purchase-form" disabled={loading} className="min-w-24 border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save /> Salva</>}
+                            </NotchButton>
+                        </NotchActions>
+                    </NotchTabs>
                     {fromOrderIds.length > 0 && (
                         <p className="text-sm text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
                             <span className="inline-block w-2 h-2 rounded-full bg-blue-500 shrink-0" />
@@ -621,14 +629,14 @@ function NewPurchaseContent() {
                     )}
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form id="purchase-form" onSubmit={handleSubmit} className="space-y-6">
                     {/* Header Data */}
                     <Card>
                         <CardHeader>
                             <CardTitle>{isOrder ? "Dati Ordine" : "Dati Bolla"}</CardTitle>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="space-y-2">
+                        <CardContent className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                            <div className="space-y-2 md:col-span-2">
                                 <Label htmlFor="supplier">Fornitore *</Label>
                                 <SearchableSelect
                                   options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
@@ -638,7 +646,7 @@ function NewPurchaseContent() {
                                   searchPlaceholder="Scrivi per cercare fornitore..."
                                 />
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2 md:col-span-2">
                                 <Label htmlFor="bolla">{isOrder ? "Numero Ordine *" : "Numero Bolla *"}</Label>
                                 <Input
                                     id="bolla"
@@ -647,7 +655,7 @@ function NewPurchaseContent() {
                                     placeholder={isOrder ? "Es. ORD-2024-001" : "Es. 123/A"}
                                 />
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2 md:col-span-2">
                                 <Label htmlFor="date">{isOrder ? "Data Ordine *" : "Data Bolla *"}</Label>
                                 <Input
                                     id="date"
@@ -656,8 +664,8 @@ function NewPurchaseContent() {
                                     onChange={(e) => setFormData({ ...formData, deliveryNoteDate: e.target.value })}
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
+                            <div className="space-y-2 md:col-span-3 border-t pt-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
                                     <Label className="flex items-center">
                                         {isHeaderJob ? "Commessa (Generale)" : "Magazzino (Generale)"}
                                         <FieldTip text="Dove arriva il materiale si decide qui, una volta sola: tutte le righe dell'acquisto vanno in questo magazzino o in questa commessa. Per spostarlo dopo si usa una movimentazione interna." />
@@ -726,10 +734,10 @@ function NewPurchaseContent() {
                                 )}
                             </div>
 
-                            <div className="space-y-2 md:col-span-4 border-t pt-2">
+                            <div className="space-y-2 md:col-span-3 border-t pt-3">
                                 <Label>Documento Allegato (PDF, Immagine)</Label>
                                 <div
-                                    className={`relative border-2 border-dashed rounded-md p-4 transition-colors text-center ${isDragging
+                                    className={`relative border-2 border-dashed rounded-md p-2 transition-colors text-center ${isDragging
                                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                                         : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                                         }`}
@@ -978,15 +986,6 @@ function NewPurchaseContent() {
                             </div>
                         </CardContent>
                     </Card>
-
-                    <div className="flex justify-end gap-4">
-                        <Link href="/purchases">
-                            <Button variant="outline" type="button">Annulla</Button>
-                        </Link>
-                        <Button type="submit" disabled={loading} className="bg-blue-600 w-32">
-                            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Salva</>}
-                        </Button>
-                    </div>
                 </form>
             </div>
 
