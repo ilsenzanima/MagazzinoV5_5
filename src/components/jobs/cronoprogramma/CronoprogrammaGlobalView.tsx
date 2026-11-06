@@ -17,7 +17,8 @@ import { jobTasksApi, jobsApi, attendanceApi, jobTaskAssignmentsApi, workersApi,
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
 import { SearchableSelect } from "@/components/ui/searchable-select"
-import { HelpTip } from "@/components/ui/help-tip"
+import { NotchTabs, NotchHelp, NotchActions } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { buildJobLinks } from "@/lib/utils/job-links"
 import { localIso, todayIso } from "@/lib/utils/local-date"
@@ -412,14 +413,12 @@ export function CronoprogrammaGlobalView() {
 
     return (
         <div className="w-full space-y-4 pb-4 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:pb-0">
-            <div className="flex shrink-0 items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-2">
-                    <GanttChartSquare className="h-6 w-6 text-blue-600" />
-                    <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Cronoprogramma Commesse</h1>
-                    <HelpTip
-                        wide
-                        title="Come leggere il cronoprogramma"
-                        lines={[
+            {/* Striscia scura: titolo e aiuto a sinistra, filtri a destra */}
+            <NotchTabs title="Cronoprogramma Commesse" className="shrink-0">
+                <NotchHelp
+                    wide
+                    title="Come leggere il cronoprogramma"
+                    lines={[
                             "Barra scura = giorni di lavoro: si spezza dove la commessa è rimasta ferma più di una settimana, con un filo tratteggiato nel vuoto (senza presenze, il periodo della commessa). Passandoci sopra si vedono anche inizio e fine della commessa. Clic sulla barra per aprirla.",
                             "↳ = fasi della commessa: trascina la barra per spostarle, clic per modificarle.",
                             "Puntini verdi = numero di lavoratori presenti quel giorno sul cantiere (si vedono nelle scale Settimane e Giorni). Per le commesse senza fasi sono sotto la barra del periodo.",
@@ -427,37 +426,35 @@ export function CronoprogrammaGlobalView() {
                             "Trascina lo sfondo = spostati nel tempo e tra le commesse; le frecce scorrono a destra e a sinistra.",
                             "Filtro «In cantiere» = commesse attive con la spunta «in cantiere»; «Attive» comprende anche quelle ferme.",
                         ]}
-                    />
-                </div>
-                <Button size="sm" onClick={openCreate}>
-                    <Plus className="h-4 w-4 mr-1" />Aggiungi fase
-                </Button>
-            </div>
+                />
+                <NotchActions>
+                    <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setJobFilter("all") }}>
+                        <SelectTrigger className="h-9 w-36 rounded-full border-slate-300 bg-white text-slate-800" aria-label="Stato commesse"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            {(Object.keys(STATUS_FILTER_LABEL) as StatusFilter[]).map(k => (
+                                <SelectItem key={k} value={k}>{STATUS_FILTER_LABEL[k]}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <div className="w-64 max-w-full text-slate-800">
+                        <SearchableSelect
+                            options={jobOptions}
+                            value={jobFilter}
+                            onValueChange={(v) => setJobFilter(v || "all")}
+                            placeholder="Tutte le commesse"
+                            searchPlaceholder="Cerca per codice, nome o committente..."
+                            emptyMessage="Nessuna commessa trovata."
+                            className="rounded-full border-slate-300 bg-white"
+                        />
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+                        <Checkbox className="border-slate-300" checked={showPhases} onCheckedChange={(v) => setShowPhases(v === true)} />
+                        Mostra le fasi
+                    </label>
+                </NotchActions>
+            </NotchTabs>
 
-            <div className="flex shrink-0 flex-wrap items-center gap-3">
-                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setJobFilter("all") }}>
-                    <SelectTrigger className="w-40" aria-label="Stato commesse"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                        {(Object.keys(STATUS_FILTER_LABEL) as StatusFilter[]).map(k => (
-                            <SelectItem key={k} value={k}>{STATUS_FILTER_LABEL[k]}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <div className="w-72 max-w-full">
-                    <SearchableSelect
-                        options={jobOptions}
-                        value={jobFilter}
-                        onValueChange={(v) => setJobFilter(v || "all")}
-                        placeholder="Tutte le commesse"
-                        searchPlaceholder="Cerca per codice, nome o committente..."
-                        emptyMessage="Nessuna commessa trovata."
-                    />
-                </div>
-                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
-                    <Checkbox checked={showPhases} onCheckedChange={(v) => setShowPhases(v === true)} />
-                    Mostra le fasi
-                </label>
-            </div>
+            <FloatingAddButton showOnMobile label="Aggiungi fase" onClick={openCreate} />
 
             {rows.length === 0 ? (
                 <div className="text-center py-16 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700">

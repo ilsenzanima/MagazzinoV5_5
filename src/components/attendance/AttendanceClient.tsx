@@ -11,7 +11,8 @@ import AssignmentModal from "./AssignmentModal";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import DayDetailPanel from "./DayDetailPanel";
 import { CourseQuickSelectDialog } from "./CourseQuickSelectDialog";
-import { ListPageHeader } from "@/components/ui/list-page-header";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
+import { NotchButton } from "@/components/ui/notch-tabs";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -425,78 +426,69 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     return (
         <div className="space-y-4 min-w-0">
-            <ListPageHeader
-                title="Presenze / Assenze"
-                actions={
-                    <>
-                        <Link href="/attendance/request" className="flex-1 sm:flex-none">
-                            <Button variant="outline" className="w-full gap-2">
-                                <FilePlus className="h-4 w-4" />
-                                Richiesta Permesso
-                            </Button>
-                        </Link>
-                        {canEdit && (
-                            <Button onClick={() => setIsBulkModalOpen(true)} className="flex-1 bg-blue-600 hover:bg-blue-700 sm:flex-none">
-                                <Users className="mr-2 h-4 w-4" />
-                                Inserisci Presenze
-                            </Button>
-                        )}
-                    </>
-                }
-            >
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center justify-center space-x-2">
-                        <Button variant="outline" size="icon" onClick={handlePrevMonth} aria-label="Periodo precedente">
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <div className="font-semibold w-48 text-center capitalize text-lg">
-                            {isMobile
-                                ? (viewStart.getMonth() === viewEnd.getMonth()
-                                    ? `${format(viewStart, 'd')} - ${format(viewEnd, 'd MMMM yyyy', { locale: it })}`
-                                    : `${format(viewStart, 'd MMM', { locale: it })} - ${format(viewEnd, 'd MMM yyyy', { locale: it })}`)
-                                : format(monthStart, 'MMMM yyyy', { locale: it })}
-                        </div>
-                        <Button variant="outline" size="icon" onClick={handleNextMonth} aria-label="Periodo successivo">
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={handleToday} className="ml-2">
-                            Oggi
-                        </Button>
-                        {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
-                    </div>
+            {/* Striscia: titolo a sinistra, mese al centro, filtro a destra */}
+            <div className="grid grid-cols-1 items-center gap-3 rounded-2xl bg-slate-800 px-4 py-3 text-white shadow-md md:grid-cols-[1fr_auto_1fr] dark:bg-slate-700">
+                <h1 className="text-sm font-semibold uppercase tracking-wide">Presenze / Assenze</h1>
 
-                    <div className="flex items-center gap-2">
-                        <Filter className="h-4 w-4 shrink-0 text-slate-500" />
-                        <Select
-                            value={filterJobId || "all"}
-                            onValueChange={(val) => setFilterJobId(val === "all" ? null : val)}
-                        >
-                            <SelectTrigger className="w-full md:w-[300px]">
-                                <SelectValue placeholder="Tutti i cantieri" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Tutti i cantieri</SelectItem>
-                                {jobsInMonth.length === 0 ? (
-                                    <SelectItem value="none" disabled>
-                                        Nessun cantiere nel mese
-                                    </SelectItem>
-                                ) : (
-                                    jobsInMonth.map(job => (
-                                        <SelectItem key={job.id} value={job.id}>
-                                            {job.code} - {job.name}
-                                        </SelectItem>
-                                    ))
-                                )}
-                            </SelectContent>
-                        </Select>
-                        {filterJobId && (
-                            <Button variant="ghost" size="icon" onClick={() => setFilterJobId(null)} aria-label="Rimuovi filtro" className="shrink-0 text-slate-600">
-                                <X className="h-4 w-4" />
-                            </Button>
-                        )}
+                <div className="flex items-center justify-center gap-2">
+                    <NotchButton type="button" size="icon" className="h-8 w-8 px-0" onClick={handlePrevMonth} aria-label="Periodo precedente">
+                        <ChevronLeft />
+                    </NotchButton>
+                    <div className="w-44 text-center text-base font-semibold capitalize">
+                        {isMobile
+                            ? (viewStart.getMonth() === viewEnd.getMonth()
+                                ? `${format(viewStart, 'd')} - ${format(viewEnd, 'd MMMM yyyy', { locale: it })}`
+                                : `${format(viewStart, 'd MMM', { locale: it })} - ${format(viewEnd, 'd MMM yyyy', { locale: it })}`)
+                            : format(monthStart, 'MMMM yyyy', { locale: it })}
                     </div>
+                    <NotchButton type="button" size="icon" className="h-8 w-8 px-0" onClick={handleNextMonth} aria-label="Periodo successivo">
+                        <ChevronRight />
+                    </NotchButton>
+                    <NotchButton type="button" onClick={handleToday}>Oggi</NotchButton>
+                    {isLoading && <Loader2 className="h-4 w-4 animate-spin text-slate-300" />}
                 </div>
-            </ListPageHeader>
+
+                <div className="flex items-center gap-2 md:justify-end">
+                    <Filter className="h-4 w-4 shrink-0 text-slate-300" />
+                    <Select
+                        value={filterJobId || "all"}
+                        onValueChange={(val) => setFilterJobId(val === "all" ? null : val)}
+                    >
+                        <SelectTrigger className="h-9 w-full rounded-full border-slate-300 bg-white text-slate-800 md:w-[260px]">
+                            <SelectValue placeholder="Tutti i cantieri" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Tutti i cantieri</SelectItem>
+                            {jobsInMonth.length === 0 ? (
+                                <SelectItem value="none" disabled>
+                                    Nessun cantiere nel mese
+                                </SelectItem>
+                            ) : (
+                                jobsInMonth.map(job => (
+                                    <SelectItem key={job.id} value={job.id}>
+                                        {job.code} - {job.name}
+                                    </SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                    {filterJobId && (
+                        <button type="button" onClick={() => setFilterJobId(null)} aria-label="Rimuovi filtro" className="shrink-0 rounded-full p-1 text-slate-300 hover:bg-slate-700 hover:text-white">
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Pulsante tondo: passandoci sopra si divide in inserimento presenze e richiesta permesso */}
+            <FloatingAddButton
+                showOnMobile
+                icon={<Users className="h-6 w-6" />}
+                actions={[
+                    ...(canEdit ? [{ label: "Inserisci presenze", onClick: () => setIsBulkModalOpen(true) }] : []),
+                    { label: "Richiedi permesso", href: "/attendance/request" },
+                ]}
+            />
 
             {canEdit && <AttendanceToolbar
                 selectedTool={selectedTool}

@@ -5,7 +5,9 @@ import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 
 interface FloatingAddAction {
-    href: string;
+    // Un link oppure, in alternativa, un'azione (es. apre una finestra)
+    href?: string;
+    onClick?: () => void;
     label: string;
 }
 
@@ -35,15 +37,14 @@ export function FloatingAddButton({ href, onClick, label, actions, icon, showOnM
                     {icon ?? <Plus className="h-7 w-7" />}
                 </span>
                 <div className="flex h-full flex-1 items-stretch opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
-                    {actions.map((a) => (
-                        <Link
-                            key={a.href}
-                            href={a.href}
-                            className="flex flex-1 items-center justify-center whitespace-nowrap border-l border-white/30 px-4 text-sm font-medium hover:bg-blue-700 focus-visible:bg-blue-700"
-                        >
-                            {a.label}
-                        </Link>
-                    ))}
+                    {actions.map((a) => {
+                        const cls = "flex flex-1 items-center justify-center whitespace-nowrap border-l border-white/30 px-4 text-sm font-medium hover:bg-blue-700 focus-visible:bg-blue-700";
+                        return a.href ? (
+                            <Link key={a.label} href={a.href} className={cls}>{a.label}</Link>
+                        ) : (
+                            <button key={a.label} type="button" onClick={a.onClick} className={cls}>{a.label}</button>
+                        );
+                    })}
                 </div>
             </div>
         );
