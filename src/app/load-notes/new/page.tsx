@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -258,7 +259,19 @@ export default function NewLoadNotePage() {
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         Torna alle Note
                     </Link>
-                    <h1 className="text-2xl font-bold">Nuova Nota di Carico</h1>
+                    <NotchTabs title="Nuova Nota di Carico">
+                        <NotchActions>
+                            <Link href="/load-notes">
+                                <NotchButton type="button">Annulla</NotchButton>
+                            </Link>
+                            <NotchButton
+                                type="button" onClick={handleSave} disabled={!isValid || isLoading}
+                                className="min-w-24 border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white"
+                            >
+                                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save /> Salva</>}
+                            </NotchButton>
+                        </NotchActions>
+                    </NotchTabs>
                     <p className="text-muted-foreground text-sm">
                         Inserisci il materiale prelevato. Non scarica il magazzino.
                     </p>
@@ -448,15 +461,6 @@ export default function NewLoadNotePage() {
                             </div>
                         </CardContent>
                     </Card>
-
-                    <div className="flex justify-end gap-4">
-                        <Link href="/load-notes">
-                            <Button variant="outline" type="button">Annulla</Button>
-                        </Link>
-                        <Button onClick={handleSave} disabled={!isValid || isLoading} className="w-32">
-                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Salva</>}
-                        </Button>
-                    </div>
                 </div>
             </div>
 
