@@ -10,6 +10,7 @@ export default function AnagrafichePage() {
   const { userRole } = useAuth()
   return (
     <SectionsPage
+      merge
       title="Committenti e fornitori"
       sections={[
         { key: "committenti", label: "Committenti", icon: <Users className="h-4 w-4" />, render: () => <ClientsPage /> },

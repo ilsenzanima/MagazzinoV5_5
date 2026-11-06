@@ -366,3 +366,16 @@ body.font-opendyslexic h6 {
 /* La barra di scorrimento della pagina è nascosta: al suo posto c'è l'indicatore sovrapposto (ScrollPill) */
 html { scrollbar-width: none; -ms-overflow-style: none; }
 html::-webkit-scrollbar { display: none; }
+
+/* Tabelle come schede: rilievo morbido, come le Card. Restano com'erano dentro una Card o una finestra di dialogo. */
+:root { --raised: 6px 6px 16px rgba(148, 163, 184, 0.35), -6px -6px 16px rgba(255, 255, 255, 0.95); }
+.dark { --raised: 6px 6px 16px rgba(0, 0, 0, 0.5), -4px -4px 12px rgba(255, 255, 255, 0.04); }
+div[class~="border"]:has(> [data-slot="table-container"]):not([data-slot="card"] *, [role="dialog"] *),
+[data-slot="table-container"]:not(div[class~="border"] > *, [data-slot="card"] *, [role="dialog"] *) {
+  border-radius: 1rem;
+  background-color: var(--card);
+  box-shadow: var(--raised);
+}
+div[class~="border"]:has(> [data-slot="table-container"]):not([data-slot="card"] *, [role="dialog"] *) {
+  border-color: transparent;
+}

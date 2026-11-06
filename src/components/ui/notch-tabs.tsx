@@ -23,6 +23,8 @@ interface NotchTabsProps {
   // Nome della pagina, a sinistra nella striscia
   title?: ReactNode
   className?: string
+  // Titolo sopra e tab centrati sotto (come in Strumenti admin), anche se ci sarebbe spazio per tenere tutto in una riga
+  compact?: boolean
   // Larghezza massima di ogni voce (default 170)
   tabWidth?: number
   // Il contenuto delle schede: può mettere i pulsanti della scheda a destra nella striscia con <NotchActions>
@@ -58,6 +60,10 @@ function barGeometry(w: number, x: number) {
 
 interface Slots { actions: HTMLElement | null; help: HTMLElement | null }
 const SlotsCtx = createContext<Slots>({ actions: null, help: null })
+// Per le pagine che stanno dentro una pagina unita: leggono gli spazi della striscia (ricerca e pulsanti vanno lì)
+export const useNotchSlots = () => useContext(SlotsCtx)
+// Vero quando la pagina sta sotto la striscia di una pagina unita: la sua striscia piatta si avvicina a quella sopra
+export const NestedStripCtx = createContext(false)
 
 // Stile unico dei pulsanti nella striscia, uguale in ogni pagina
 export function NotchButton({ className, ...props }: React.ComponentProps<typeof Button>) {
@@ -105,7 +111,8 @@ export function NotchActions({ children }: { children: ReactNode }) {
 
 // Striscia unica: nome della pagina a sinistra, tab con tacca animata al centro, pulsanti a destra.
 // Se lo spazio non basta, titolo e pulsanti passano sopra la barra. Su telefono le voci non attive mostrano solo l'icona.
-export function NotchTabs({ items = [], value = "", onValueChange, title, className, tabWidth = TAB_W, children }: NotchTabsProps) {
+export function NotchTabs({ items = [], value = "", onValueChange, title, className, tabWidth = TAB_W, compact, children }: NotchTabsProps) {
+  const nested = useContext(NestedStripCtx)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null)
   const [helpEl, setHelpEl] = useState<HTMLElement | null>(null)
@@ -117,7 +124,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
 
   const tw = Math.min(items.length * tabWidth, width)
   const sideRoom = (width - tw) / 2
-  const inline = sideRoom >= SIDE_MIN
+  const inline = !compact && sideRoom >= SIDE_MIN
   const barW = inline ? width : tw
   const ox = inline ? sideRoom : 0
   const colW = items.length ? tw / items.length : 0
@@ -175,7 +182,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
   if (items.length === 0) {
     return (
       <SlotsCtx.Provider value={slots}>
-        <div style={{ minHeight: H }} className={cn("mt-7 flex items-center justify-between gap-3 rounded-2xl bg-slate-800 px-4 text-white shadow-md dark:bg-slate-700", className)}>
+        <div style={{ minHeight: H }} className={cn("flex items-center justify-between gap-3 rounded-2xl bg-slate-800 px-4 text-white shadow-md dark:bg-slate-700", nested ? "mt-0" : "mt-7", className)}>
           {titleBlock}
           {actionsBlock}
         </div>

@@ -1,7 +1,10 @@
 "use client"
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { ChevronLeft, Search } from "lucide-react";
+import { useNotchSlots, NestedStripCtx } from "@/components/ui/notch-tabs";
+import { useContext } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,10 +31,31 @@ interface ListPageHeaderProps {
 
 // Intestazione standard delle pagine con un elenco: riquadro fisso in alto con titolo e barra di ricerca
 export function ListPageHeader({ title, actions, search, searchActions, children, strip }: ListPageHeaderProps) {
+    const { actions: slot } = useNotchSlots();
+    const nested = useContext(NestedStripCtx);
+    // Dentro una pagina unita da PC: niente seconda striscia, ricerca e filtri vanno nella striscia di sopra
+    const merged = !!(strip && slot);
+    const mergedSearch = merged && (search || searchActions) ? createPortal(
+        <div className="hidden items-center gap-2 md:flex">
+            {search && (
+                <div className="relative w-72 max-w-full">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Label htmlFor={search.id + "-strip"} className="sr-only">{search.label}</Label>
+                    <Input id={search.id + "-strip"} name="search" type="search" autoComplete="off" placeholder={search.placeholder} className="h-9 rounded-full border-none bg-white pl-9 text-slate-800" value={search.value} onChange={(e) => search.onChange(e.target.value)} />
+                </div>
+            )}
+            {searchActions}
+        </div>,
+        slot!
+    ) : null;
     return (
+        <>
+        {mergedSearch}
         <div className={cn(
             "bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border",
-            strip && "md:flex md:items-center md:gap-4 md:space-y-0 md:mt-7 md:min-h-[68px] md:rounded-2xl md:border-0 md:bg-slate-800 md:px-4 md:py-0 md:text-white md:shadow-md md:dark:bg-slate-800"
+            merged && "md:hidden",
+            strip && (nested ? "md:mt-0" : "md:mt-7"),
+            strip && "md:flex md:items-center md:gap-4 md:space-y-0 md:min-h-[68px] md:rounded-2xl md:border-0 md:bg-slate-800 md:px-4 md:py-0 md:text-white md:shadow-md md:dark:bg-slate-800"
         )}>
             <div className={cn("flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4", strip && "md:justify-start")}>
                 <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -65,5 +89,6 @@ export function ListPageHeader({ title, actions, search, searchActions, children
 
             {children}
         </div>
+        </>
     );
 }
