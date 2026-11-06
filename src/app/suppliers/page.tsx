@@ -110,8 +110,12 @@ function SuppliersPageContent() {
     if (sortKey !== "name") params.set("sort", sortKey);
     if (sortDir !== "asc") params.set("dir", sortDir);
     if (page !== 1) params.set("page", String(page));
+    // Dentro una pagina unita (/anagrafiche, /report-analisi) resta sulla pagina corrente e mantiene la scheda scelta (?v=)
+    const here = typeof window !== "undefined" ? window.location.pathname : "/suppliers";
+    const section = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("v") : null;
+    if (section) params.set("v", section);
     const query = params.toString();
-    router.replace(query ? `/suppliers?${query}` : "/suppliers", { scroll: false });
+    router.replace(query ? `${here}?${query}` : here, { scroll: false });
   }, [debouncedSearch, completeness, year, sortKey, sortDir, page, router]);
 
   const load = async () => {

@@ -29,8 +29,12 @@ function ReportsContent() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (activeTab !== "articles") params.set("tab", activeTab);
+    // Dentro una pagina unita (/anagrafiche, /report-analisi) resta sulla pagina corrente e mantiene la scheda scelta (?v=)
+    const here = typeof window !== "undefined" ? window.location.pathname : "/reports";
+    const section = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("v") : null;
+    if (section) params.set("v", section);
     const query = params.toString();
-    router.replace(query ? `/reports?${query}` : "/reports", { scroll: false });
+    router.replace(query ? `${here}?${query}` : here, { scroll: false });
   }, [activeTab, router]);
 
   // Solo admin e operativi vedono i report
