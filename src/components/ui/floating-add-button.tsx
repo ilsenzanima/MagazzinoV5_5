@@ -31,7 +31,7 @@ export function FloatingAddButton({ href, onClick, label, actions, icon, showOnM
     if (actions && actions.length > 0) {
         return (
             <div
-                className={`group fixed bottom-10 right-10 z-20 ${vis} h-14 w-14 items-center overflow-hidden rounded-full bg-blue-600 text-white shadow-lg transition-all duration-300 ease-out hover:w-[30rem] focus-within:w-[30rem]`}
+                className={`group fixed bottom-10 right-10 z-20 ${vis} h-14 w-14 items-center overflow-hidden rounded-full bg-blue-600 text-white ring-[6px] ring-white/80 shadow-[0_10px_18px_rgba(37,99,235,0.35),inset_0_2px_2px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(0,0,0,0.25)] dark:ring-white/10 transition-all duration-300 ease-out hover:w-[30rem] focus-within:w-[30rem]`}
             >
                 <span className="grid h-14 w-14 shrink-0 place-items-center" aria-hidden>
                     {icon ?? <Plus className="h-7 w-7" />}
@@ -50,7 +50,7 @@ export function FloatingAddButton({ href, onClick, label, actions, icon, showOnM
         );
     }
 
-    const className = `group fixed bottom-10 right-10 z-20 ${vis} h-14 w-14 items-center overflow-hidden rounded-full bg-blue-600 text-white shadow-lg transition-all duration-300 ease-out hover:w-56 hover:bg-blue-700 focus-visible:w-56 focus-visible:bg-blue-700`;
+    const className = `group fixed bottom-10 right-10 z-20 ${vis} h-14 w-14 items-center overflow-hidden rounded-full bg-blue-600 text-white ring-[6px] ring-white/80 shadow-[0_10px_18px_rgba(37,99,235,0.35),inset_0_2px_2px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(0,0,0,0.25)] dark:ring-white/10 transition-all duration-300 ease-out hover:w-56 hover:bg-blue-700 focus-visible:w-56 focus-visible:bg-blue-700`;
     const content = (
         <>
             <span className="grid h-14 w-14 shrink-0 place-items-center">
