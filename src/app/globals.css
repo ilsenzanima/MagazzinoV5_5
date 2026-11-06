@@ -362,3 +362,7 @@ body.font-opendyslexic h6 {
   from { transform: rotateX(90deg); }
   to { transform: rotateX(0deg); }
 }
+
+/* La barra di scorrimento della pagina è nascosta: al suo posto c'è l'indicatore sovrapposto (ScrollPill) */
+html { scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar { display: none; }

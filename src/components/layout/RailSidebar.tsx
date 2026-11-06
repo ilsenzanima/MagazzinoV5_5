@@ -60,6 +60,9 @@ const slotPath = (w: number, cx: number, cy: number) =>
 let railWanted = false
 let railTimer: ReturnType<typeof setTimeout> | undefined
 const railListeners = new Set<() => void>()
+// Larghezza attuale del menu (animata): la barra in alto parte sempre dal suo bordo destro
+let railW = W0
+const railWListeners = new Set<(w: number) => void>()
 const setRail = (v: boolean) => { if (railWanted !== v) { railWanted = v; railListeners.forEach(l => l()) } }
 export function useRailRequest(on: boolean) {
   useEffect(() => {
@@ -75,7 +78,7 @@ export function RailHost() {
     () => railWanted,
     () => false
   )
-  return wanted ? <><TopBar /><RailSidebar /></> : null
+  return wanted ? <><TopBar /><RailSidebar /><ScrollPill /></> : null
 }
 
 function RailSidebar() {
@@ -160,6 +163,7 @@ function RailSidebar() {
     const t = target.current
     const k = 0.11
     a.w += (t.w - a.w) * k
+    const prevW = railW
     a.cx += (t.cx - a.cx) * k
     a.cy += (t.cy - a.cy) * (a.cy < -100 || t.cy < -100 ? 1 : 0.16)
     let moving = false
@@ -174,6 +178,7 @@ function RailSidebar() {
       const hasHole = t.cy > -100
       const cy = Math.min(Math.max(a.cy, lo), hi)
       panel.style.width = `${a.w}px`
+      if (a.w !== prevW) { railW = a.w; railWListeners.forEach(f => f(a.w)) }
       svgRef.current.setAttribute("width", String(a.w))
       svgRef.current.setAttribute("height", String(h))
       pathRef.current.setAttribute("d", hasHole ? panelPath(a.w, h, a.cx, cy) : rectPath(a.w, h))
@@ -201,7 +206,7 @@ function RailSidebar() {
 
   // Qualsiasi cambio di bersaglio rimette in moto l'animazione, che poi si ferma da sola
   useEffect(() => { kick() }, [expanded, holeIdx, scrollTop, kick, listHeight])
-  useEffect(() => () => cancelAnimationFrame(raf.current), [])
+  useEffect(() => () => { cancelAnimationFrame(raf.current); railW = W0; railWListeners.forEach(f => f(W0)) }, [])
 
   const close = () => {
     setExpanded(false)
@@ -308,12 +313,22 @@ function RailSidebar() {
 const BAND_W = 250
 const CURVE_W = 150
 const BAND_H = 54
-const LINE_H = 8
+const LINE_H = 15
+const CAP_R = CR + 5 // raggio dell'incavo che segue l'angolo del menu
 
 function TopBar() {
   const pathname = usePathname()
   const { user, signOut, userRole, fullName, simulatedRole } = useAuth()
   const [now, setNow] = useState<Date | null>(null)
+  const barRef = useRef<HTMLDivElement>(null)
+
+  // Il punto di partenza della linea si sposta insieme al menu quando si apre e si chiude
+  useEffect(() => {
+    const f = (w: number) => { if (barRef.current) barRef.current.style.paddingLeft = `${w + 8 - CR}px` }
+    railWListeners.add(f)
+    f(railW)
+    return () => { railWListeners.delete(f) }
+  }, [])
 
   useEffect(() => {
     setNow(new Date())
@@ -344,11 +359,17 @@ function TopBar() {
   const cw = CURVE_W
   // la curva è 2px più larga e si sovrappone alla linea e alla fascia: niente fessura chiara tra i pezzi
   const sw = cw + 2
+  // Estremità sinistra della linea: un incavo che segue l'angolo in alto a destra del menu, senza sovrapporsi
+  const capCy = 8 + CR
+  const capDx = Math.sqrt(CAP_R ** 2 - (capCy - LINE_H) ** 2)
+  const capTop = capCy - CAP_R
+  const cap = `M0,0 H${CAP_R + 1} V${LINE_H} H${capDx} A${CAP_R},${CAP_R} 0 0 0 0,${capTop} Z`
   const curve = `M0,0 H${sw} V${BAND_H} C${sw * 0.55},${BAND_H} ${sw * 0.45},${LINE_H} 0,${LINE_H} Z`
 
   return (
-    <div className="pointer-events-none absolute left-0 right-0 z-40 hidden lg:block" style={{ top: simulatedRole ? 40 : 0, paddingLeft: 80 }}>
+    <div ref={barRef} className="pointer-events-none absolute left-0 right-0 z-40 hidden lg:block" style={{ top: simulatedRole ? 40 : 0, paddingLeft: railW + 8 - CR }}>
       <div className="flex items-start">
+        <svg width={CAP_R + 1} height={LINE_H} className="shrink-0 fill-slate-800" aria-hidden="true"><path d={cap} /></svg>
         <div className="flex-1 bg-slate-800" style={{ height: LINE_H }} />
         <svg width={sw} height={BAND_H} className="shrink-0 fill-slate-800" style={{ marginLeft: -1, marginRight: -1 }} aria-hidden="true"><path d={curve} /></svg>
         <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-4 bg-slate-800 pr-5 text-white" style={{ width: BAND_W, height: BAND_H }}>
@@ -434,6 +455,52 @@ function FlipDigit({ value }: { value: string }) {
           <FlipHalf key={`b${cur}`} d={cur} bottom onAnimationEnd={() => setPrev(cur)} className="flip-leaf-bottom z-10 [backface-visibility:hidden]" />
         </>
       )}
+    </div>
+  )
+}
+
+// Indicatore di scorrimento sovrapposto: linea sottile con una pillola che sale e scende
+// e sparisce poco dopo lo scorrimento. La scrollbar vera è nascosta, così la pagina non "scatta".
+function ScrollPill() {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const pillRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    let hideTimer: ReturnType<typeof setTimeout> | undefined
+    let frame = 0
+    const update = (show: boolean) => {
+      const wrap = wrapRef.current
+      const pill = pillRef.current
+      if (!wrap || !pill) return
+      const el = document.documentElement
+      const max = el.scrollHeight - el.clientHeight
+      if (max <= 2) { wrap.style.opacity = "0"; return }
+      const track = wrap.clientHeight
+      const h = Math.max(36, Math.round((el.clientHeight / el.scrollHeight) * track))
+      const y = Math.round((window.scrollY / max) * (track - h))
+      pill.style.height = `${h}px`
+      pill.style.transform = `translateY(${y}px)`
+      if (show) {
+        wrap.style.opacity = "1"
+        clearTimeout(hideTimer)
+        hideTimer = setTimeout(() => { wrap.style.opacity = "0" }, 900)
+      }
+    }
+    const onScroll = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => update(true)) }
+    window.addEventListener("scroll", onScroll, { passive: true })
+    window.addEventListener("resize", onScroll)
+    return () => {
+      window.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onScroll)
+      cancelAnimationFrame(frame)
+      clearTimeout(hideTimer)
+    }
+  }, [])
+
+  return (
+    <div ref={wrapRef} className="pointer-events-none fixed bottom-3 right-1.5 top-16 z-[45] w-1.5 opacity-0 transition-opacity duration-300" aria-hidden="true">
+      <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-400/40" />
+      <div ref={pillRef} className="absolute inset-x-0 top-0 rounded-full bg-slate-700" />
     </div>
   )
 }
