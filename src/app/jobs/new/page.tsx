@@ -5,6 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -222,15 +223,20 @@ function NewJobForm() {
   return (
     <DashboardLayout>
       <BlockBrowserBack />
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-6">
-          <Link href="/jobs" className="flex items-center text-slate-500 hover:text-slate-900 mb-2">
+      <div className="w-full">
+        <div className="mb-6 space-y-2">
+          <Link href="/jobs" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Torna alle Commesse
+            Commesse
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900">
-            {cloneId ? "Nuovo Inizio Cantiere" : "Nuova Commessa"}
-          </h1>
+          <NotchTabs title={cloneId ? "Nuovo Inizio Cantiere" : "Nuova Commessa"}>
+            <NotchActions>
+              <Link href="/jobs"><NotchButton type="button">Annulla</NotchButton></Link>
+              <NotchButton type="submit" form="job-form" disabled={loading} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                {loading ? <Loader2 className="animate-spin" /> : <Save />} Salva
+              </NotchButton>
+            </NotchActions>
+          </NotchTabs>
           {cloneId && (
             <p className="text-sm text-blue-600 mt-1">
               Dati pre-compilati dalla commessa precedente. Inserisci la nuova data di inizio — CIG e CUP sono stati lasciati vuoti.
@@ -238,7 +244,7 @@ function NewJobForm() {
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id="job-form" onSubmit={handleSubmit} className="space-y-6">
 
           {/* Nuovo inizio: parti da una commessa esistente */}
           <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
@@ -511,25 +517,6 @@ function NewJobForm() {
                 </div>
               </CardContent>
             </Card>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Link href="/jobs">
-              <Button type="button" variant="outline">Annulla</Button>
-            </Link>
-            <Button type="submit" disabled={loading} className="bg-blue-600">
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvataggio...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Salva Commessa
-                </>
-              )}
-            </Button>
           </div>
         </form>
       </div>

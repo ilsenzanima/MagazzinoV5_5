@@ -5,6 +5,7 @@ import { notify } from "@/lib/notify";;
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2, Wand2 } from "lucide-react";
 import { inventoryApi } from "@/lib/api";
@@ -174,26 +175,16 @@ function NewInventoryItemContent() {
   return (
     <DashboardLayout>
       <BlockBrowserBack />
-      <div className="max-w-3xl mx-auto space-y-6 pb-20">
+      <div className="w-full space-y-6 pb-20">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Link href="/inventory">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                {cloneId ? "Crea Variante Articolo" : "Nuovo Articolo"}
-              </h1>
-              <p className="text-sm text-slate-500">
-                {cloneId ? "Creazione variante da articolo esistente" : "Aggiungi un nuovo prodotto al magazzino"}
-              </p>
-            </div>
-          </div>
+        <div className="space-y-2">
+          <Link href="/inventory" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
+            <ArrowLeft className="mr-1 h-4 w-4" /> Inventario
+          </Link>
+          <NotchTabs title={cloneId ? "Crea Variante Articolo" : "Nuovo Articolo"}>
+            <NotchActions>
           {!wizardOpen && (
-            <Button variant="outline" onClick={() => {
+            <NotchButton type="button" onClick={() => {
               // Riporta nel modale i valori attuali della scheda, anche quelli modificati a mano
               const current = formRef.current?.getValues();
               if (current) {
@@ -218,8 +209,10 @@ function NewInventoryItemContent() {
             }}>
               <Wand2 className="mr-2 h-4 w-4" />
               Procedura guidata
-            </Button>
+            </NotchButton>
           )}
+            </NotchActions>
+          </NotchTabs>
         </div>
 
         <InventoryItemForm

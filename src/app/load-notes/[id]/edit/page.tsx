@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -292,16 +293,20 @@ export default function EditLoadNotePage() {
     return (
         <DashboardLayout>
           <BlockBrowserBack />
-            <div className="max-w-4xl mx-auto pb-10">
-                <div className="mb-6">
-                    <Link href={`/load-notes/${noteId}`} className="flex items-center text-muted-foreground hover:text-foreground mb-2">
+            <div className="w-full pb-10">
+                <div className="mb-6 space-y-2">
+                    <Link href={`/load-notes/${noteId}`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         Torna al Dettaglio
                     </Link>
-                    <h1 className="text-2xl font-bold">Modifica Nota di Carico</h1>
-                    <p className="text-muted-foreground text-sm">
-                        Modifica i dati della nota e i materiali.
-                    </p>
+                    <NotchTabs title="Modifica Nota di Carico">
+                        <NotchActions>
+                            <Link href={`/load-notes/${noteId}`}><NotchButton type="button">Annulla</NotchButton></Link>
+                            <NotchButton type="button" onClick={handleSave} disabled={!isValid || isLoading} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                                {isLoading ? <Loader2 className="animate-spin" /> : <Save />} Salva
+                            </NotchButton>
+                        </NotchActions>
+                    </NotchTabs>
                 </div>
 
                 <div className="space-y-6">
@@ -472,15 +477,6 @@ export default function EditLoadNotePage() {
                             </div>
                         </CardContent>
                     </Card>
-
-                    <div className="flex justify-end gap-4">
-                        <Link href={`/load-notes/${noteId}`}>
-                            <Button variant="outline" type="button">Annulla</Button>
-                        </Link>
-                        <Button onClick={handleSave} disabled={!isValid || isLoading} className="w-32">
-                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Salva</>}
-                        </Button>
-                    </div>
                 </div>
             </div>
 

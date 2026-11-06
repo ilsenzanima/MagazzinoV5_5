@@ -6,8 +6,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ShieldCheck, ExternalLink, PackageSearch } from "lucide-react";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { NotchTabs } from "@/components/ui/notch-tabs";
+import { Loader2, ShieldCheck, ExternalLink, PackageSearch, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { inventoryApi, UntrackedStockItem } from "@/lib/services/inventory";
 import { InventoryItem } from "@/lib/types";
@@ -22,6 +23,7 @@ function formatDate(iso: string): string {
 }
 
 export default function InventoryVerificaPage() {
+    const [tab, setTab] = useState("nuovi");
     const { userRole } = useAuth();
 
     const [items, setItems] = useState<UnverifiedItem[]>([]);
@@ -90,24 +92,17 @@ export default function InventoryVerificaPage() {
     return (
         <DashboardLayout>
             <div className="space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <ShieldCheck className="h-6 w-6 text-green-600" />
-                        Controllo Articoli
-                    </h1>
-                </div>
-
-                <Tabs defaultValue="nuovi">
-                    <TabsList>
-                        <TabsTrigger value="nuovi" className="gap-2">
-                            Nuovi Articoli
-                            {items.length > 0 && <Badge variant="secondary">{items.length}</Badge>}
-                        </TabsTrigger>
-                        <TabsTrigger value="fuori-lotto" className="gap-2">
-                            Fuori Lotto
-                            {untracked.length > 0 && <Badge variant="secondary">{untracked.length}</Badge>}
-                        </TabsTrigger>
-                    </TabsList>
+                <Tabs value={tab} onValueChange={setTab}>
+                    <NotchTabs
+                        title="Controllo Articoli"
+                        items={[
+                            { value: "nuovi", label: items.length > 0 ? `Nuovi Articoli (${items.length})` : "Nuovi Articoli", icon: <ShieldCheck /> },
+                            { value: "fuori-lotto", label: untracked.length > 0 ? `Fuori Lotto (${untracked.length})` : "Fuori Lotto", icon: <AlertTriangle /> },
+                        ]}
+                        value={tab}
+                        onValueChange={setTab}
+                        tabWidth={210}
+                    />
 
                     <TabsContent value="nuovi" className="mt-4 space-y-4">
                         <p className="text-sm text-slate-500 dark:text-slate-400">
