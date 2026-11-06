@@ -4,18 +4,16 @@ import { notify } from "@/lib/notify";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Loader2, FileText, Calendar, User, AlertTriangle,
   Paperclip, Package, PackageX, Receipt, ClipboardList, ArrowRightLeft, Undo2,
-  ArrowUp, ArrowDown, ArrowUpDown
+  ArrowUp, ArrowDown, ArrowUpDown, ShoppingCart, Layers
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { KindBadge } from "@/components/purchases/KindBadge";
-import { ListPageHeader } from "@/components/ui/list-page-header";
+import { NotchTabs, NotchSearch, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
 import { useState, useEffect, useRef, Suspense } from "react";
@@ -65,8 +63,6 @@ function PurchasesPageContent() {
   const [kind, setKind] = useState<DocumentKind | "all">(kindFromParams(searchParams));
   const [searchTerm, setSearchTerm] = useState(searchParams?.get("q") || "");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
-  const [dateFrom, setDateFrom] = useState(searchParams?.get("dateFrom") || "");
-  const [dateTo, setDateTo] = useState(searchParams?.get("dateTo") || "");
   const [supplierId, setSupplierId] = useState(searchParams?.get("supplierId") || "");
   const [sortKey, setSortKey] = useState<PurchaseDocumentSortKey>((searchParams?.get("sort") as PurchaseDocumentSortKey) || "date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams?.get("dir") === "asc" ? "asc" : "desc");
@@ -100,15 +96,13 @@ function PurchasesPageContent() {
     const params = new URLSearchParams();
     if (kind !== "all") params.set("tipo", kind);
     if (debouncedSearch) params.set("q", debouncedSearch);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
     if (supplierId) params.set("supplierId", supplierId);
     if (sortKey !== "date") params.set("sort", sortKey);
     if (sortDir !== "desc") params.set("dir", sortDir);
     if (page !== 1) params.set("page", String(page));
     const query = params.toString();
     router.replace(query ? `/purchases?${query}` : "/purchases", { scroll: false });
-  }, [kind, debouncedSearch, dateFrom, dateTo, supplierId, sortKey, sortDir, page, router]);
+  }, [kind, debouncedSearch, supplierId, sortKey, sortDir, page, router]);
 
   const load = async () => {
     const id = ++requestId.current;
@@ -116,7 +110,7 @@ function PurchasesPageContent() {
       setLoading(true);
       const { data, total } = await purchaseDocumentsApi.getPaginated({
         page, limit: PAGE_SIZE, search: debouncedSearch, kind: effectiveKind, supplierId,
-        dateFrom, dateTo, sort: sortKey, dir: sortDir, includeInvoices: canSeeFatture,
+        sort: sortKey, dir: sortDir, includeInvoices: canSeeFatture,
       });
       if (id !== requestId.current) return;
       setDocs(data);
@@ -132,7 +126,7 @@ function PurchasesPageContent() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, effectiveKind, supplierId, dateFrom, dateTo, sortKey, sortDir, canSeeFatture]);
+  }, [page, debouncedSearch, effectiveKind, supplierId, sortKey, sortDir, canSeeFatture]);
 
   const toggleSort = (key: PurchaseDocumentSortKey) => {
     if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -142,11 +136,10 @@ function PurchasesPageContent() {
 
   const changeKind = (v: string) => { setKind(v as DocumentKind | "all"); setPage(1); };
   const changeSupplier = (v: string) => { setSupplierId(v === "all" ? "" : v); setPage(1); };
-  const changeDate = (setter: (v: string) => void) => (v: string) => { setter(v); setPage(1); };
 
-  const anyFilterActive = kind !== "all" || !!supplierId || !!dateFrom || !!dateTo || !!searchTerm;
+  const anyFilterActive = kind !== "all" || !!supplierId || !!searchTerm;
   const resetFilters = () => {
-    setKind("all"); setSupplierId(""); setDateFrom(""); setDateTo(""); setSearchTerm(""); setPage(1);
+    setKind("all"); setSupplierId(""); setSearchTerm(""); setPage(1);
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -209,45 +202,27 @@ function PurchasesPageContent() {
 
   return (
     <>
-      <ListPageHeader
-        title="Gestione Acquisti"
-        actions={canSeeAmounts && (
-          <div className="flex gap-1.5 md:hidden">
-            <Link href="/purchases/new"><Button size="sm" className="bg-blue-600 hover:bg-blue-700">Acquisto</Button></Link>
-            <Link href="/purchases/new?type=order"><Button size="sm" variant="outline">Ordine</Button></Link>
-            <Link href="/invoices/new"><Button size="sm" variant="outline">Fattura</Button></Link>
-          </div>
-        )}
-        search={{ id: "purchases-search", label: "Cerca documenti", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca per numero, fornitore, commessa, articolo... (virgola = OR)" }}
-        searchActions={
-          <>
-            <div className="hidden items-center gap-2 md:flex">
-              <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Dal</span>
-              <Input type="date" aria-label="Dal" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-              <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Al</span>
-              <Input type="date" aria-label="Al" className="w-36 border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
-            </div>
-            {anyFilterActive && (
-              <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
-                Azzera filtri
-              </Button>
-            )}
-          </>
-        }
+      <NotchTabs
+        title="Acquisti"
+        items={[
+          { value: "all", label: "Tutti", icon: <Layers /> },
+          { value: "purchase", label: "Acquisti", icon: <ShoppingCart /> },
+          { value: "order", label: "Ordini", icon: <ClipboardList /> },
+          ...(canSeeFatture ? [{ value: "invoice", label: "Fatture", icon: <Receipt /> }] : []),
+        ]}
+        value={effectiveKind}
+        onValueChange={changeKind}
+        className="mb-4"
       >
-        {/* Telefono: date, tipo e fornitore */}
-        <div className="grid grid-cols-2 gap-2 md:hidden">
-          <Input type="date" aria-label="Dal" className="border-none bg-slate-100 dark:bg-muted" value={dateFrom} onChange={(e) => changeDate(setDateFrom)(e.target.value)} />
-          <Input type="date" aria-label="Al" className="border-none bg-slate-100 dark:bg-muted" value={dateTo} onChange={(e) => changeDate(setDateTo)(e.target.value)} />
-          <Select value={kind} onValueChange={changeKind}>
-            <SelectTrigger aria-label="Tipo"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tutti i documenti</SelectItem>
-              <SelectItem value="purchase">Acquisti</SelectItem>
-              <SelectItem value="order">Ordini</SelectItem>
-              {canSeeFatture && <SelectItem value="invoice">Fatture</SelectItem>}
-            </SelectContent>
-          </Select>
+        <NotchActions>
+          {anyFilterActive && (
+            <NotchButton type="button" onClick={resetFilters} className="hidden md:inline-flex">Azzera filtri</NotchButton>
+          )}
+        </NotchActions>
+        <NotchSearch value={searchTerm} onChange={setSearchTerm} placeholder="Cerca per numero, fornitore, commessa, articolo... (virgola = OR)" />
+
+        {/* Telefono: fornitore */}
+        <div className="mb-4 md:hidden">
           <SearchableSelect
             options={[{ value: "all", label: "Tutti i fornitori" }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
             value={supplierId}
@@ -256,7 +231,7 @@ function PurchasesPageContent() {
             searchPlaceholder="Scrivi per cercare fornitore..."
           />
         </div>
-      </ListPageHeader>
+
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -271,23 +246,7 @@ function PurchasesPageContent() {
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                   <TableHead className={`w-40 ${headCls}`}>
-                    <div className="flex items-center gap-1">
-                      <div className="min-w-0 flex-1">
-                        <Select value={kind} onValueChange={changeKind}>
-                          <SelectTrigger aria-label="Filtra per tipo" className="h-7 border-slate-300 bg-white px-2 text-xs font-semibold uppercase"><SelectValue placeholder="Tipo" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Tutti i documenti</SelectItem>
-                            <SelectItem value="purchase">Acquisti</SelectItem>
-                            <SelectItem value="order">Ordini</SelectItem>
-                            {canSeeFatture && <SelectItem value="invoice">Fatture</SelectItem>}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900">
-                        <SortArrow active={sortKey === "type"} dir={sortDir} />
-                      </button>
-                    </div>
-                  </TableHead>
+                    {sortBtn("type", "Tipo")}</TableHead>
                   <TableHead className={`w-36 ${headCls}`}>{sortBtn("number", "Numero")}</TableHead>
                   <TableHead className={`w-56 ${headCls}`}>
                     <div className="flex items-center gap-1">
@@ -401,6 +360,7 @@ function PurchasesPageContent() {
       {/* Pulsante «nuovo» sempre visibile (PC): passandoci sopra si divide in acquisto, ordine e fattura */}
       {canSeeAmounts && (
         <FloatingAddButton
+          showOnMobile
           actions={[
             { href: "/purchases/new", label: "Nuovo acquisto" },
             { href: "/purchases/new?type=order", label: "Nuovo ordine" },
@@ -416,6 +376,7 @@ function PurchasesPageContent() {
           triggerOrder={convertOrder}
         />
       )}
+      </NotchTabs>
     </>
   );
 }
