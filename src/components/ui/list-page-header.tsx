@@ -5,6 +5,7 @@ import { ChevronLeft, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 interface ListPageHeaderProps {
     title: string;
@@ -21,26 +22,31 @@ interface ListPageHeaderProps {
     searchActions?: React.ReactNode;
     // Righe aggiuntive sotto la ricerca (es. menu a tendina da telefono)
     children?: React.ReactNode;
+    // Da tablet in su: striscia scura con titolo a sinistra e ricerca a destra (come le pagine della commessa)
+    strip?: boolean;
 }
 
 // Intestazione standard delle pagine con un elenco: riquadro fisso in alto con titolo e barra di ricerca
-export function ListPageHeader({ title, actions, search, searchActions, children }: ListPageHeaderProps) {
+export function ListPageHeader({ title, actions, search, searchActions, children, strip }: ListPageHeaderProps) {
     return (
-        <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className={cn(
+            "bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border",
+            strip && "md:flex md:items-center md:gap-4 md:space-y-0 md:rounded-2xl md:border-0 md:bg-slate-800 md:px-4 md:py-3 md:text-white md:shadow-md md:dark:bg-slate-800"
+        )}>
+            <div className={cn("flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4", strip && "md:justify-start")}>
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     <Link href="/dashboard" className="md:hidden">
                         <Button variant="ghost" size="icon" className="-ml-2" aria-label="Torna indietro">
                             <ChevronLeft className="h-6 w-6 text-slate-600 dark:text-slate-400" />
                         </Button>
                     </Link>
-                    <h1 className="text-xl font-bold text-slate-900 dark:text-white">{title}</h1>
+                    <h1 className={cn("text-xl font-bold text-slate-900 dark:text-white", strip && "md:text-sm md:uppercase md:tracking-wide md:text-white")}>{title}</h1>
                 </div>
                 {actions && <div className="flex items-center gap-2 w-full sm:w-auto">{actions}</div>}
             </div>
 
-            {(search || searchActions) && <div className="flex gap-2">
-                {search && <div className="relative flex-1">
+            {(search || searchActions) && <div className={cn("flex gap-2", strip && "md:ml-auto md:items-center")}>
+                {search && <div className={cn("relative flex-1", strip && "md:w-80 md:flex-none")}>
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                     <Label htmlFor={search.id} className="sr-only">{search.label}</Label>
                     <Input
@@ -49,7 +55,7 @@ export function ListPageHeader({ title, actions, search, searchActions, children
                         type="search"
                         autoComplete="off"
                         placeholder={search.placeholder}
-                        className="pl-9 bg-slate-100 dark:bg-muted border-none"
+                        className={cn("pl-9 bg-slate-100 dark:bg-muted border-none", strip && "md:rounded-full md:bg-white md:dark:bg-white md:text-slate-800")}
                         value={search.value}
                         onChange={(e) => search.onChange(e.target.value)}
                     />
