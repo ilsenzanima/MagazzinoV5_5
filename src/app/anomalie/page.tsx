@@ -5,7 +5,8 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { NotchTabs } from "@/components/ui/notch-tabs";
 import { Loader2, AlertTriangle, ExternalLink, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { inventoryApi, NegativeLotMovement, OrphanedJobReference } from "@/lib/services/inventory";
@@ -20,6 +21,7 @@ function formatDate(iso: string): string {
 export default function AnomaliePage() {
     const { userRole } = useAuth();
 
+    const [tab, setTab] = useState("lotti-negativi");
     const [negativeLots, setNegativeLots] = useState<NegativeLotMovement[]>([]);
     const [loadingNegativeLots, setLoadingNegativeLots] = useState(true);
 
@@ -71,24 +73,17 @@ export default function AnomaliePage() {
     return (
         <DashboardLayout>
             <div className="space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <AlertTriangle className="h-6 w-6 text-orange-500" />
-                        Anomalie
-                    </h1>
-                </div>
-
-                <Tabs defaultValue="lotti-negativi">
-                    <TabsList>
-                        <TabsTrigger value="lotti-negativi" className="gap-2">
-                            Lotti negativi
-                            {negativeLots.length > 0 && <Badge variant="secondary">{negativeLots.length}</Badge>}
-                        </TabsTrigger>
-                        <TabsTrigger value="commesse-eliminate" className="gap-2">
-                            Commesse eliminate
-                            {orphanedJobs.length > 0 && <Badge variant="secondary">{orphanedJobs.length}</Badge>}
-                        </TabsTrigger>
-                    </TabsList>
+                <Tabs value={tab} onValueChange={setTab}>
+                    <NotchTabs
+                        title="Anomalie"
+                        items={[
+                            { value: "lotti-negativi", label: negativeLots.length > 0 ? `Lotti negativi (${negativeLots.length})` : "Lotti negativi", icon: <AlertTriangle /> },
+                            { value: "commesse-eliminate", label: orphanedJobs.length > 0 ? `Commesse eliminate (${orphanedJobs.length})` : "Commesse eliminate", icon: <ShieldCheck /> },
+                        ]}
+                        value={tab}
+                        onValueChange={setTab}
+                        tabWidth={210}
+                    />
 
                     <TabsContent value="lotti-negativi" className="mt-4 space-y-4">
                         <p className="text-sm text-slate-500 dark:text-slate-400">

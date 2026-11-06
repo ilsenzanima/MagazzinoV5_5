@@ -281,6 +281,7 @@ function GuestSitesContent() {
     return (
         <>
             <ListPageHeader
+                strip
                 title="Cantieri ospiti"
                 actions={
                     <Button className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto md:hidden" onClick={openCreateDialog}>
@@ -291,9 +292,9 @@ function GuestSitesContent() {
                 search={{ id: "guest-sites-search", label: "Cerca cantieri", value: search, onChange: (v) => { setSearch(v); setPage(1); }, placeholder: "Cerca per cantiere, indirizzo, codice o commessa..." }}
                 searchActions={
                     <>
-                        {checkSelect("hidden w-56 shrink-0 border-none bg-slate-100 dark:bg-muted md:flex")}
+                        {checkSelect("hidden w-56 shrink-0 border-none bg-slate-100 dark:bg-muted md:flex md:rounded-full md:bg-white md:dark:bg-white md:text-slate-800")}
                         {anyFilterActive && (
-                            <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+                            <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
                                 Azzera filtri
                             </Button>
                         )}

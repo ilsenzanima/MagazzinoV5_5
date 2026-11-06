@@ -2,10 +2,10 @@
 
 import { notify } from "@/lib/notify";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2, FileText, Calendar, User, Paperclip } from "lucide-react";
+import { ListPageHeader } from "@/components/ui/list-page-header";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
+import { Loader2, FileText, Calendar, User, Paperclip } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import Link from "next/link";
 import { useState, useEffect, useRef, Suspense, useDeferredValue } from "react";
@@ -21,8 +21,6 @@ function InvoicesContent() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
-  const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") || "");
-  const [dateTo, setDateTo] = useState(searchParams.get("dateTo") || "");
   const debouncedSearch = useDeferredValue(searchTerm);
 
   const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
@@ -38,21 +36,19 @@ function InvoicesContent() {
       return;
     }
     setPage(1);
-  }, [debouncedSearch, dateFrom, dateTo]);
+  }, [debouncedSearch]);
 
-  useEffect(() => { loadInvoices(); }, [page, debouncedSearch, dateFrom, dateTo]);
+  useEffect(() => { loadInvoices(); }, [page, debouncedSearch]);
 
   // Keep the URL in sync with search/date filters/page so browser back/forward
   // restores the exact view instead of resetting it.
   useEffect(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("q", debouncedSearch);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
     if (page !== 1) params.set("page", String(page));
     const query = params.toString();
     router.replace(query ? `/invoices?${query}` : "/invoices", { scroll: false });
-  }, [debouncedSearch, dateFrom, dateTo, page, router]);
+  }, [debouncedSearch, page, router]);
 
   const loadInvoices = async () => {
     try {
@@ -61,8 +57,6 @@ function InvoicesContent() {
         page,
         limit: LIMIT,
         search: debouncedSearch,
-        dateFrom,
-        dateTo,
       });
       setInvoices(data);
       setTotalItems(total);
@@ -78,64 +72,15 @@ function InvoicesContent() {
 
   return (
     <>
-      <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 space-y-4 rounded-lg mb-6 border dark:border-border">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gestione Fatturazione</h1>
-          <div className="flex gap-2 w-full sm:w-auto">
-            {(userRole === 'admin' || userRole === 'operativo') && (
-              <Link href="/invoices/new" className="flex-1 sm:flex-none">
-                <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuova Fattura
-                </Button>
-              </Link>
-            )}
-          </div>
-        </div>
+      <ListPageHeader
+        strip
+        title="Gestione Fatturazione"
+        search={{ id: "invoices-search", label: "Cerca fattura", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca per numero fattura..." }}
+      />
 
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
-            <Input
-              placeholder="Cerca per numero fattura..."
-              className="pl-9 bg-slate-100 dark:bg-muted border-none"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Dal</span>
-              <Input
-                type="date"
-                className="bg-slate-100 dark:bg-muted border-none w-36"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Al</span>
-              <Input
-                type="date"
-                className="bg-slate-100 dark:bg-muted border-none w-36"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-            {(dateFrom || dateTo) && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => { setDateFrom(""); setDateTo(""); }}
-                title="Rimuovi filtro data"
-                className="shrink-0"
-              >
-                ×
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
+      {(userRole === 'admin' || userRole === 'operativo') && (
+        <FloatingAddButton showOnMobile label="Nuova Fattura" href="/invoices/new" />
+      )}
 
       {loading ? (
         <div className="flex justify-center items-center py-12">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Check, Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -183,14 +184,15 @@ export default function SchedeVariantiPage() {
     return (
         <DashboardLayout>
             <div className="space-y-4">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Schede varianti</h1>
-                    <p className="text-sm text-slate-500">
-                        Per ogni tipologia definisci i campi che compongono la variante degli articoli (misure, scelte, testo).
-                        I <b>sottotipi</b> non sono nuove tipologie: servono solo a scegliere quali campi chiedere (es. nelle Porte:
-                        porta, telaio, maniglione).
-                    </p>
-                </div>
+                <NotchTabs title="Schede varianti">
+                    <NotchHelp
+                        title="Schede varianti"
+                        lines={[
+                            "Per ogni tipologia definisci i campi che compongono la variante degli articoli (misure, scelte, testo).",
+                            "I sottotipi non sono nuove tipologie: servono solo a scegliere quali campi chiedere (es. nelle Porte: porta, telaio, maniglione).",
+                        ]}
+                    />
+                </NotchTabs>
 
                 <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
                     {/* Elenco tipologie */}

@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -146,12 +147,12 @@ export default function AnalyticsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 pb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Analisi spostamenti</h1>
-          <p className="text-sm text-muted-foreground">
-            Scegli una o più commesse: vedi quali materiali sono andati e quali sono rientrati, la quantità reale rimasta in commessa e come cambia nel tempo.
-          </p>
-        </div>
+        <NotchTabs title="Analisi spostamenti">
+          <NotchHelp
+            title="Analisi spostamenti"
+            lines={["Scegli una o più commesse: vedi quali materiali sono andati e quali sono rientrati, la quantità reale rimasta in commessa e come cambia nel tempo."]}
+          />
+        </NotchTabs>
 
         {/* Scelta commesse */}
         <Card>

@@ -173,6 +173,7 @@ function SuppliersPageContent() {
   return (
     <DashboardLayout>
       <ListPageHeader
+        strip
         title="Gestione Fornitori"
         actions={
           <Button className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto md:hidden" onClick={() => setNewOpen(true)}>
@@ -182,7 +183,7 @@ function SuppliersPageContent() {
         }
         search={{ id: "suppliers-search", label: "Cerca fornitore", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca Fornitore (Nome, P.IVA, Email, Telefono, Indirizzo...)" }}
         searchActions={anyFilterActive && (
-          <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex" onClick={resetFilters}>
+          <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
             Azzera filtri
           </Button>
         )}

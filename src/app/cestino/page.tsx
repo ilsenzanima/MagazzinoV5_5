@@ -4,10 +4,11 @@ import { notify } from "@/lib/notify";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs";
 import {
   Trash2, RotateCcw, Loader2, ShoppingCart, Receipt, ClipboardList,
-  Users, Building2, Package, Briefcase, HardHat, Info, ShieldAlert, X
+  Users, Building2, Package, Briefcase, HardHat, ShieldAlert, X
 } from "lucide-react";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { useEffect, useState, useCallback, Suspense } from "react";
@@ -386,48 +387,37 @@ function CestinoContent() {
 
   return (
     <DashboardLayout>
-      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <Trash2 className="h-6 w-6 text-slate-600 dark:text-slate-400" />
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Cestino</h1>
-            {totalCount > 0 && (
-              <Badge variant="secondary">{totalCount} elementi</Badge>
-            )}
-          </div>
-          <p className="text-sm text-slate-500 flex items-center gap-1.5">
-            <Info className="h-3.5 w-3.5" />
-            Gli elementi vengono eliminati definitivamente dopo 30 giorni. Solo gli admin possono ripristinarli.
-          </p>
-          <div className="flex items-center gap-3 mt-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-red-600 border-red-200 hover:bg-red-50 gap-1.5"
-              onClick={handlePurge}
-              disabled={purging}
-            >
-              {purging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldAlert className="h-3.5 w-3.5" />}
-              Purga elementi scaduti
-            </Button>
-            {purgeResult && <span className="text-xs text-slate-500">{purgeResult}</span>}
-          </div>
-        </div>
-
+      <div className="w-full space-y-6">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SectionKey)}>
-          <TabsList className="flex flex-wrap h-auto gap-1 bg-slate-100 dark:bg-muted p-1">
-            {tabs.map(({ key, label, icon: Icon }) => (
-              <TabsTrigger key={key} value={key} className="gap-1.5 text-xs sm:text-sm">
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-                {sections[key].items.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-                    {sections[key].items.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <NotchTabs
+            title={
+              <span className="flex items-center gap-2">
+                Cestino
+                {totalCount > 0 && <span className="rounded-full bg-slate-600 px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal">{totalCount} elementi</span>}
+              </span>
+            }
+            items={tabs.map(({ key, label, icon: Icon }) => ({
+              value: key,
+              label: sections[key].items.length > 0 ? `${label} (${sections[key].items.length})` : label,
+              icon: <Icon />,
+            }))}
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as SectionKey)}
+          >
+            <NotchHelp
+              title="Come funziona il cestino"
+              lines={["Gli elementi vengono eliminati definitivamente dopo 30 giorni. Solo gli admin possono ripristinarli."]}
+            />
+            <NotchActions>
+              {purgeResult && <span className="text-xs text-slate-300">{purgeResult}</span>}
+              <NotchButton
+                type="button" onClick={handlePurge} disabled={purging}
+                className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"
+              >
+                {purging ? <Loader2 className="animate-spin" /> : <ShieldAlert />} Purga elementi scaduti
+              </NotchButton>
+            </NotchActions>
+          </NotchTabs>
 
           <TabsContent value="purchases" className="mt-4">
             <TrashTable

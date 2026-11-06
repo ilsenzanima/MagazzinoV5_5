@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { ListPageHeader } from "@/components/ui/list-page-header";
+import { NotchTabs } from "@/components/ui/notch-tabs";
 import { useAuth } from "@/components/auth-provider";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Package, Users, ClipboardList, QrCode, Loader2 } from "lucide-react";
 import ArticlesReport from "@/components/reports/articles-report";
 import AttendanceReport from "@/components/reports/attendance-report";
@@ -46,28 +46,19 @@ function ReportsContent() {
     <DashboardLayout>
       <div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <ListPageHeader title="Report">
-          <TabsList className="grid w-full grid-cols-4 lg:w-[640px]">
-            <TabsTrigger value="articles" className="gap-2">
-              <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Articoli</span>
-            </TabsTrigger>
-            <TabsTrigger value="attendance" className="gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Presenze</span>
-            </TabsTrigger>
-            <TabsTrigger value="inventory" className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Inventario</span>
-            </TabsTrigger>
-            <TabsTrigger value="qr" className="gap-2">
-              <QrCode className="h-4 w-4" />
-              <span className="hidden sm:inline">QR / Codici</span>
-            </TabsTrigger>
-          </TabsList>
-          </ListPageHeader>
+          <NotchTabs
+            title="Report"
+            items={[
+              { value: "articles", label: "Articoli", icon: <Package /> },
+              { value: "attendance", label: "Presenze", icon: <Users /> },
+              { value: "inventory", label: "Inventario", icon: <ClipboardList /> },
+              { value: "qr", label: "QR / Codici", icon: <QrCode /> },
+            ]}
+            value={activeTab}
+            onValueChange={setActiveTab}
+          />
 
-          <TabsContent value="articles">
+          <TabsContent value="articles" className="mt-6">
             <ArticlesReport />
           </TabsContent>
 
