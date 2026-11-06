@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { KindBadge } from "@/components/purchases/KindBadge";
-import { NotchTabs, NotchSearch, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { NotchTabs, NotchSearch } from "@/components/ui/notch-tabs";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -137,10 +137,6 @@ function PurchasesPageContent() {
   const changeKind = (v: string) => { setKind(v as DocumentKind | "all"); setPage(1); };
   const changeSupplier = (v: string) => { setSupplierId(v === "all" ? "" : v); setPage(1); };
 
-  const anyFilterActive = kind !== "all" || !!supplierId || !!searchTerm;
-  const resetFilters = () => {
-    setKind("all"); setSupplierId(""); setSearchTerm(""); setPage(1);
-  };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const href = (d: PurchaseDocument) => (d.kind === "invoice" ? `/invoices/${d.id}` : `/purchases/${d.id}`);
@@ -214,11 +210,6 @@ function PurchasesPageContent() {
         onValueChange={changeKind}
         className="mb-4"
       >
-        <NotchActions>
-          {anyFilterActive && (
-            <NotchButton type="button" onClick={resetFilters} className="hidden md:inline-flex">Azzera filtri</NotchButton>
-          )}
-        </NotchActions>
         <NotchSearch value={searchTerm} onChange={setSearchTerm} placeholder="Cerca per numero, fornitore, commessa, articolo... (virgola = OR)" />
 
         {/* Telefono: fornitore */}

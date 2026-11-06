@@ -469,7 +469,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
             </SheetFooter>
           </SheetContent>
         </Sheet>
-          <Button variant="outline" size="icon" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR" aria-label="Scansiona Barcode/QR">
+          <Button variant="outline" size="icon" className="shrink-0 border-slate-300 bg-white text-blue-600 shadow-sm hover:bg-slate-100 hover:text-blue-700" onClick={() => setIsScanning(true)} title="Scansiona Barcode/QR" aria-label="Scansiona Barcode/QR">
             <ScanLine className="h-4 w-4" />
           </Button>
           </>
