@@ -13,6 +13,12 @@ import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { fictitiousPricesApi } from "@/lib/services/fictitiousPrices"
 import { notify } from "@/lib/notify"
+import Image from "next/image"
+import { supabase } from "@/lib/supabase"
+import { itemTypesApi } from "@/lib/services/inventory"
+import { costAnalysisApi } from "@/lib/services/cost-analysis"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { NotchTabs, NotchActions, NotchSearch, NotchStat } from "@/components/ui/notch-tabs"
 
 // Rounds to 2 decimals to avoid floating-point noise (e.g. 30.950000000000003)
@@ -28,6 +34,16 @@ export function JobStock({ movements, jobId }: JobStockProps) {
     const { userRole } = useAuth()
     const [searchTerm, setSearchTerm] = useState("")
     const [tab, setTab] = useState("stock")
+    const [officialPrices, setOfficialPrices] = useState<Map<string, number>>(new Map())
+    const [itemMeta, setItemMeta] = useState<Map<string, { image?: string; type?: string }>>(new Map())
+    const [typeImages, setTypeImages] = useState<Map<string, string>>(new Map())
+    const [sortKey, setSortKey] = useState<'name' | 'model' | 'batches' | 'qty' | 'value'>('name')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+    const [priceFilter, setPriceFilter] = useState<'all' | 'missing'>('all')
+    const toggleSort = (k: typeof sortKey) => {
+        if (sortKey === k) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+        else { setSortKey(k); setSortDir('asc') }
+    }
     const [expandedItemCode, setExpandedItemCode] = useState<string | null>(null)
     const [fictitiousPrices, setFictitiousPrices] = useState<Record<string, number>>({})
     const [loadingPrices, setLoadingPrices] = useState(true)
@@ -52,6 +68,28 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         }
         loadPrices()
     }, [jobId])
+
+    // Prezzi ufficiali dei costi della commessa (Analisi costi): solo admin e operativo
+    useEffect(() => {
+        if (userRole !== 'admin' && userRole !== 'operativo') return
+        costAnalysisApi.getByJobId(jobId).then(rows => {
+            const m = new Map<string, number>()
+            rows.forEach(r => { if (r.itemId && r.unitPrice !== null) m.set(r.itemId, r.unitPrice) })
+            setOfficialPrices(m)
+        }).catch(() => { /* non bloccante: il valore resta "—" */ })
+    }, [jobId, userRole])
+
+    // Foto e tipologia degli articoli
+    useEffect(() => {
+        const ids = Array.from(new Set(movements.map(m => m.itemId).filter(Boolean)))
+        if (ids.length === 0) return
+        supabase.from('inventory').select('id, image_url, category').in('id', ids).then(({ data }) => {
+            const m = new Map<string, { image?: string; type?: string }>()
+            ;(data || []).forEach((r: any) => m.set(r.id, { image: r.image_url || undefined, type: r.category || undefined }))
+            setItemMeta(m)
+        })
+        itemTypesApi.getAll().then(ts => setTypeImages(new Map(ts.filter(t => t.imageUrl).map(t => [t.name, t.imageUrl as string])))).catch(() => { })
+    }, [movements])
 
     // Debounced save function
     const savePriceDebounced = useCallback(
@@ -237,21 +275,69 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         })
     }, [groupedStock, searchTerm])
 
-    // Calculate Total Value including fictitious items
-    const totalValue = useMemo(() => {
-        return round2(groupedStock.reduce((sum, item) => {
-            if (item.isFictitious) {
-                // Use batch-computed value if available, fallback to manual price
-                if (item.totalValue > 0) {
-                    return sum + item.totalValue
-                }
-                const price = fictitiousPrices[item.itemId] ?? 0
-                return sum + (item.totalQty * price)
-            } else {
-                return sum + item.totalValue
+    // Valore di un articolo: prezzo ufficiale dell'Analisi costi x quantita' in cantiere (per i fittizi senza prezzo vale quello inserito a mano)
+    const itemValue = (item: GroupedItem): number | null => {
+        const p = officialPrices.get(item.itemId)
+        if (p !== undefined) return round2(item.totalQty * p)
+        if (item.isFictitious) return round2(item.totalQty * (fictitiousPrices[item.itemId] ?? 0))
+        return null
+    }
+    const totalValue = useMemo(() => round2(groupedStock.reduce((sum, i) => sum + (itemValue(i) ?? 0), 0)),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [groupedStock, fictitiousPrices, officialPrices])
+
+    // Ordinamento e filtro prezzo
+    const rows = useMemo(() => {
+        let r = filteredStock
+        if (priceFilter === 'missing') r = r.filter(i => itemValue(i) === null)
+        const dir = sortDir === 'asc' ? 1 : -1
+        return [...r].sort((a, b) => {
+            switch (sortKey) {
+                case 'model': return dir * (a.model || '').localeCompare(b.model || '', 'it', { numeric: true })
+                case 'batches': return dir * (a.batches.length - b.batches.length)
+                case 'qty': return dir * (a.totalQty - b.totalQty)
+                case 'value': return dir * ((itemValue(a) ?? -1) - (itemValue(b) ?? -1))
+                default: return dir * a.name.localeCompare(b.name, 'it', { numeric: true })
             }
-        }, 0))
-    }, [groupedStock, fictitiousPrices])
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredStock, sortKey, sortDir, priceFilter, officialPrices, fictitiousPrices])
+
+    const sortIcon = (k: typeof sortKey) => sortKey === k
+        ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)
+        : <ArrowUpDown className="h-3 w-3 opacity-30" />
+    const sortHead = (k: typeof sortKey, label: string, cls = '') => (
+        <TableHead className={`border-r text-xs font-semibold uppercase tracking-wide text-slate-600 ${cls}`}>
+            <button type="button" onClick={() => toggleSort(k)} className={`inline-flex items-center gap-1 uppercase hover:text-slate-900 ${cls.includes('text-right') ? 'flex-row-reverse' : ''}`}>
+                {label}{sortIcon(k)}
+            </button>
+        </TableHead>
+    )
+    const thumb = (item: GroupedItem) => {
+        const meta = itemMeta.get(item.itemId)
+        return <StockThumb name={item.name} image={meta?.image} typeImage={meta?.type ? typeImages.get(meta.type) : undefined} />
+    }
+    const valueCell = (item: GroupedItem) => {
+        if (userRole === 'user') return <span className="text-xs italic text-slate-400">Riservato</span>
+        const v = itemValue(item)
+        if (officialPrices.get(item.itemId) === undefined && item.isFictitious) {
+            return (
+                <div className="flex items-center justify-end gap-1">
+                    <span className="text-xs">€</span>
+                    <Input
+                        type="number" min="0" step="0.00001" className="h-7 w-20 text-right text-sm"
+                        value={fictitiousPrices[item.itemId] ?? 0}
+                        onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
+                        placeholder="0.00" disabled={loadingPrices}
+                    />
+                </div>
+            )
+        }
+        return v === null
+            ? <span className="text-slate-400" title="Prezzo non definito nell'Analisi costi della commessa">—</span>
+            : <span className="font-medium">€ {v.toLocaleString('it-IT', { minimumFractionDigits: 2, useGrouping: true })}</span>
+    }
+
 
     // Count unique items (for display)
     const realItemsCount = groupedStock.filter(i => !i.isFictitious).length
@@ -280,250 +366,89 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                 {/* Tab: Giacenza Attuale */}
                 <TabsContent value="stock" className="mt-6">
                     <div className="space-y-4">
-                        {/* Mobile View - Cards with Expandable Details */}
+                        {/* Telefono: una scheda per articolo */}
                         <div className="space-y-2 md:hidden">
-                            {filteredStock.length === 0 ? (
-                                <div className="text-center py-8 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700">
-                                    {searchTerm ? 'Nessun risultato trovato.' : 'Nessun materiale attualmente in cantiere.'}
+                            {rows.length === 0 ? (
+                                <div className="rounded-lg border border-dashed bg-slate-50 py-8 text-center text-slate-400 dark:border-slate-700 dark:bg-muted dark:text-slate-500">
+                                    {searchTerm || priceFilter === 'missing' ? 'Nessun risultato trovato.' : 'Nessun materiale attualmente in cantiere.'}
                                 </div>
-                            ) : (
-                                filteredStock.map((item) => {
-                                    const isExpanded = expandedItemCode === item.code
-                                    return (
-                                        <Card key={`mobile-${item.code}`} className="overflow-hidden">
-                                            {/* Main Row - Always Visible */}
-                                            <div
-                                                className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                                onClick={() => toggleExpanded(item.code)}
-                                            >
-                                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 p-0">
-                                                        {isExpanded ? (
-                                                            <ChevronDown className="h-4 w-4 text-slate-500" />
-                                                        ) : (
-                                                            <ChevronRight className="h-4 w-4 text-slate-500" />
-                                                        )}
-                                                    </Button>
-                                                    <div className="min-w-0">
-                                                        <div className="font-medium text-slate-900 dark:text-white truncate">
-                                                            {item.name}
-                                                            {item.model && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({item.model})</span>}
-                                                        </div>
-                                                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{item.code}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right shrink-0 ml-2">
-                                                    <div className="font-bold text-slate-900 dark:text-white">
-                                                        {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
-                                                    </div>
-                                                    {(userRole === 'admin' || userRole === 'operativo') && !item.isFictitious && (
-                                                        <div className="text-xs text-slate-500 flex items-center justify-end gap-1">
-                                                            {item.hasMissingPrice && (
-                                                                <span title="Prezzo mancante in uno o più lotti">
-                                                                    <AlertTriangle className="h-3 w-3 text-amber-500" />
-                                                                </span>
-                                                            )}
-                                                            € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
-                                                        </div>
-                                                    )}
-                                                </div>
+                            ) : rows.map(item => (
+                                <Card key={`mobile-${item.code}-${item.isFictitious}`} className="px-3 py-2.5">
+                                    <div className="flex items-center gap-3">
+                                        {thumb(item)}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="truncate font-medium text-slate-900 dark:text-white">{item.name}</div>
+                                            {item.model && <div className="truncate text-xs text-slate-500">{item.model}</div>}
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                            <div className="font-bold text-slate-900 dark:text-white">
+                                                {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} {item.unit}
                                             </div>
-
-                                            {/* Expanded Details */}
-                                            {isExpanded && (
-                                                <div className="border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-3">
-                                                    <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                                                        {item.batches.length} {item.batches.length === 1 ? 'Lotto' : 'Lotti'}
-                                                    </div>
-                                                    {item.batches.map((batch, idx) => (
-                                                        <div key={idx} className="bg-white dark:bg-slate-800 rounded-md p-2 border border-slate-200 dark:border-slate-700 text-sm space-y-1">
-                                                            <div className="flex justify-between items-start">
-                                                                <div className="text-slate-600 dark:text-slate-300">
-                                                                    {batch.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
-                                                                    {Math.abs(batch.pieces) > 0.01 && (
-                                                                        <span className="text-slate-400 ml-1">({batch.pieces.toLocaleString('it-IT', { maximumFractionDigits: 0 , useGrouping: true})} pz)</span>
-                                                                    )}
-                                                                </div>
-                                                                {(userRole === 'admin' || userRole === 'operativo') && (
-                                                                    <div className="text-right text-slate-600 dark:text-slate-300">
-                                                                        € {(batch.qty * batch.price).toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
-                                                                        <div className="text-xs text-slate-400">@ €{batch.price.toFixed(4)}</div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            {batch.purchaseId && (
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className="text-xs text-slate-500">Riferimento acquisto:</span>
-                                                                    <Link href={`/purchases/${batch.purchaseId}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-                                                                        Bolla {batch.purchaseNumber} - {batch.supplierName || 'Fornitore'}
-                                                                    </Link>
-                                                                </div>
-                                                            )}
-                                                            {batch.referenceMap.size > 0 && (
-                                                                <div className="flex flex-wrap items-center gap-1">
-                                                                    <span className="text-xs text-slate-500">Bolle di riferimento:</span>
-                                                                    {Array.from(batch.referenceMap.entries()).map(([ref, info]) => (
-                                                                        <Link
-                                                                            key={ref}
-                                                                            href={`/movements/${info.noteId}`}
-                                                                            className={`text-xs hover:underline ${info.isReturn ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`}
-                                                                        >
-                                                                            {ref}
-                                                                        </Link>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </Card>
-                                    )
-                                })
-                            )}
+                                            <div className="text-xs text-slate-500">{valueCell(item)}</div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
                         </div>
 
-                        {/* Desktop View - Table with Expandable Rows */}
+                        {/* Tabella: da tablet in su */}
                         <div className="hidden md:block">
-                            <Table>
+                            <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                                 <TableHeader>
                                     <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
-                                        <TableHead className="w-8 text-xs font-semibold uppercase tracking-wide text-slate-600"></TableHead>
-                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Codice</TableHead>
-                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Articolo</TableHead>
-                                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">N° Lotti</TableHead>
-                                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Q.tà Totale</TableHead>
-                                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Valore</TableHead>
+                                        <TableHead className="w-14 border-r" />
+                                        {sortHead('name', 'Nome')}
+                                        {sortHead('model', 'Modello / variante', 'w-56')}
+                                        {sortHead('batches', 'N° lotti', 'w-24 text-right')}
+                                        {sortHead('qty', 'Q.tà totale', 'w-36 text-right')}
+                                        <TableHead className="w-44 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {userRole !== 'user' && (
+                                                    <Select value={priceFilter} onValueChange={v => setPriceFilter(v as 'all' | 'missing')}>
+                                                        <SelectTrigger className="h-7 min-w-0 flex-1 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                                                            <SelectValue>{priceFilter === 'all' ? 'Valore' : 'Senza prezzo'}</SelectValue>
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="all">Tutti i valori</SelectItem>
+                                                            <SelectItem value="missing">Senza prezzo</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
+                                                {userRole === 'user' && 'Valore'}
+                                                <button type="button" aria-label="Ordina per valore" onClick={() => toggleSort('value')} className="shrink-0 text-slate-500 hover:text-slate-900">
+                                                    {sortIcon('value')}
+                                                </button>
+                                            </div>
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredStock.length === 0 ? (
+                                    {rows.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-500">
-                                                {searchTerm ? 'Nessun risultato trovato.' : 'Nessun materiale attualmente in cantiere.'}
+                                            <TableCell colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500">
+                                                {searchTerm || priceFilter === 'missing' ? 'Nessun risultato trovato.' : 'Nessun materiale attualmente in cantiere.'}
                                             </TableCell>
                                         </TableRow>
-                                    ) : (
-                                        filteredStock.map((item) => {
-                                            const isExpanded = expandedItemCode === item.code
-                                            return (
-                                                <Fragment key={item.code}>
-                                                    <TableRow
-                                                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                                                        onClick={() => toggleExpanded(item.code)}
-                                                    >
-                                                        <TableCell className="w-8 p-2">
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
-                                                                {isExpanded ? (
-                                                                    <ChevronDown className="h-4 w-4 text-slate-500" />
-                                                                ) : (
-                                                                    <ChevronRight className="h-4 w-4 text-slate-500" />
-                                                                )}
-                                                            </Button>
-                                                        </TableCell>
-                                                        <TableCell className="font-mono text-xs">{item.code}</TableCell>
-                                                        <TableCell className="font-medium">
-                                                            {item.name}
-                                                            {item.model && <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">({item.model})</span>}
-                                                            {item.isFictitious && (
-                                                                <Badge variant="outline" className="ml-2 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-[10px] h-5 px-1.5">
-                                                                    Fittizio
-                                                                </Badge>
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="text-right text-slate-500">{item.batches.length}</TableCell>
-                                                        <TableCell className="text-right font-bold text-slate-700 dark:text-slate-300">
-                                                            {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            {userRole === 'user' ? (
-                                                                <span className="text-slate-400 italic text-xs">Riservato</span>
-                                                            ) : item.isFictitious ? (
-                                                                item.totalValue > 0 ? (
-                                                                    <span className="text-slate-600 dark:text-slate-400 flex items-center justify-end gap-1">
-                                                                        € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
-                                                                        <span className="text-xs text-amber-500 ml-1" title="Valore dal lotto di origine">auto</span>
-                                                                    </span>
-                                                                ) : (
-                                                                    <div className="flex items-center justify-end gap-1">
-                                                                        <span className="text-xs">€</span>
-                                                                        <Input
-                                                                            type="number"
-                                                                            min="0"
-                                                                            step="0.00001"
-                                                                            className="w-20 h-7 text-right text-sm"
-                                                                            value={fictitiousPrices[item.itemId] ?? 0}
-                                                                            onChange={(e) => handlePriceChange(item.itemId, e.target.value)}
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            placeholder="0.00"
-                                                                            disabled={loadingPrices}
-                                                                        />
-                                                                    </div>
-                                                                )
-                                                            ) : (
-                                                                <span className="text-slate-600 dark:text-slate-400 flex items-center justify-end gap-1">
-                                                                    {item.hasMissingPrice && (
-                                                                        <span title="Prezzo mancante in uno o più lotti">
-                                                                            <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                                                        </span>
-                                                                    )}
-                                                                    € {item.totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
-                                                                </span>
-                                                            )}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                    {/* Expanded Batch Details */}
-                                                    {isExpanded && item.batches.map((batch, idx) => (
-                                                        <TableRow key={`${item.code}-batch-${idx}`} className="bg-slate-50/50 dark:bg-slate-900/50">
-                                                            <TableCell></TableCell>
-                                                            <TableCell colSpan={2} className="text-sm">
-                                                                <div className="pl-4 flex items-center gap-2 flex-wrap">
-                                                                    <span className="text-slate-400">└─</span>
-                                                                    <span className="text-xs text-slate-500">Rif. Acquisto:</span>
-                                                                    {batch.purchaseId ? (
-                                                                        <Link href={`/purchases/${batch.purchaseId}`} className="text-blue-600 dark:text-blue-400 hover:underline">
-                                                                            Bolla {batch.purchaseNumber} - {batch.supplierName || 'Fornitore'}
-                                                                        </Link>
-                                                                    ) : (
-                                                                        <span className="text-slate-500">Magazzino</span>
-                                                                    )}
-                                                                    {batch.referenceMap.size > 0 && (
-                                                                        <>
-                                                                            <span className="text-slate-300 dark:text-slate-600">|</span>
-                                                                            <span className="text-xs text-slate-500">Bolle:</span>
-                                                                            {Array.from(batch.referenceMap.entries()).map(([ref, info]) => (
-                                                                                <Link
-                                                                                    key={ref}
-                                                                                    href={`/movements/${info.noteId}`}
-                                                                                    className={`text-xs hover:underline ${info.isReturn ? 'text-orange-600' : 'text-blue-600'}`}
-                                                                                >
-                                                                                    {ref}
-                                                                                </Link>
-                                                                            ))}
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="text-right text-slate-500 text-sm">
-                                                                {Math.abs(batch.pieces) > 0.01 ? `${batch.pieces.toLocaleString('it-IT', { maximumFractionDigits: 0 , useGrouping: true})} pz` : '-'}
-                                                            </TableCell>
-                                                            <TableCell className="text-right text-slate-600 dark:text-slate-400 text-sm">
-                                                                {batch.qty.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
-                                                            </TableCell>
-                                                            <TableCell className="text-right text-slate-500 text-sm">
-                                                                {(userRole === 'admin' || userRole === 'operativo') && (
-                                                                    <>
-                                                                        € {(batch.qty * batch.price).toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
-                                                                        <span className="text-xs text-slate-400 ml-1">(@€{batch.price.toFixed(4)})</span>
-                                                                    </>
-                                                                )}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </Fragment>
-                                            )
-                                        })
-                                    )}
+                                    ) : rows.map(item => (
+                                        <TableRow key={`${item.code}-${item.isFictitious}`}>
+                                            <TableCell className="border-r py-1.5">{thumb(item)}</TableCell>
+                                            <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">
+                                                {item.name}
+                                                {item.isFictitious && (
+                                                    <Badge variant="outline" className="ml-2 h-5 border-amber-200 bg-amber-50 px-1.5 text-[10px] text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Fittizio</Badge>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.model || <span className="text-slate-300">—</span>}</TableCell>
+                                            <TableCell className="border-r py-2 text-right text-slate-500">{item.batches.length}</TableCell>
+                                            <TableCell className="border-r py-2 text-right font-bold text-slate-700 dark:text-slate-300">
+                                                {item.totalQty.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} {item.unit}
+                                                {Math.abs(item.totalPieces) > 0.01 && (
+                                                    <div className="text-xs font-normal text-slate-400">{item.totalPieces.toLocaleString('it-IT', { maximumFractionDigits: 0, useGrouping: true })} pz</div>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="py-2 text-right text-slate-700 dark:text-slate-300">{valueCell(item)}</TableCell>
+                                        </TableRow>
+                                    ))}
                                 </TableBody>
                             </Table>
                         </div>
@@ -702,3 +627,15 @@ export function JobStock({ movements, jobId }: JobStockProps) {
     )
 }
 
+// Miniatura dell'articolo: foto propria, altrimenti quella della tipologia, altrimenti un segnaposto
+function StockThumb({ name, image, typeImage }: { name: string; image?: string; typeImage?: string }) {
+    const [err, setErr] = useState(false)
+    const own = !!image && !err
+    const src = own ? image! : (typeImage || "/placeholder.svg")
+    const placeholder = !own && !typeImage
+    return (
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded border bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+            <Image src={src} alt={name} fill sizes="40px" className={placeholder ? "object-contain p-1.5 opacity-50" : "object-cover"} onError={() => setErr(true)} />
+        </div>
+    )
+}

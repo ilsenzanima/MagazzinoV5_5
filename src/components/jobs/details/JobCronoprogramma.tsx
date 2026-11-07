@@ -11,6 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, GanttChartSquare, Pencil, Trash2, Users } from "lucide-react"
+import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { jobTasksApi, attendanceApi, jobTaskAssignmentsApi, workersApi, Job, JobTask, Attendance, JobTaskAssignment, Worker } from "@/lib/api"
 import { notify } from "@/lib/notify"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
@@ -267,34 +269,28 @@ export function JobCronoprogramma({ jobId, job }: JobCronoprogrammaProps) {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
-                <span className="ml-2 text-slate-500 text-sm">Caricamento cronoprogramma...</span>
-            </div>
+            <NotchTabs title="Cronoprogramma">
+                <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+                    <span className="ml-2 text-slate-500 text-sm">Caricamento cronoprogramma...</span>
+                </div>
+            </NotchTabs>
         )
     }
 
     return (
+        <NotchTabs title="Cronoprogramma">
+                <NotchHelp
+                    wide
+                    title="Come leggere il cronoprogramma"
+                    lines={[
+                        "Barra scura = giorni di lavoro, dalla prima all'ultima presenza registrata: si spezza dove la commessa è rimasta ferma più di una settimana, con un filo tratteggiato nel vuoto. Senza presenze, mostra il periodo della commessa.",
+                        "↳ = fasi della commessa: trascina la barra per spostarle, clic per modificarle.",
+                        "Puntini verdi = numero di lavoratori presenti quel giorno (si vedono nelle scale Settimane e Giorni). Per le commesse senza fasi sono sotto la barra del periodo.",
+                        "Rotella = cambia la scala del tempo (anni, mesi, settimane, giorni). Trascina lo sfondo = spostati nel tempo.",
+                    ]}
+                />
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <GanttChartSquare className="h-5 w-5 text-blue-600" />
-                    <h3 className="font-semibold text-slate-800 dark:text-slate-100">Cronoprogramma</h3>
-                    <HelpTip
-                        wide
-                        title="Come leggere il cronoprogramma"
-                        lines={[
-                            "Barra scura = giorni di lavoro, dalla prima all'ultima presenza registrata: si spezza dove la commessa è rimasta ferma più di una settimana, con un filo tratteggiato nel vuoto. Senza presenze, mostra il periodo della commessa.",
-                            "↳ = fasi della commessa: trascina la barra per spostarle, clic per modificarle.",
-                            "Puntini verdi = numero di lavoratori presenti quel giorno (si vedono nelle scale Settimane e Giorni). Per le commesse senza fasi sono sotto la barra del periodo.",
-                            "Rotella = cambia la scala del tempo (anni, mesi, settimane, giorni). Trascina lo sfondo = spostati nel tempo.",
-                        ]}
-                    />
-                </div>
-                <Button size="sm" onClick={openCreate}>
-                    <Plus className="h-4 w-4 mr-1" />Aggiungi fase
-                </Button>
-            </div>
 
             {rows.length > 0 ? (
                 <Card>
@@ -491,5 +487,7 @@ export function JobCronoprogramma({ jobId, job }: JobCronoprogrammaProps) {
                 onConfirm={handleDelete}
             />
         </div>
+        <FloatingAddButton onClick={openCreate} label="Aggiungi fase" />
+        </NotchTabs>
     )
 }

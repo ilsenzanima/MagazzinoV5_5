@@ -1,10 +1,10 @@
 "use client"
 
-import { Fragment, useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Recycle, CalendarDays, Truck, ChevronDown, ChevronRight, ExternalLink } from "lucide-react"
+import { Recycle, CalendarDays, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { deliveryNotesApi } from "@/lib/api"
@@ -21,7 +21,21 @@ interface JobEccedenzeProps {
 export function JobEccedenze({ jobId }: JobEccedenzeProps) {
     const [notes, setNotes] = useState<DeliveryNote[]>([])
     const [loading, setLoading] = useState(true)
-    const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [sortKey, setSortKey] = useState<'number' | 'date'>('date')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+    const toggleSort = (k: 'number' | 'date') => {
+        if (sortKey === k) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+        else { setSortKey(k); setSortDir(k === 'date' ? 'desc' : 'asc') }
+    }
+    const sorted = [...notes].sort((a, b) => {
+        const dir = sortDir === 'asc' ? 1 : -1
+        return sortKey === 'number'
+            ? dir * String(a.number).localeCompare(String(b.number), 'it', { numeric: true })
+            : dir * String(a.date || '').localeCompare(String(b.date || ''))
+    })
+    const sortIcon = (k: 'number' | 'date') => sortKey === k
+        ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)
+        : <ArrowUpDown className="h-3 w-3 opacity-30" />
 
     useEffect(() => {
         const load = async () => {
@@ -38,10 +52,6 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
         }
         load()
     }, [jobId])
-
-    const toggleExpand = (id: string) => {
-        setExpandedId(prev => prev === id ? null : id)
-    }
 
     // Calcolo totale articoli trasportati (tutte le bolle)
     const totalItems = notes.reduce((sum, n) => sum + (n.items?.length || 0), 0)
@@ -71,187 +81,76 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
                 </div>
             ) : (
                 <>
-                    {/* Mobile View */}
+                    {/* Telefono: una scheda per trasporto */}
                     <div className="space-y-2 md:hidden">
-                        {notes.map(note => {
-                            const isExpanded = expandedId === note.id
-                            const dateStr = note.date
-                                ? format(new Date(note.date.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })
-                                : '-'
+                        {sorted.map(note => {
+                            const dateStr = note.date ? format(new Date(note.date.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy', { locale: it }) : '-'
                             return (
-                                <Card key={note.id} className="overflow-hidden">
-                                    <div
-                                        className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                        onClick={() => toggleExpand(note.id)}
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 p-0">
-                                                {isExpanded
-                                                    ? <ChevronDown className="h-4 w-4 text-slate-500" />
-                                                    : <ChevronRight className="h-4 w-4 text-slate-500" />}
-                                            </Button>
-                                            <div className="min-w-0">
-                                                <div className="font-medium text-slate-900 dark:text-white font-mono text-sm">
-                                                    {note.number}
-                                                </div>
-                                                <div className="text-xs text-slate-500 flex items-center gap-1">
-                                                    <CalendarDays className="h-3 w-3" />
-                                                    {dateStr}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                                            <Badge className="bg-violet-100 text-violet-700 border-violet-200 text-xs">
-                                                {note.items?.length || 0} voci
-                                            </Badge>
-                                            <Link href={`/movements/${note.id}`} onClick={e => e.stopPropagation()}>
-                                                <ExternalLink className="h-4 w-4 text-slate-400 hover:text-violet-600" />
-                                            </Link>
-                                        </div>
+                                <Card key={note.id} className="px-3 py-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <Link href={`/movements/${note.id}`} className="flex items-center gap-1 font-mono text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+                                            {note.number} <ExternalLink className="h-3 w-3" />
+                                        </Link>
+                                        <span className="flex items-center gap-1 text-xs text-slate-500"><CalendarDays className="h-3 w-3" />{dateStr}</span>
                                     </div>
-                                    {isExpanded && note.items && note.items.length > 0 && (
-                                        <div className="border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-2">
-                                            {note.pickupLocation && (
-                                                <div className="text-xs text-slate-500 flex items-center gap-1">
-                                                    <Truck className="h-3 w-3" />
-                                                    <span className="font-medium">Da:</span> {note.pickupLocation}
-                                                </div>
-                                            )}
-                                            {note.deliveryLocation && (
-                                                <div className="text-xs text-slate-500">
-                                                    <span className="font-medium">A:</span> {note.deliveryLocation}
-                                                </div>
-                                            )}
-                                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider pt-1">
-                                                Materiali
-                                            </div>
-                                            {note.items.map(item => (
-                                                <div key={item.id} className="bg-white dark:bg-slate-800 rounded p-2 border border-slate-200 dark:border-slate-700 text-sm flex justify-between">
-                                                    <div>
-                                                        <span className="font-medium text-slate-800 dark:text-slate-200">
-                                                            {item.inventoryName}
-                                                        </span>
-                                                        {item.inventoryModel && (
-                                                            <span className="text-slate-400 ml-1">({item.inventoryModel})</span>
-                                                        )}
-                                                        <div className="text-xs font-mono text-slate-400">{item.inventoryCode}</div>
-                                                    </div>
-                                                    <div className="text-right shrink-0 ml-2">
-                                                        {item.kgEccedenza != null ? (
-                                                            <div className="text-violet-600 dark:text-violet-400 font-bold">
-                                                                {item.kgEccedenza} kg
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-slate-700 dark:text-slate-300 font-bold">
-                                                                {item.quantity} {item.inventoryUnit}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                    <ul className="mt-2 space-y-1 text-sm">
+                                        {(note.items || []).map(item => (
+                                            <li key={item.id} className="flex justify-between gap-2">
+                                                <span className="min-w-0 truncate text-slate-700 dark:text-slate-200">
+                                                    {item.inventoryName}{item.inventoryModel && <span className="text-slate-400"> ({item.inventoryModel})</span>}
+                                                </span>
+                                                <span className="shrink-0 font-semibold">{item.kgEccedenza != null ? `${item.kgEccedenza} kg` : `${item.quantity} ${item.inventoryUnit}`}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </Card>
                             )
                         })}
                     </div>
 
-                    {/* Desktop View */}
+                    {/* Tabella: da tablet in su */}
                     <div className="hidden md:block">
-                        <Table>
+                        <Table className="table-fixed border-collapse [&_td]:px-3 [&_th]:px-3">
                             <TableHeader>
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
-                                    <TableHead className="w-8 text-xs font-semibold uppercase tracking-wide text-slate-600"></TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">N° Bolla</TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Data</TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Causale</TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Partenza</TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Destinazione</TableHead>
-                                    <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Voci</TableHead>
-                                    <TableHead className="w-10 text-xs font-semibold uppercase tracking-wide text-slate-600"></TableHead>
+                                    <TableHead className="w-40 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                        <button type="button" onClick={() => toggleSort('number')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">N° bolla{sortIcon('number')}</button>
+                                    </TableHead>
+                                    <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                        <button type="button" onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Data{sortIcon('date')}</button>
+                                    </TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Dettagli</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {notes.map(note => {
-                                    const isExpanded = expandedId === note.id
-                                    const dateStr = note.date
-                                        ? format(new Date(note.date.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })
-                                        : '-'
+                                {sorted.map(note => {
+                                    const dateStr = note.date ? format(new Date(note.date.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy', { locale: it }) : '-'
                                     return (
-                                        <Fragment key={note.id}>
-                                            <TableRow
-                                                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                                                onClick={() => toggleExpand(note.id)}
-                                            >
-                                                <TableCell className="w-8 p-2">
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
-                                                        {isExpanded
-                                                            ? <ChevronDown className="h-4 w-4 text-slate-500" />
-                                                            : <ChevronRight className="h-4 w-4 text-slate-500" />}
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell className="font-mono font-medium text-slate-900 dark:text-white">
-                                                    {note.number}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                                                    {dateStr}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                                                    {note.causal || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-slate-500 max-w-[180px] truncate">
-                                                    {note.pickupLocation || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-slate-500 max-w-[180px] truncate">
-                                                    {note.deliveryLocation || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Badge className="bg-violet-100 text-violet-700 border-violet-200">
-                                                        {note.items?.length || 0}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Link href={`/movements/${note.id}`} onClick={e => e.stopPropagation()}>
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 p-0">
-                                                            <ExternalLink className="h-3.5 w-3.5 text-slate-400 hover:text-violet-600" />
-                                                        </Button>
-                                                    </Link>
-                                                </TableCell>
-                                            </TableRow>
-
-                                            {/* Expanded: righe materiali */}
-                                            {isExpanded && note.items && note.items.map(item => (
-                                                <TableRow key={`${note.id}-${item.id}`} className="bg-violet-50/40 dark:bg-violet-900/10">
-                                                    <TableCell></TableCell>
-                                                    <TableCell colSpan={2} className="text-sm pl-8">
-                                                        <div className="flex items-center gap-2 text-slate-400">
-                                                            <span>└─</span>
-                                                            <span className="font-mono text-xs text-slate-400">{item.inventoryCode}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell colSpan={3} className="text-sm">
-                                                        <span className="font-medium text-slate-800 dark:text-slate-200">
-                                                            {item.inventoryName}
-                                                        </span>
-                                                        {item.inventoryModel && (
-                                                            <span className="text-slate-400 ml-1 font-normal">({item.inventoryModel})</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {item.kgEccedenza != null ? (
-                                                            <div className="font-bold text-violet-600 dark:text-violet-400">
-                                                                {item.kgEccedenza} kg
-                                                            </div>
-                                                        ) : (
-                                                            <div className="font-bold text-slate-700 dark:text-slate-300">
-                                                                {item.quantity} {item.inventoryUnit}
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell></TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </Fragment>
+                                        <TableRow key={note.id}>
+                                            <TableCell className="border-r py-3 align-top">
+                                                <Link href={`/movements/${note.id}`} className="inline-flex items-center gap-1 font-mono font-medium text-blue-600 hover:underline dark:text-blue-400">
+                                                    {note.number} <ExternalLink className="h-3 w-3" />
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell className="border-r py-3 align-top text-sm text-slate-600 dark:text-slate-300">{dateStr}</TableCell>
+                                            <TableCell className="py-3">
+                                                <ul className="space-y-1 text-sm">
+                                                    {(note.items || []).map(item => (
+                                                        <li key={item.id} className="flex items-baseline justify-between gap-4">
+                                                            <span className="min-w-0 text-slate-800 dark:text-slate-200">
+                                                                <span className="mr-2 font-mono text-xs text-slate-400">{item.inventoryCode}</span>
+                                                                <span className="font-medium">{item.inventoryName}</span>
+                                                                {item.inventoryModel && <span className="ml-1 text-slate-500">({item.inventoryModel})</span>}
+                                                            </span>
+                                                            <span className="shrink-0 font-semibold text-slate-700 dark:text-slate-300">
+                                                                {item.kgEccedenza != null ? `${item.kgEccedenza} kg` : `${item.quantity} ${item.inventoryUnit}`}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                    {(!note.items || note.items.length === 0) && <li className="text-slate-400">—</li>}
+                                                </ul>
+                                            </TableCell>
+                                        </TableRow>
                                     )
                                 })}
                             </TableBody>
