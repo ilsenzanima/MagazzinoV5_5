@@ -623,7 +623,7 @@ export default function ProposalDetailPage() {
                     {/* ── OFFERTE FORNITORI ────────────────────────────── */}
                     <TabsContent value="offerte-fornitori" className="space-y-6 focus-visible:outline-none">
                         <NotchTabs title="Offerte fornitori">
-                            <SupplierOffers proposalId={proposalId} />
+                            <SupplierOffers proposalId={proposalId} inStrip />
                         </NotchTabs>
                     </TabsContent>
 
