@@ -15,7 +15,7 @@ export default async function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center px-4">
+    <div className="page-texture min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center px-4">
 
       {/* Main Content */}
       <div className="w-full max-w-md text-center space-y-8">

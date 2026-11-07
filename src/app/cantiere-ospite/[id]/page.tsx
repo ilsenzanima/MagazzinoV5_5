@@ -210,7 +210,7 @@ function GuestPortalContent({ params }: Props) {
     if (!isAuthenticated) {
         // Schermata di Login
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-900 font-sans">
+            <div className="page-texture min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-900 font-sans">
                 <div className="w-full max-w-md space-y-6">
                     {/* Brand Logo Header */}
                     <div className="flex flex-col items-center gap-3 mb-2">
@@ -547,7 +547,7 @@ function GuestPortalContent({ params }: Props) {
 
     // Portale Cantiere Ospite (Autenticato)
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 font-sans pb-12">
+        <div className="page-texture min-h-screen bg-slate-50 dark:bg-slate-900 font-sans pb-12">
             {/* Header istituzionale stile DDT OPI Firesafe */}
             <header className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800/80 shadow-sm py-5">
                 <div className="max-w-5xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">

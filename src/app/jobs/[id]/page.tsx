@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -23,6 +23,9 @@ import { buildAndDownloadDocumentationZip } from "@/lib/zip/build-documentation-
 import { JobSectionMenu, type SectionMenuGroup } from "@/components/jobs/JobSectionMenu";
 import { JobActionsMenu } from "@/components/jobs/JobActionsMenu";
 import { Badge } from "@/components/ui/badge";
+import { NotchTabs, NotchActions } from "@/components/ui/notch-tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { JobPortalDialog } from "@/components/guest-sites/JobPortalDialog";
 import { JOB_CATEGORY_LABELS, JOB_CATEGORY_BADGE_COLORS } from "@/lib/types";
 import { jobConformitaDocumentTypesApi } from "@/lib/services/job-conformita-document-types";
 import { jobSiteDocumentTypesApi } from "@/lib/services/job-site-document-types";
@@ -42,6 +45,9 @@ import { JobFatturazione } from "@/components/jobs/details/JobFatturazione";
 import { JobAnalisiCosti } from "@/components/jobs/details/JobAnalisiCosti";
 import { JobCronoprogramma } from "@/components/jobs/details/JobCronoprogramma";
 import { clientProposalsApi, ClientProposal } from "@/lib/services/client-proposals";
+
+const STATUS_LABEL: Record<string, string> = { active: 'Attiva', completed: 'Completata', suspended: 'Sospesa' };
+const statusColor = (st: string) => (st === 'active' ? 'bg-green-600' : st === 'completed' ? 'bg-slate-500' : 'bg-yellow-500');
 
 type TabGroupKey = 'generale' | 'documenti' | 'economico';
 
@@ -115,6 +121,8 @@ function groupOfTab(tab: string): TabGroupKey {
 export default function JobDetailsPage() {
     const { id } = useParams<{ id: string }>();
     const { userRole } = useAuth();
+    const [portalOpen, setPortalOpen] = useState(false);
+    const [changingStatus, setChangingStatus] = useState(false);
     // ?tab=analisi-costi apre direttamente quella scheda (usato dai link degli avvisi)
     const requestedTab = useSearchParams().get("tab");
     const initialTab = requestedTab && TAB_GROUPS.some(g => g.tabs.includes(requestedTab)) ? requestedTab : "overview";
@@ -545,6 +553,24 @@ export default function JobDetailsPage() {
         loadData();
     }, [id]);
 
+    // Cambio di stato dal badge in alto. Come nella modifica: se diventa "completata" la fine cantiere e' oggi e si propone il portale ospiti.
+    const handleStatusChange = async (status: Job['status']) => {
+        if (!job || status === job.status) return;
+        try {
+            setChangingStatus(true);
+            const becomesCompleted = status === 'completed';
+            const d = new Date();
+            const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            await jobsApi.update(job.id, becomesCompleted ? { status, endDate: today } : { status });
+            if (becomesCompleted) setPortalOpen(true);
+            await loadData();
+        } catch {
+            notify.error("Errore durante il cambio di stato");
+        } finally {
+            setChangingStatus(false);
+        }
+    };
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -572,25 +598,40 @@ export default function JobDetailsPage() {
         <DashboardLayout>
             <div className="max-w-[1700px] mx-auto space-y-6 pb-20 print:p-0 print:max-w-none overflow-x-hidden">
 
-                {/* Header Navigation - Hidden in print */}
-                <div className="flex items-center justify-between gap-2 print:hidden">
-                    <Link href="/jobs">
-                        <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900 px-2 md:px-4">
-                            <ArrowLeft className="h-4 w-4 md:mr-2" />
-                            <span className="hidden md:inline">Torna alle Commesse</span>
-                        </Button>
+                {/* Striscia scura con il nome della commessa; a destra tipo e stato (lo stato si cambia con un clic) */}
+                <div className="print:hidden">
+                    <Link href="/jobs" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+                        <ArrowLeft className="mr-1 h-4 w-4" /> Commesse
                     </Link>
-                    <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-2">
-                        <h1 className="truncate text-sm md:text-lg font-semibold text-slate-800 dark:text-slate-100">
-                            {job?.name}
-                        </h1>
-                        <Badge className={`hidden shrink-0 text-xs sm:inline-flex ${job.status === 'active' ? 'bg-green-600' : job.status === 'completed' ? 'bg-slate-500' : 'bg-yellow-500'}`}>
-                            {job.status === 'active' ? 'Attiva' : job.status === 'completed' ? 'Completata' : 'Sospesa'}
-                        </Badge>
-                        <Badge className={`hidden shrink-0 text-xs md:inline-flex ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
-                            {JOB_CATEGORY_LABELS[job.category]}
-                        </Badge>
-                    </div>
+                    <NotchTabs title={job.name}>
+                        <NotchActions>
+                            <Badge className={`shrink-0 text-xs ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
+                                {JOB_CATEGORY_LABELS[job.category]}
+                            </Badge>
+                            {(userRole === 'admin' || userRole === 'operativo') ? (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button type="button" disabled={changingStatus} title="Cambia stato" className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-60">
+                                            <Badge className={`cursor-pointer gap-1 text-xs ${statusColor(job.status)}`}>
+                                                {STATUS_LABEL[job.status] ?? job.status}
+                                                {changingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChevronDown className="h-3 w-3" />}
+                                            </Badge>
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        {(['active', 'suspended', 'completed'] as const).map(st => (
+                                            <DropdownMenuItem key={st} onClick={() => handleStatusChange(st)} className={job.status === st ? 'font-semibold' : ''}>
+                                                <span className={`mr-2 inline-block h-2 w-2 rounded-full ${statusColor(st)}`} />
+                                                {STATUS_LABEL[st]}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            ) : (
+                                <Badge className={`shrink-0 text-xs ${statusColor(job.status)}`}>{STATUS_LABEL[job.status] ?? job.status}</Badge>
+                            )}
+                        </NotchActions>
+                    </NotchTabs>
                 </div>
 
                 {/* Printable Area */}
@@ -690,6 +731,7 @@ export default function JobDetailsPage() {
                     </Tabs>
                 </div>
             </div>
+            <JobPortalDialog jobId={job.id} open={portalOpen} onOpenChange={setPortalOpen} reason="completed" />
         </DashboardLayout>
     );
 }

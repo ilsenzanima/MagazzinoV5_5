@@ -63,14 +63,14 @@ export default function ResetPasswordPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-background">
+      <div className="page-texture min-h-screen flex items-center justify-center bg-slate-50 dark:bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-background p-4">
+    <div className="page-texture min-h-screen flex items-center justify-center bg-slate-50 dark:bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Nuova Password</CardTitle>

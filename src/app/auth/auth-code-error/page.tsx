@@ -7,7 +7,7 @@ import { AlertCircle } from "lucide-react";
 
 export default function AuthCodeErrorPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-background p-4">
+    <div className="page-texture min-h-screen flex items-center justify-center bg-slate-50 dark:bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-2">
