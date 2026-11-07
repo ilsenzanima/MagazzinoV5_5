@@ -47,7 +47,7 @@ interface PendingFile {
 const UNTYPED_KEY = "__untyped__"
 const PAGE_SIZE = 50
 
-export function ProposalProposalDocuments({ proposalId }: Props) {
+export function ProposalDocuments({ proposalId }: Props) {
     const [documents, setDocuments] = useState<ProposalDocument[]>([])
     const [docTypes, setDocTypes] = useState<ProposalDocumentType[]>([])
     const [folders, setFolders] = useState<ProposalDocumentFolder[]>([])
