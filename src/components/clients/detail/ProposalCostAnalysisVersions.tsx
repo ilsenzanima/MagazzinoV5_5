@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { Loader2, PlusCircle, Search, Calculator, Pencil, Trash2 } from "lucide-react"
+import { Loader2, Calculator, Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { notify } from "@/lib/notify"
-import { ViewToggle } from "@/components/ui/view-toggle"
-import { NotchActions, NotchSearch, NotchButton } from "@/components/ui/notch-tabs"
-import { useViewMode } from "@/hooks/useViewMode"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { NotchActions, NotchSearch } from "@/components/ui/notch-tabs"
 import { ProposalAnalisiCosti } from "@/components/clients/detail/ProposalAnalisiCosti"
 
 // Le versioni appartengono a un'offerta (proposalId) oppure, per le commesse
@@ -27,7 +27,15 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
     const [versions, setVersions] = useState<ProposalCostAnalysisVersion[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
-    const [viewMode, setViewMode] = useViewMode("proposal-cost-analysis-versions", "grid")
+    const [sortKey, setSortKey] = useState<'name' | 'date'>('date')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+    const toggleSort = (k: 'name' | 'date') => {
+        if (sortKey === k) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+        else { setSortKey(k); setSortDir(k === 'date' ? 'desc' : 'asc') }
+    }
+    const sortIcon = (k: 'name' | 'date') => sortKey === k
+        ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)
+        : <ArrowUpDown className="h-3 w-3 opacity-30" />
     const [openVersionId, setOpenVersionId] = useState<string | null>(null)
 
     const [createOpen, setCreateOpen] = useState(false)
@@ -59,6 +67,13 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
         if (!term) return versions
         return versions.filter(v => v.name.toLowerCase().includes(term) || (v.note ?? '').toLowerCase().includes(term))
     }, [versions, search])
+
+    const sorted = useMemo(() => {
+        const dir = sortDir === 'asc' ? 1 : -1
+        return [...filtered].sort((a, b) => sortKey === 'name'
+            ? dir * a.name.localeCompare(b.name, 'it', { numeric: true })
+            : dir * String(a.createdAt).localeCompare(String(b.createdAt)))
+    }, [filtered, sortKey, sortDir])
 
     const handleCreate = async () => {
         const name = newName.trim()
@@ -118,61 +133,47 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-                <NotchActions>
-                    <NotchSearch value={search} onChange={setSearch} placeholder="Cerca analisi costi" />
-                    <ViewToggle mode={viewMode} onChange={setViewMode} className="border-slate-300 bg-white" />
-                    <NotchButton onClick={() => setCreateOpen(true)}>
-                        <PlusCircle />Nuova analisi costi
-                    </NotchButton>
-                </NotchActions>
-            </div>
+            <NotchActions>
+                <NotchSearch value={search} onChange={setSearch} placeholder="Cerca analisi costi" />
+            </NotchActions>
 
             {loading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
-            ) : filtered.length === 0 ? (
+            ) : sorted.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-12">
-                    {versions.length === 0 ? 'Nessuna analisi costi creata. Usa "Nuova analisi costi" per iniziare.' : 'Nessuna analisi costi corrisponde alla ricerca.'}
+                    {versions.length === 0 ? 'Nessuna analisi costi creata. Usa il pulsante + in basso a destra per iniziare.' : 'Nessuna analisi costi corrisponde alla ricerca.'}
                 </p>
-            ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {filtered.map(v => (
-                        <Card key={v.id} className="cursor-pointer hover:border-blue-400 transition-colors group" onClick={() => setOpenVersionId(v.id)}>
-                            <CardContent className="p-4 space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <Calculator className="h-4 w-4 text-emerald-600 shrink-0" />
-                                        <span className="font-semibold text-slate-800 dark:text-slate-100 truncate">{v.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                        <button onClick={e => { e.stopPropagation(); openEdit(v) }} className="text-slate-400 hover:text-blue-600 p-0.5"><Pencil className="h-3.5 w-3.5" /></button>
-                                        <button onClick={e => { e.stopPropagation(); setDeleteTarget(v) }} className="text-slate-400 hover:text-red-600 p-0.5"><Trash2 className="h-3.5 w-3.5" /></button>
-                                    </div>
-                                </div>
-                                {v.note && <p className="text-xs text-slate-500 line-clamp-2">{v.note}</p>}
-                                <p className="text-[11px] text-slate-400">Creata il {new Date(v.createdAt).toLocaleDateString('it-IT')}</p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
             ) : (
-                <div className="border rounded-md divide-y dark:border-slate-700">
-                    {filtered.map(v => (
-                        <div key={v.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group" onClick={() => setOpenVersionId(v.id)}>
-                            <Calculator className="h-4 w-4 text-emerald-600 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm text-slate-800 dark:text-slate-100 truncate">{v.name}</p>
-                                {v.note && <p className="text-xs text-slate-500 truncate">{v.note}</p>}
-                            </div>
-                            <span className="text-xs text-slate-400 shrink-0">{new Date(v.createdAt).toLocaleDateString('it-IT')}</span>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                <button onClick={e => { e.stopPropagation(); openEdit(v) }} className="text-slate-400 hover:text-blue-600 p-1"><Pencil className="h-3.5 w-3.5" /></button>
-                                <button onClick={e => { e.stopPropagation(); setDeleteTarget(v) }} className="text-slate-400 hover:text-red-600 p-1"><Trash2 className="h-3.5 w-3.5" /></button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                <Table className="border-collapse">
+                    <TableHeader>
+                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className="w-1/3 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Nome{sortIcon('name')}</button></TableHead>
+                            <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Nota</TableHead>
+                            <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Creata il{sortIcon('date')}</button></TableHead>
+                            <TableHead className="w-24" />
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {sorted.map(v => (
+                            <TableRow key={v.id} className="group cursor-pointer" onClick={() => setOpenVersionId(v.id)}>
+                                <TableCell className="border-r py-2">
+                                    <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white"><Calculator className="h-4 w-4 shrink-0 text-emerald-600" />{v.name}</span>
+                                </TableCell>
+                                <TableCell className="border-r py-2 text-sm text-slate-500">{v.note || <span className="text-slate-300">—</span>}</TableCell>
+                                <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{new Date(v.createdAt).toLocaleDateString('it-IT')}</TableCell>
+                                <TableCell className="py-2">
+                                    <div className="flex items-center justify-end gap-1">
+                                        <button onClick={e => { e.stopPropagation(); openEdit(v) }} title="Modifica" className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
+                                        <button onClick={e => { e.stopPropagation(); setDeleteTarget(v) }} title="Elimina" className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             )}
+
+            <FloatingAddButton onClick={() => setCreateOpen(true)} label="Nuova analisi costi" />
 
             {/* Crea nuova analisi costi */}
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>

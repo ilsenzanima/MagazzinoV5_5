@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Upload, Loader2, FileText, Pencil, Trash2, X } from "lucide-react"
+import { Upload, Loader2, FileText, Pencil, Trash2, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { costAnalysisDocumentsApi, CostAnalysisDocument } from "@/lib/services/cost-analysis-documents"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -16,9 +16,9 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { getFileIcon } from "@/lib/file-icon"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { uploadFileToDrive } from "@/lib/drive-upload"
-import { ViewToggle } from "@/components/ui/view-toggle"
-import { NotchActions, NotchSearch, NotchButton } from "@/components/ui/notch-tabs"
-import { useViewMode } from "@/hooks/useViewMode"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { NotchActions, NotchSearch } from "@/components/ui/notch-tabs"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
 
@@ -43,7 +43,15 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
     const [activeDoc, setActiveDoc] = useState<CostAnalysisDocument | null>(null)
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
-    const [viewMode, setViewMode] = useViewMode('cost-analysis-documents', 'grid')
+    const [sortKey, setSortKey] = useState<'name' | 'date'>('date')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+    const toggleSort = (k: 'name' | 'date') => {
+        if (sortKey === k) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+        else { setSortKey(k); setSortDir(k === 'date' ? 'desc' : 'asc') }
+    }
+    const sortIcon = (k: 'name' | 'date') => sortKey === k
+        ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)
+        : <ArrowUpDown className="h-3 w-3 opacity-30" />
     const [search, setSearch] = useState("")
     const supabase = createClient()
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -219,70 +227,18 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
         const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
         const target = `${d.name} ${d.notes || ''}`.toLowerCase()
         return words.every(w => target.includes(w))
+    }).sort((a, b) => {
+        const dir = sortDir === 'asc' ? 1 : -1
+        return sortKey === 'name'
+            ? dir * a.name.localeCompare(b.name, 'it', { numeric: true })
+            : dir * String(a.createdAt).localeCompare(String(b.createdAt))
     })
-
-    const renderDocCard = (doc: CostAnalysisDocument) => (
-        <Card key={doc.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenDocument(doc.fileUrl)}>
-            <CardContent className="p-4 flex items-start gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-                    {getFileIcon(doc.fileType)}
-                </div>
-                <div className="flex-1 overflow-hidden min-w-0">
-                    <div className="flex justify-between items-start gap-1">
-                        <p className="font-medium truncate text-sm pr-1" title={doc.name}>{doc.name}</p>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-                            onClick={(e) => { e.stopPropagation(); openEdit(doc) }}
-                        >
-                            <Pencil className="h-3 w-3" />
-                        </Button>
-                    </div>
-                    {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
-                    <p className="text-xs text-slate-400 mt-1">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
-                </div>
-            </CardContent>
-        </Card>
-    )
-
-    const renderDocRow = (doc: CostAnalysisDocument) => (
-        <div
-            key={doc.id}
-            className="flex items-center gap-3 p-3 border rounded-lg bg-white dark:bg-slate-800 hover:shadow-sm transition-shadow cursor-pointer"
-            onClick={() => handleOpenDocument(doc.fileUrl)}
-        >
-            <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">
-                {getFileIcon(doc.fileType)}
-            </div>
-            <div className="flex-1 overflow-hidden min-w-0">
-                <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
-                {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
-            </div>
-            <p className="text-xs text-slate-400 shrink-0">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</p>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700"
-                onClick={(e) => { e.stopPropagation(); openEdit(doc) }}
-            >
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
-        </div>
-    )
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-                <NotchActions>
-                    <NotchSearch value={search} onChange={setSearch} placeholder="Cerca documento" />
-                    <ViewToggle mode={viewMode} onChange={setViewMode} className="border-slate-300 bg-white" />
-                    <NotchButton onClick={openUpload}>
-                        <Upload />
-                        Carica analisi costi
-                    </NotchButton>
-                </NotchActions>
-            </div>
+            <NotchActions>
+                <NotchSearch value={search} onChange={setSearch} placeholder="Cerca documento" />
+            </NotchActions>
 
             {loading ? (
                 <div className="flex justify-center py-12">
@@ -298,15 +254,39 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
                 </Card>
             ) : shown.length === 0 ? (
                 <p className="py-12 text-center text-sm text-slate-400">Nessun documento corrisponde alla ricerca.</p>
-            ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {shown.map(renderDocCard)}
-                </div>
             ) : (
-                <div className="space-y-2">
-                    {shown.map(renderDocRow)}
-                </div>
+                <Table className="border-collapse">
+                    <TableHeader>
+                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className="w-1/3 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Nome{sortIcon('name')}</button></TableHead>
+                            <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Note</TableHead>
+                            <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Caricato il{sortIcon('date')}</button></TableHead>
+                            <TableHead className="w-16" />
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {shown.map(doc => (
+                            <TableRow key={doc.id} className="cursor-pointer" onClick={() => handleOpenDocument(doc.fileUrl)}>
+                                <TableCell className="border-r py-2">
+                                    <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white">
+                                        <span className="shrink-0">{getFileIcon(doc.fileType)}</span>
+                                        <span className="truncate" title={doc.name}>{doc.name}</span>
+                                    </span>
+                                </TableCell>
+                                <TableCell className="border-r py-2 text-sm text-slate-500">{doc.notes || <span className="text-slate-300">—</span>}</TableCell>
+                                <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })}</TableCell>
+                                <TableCell className="py-2">
+                                    <div className="flex justify-end">
+                                        <button onClick={e => { e.stopPropagation(); openEdit(doc) }} title="Modifica" className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             )}
+
+            <FloatingAddButton onClick={openUpload} label="Carica analisi costi" />
 
             {/* Upload dialog */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>

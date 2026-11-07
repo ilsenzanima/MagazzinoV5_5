@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, ArrowUpRight, ChevronDown, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ChevronDown, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2, Link2, Check } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -134,6 +134,13 @@ export default function JobDetailsPage() {
     const [totalHours, setTotalHours] = useState(0);
     const [loading, setLoading] = useState(true);
     const [linkedProposal, setLinkedProposal] = useState<ClientProposal | null>(null);
+    // Stesso cantiere: commesse collegate da "Nuovo inizio"
+    const [chain, setChain] = useState<{ id: string; code: string; name: string }[]>([]);
+    useEffect(() => {
+        let cancelled = false;
+        jobsApi.getChain(id).then(c => { if (!cancelled) setChain(c); }).catch(console.error);
+        return () => { cancelled = true; };
+    }, [id]);
     const [downloadingZip, setDownloadingZip] = useState(false);
     const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null);
 
@@ -645,6 +652,28 @@ export default function JobDetailsPage() {
                             <div className="print:hidden">
                     <NotchTabs title="Dettagli">
                         <NotchActions>
+                            {chain.length > 1 && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button type="button" title="Passa a un'altra commessa dello stesso cantiere" className="hidden h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-xs font-medium normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-blue-400 md:inline-flex">
+                                            <Link2 className="h-3.5 w-3.5 text-slate-300" />
+                                            <span><span className="text-slate-300">Stesso cantiere: </span>{chain.length} commesse</span>
+                                            <ChevronDown className="h-3 w-3 text-slate-300" />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-72">
+                                        {chain.map(c => (
+                                            <DropdownMenuItem key={c.id} asChild>
+                                                <Link href={`/jobs/${c.id}`} className="flex items-center gap-2">
+                                                    <span className="font-mono text-xs font-semibold">{c.code}</span>
+                                                    <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{c.name}</span>
+                                                    {c.id === job.id && <Check className="h-4 w-4 text-blue-600" />}
+                                                </Link>
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                             {linkedProposal && (
                                 <Link
                                     href={`/clients/${linkedProposal.clientId}/proposals/${linkedProposal.id}`}

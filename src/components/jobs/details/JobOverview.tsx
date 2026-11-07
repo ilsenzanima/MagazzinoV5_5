@@ -19,32 +19,8 @@ interface JobOverviewProps {
 
 export function JobOverview({ job, totalHours = 0 }: JobOverviewProps) {
 
-  // Stesso cantiere: commesse collegate da "Nuovo inizio"
-  const [chain, setChain] = useState<JobChainItem[]>([])
-  useEffect(() => {
-    let cancelled = false
-    jobsApi.getChain(job.id).then(c => { if (!cancelled) setChain(c) }).catch(console.error)
-    return () => { cancelled = true }
-  }, [job.id])
-
   return (
     <div className="space-y-6 overflow-x-hidden">
-      {/* Stesso cantiere */}
-      {chain.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 text-xs dark:border-blue-900/40 dark:bg-blue-950/20">
-          <span className="flex items-center gap-1.5 font-semibold text-blue-700 dark:text-blue-300">
-            <Link2 className="h-3.5 w-3.5" /> Stesso cantiere: {chain.length} commesse
-          </span>
-          {chain.map(c => c.id === job.id ? (
-            <span key={c.id} className="rounded bg-blue-600 px-2 py-0.5 font-mono font-semibold text-white" title={c.name}>{c.code}</span>
-          ) : (
-            <Link key={c.id} href={`/jobs/${c.id}`} className="rounded border border-blue-200 bg-white px-2 py-0.5 font-mono font-semibold text-blue-700 hover:bg-blue-100 dark:bg-transparent" title={c.name}>
-              {c.code}
-            </Link>
-          ))}
-        </div>
-      )}
-
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <Card>
