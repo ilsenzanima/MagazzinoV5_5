@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export default async function Home() {
   // Check if user is already logged in
@@ -18,7 +19,7 @@ export default async function Home() {
     <div className="page-texture min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center px-4">
 
       {/* Main Content */}
-      <div className="w-full max-w-md text-center space-y-8">
+      <Card className="w-full max-w-md gap-8 px-8 py-10 text-center sm:px-10">
 
         {/* Logo */}
         <div className="flex justify-center">
@@ -54,32 +55,7 @@ export default async function Home() {
           </Link>
         </div>
 
-        {/* Divider */}
-        <div className="relative py-4">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
-          </div>
-          <div className="relative flex justify-center">
-            <span className="px-4 bg-slate-50 dark:bg-slate-900 text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wide">
-              oppure
-            </span>
-          </div>
-        </div>
-
-        {/* Register Link */}
-        <div>
-          <Link href="/register">
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full h-12 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
-            >
-              Nuovo utente? Richiedi accesso
-            </Button>
-          </Link>
-        </div>
-
-      </div>
+      </Card>
 
       {/* Footer */}
       <footer className="absolute bottom-4 text-center">

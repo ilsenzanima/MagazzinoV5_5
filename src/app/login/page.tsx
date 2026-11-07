@@ -96,12 +96,6 @@ export default function LoginPage() {
               Password dimenticata?
             </Link>
           </div>
-          <div className="text-sm">
-            Non hai un account?{" "}
-            <Link href="/register" className="text-blue-600 hover:underline">
-              Registrati qui
-            </Link>
-          </div>
           <Link href="/" className="hover:text-blue-600 underline">
             Torna alla Home
           </Link>
