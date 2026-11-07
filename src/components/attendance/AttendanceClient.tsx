@@ -427,7 +427,7 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
     return (
         <div className="space-y-4 min-w-0">
             {/* Striscia: titolo a sinistra, mese al centro, filtro a destra */}
-            <div className="grid grid-cols-1 items-center gap-3 rounded-2xl bg-slate-800 px-4 py-3 text-white shadow-md md:grid-cols-[1fr_auto_1fr] dark:bg-slate-700">
+            <div className="mt-7 grid min-h-[68px] grid-cols-1 items-center gap-3 rounded-2xl bg-slate-800 px-4 py-2 text-white shadow-md md:grid-cols-[1fr_auto_1fr] dark:bg-slate-700">
                 <h1 className="text-sm font-semibold uppercase tracking-wide">Presenze / Assenze</h1>
 
                 <div className="flex items-center justify-center gap-2">
