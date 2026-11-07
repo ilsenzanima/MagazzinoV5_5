@@ -617,9 +617,7 @@ export default function ProposalDetailPage() {
 
                     {/* ── CRONOPROGRAMMA ───────────────────────────────── */}
                     <TabsContent value="cronoprogramma" className="space-y-6 focus-visible:outline-none">
-                        <NotchTabs title="Cronoprogramma">
-                            <ProposalCronoprogramma proposalId={proposalId} />
-                        </NotchTabs>
+                        <ProposalCronoprogramma proposalId={proposalId} />
                     </TabsContent>
 
                     {/* ── OFFERTE FORNITORI ────────────────────────────── */}
