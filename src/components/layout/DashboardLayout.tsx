@@ -437,7 +437,7 @@ export default function DashboardLayout({
 
   return (
     <LayoutContext.Provider value={true}>
-    <div className="flex min-h-screen bg-background">
+    <div className="page-texture flex min-h-screen bg-background">
       {/* Simulation Banner */}
       {simulatedRole && (
         <div className="fixed top-0 left-0 right-0 h-10 bg-amber-500 text-white z-[60] flex items-center justify-center px-4 font-bold shadow-md">
