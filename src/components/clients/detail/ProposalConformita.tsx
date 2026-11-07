@@ -1,6 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { NotchTabs, NotchSearch, NotchStat, NotchActions } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +21,8 @@ import {
     Link2,
     Unlink,
     Search,
+    ArrowUp,
+    ArrowDown,
     Pencil,
     ExternalLink,
     ShieldCheck,
@@ -117,80 +122,105 @@ export function ProposalConformita({ proposalId }: Props) {
         load()
     }
 
+    const [search, setSearch] = useState("")
+    const [typeFilter, setTypeFilter] = useState("all")
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+    const nameOf = (a: ProposalComplianceAssociation) => a.customName || a.document?.name || ""
+    const typeNames = useMemo(
+        () => Array.from(new Set(associations.map(a => a.document?.documentTypeName).filter((x): x is string => !!x))).sort((x, y) => x.localeCompare(y, 'it')),
+        [associations]
+    )
+    const shown = useMemo(() => {
+        const words = search.toLowerCase().split(/\s+/).filter(Boolean)
+        const dir = sortDir === 'asc' ? 1 : -1
+        return associations
+            .filter(a => {
+                if (typeFilter !== 'all' && a.document?.documentTypeName !== typeFilter) return false
+                const target = `${nameOf(a)} ${a.document?.name || ''} ${a.customNotes || ''} ${a.document?.brandName || ''} ${a.document?.documentTypeName || ''}`.toLowerCase()
+                return words.every(w => target.includes(w))
+            })
+            .sort((x, y) => dir * nameOf(x).localeCompare(nameOf(y), 'it', { numeric: true }))
+    }, [associations, search, typeFilter, sortDir])
+    const head = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600"
+
     return (
-        <div className="space-y-3">
-            <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Conformità</h2>
-                <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setSearchOpen(true)}>
-                    <Link2 className="h-4 w-4 mr-2" />Associa Documento
-                </Button>
-            </div>
+        <NotchTabs title="Conformità">
+            <NotchActions>
+                <NotchSearch value={search} onChange={setSearch} placeholder="Cerca per nome, marca o tipo" />
+                <NotchStat label="Documenti" value={String(associations.length)} />
+            </NotchActions>
 
             {loading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
-            ) : associations.length === 0 ? (
-                <Card className="border-dashed">
-                    <CardContent className="py-12 text-center text-slate-500">
-                        <ShieldCheck className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                        <p>Nessun documento di conformità associato. Quando la proposta diventa commessa, i documenti associati qui verranno collegati anche alla commessa.</p>
-                    </CardContent>
-                </Card>
             ) : (
-                <div className="space-y-2">
-                    {associations.map(assoc => {
-                        const doc = assoc.document
-                        const displayName = assoc.customName || doc?.name || "—"
-                        return (
-                            <Card key={assoc.id} className="group hover:shadow-sm transition-shadow">
-                                <CardContent className="p-3 flex items-start gap-3">
-                                    <div className="bg-green-50 dark:bg-green-950/30 p-1.5 rounded shrink-0">
-                                        <ShieldCheck className="h-6 w-6 text-green-600" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-sm">{displayName}</p>
-                                        {assoc.customName && doc?.name && (
-                                            <p className="text-xs text-slate-400">Originale: {doc.name}</p>
-                                        )}
-                                        {assoc.customNotes && (
-                                            <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap">{assoc.customNotes}</p>
-                                        )}
-                                        {doc && (
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                                {doc.brandName && (
-                                                    <span className="text-[10px] uppercase tracking-wide bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-semibold">
-                                                        {doc.brandName}
-                                                    </span>
-                                                )}
-                                                <span className="text-[10px] uppercase tracking-wide bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 font-semibold">
-                                                    {doc.documentTypeName}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                                        {doc?.fileUrl && (
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDoc(doc.fileUrl)}>
-                                                <ExternalLink className="h-3 w-3 text-slate-500" />
-                                            </Button>
-                                        )}
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                                            setEditing(assoc)
-                                            setEditName(assoc.customName || "")
-                                            setEditNotes(assoc.customNotes || "")
-                                            setEditOpen(true)
-                                        }}>
-                                            <Pencil className="h-3 w-3 text-slate-500" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }}>
-                                            <Unlink className="h-3 w-3 text-red-500" />
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
-                </div>
+                <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                    <TableHeader>
+                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className={head}>
+                                <button type="button" onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                                    Documento{sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                                </button>
+                            </TableHead>
+                            <TableHead className={`w-48 ${head}`}>
+                                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                                    <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                                        <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter}</SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Tutti i tipi</SelectItem>
+                                        {typeNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </TableHead>
+                            <TableHead className={`w-36 ${head}`}>Marca</TableHead>
+                            <TableHead className={`w-[28%] ${head}`}>Nota</TableHead>
+                            <TableHead className="w-24" />
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {shown.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                    {associations.length === 0
+                                        ? "Nessun documento di conformità associato. Quando l'offerta diventa commessa, i documenti associati qui verranno collegati anche alla commessa."
+                                        : "Nessun documento corrisponde ai filtri."}
+                                </TableCell>
+                            </TableRow>
+                        ) : shown.map(assoc => {
+                            const doc = assoc.document
+                            return (
+                                <TableRow key={assoc.id} className={doc?.fileUrl ? "cursor-pointer" : ""} onClick={() => doc?.fileUrl && openDoc(doc.fileUrl)}>
+                                    <TableCell className="border-r py-2">
+                                        <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white">
+                                            <ShieldCheck className="h-4 w-4 shrink-0 text-green-600" />
+                                            <span className="min-w-0">
+                                                <span className="block truncate" title={nameOf(assoc)}>{nameOf(assoc) || "—"}</span>
+                                                {assoc.customName && doc?.name && <span className="block truncate text-xs font-normal text-slate-400">Originale: {doc.name}</span>}
+                                            </span>
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300">{doc?.documentTypeName || <span className="text-slate-300">—</span>}</TableCell>
+                                    <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300">{doc?.brandName || <span className="text-slate-300">—</span>}</TableCell>
+                                    <TableCell className="truncate border-r py-2 text-sm text-slate-500" title={assoc.customNotes || undefined}>{assoc.customNotes || <span className="text-slate-300">—</span>}</TableCell>
+                                    <TableCell className="py-2" onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end gap-0.5">
+                                            <button type="button" title="Personalizza" onClick={() => {
+                                                setEditing(assoc)
+                                                setEditName(assoc.customName || "")
+                                                setEditNotes(assoc.customNotes || "")
+                                                setEditOpen(true)
+                                            }} className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
+                                            <button type="button" title="Disassocia" onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }} className="p-1 text-slate-400 hover:text-red-600"><Unlink className="h-4 w-4" /></button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        })}
+                    </TableBody>
+                </Table>
             )}
+
+            <FloatingAddButton onClick={() => setSearchOpen(true)} label="Associa documento" icon={<Link2 className="h-6 w-6" />} showOnMobile />
 
             {/* Edit dialog */}
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -247,7 +277,7 @@ export function ProposalConformita({ proposalId }: Props) {
                     onAssociated={handleAssociated}
                 />
             )}
-        </div>
+        </NotchTabs>
     )
 }
 

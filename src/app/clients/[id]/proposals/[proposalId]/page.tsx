@@ -629,9 +629,7 @@ export default function ProposalDetailPage() {
 
                     {/* ── DOCUMENTI ─────────────────────────────────────── */}
                     <TabsContent value="conformita" className="space-y-6 focus-visible:outline-none">
-                        <NotchTabs title="Conformità">
-                            <ProposalConformita proposalId={proposalId} />
-                        </NotchTabs>
+                        <ProposalConformita proposalId={proposalId} />
                     </TabsContent>
                     <TabsContent value="documenti-cantiere" className="space-y-6 focus-visible:outline-none">
                         <ProposalSiteDocuments proposalId={proposalId} />
