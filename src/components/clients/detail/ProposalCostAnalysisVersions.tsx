@@ -10,6 +10,7 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { Loader2, Calculator, Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { notify } from "@/lib/notify"
+import { useHistoryStep } from "@/hooks/useHistoryStep"
 import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { NotchActions, NotchSearch } from "@/components/ui/notch-tabs"
@@ -36,7 +37,7 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
     const sortIcon = (k: 'name' | 'date') => sortKey === k
         ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)
         : <ArrowUpDown className="h-3 w-3 opacity-30" />
-    const [openVersionId, setOpenVersionId] = useState<string | null>(null)
+    const [openVersionId, setOpenVersionId, closeVersion] = useHistoryStep<string>("magCostVersion")
 
     const [createOpen, setCreateOpen] = useState(false)
     const [newName, setNewName] = useState("")
@@ -126,7 +127,7 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
                 versionId={openVersionId}
                 versionName={v?.name ?? ""}
                 versionCreatedAt={v?.createdAt ?? ""}
-                onBack={() => setOpenVersionId(null)}
+                onBack={closeVersion}
             />
         )
     }

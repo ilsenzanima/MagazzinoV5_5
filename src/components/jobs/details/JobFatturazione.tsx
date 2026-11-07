@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { todayIso } from "@/lib/utils/local-date"
-import { Loader2, Plus, Pencil, Trash2, Paperclip, Euro, TrendingUp, X } from "lucide-react"
+import { Loader2, Pencil, Trash2, Paperclip, Euro, TrendingUp, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { jobSalApprovatiApi, jobFattureCommittenteApi } from "@/lib/services/job-billing"
 import { jobsApi } from "@/lib/api"
 import { JobSalApprovato, JobFatturaCommittente } from "@/lib/types"
@@ -18,6 +18,10 @@ import { it } from "date-fns/locale"
 import { createClient } from "@/lib/supabase/client"
 import { useBatchUpload, UploadItemState } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
+import { NotchTabs, NotchActions, NotchStat } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface JobFatturazioneProps {
     jobId: string
@@ -389,165 +393,149 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
     const totalFatture = fatture.reduce((s, x) => s + x.amount, 0)
     const estimatedCost = job.estimatedCost ?? null
 
+    // ── Tabella unica: SAL approvati e fatture del committente ──────────────
+    const [kindFilter, setKindFilter] = useState<'all' | 'sal' | 'fattura'>('all')
+    const [sortKey, setSortKey] = useState<'date' | 'name' | 'amount'>('date')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+    const toggleSort = (k: 'date' | 'name' | 'amount') => {
+        if (sortKey === k) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+        else { setSortKey(k); setSortDir(k === 'name' ? 'asc' : 'desc') }
+    }
+    const sortIcon = (k: 'date' | 'name' | 'amount') => sortKey === k
+        ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)
+        : <ArrowUpDown className="h-3 w-3 opacity-30" />
+    const rows = useMemo(() => {
+        const all = [
+            ...sals.map(e => ({ kind: 'sal' as const, e })),
+            ...fatture.map(e => ({ kind: 'fattura' as const, e })),
+        ].filter(r => kindFilter === 'all' || r.kind === kindFilter)
+        const dir = sortDir === 'asc' ? 1 : -1
+        return all.sort((x, y) => {
+            if (sortKey === 'name') return dir * x.e.name.localeCompare(y.e.name, 'it', { numeric: true })
+            if (sortKey === 'amount') return dir * (x.e.amount - y.e.amount)
+            return dir * String(x.e.date || '').localeCompare(String(y.e.date || ''))
+        })
+    }, [sals, fatture, kindFilter, sortKey, sortDir])
+    const sortHead = (k: 'date' | 'name' | 'amount', label: string, cls = '') => (
+        <TableHead className={`border-r text-xs font-semibold uppercase tracking-wide text-slate-600 ${cls}`}>
+            <button type="button" onClick={() => toggleSort(k)} className={`inline-flex items-center gap-1 uppercase hover:text-slate-900 ${cls.includes('text-right') ? 'flex-row-reverse' : ''}`}>
+                {label}{sortIcon(k)}
+            </button>
+        </TableHead>
+    )
+    const money = (n: number) => `€ ${n.toLocaleString("it-IT", { minimumFractionDigits: 2, useGrouping: true })}`
+
+    const strip = (
+        <NotchActions>
+            {editingCosto ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 py-0.5 pl-3 pr-1 text-xs normal-case tracking-normal text-slate-300">
+                    Importo commessa
+                    <input
+                        autoFocus
+                        className="h-7 w-28 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-400"
+                        placeholder="0,00"
+                        value={costoValue}
+                        onChange={e => setCostoValue(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") saveCosto(); if (e.key === "Escape") setEditingCosto(false) }}
+                    />
+                    <button type="button" onClick={saveCosto} disabled={savingCosto} className="h-7 rounded-full bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-blue-500">
+                        {savingCosto ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "OK"}
+                    </button>
+                    <button type="button" onClick={() => setEditingCosto(false)} aria-label="Annulla" className="flex h-7 w-7 items-center justify-center rounded-full text-white hover:bg-white/20"><X className="h-3.5 w-3.5" /></button>
+                </span>
+            ) : (
+                <span className="inline-flex items-baseline gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium normal-case tracking-normal text-slate-300">
+                    Importo commessa
+                    <b className="text-sm font-semibold text-white">{estimatedCost != null ? money(estimatedCost) : <i className="font-normal text-slate-400">non impostato</i>}</b>
+                    <button type="button" title="Modifica importo" aria-label="Modifica importo" className="self-center text-slate-300 hover:text-white"
+                        onClick={() => { setCostoValue(estimatedCost != null ? String(estimatedCost) : ""); setEditingCosto(true) }}>
+                        <Pencil className="h-3 w-3" />
+                    </button>
+                </span>
+            )}
+            <NotchStat label="SAL approvati" value={`${money(totalSal)} · ${sals.length}`} />
+            <NotchStat label="Fatturato" value={`${money(totalFatture)} · ${fatture.length}`} />
+            {totalSal > 0 && <NotchStat label="Da fatturare" value={money(totalSal - totalFatture)} />}
+        </NotchActions>
+    )
+
     if (loading) {
         return (
-            <div className="flex justify-center items-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                <span className="ml-2 text-slate-500">Caricamento fatturazione...</span>
-            </div>
+            <NotchTabs title="Fatturazione">
+                <div className="flex justify-center items-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    <span className="ml-2 text-slate-500">Caricamento fatturazione...</span>
+                </div>
+            </NotchTabs>
         )
     }
 
     return (
-        <div className="space-y-6">
-
-            {/* ── Riepilogo ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Costo presunto */}
-                <Card className="border-slate-200 dark:border-slate-700">
-                    <CardContent className="p-4">
-                        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Importo Commessa</p>
-                        {editingCosto ? (
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    autoFocus
-                                    className="h-8 text-base"
-                                    placeholder="0,00"
-                                    value={costoValue}
-                                    onChange={e => setCostoValue(e.target.value)}
-                                    onKeyDown={e => { if (e.key === "Enter") saveCosto(); if (e.key === "Escape") setEditingCosto(false) }}
-                                />
-                                <Button size="sm" onClick={saveCosto} disabled={savingCosto}>
-                                    {savingCosto ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "OK"}
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => setEditingCosto(false)}>
-                                    <X className="h-3.5 w-3.5" />
-                                </Button>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xl font-bold text-slate-900 dark:text-white">
-                                        {estimatedCost != null
-                                            ? `€ ${estimatedCost.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}`
-                                            : <span className="text-slate-400 text-base font-normal italic">Non impostato</span>
-                                        }
-                                    </span>
-                                    <button onClick={() => { setCostoValue(estimatedCost != null ? String(estimatedCost) : ""); setEditingCosto(true) }}
-                                        className="text-slate-400 hover:text-slate-600">
-                                        <Pencil className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Totale SAL */}
-                <Card className="border-slate-200 dark:border-slate-700">
-                    <CardContent className="p-4">
-                        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">SAL Approvati</p>
-                        <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
-                            € {totalSal.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-0.5">{sals.length} SAL</p>
-                    </CardContent>
-                </Card>
-
-                {/* Totale fatture */}
-                <Card className="border-slate-200 dark:border-slate-700">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Fatturato</p>
-                                <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
-                                    € {totalFatture.toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
-                                </p>
-                                <p className="text-xs text-slate-400 mt-0.5">{fatture.length} fatture</p>
-                            </div>
-                            {totalSal > 0 && (
-                                <div className="text-right">
-                                    <p className="text-xs text-slate-500">Da fatturare</p>
-                                    <p className={`text-base font-bold ${totalSal - totalFatture > 0.005 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                                        € {(totalSal - totalFatture).toLocaleString("it-IT", { minimumFractionDigits: 2 , useGrouping: true})}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+        <NotchTabs title="Fatturazione">
+            {strip}
+            <div className="space-y-4">
+                <Table className="border-collapse">
+                    <TableHeader>
+                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className="w-52 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <Select value={kindFilter} onValueChange={v => setKindFilter(v as 'all' | 'sal' | 'fattura')}>
+                                    <SelectTrigger className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                                        <SelectValue>{kindFilter === 'all' ? 'Tipo' : kindFilter === 'sal' ? 'SAL approvati' : 'Fatture committente'}</SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Tutti</SelectItem>
+                                        <SelectItem value="sal">SAL approvati</SelectItem>
+                                        <SelectItem value="fattura">Fatture committente</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </TableHead>
+                            {sortHead('name', 'Nome')}
+                            {sortHead('date', 'Data', 'w-32')}
+                            {sortHead('amount', 'Importo', 'w-36 text-right')}
+                            <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Note</TableHead>
+                            <TableHead className="w-28" />
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rows.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={6} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                    {sals.length === 0 && fatture.length === 0 ? 'Nessun SAL o fattura inserita. Usa il pulsante + in basso a destra per aggiungere.' : 'Nessuna voce per questo filtro.'}
+                                </TableCell>
+                            </TableRow>
+                        ) : rows.map(({ kind, e }) => (
+                            <TableRow key={`${kind}-${e.id}`}>
+                                <TableCell className="border-r py-2">
+                                    {kind === 'sal'
+                                        ? <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"><TrendingUp className="h-3 w-3" />SAL approvato</span>
+                                        : <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"><Euro className="h-3 w-3" />Fattura committente</span>}
+                                </TableCell>
+                                <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">{e.name}</TableCell>
+                                <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{e.date ? format(new Date(e.date + "T00:00:00"), "dd/MM/yyyy", { locale: it }) : <span className="text-slate-300">—</span>}</TableCell>
+                                <TableCell className={`border-r py-2 text-right font-bold ${kind === 'sal' ? 'text-emerald-700 dark:text-emerald-400' : 'text-blue-700 dark:text-blue-400'}`}>{money(e.amount)}</TableCell>
+                                <TableCell className="border-r py-2 text-sm text-slate-500">{e.notes || <span className="text-slate-300">—</span>}</TableCell>
+                                <TableCell className="py-2">
+                                    <div className="flex items-center justify-end gap-0.5">
+                                        {e.documentUrl && (
+                                            <button type="button" title="Apri documento" onClick={() => openDocument(e.documentUrl!)} className="p-1 text-violet-500 hover:text-violet-700"><Paperclip className="h-4 w-4" /></button>
+                                        )}
+                                        <button type="button" title="Modifica" onClick={() => kind === 'sal' ? openEditSal(e as JobSalApprovato) : openEditFattura(e as JobFatturaCommittente)} className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
+                                        <button type="button" title="Elimina" onClick={() => kind === 'sal' ? deleteSal(e.id) : deleteFattura(e.id)} className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             </div>
 
-            {/* ── Intestazioni colonne + pulsanti ── */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-sm">
-                        <TrendingUp className="h-4 w-4 text-emerald-600" />
-                        SAL Approvati
-                    </h3>
-                    <Button size="sm" onClick={openNewSal}
-                        className="bg-emerald-600 hover:bg-emerald-700 h-7 px-2 text-xs">
-                        <Plus className="h-3.5 w-3.5 mr-1" />Aggiungi
-                    </Button>
-                </div>
-                <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-sm">
-                        <Euro className="h-4 w-4 text-blue-600" />
-                        Fatture Committente
-                    </h3>
-                    <Button size="sm" onClick={openNewFattura}
-                        className="bg-blue-600 hover:bg-blue-700 h-7 px-2 text-xs">
-                        <Plus className="h-3.5 w-3.5 mr-1" />Aggiungi
-                    </Button>
-                </div>
-            </div>
-
-            {/* ── Due colonne indipendenti ── */}
-            {sals.length === 0 && fatture.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg">
-                    <p className="text-sm">Nessun SAL o fattura inserita</p>
-                    <p className="text-xs mt-1">Usa i pulsanti sopra per aggiungere</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-2 gap-4 items-start">
-                    {/* Colonna SAL */}
-                    <div className="space-y-2">
-                        {sals.length === 0 ? (
-                            <div className="text-center py-6 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg text-xs">
-                                Nessun SAL inserito
-                            </div>
-                        ) : (
-                            sals.map(sal => (
-                                <EntryCard
-                                    key={sal.id}
-                                    entry={sal}
-                                    color="emerald"
-                                    onEdit={() => openEditSal(sal)}
-                                    onDelete={() => deleteSal(sal.id)}
-                                />
-                            ))
-                        )}
-                    </div>
-                    {/* Colonna Fatture */}
-                    <div className="space-y-2">
-                        {fatture.length === 0 ? (
-                            <div className="text-center py-6 text-slate-400 dark:text-slate-500 border border-dashed rounded-lg text-xs">
-                                Nessuna fattura inserita
-                            </div>
-                        ) : (
-                            fatture.map(f => (
-                                <EntryCard
-                                    key={f.id}
-                                    entry={f}
-                                    color="blue"
-                                    onEdit={() => openEditFattura(f)}
-                                    onDelete={() => deleteFattura(f.id)}
-                                />
-                            ))
-                        )}
-                    </div>
-                </div>
-            )}
+            <FloatingAddButton
+                label="Aggiungi"
+                actions={[
+                    { label: "Nuovo SAL approvato", onClick: openNewSal },
+                    { label: "Nuova fattura committente", onClick: openNewFattura },
+                ]}
+            />
 
             {/* ── Dialogs ── */}
             <EntryDialog
@@ -582,6 +570,6 @@ export function JobFatturazione({ jobId, job, onJobUpdated }: JobFatturazionePro
                 description={toDelete?.kind === 'sal' ? "Eliminare questo SAL?" : "Eliminare questa fattura?"}
                 onConfirm={doDelete}
             />
-        </div>
+        </NotchTabs>
     )
 }
