@@ -598,7 +598,7 @@ export default function JobDetailsPage() {
         <DashboardLayout>
             <div className="max-w-[1700px] mx-auto space-y-6 pb-20 print:p-0 print:max-w-none overflow-x-hidden">
 
-                {/* Intestazione con il nome; sotto la striscia scura con il nome della pagina e, a destra, tipo e stato (lo stato si cambia con un clic) */}
+                {/* Intestazione con il nome della commessa. La striscia scura con tipo e stato sta solo nei Dettagli: le altre pagine hanno la loro */}
                 <div className="print:hidden">
                     <div className="mb-3 flex items-center justify-between gap-2">
                         <Link href="/jobs">
@@ -612,35 +612,6 @@ export default function JobDetailsPage() {
                         </h1>
                         <span className="w-9 md:w-40" aria-hidden />
                     </div>
-                    <NotchTabs title={buildMenuGroups(true).flatMap(g => g.items).find(i => i.key === activeTab)?.label ?? "Dettagli"}>
-                        <NotchActions>
-                            <Badge className={`shrink-0 text-xs ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
-                                {JOB_CATEGORY_LABELS[job.category]}
-                            </Badge>
-                            {(userRole === 'admin' || userRole === 'operativo') ? (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <button type="button" disabled={changingStatus} title="Cambia stato" className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-60">
-                                            <Badge className={`cursor-pointer gap-1 text-xs ${statusColor(job.status)}`}>
-                                                {STATUS_LABEL[job.status] ?? job.status}
-                                                {changingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChevronDown className="h-3 w-3" />}
-                                            </Badge>
-                                        </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        {(['active', 'suspended', 'completed'] as const).map(st => (
-                                            <DropdownMenuItem key={st} onClick={() => handleStatusChange(st)} className={job.status === st ? 'font-semibold' : ''}>
-                                                <span className={`mr-2 inline-block h-2 w-2 rounded-full ${statusColor(st)}`} />
-                                                {STATUS_LABEL[st]}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            ) : (
-                                <Badge className={`shrink-0 text-xs ${statusColor(job.status)}`}>{STATUS_LABEL[job.status] ?? job.status}</Badge>
-                            )}
-                        </NotchActions>
-                    </NotchTabs>
                 </div>
 
                 {/* Printable Area */}
@@ -671,6 +642,37 @@ export default function JobDetailsPage() {
                         </div>
 
                         <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">
+                            <div className="print:hidden">
+                    <NotchTabs title="Dettagli">
+                        <NotchActions>
+                            <Badge className={`shrink-0 text-xs ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
+                                {JOB_CATEGORY_LABELS[job.category]}
+                            </Badge>
+                            {(userRole === 'admin' || userRole === 'operativo') ? (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button type="button" disabled={changingStatus} title="Cambia stato" className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-60">
+                                            <Badge className={`cursor-pointer gap-1 text-xs ${statusColor(job.status)}`}>
+                                                {STATUS_LABEL[job.status] ?? job.status}
+                                                {changingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChevronDown className="h-3 w-3" />}
+                                            </Badge>
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        {(['active', 'suspended', 'completed'] as const).map(st => (
+                                            <DropdownMenuItem key={st} onClick={() => handleStatusChange(st)} className={job.status === st ? 'font-semibold' : ''}>
+                                                <span className={`mr-2 inline-block h-2 w-2 rounded-full ${statusColor(st)}`} />
+                                                {STATUS_LABEL[st]}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            ) : (
+                                <Badge className={`shrink-0 text-xs ${statusColor(job.status)}`}>{STATUS_LABEL[job.status] ?? job.status}</Badge>
+                            )}
+                        </NotchActions>
+                    </NotchTabs>
+                            </div>
                             <JobOverview job={job} totalCost={totalCost} totalHours={totalHours} onJobUpdated={loadData} />
                             {linkedProposal && (
                                 <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 flex items-center justify-between gap-4">
