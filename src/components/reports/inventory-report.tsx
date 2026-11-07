@@ -143,6 +143,7 @@ export default function InventoryReport() {
     // Il filtro per sede sta in un menu hamburger nella striscia in alto
     const warehouseTabs = stockWarehouses.length > 1 && (
         <NotchMenu
+            inline
             prefix="Sede:"
             items={[{ value: "all", label: "Tutti i magazzini", icon: <WarehouseIcon /> }, ...stockWarehouses.map(w => ({ value: w.id, label: w.name, icon: <WarehouseIcon /> }))]}
             value={selectedWarehouse}
@@ -187,8 +188,6 @@ export default function InventoryReport() {
 
     return (
         <div className="space-y-4">
-            {warehouseTabs}
-
             <Card className="bg-slate-50 dark:bg-slate-900">
                 <CardContent className="space-y-1 py-3 text-sm text-slate-600 dark:text-slate-300">
                     <div className="flex items-start gap-2">
@@ -205,8 +204,9 @@ export default function InventoryReport() {
                 </CardContent>
             </Card>
 
-            {/* Una sola barra: ricerca, filtro movimenti, totale righe */}
+            {/* Una sola barra: sede, ricerca, filtro movimenti, totale righe */}
             <div className="flex flex-wrap items-center gap-3">
+                {warehouseTabs}
                 <div className="relative min-w-[16rem] flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input

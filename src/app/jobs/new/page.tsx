@@ -63,7 +63,7 @@ function NewJobForm() {
   }
 
   const [formData, setFormData] = useState({
-    clientId: "",
+    clientId: searchParams.get("clientId") || "",
     code: "",
     name: "",
     description: "",

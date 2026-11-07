@@ -154,6 +154,7 @@ export default function ArticlesReport() {
     // Si basa sulla posizione attuale del lotto: per lo storico per data (non tracciato) è disabilitato.
     const warehouseTabs = stockWarehouses.length > 1 && (
         <NotchMenu
+            inline
             prefix="Sede:"
             items={[{ value: "all", label: "Tutti i magazzini", icon: <WarehouseIcon /> }, ...stockWarehouses.map(w => ({ value: w.id, label: w.name, icon: <WarehouseIcon /> }))]}
             value={selectedWarehouse}
@@ -207,9 +208,9 @@ export default function ArticlesReport() {
 
     return (
         <div className="space-y-4">
-            {warehouseTabs}
-            {/* Una sola barra: ricerca, data dello stock, totali */}
+            {/* Una sola barra: sede, ricerca, data dello stock, totali */}
             <div className="flex flex-wrap items-center gap-3">
+                {warehouseTabs}
                 <div className="relative min-w-[16rem] flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input

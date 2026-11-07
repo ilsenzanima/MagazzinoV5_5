@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 
 // Geometria del menu (px)
 const W0 = 72 // larghezza a riposo: sole icone
-const W1 = 264 // larghezza aperta
+const W1 = 288 // larghezza aperta
 const HEAD = 64 // testata con il logo
 const FOOT = 16 // margine in fondo
 const RH = 38 // altezza di una voce

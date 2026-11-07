@@ -26,8 +26,8 @@ import { ClientContacts } from "@/components/clients/detail/ClientContacts";
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { ViewToggle } from "@/components/ui/view-toggle";
-import { useViewMode } from "@/hooks/useViewMode";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Attiva", completed: "Completata", suspended: "Sospesa",
@@ -71,7 +71,6 @@ export default function ClientDetailPage() {
   const [savingNotes, setSavingNotes] = useState(false);
   const [proposalSearch, setProposalSearch] = useState("");
   const [proposalStatusFilter, setProposalStatusFilter] = useState<string>("all");
-  const [proposalsViewMode, setProposalsViewMode] = useViewMode("client-proposals", "grid");
 
   // Dialogs
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -107,10 +106,10 @@ export default function ClientDetailPage() {
     try {
       setLoadingClient(true);
       const data = await clientsApi.getById(id);
-      if (!data) { router.push("/clients"); return; }
+      if (!data) { router.push("/anagrafiche?v=committenti"); return; }
       setClient(data);
       setNotes((data as any).notes || "");
-    } catch { router.push("/clients"); }
+    } catch { router.push("/anagrafiche?v=committenti"); }
     finally { setLoadingClient(false); }
   };
 
@@ -183,7 +182,7 @@ export default function ClientDetailPage() {
   return (
     <DashboardLayout>
       <div className="mb-3">
-        <Link href="/clients" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+        <Link href="/anagrafiche?v=committenti" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
           <ArrowLeft className="mr-1 h-4 w-4" /> Committenti
         </Link>
       </div>
@@ -281,90 +280,59 @@ export default function ClientDetailPage() {
         {/* ── PROPOSTE ─────────────────────────────────────────────────── */}
         <TabsContent value="proposte">
           <div className="space-y-4">
-            {/* Barra ricerca + filtro + nuovo */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-              <div className="flex gap-2 flex-1 w-full">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input className="pl-9" placeholder="Cerca offerta..." value={proposalSearch} onChange={e => setProposalSearch(e.target.value)} />
-                </div>
-                <Select value={proposalStatusFilter} onValueChange={setProposalStatusFilter}>
-                  <SelectTrigger className="w-36"><SelectValue placeholder="Tutti gli stati" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tutti gli stati</SelectItem>
-                    {(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <ViewToggle mode={proposalsViewMode} onChange={setProposalsViewMode} />
+            <div className="flex gap-2">
+              <div className="relative max-w-sm flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input className="pl-9" placeholder="Cerca offerta..." value={proposalSearch} onChange={e => setProposalSearch(e.target.value)} />
               </div>
-              {canEdit && (
-                <Button onClick={() => { setProposalForm(EMPTY_PROPOSAL_FORM); setUseClientAddr(false); setNewProposalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 shrink-0">
-                  <Plus className="h-4 w-4 mr-2" />Nuova Offerta
-                </Button>
-              )}
+              <Select value={proposalStatusFilter} onValueChange={setProposalStatusFilter}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Tutti gli stati" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti gli stati</SelectItem>
+                  {(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             {loadingProposals ? (
               <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
             ) : filteredProposals.length === 0 ? (
-              <div className="text-center py-12 text-slate-400">
-                <Plus className="h-12 w-12 mx-auto mb-2 opacity-20" />
+              <div className="py-12 text-center text-slate-400">
+                <Plus className="mx-auto mb-2 h-12 w-12 opacity-20" />
                 <p>{proposals.length === 0 ? "Nessuna offerta ancora. Creane una!" : "Nessuna offerta corrisponde alla ricerca."}</p>
               </div>
-            ) : proposalsViewMode === "list" ? (
-              <div className="space-y-1.5">
-                {filteredProposals.map(p => (
-                  <Link key={p.id} href={`/clients/${id}/proposals/${p.id}`}>
-                    <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer">
-                      <span className="font-medium text-slate-900 dark:text-white text-sm flex-1 min-w-0 truncate">
-                        {p.title}
-                      </span>
-                      {p.estimatedValue !== null && (
-                        <span className="text-blue-700 dark:text-blue-400 text-xs w-28 shrink-0 text-right hidden md:block">
-                          € {p.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}
-                        </span>
-                      )}
-                      {(p.siteCity || p.siteStreet) && (
-                        <span className="text-slate-400 text-xs w-36 shrink-0 truncate hidden lg:flex items-center gap-1">
-                          <MapPin className="h-3 w-3 shrink-0" />{[p.siteStreet, p.siteCity].filter(Boolean).join(", ")}
-                        </span>
-                      )}
-                      {p.date && (
-                        <span className="text-slate-400 text-xs w-24 shrink-0 hidden xl:block">
-                          {format(new Date(p.date), "d MMM yyyy", { locale: it })}
-                        </span>
-                      )}
-                      <Badge className={`text-xs shrink-0 ${PROP_STATUS_COLORS[p.status]}`} variant="secondary">{PROP_STATUS_LABELS[p.status]}</Badge>
-                    </div>
-                  </Link>
-                ))}
-              </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {filteredProposals.map(p => (
-                  <Link key={p.id} href={`/clients/${id}/proposals/${p.id}`}>
-                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                      <CardContent className="p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-slate-900 dark:text-white leading-snug">{p.title}</p>
-                          <Badge className={`text-xs shrink-0 ${PROP_STATUS_COLORS[p.status]}`} variant="secondary">{PROP_STATUS_LABELS[p.status]}</Badge>
-                        </div>
-                        {p.estimatedValue !== null && (
-                          <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">€ {p.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}</p>
-                        )}
-                        {p.description && <p className="text-xs text-slate-500 line-clamp-2">{p.description}</p>}
-                        {(p.siteCity || p.siteStreet) && (
-                          <div className="flex items-center gap-1 text-xs text-slate-400">
-                            <MapPin className="h-3 w-3 shrink-0" />
-                            <span>{[p.siteStreet, p.siteCity].filter(Boolean).join(", ")}</span>
-                          </div>
-                        )}
-                        {p.date && <p className="text-xs text-slate-400">{format(new Date(p.date), "d MMM yyyy", { locale: it })}</p>}
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Offerta</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Luogo</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Data</TableHead>
+                    <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Valore</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Stato</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProposals.map(p => (
+                    <TableRow key={p.id} className="cursor-pointer" onClick={() => router.push(`/clients/${id}/proposals/${p.id}`)}>
+                      <TableCell className="py-3">
+                        <div className="font-medium text-slate-900 dark:text-white">{p.title}</div>
+                        {p.description && <div className="line-clamp-1 text-xs text-slate-500">{p.description}</div>}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-slate-600 dark:text-slate-300">
+                        {(p.siteCity || p.siteStreet) ? [p.siteStreet, p.siteCity].filter(Boolean).join(", ") : "—"}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-slate-600 dark:text-slate-300">
+                        {p.date ? format(new Date(p.date), "d MMM yyyy", { locale: it }) : "—"}
+                      </TableCell>
+                      <TableCell className="py-3 text-right text-sm font-semibold text-blue-700 dark:text-blue-300">
+                        {p.estimatedValue !== null ? `€ ${p.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2, useGrouping: true })}` : "—"}
+                      </TableCell>
+                      <TableCell className="py-3"><Badge className={`text-xs ${PROP_STATUS_COLORS[p.status]}`} variant="secondary">{PROP_STATUS_LABELS[p.status]}</Badge></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </div>
         </TabsContent>
@@ -374,42 +342,47 @@ export default function ClientDetailPage() {
           {loadingJobs ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
           ) : jobs.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
-              <Briefcase className="h-12 w-12 mx-auto mb-2 opacity-20" />
+            <div className="py-12 text-center text-slate-400">
+              <Briefcase className="mx-auto mb-2 h-12 w-12 opacity-20" />
               <p>Nessuna commessa associata a questo committente</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-500 dark:text-slate-400">{jobs.length} commess{jobs.length === 1 ? "a" : "e"} trovat{jobs.length === 1 ? "a" : "e"}</p>
-              {jobs.map(job => (
-                <Link key={job.id} href={`/jobs/${job.id}`}>
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-mono text-xs text-slate-500">{job.code}</span>
-                            <Badge className={`text-xs ${STATUS_COLORS[job.status] ?? ""}`} variant="secondary">{STATUS_LABELS[job.status] ?? job.status}</Badge>
-                          </div>
-                          <p className="font-medium text-slate-900 dark:text-white truncate">{job.name}</p>
-                          {job.siteAddress && <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{job.siteAddress}</p>}
-                        </div>
-                        <div className="text-right shrink-0 text-xs text-slate-400">
-                          {job.startDate && <p>{format(new Date(job.startDate), "dd/MM/yyyy")}</p>}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Codice</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Commessa</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Indirizzo</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Inizio</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Stato</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {jobs.map(job => (
+                  <TableRow key={job.id} className="cursor-pointer" onClick={() => router.push(`/jobs/${job.id}`)}>
+                    <TableCell className="py-3 font-mono text-xs text-slate-500">{job.code}</TableCell>
+                    <TableCell className="py-3 font-medium text-slate-900 dark:text-white">{job.name}</TableCell>
+                    <TableCell className="py-3 text-sm text-slate-600 dark:text-slate-300">{job.siteAddress || "—"}</TableCell>
+                    <TableCell className="py-3 text-sm text-slate-600 dark:text-slate-300">{job.startDate ? format(new Date(job.startDate), "dd/MM/yyyy") : "—"}</TableCell>
+                    <TableCell className="py-3"><Badge className={`text-xs ${STATUS_COLORS[job.status] ?? ""}`} variant="secondary">{STATUS_LABELS[job.status] ?? job.status}</Badge></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </TabsContent>
       </Tabs>
 
+      {canEdit && activeTab === "proposte" && (
+        <FloatingAddButton onClick={() => { setProposalForm(EMPTY_PROPOSAL_FORM); setUseClientAddr(false); setNewProposalOpen(true); }} label="Nuova offerta" />
+      )}
+      {canEdit && activeTab === "commesse" && (
+        <FloatingAddButton href={`/jobs/new?clientId=${id}`} label="Nuova commessa" />
+      )}
+
       {/* Edit / Delete dialogs */}
       <ClientEditDialog client={client} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} onSaved={() => { setIsEditDialogOpen(false); loadClient(); }} />
-      <ClientDeleteDialog client={client} open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} onConfirm={async () => { try { await clientsApi.delete(client.id); router.push("/clients"); } catch { notify.error("Errore durante l'eliminazione del committente"); } }} />
+      <ClientDeleteDialog client={client} open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} onConfirm={async () => { try { await clientsApi.delete(client.id); router.push("/anagrafiche?v=committenti"); } catch { notify.error("Errore durante l'eliminazione del committente"); } }} />
 
       {/* Nuova proposta dialog */}
       <Dialog open={newProposalOpen} onOpenChange={setNewProposalOpen}>

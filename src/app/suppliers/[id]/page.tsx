@@ -155,7 +155,7 @@ export default function SupplierDetailPage() {
         return;
       }
       await suppliersApi.delete(id);
-      router.push("/suppliers");
+      router.push("/anagrafiche?v=fornitori");
     } catch (error) {
       console.error("Failed to delete supplier:", error);
       notify.error("Errore durante l'eliminazione del fornitore.");
@@ -210,7 +210,7 @@ export default function SupplierDetailPage() {
       <DashboardLayout>
         <div className="text-center py-20">
           <h2 className="text-xl font-bold text-slate-900">Fornitore non trovato</h2>
-          <Link href="/suppliers" className="text-blue-600 hover:underline mt-4 inline-block">Torna alla lista</Link>
+          <Link href="/anagrafiche?v=fornitori" className="text-blue-600 hover:underline mt-4 inline-block">Torna alla lista</Link>
         </div>
       </DashboardLayout>
     );
@@ -232,7 +232,7 @@ export default function SupplierDetailPage() {
     <DashboardLayout>
       <div className="w-full">
         <div className="mb-3">
-          <Link href="/suppliers" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+          <Link href="/anagrafiche?v=fornitori" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
             <ArrowLeft className="mr-1 h-4 w-4" /> Fornitori
           </Link>
         </div>

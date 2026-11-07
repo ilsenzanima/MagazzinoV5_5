@@ -105,15 +105,15 @@ export function NotchHelp(props: React.ComponentProps<typeof HelpTip>) {
 }
 
 // Menu a tendina (hamburger) nella striscia, dopo il nome della pagina: una voce per ogni sotto-pagina
-export function NotchMenu({ items, value, onValueChange, prefix, disabled, title }: { items: { value: string; label: string; icon: ReactNode }[]; value: string; onValueChange: (v: string) => void; prefix?: string; disabled?: boolean; title?: string }) {
+export function NotchMenu({ items, value, onValueChange, prefix, disabled, title, inline }: { items: { value: string; label: string; icon: ReactNode }[]; value: string; onValueChange: (v: string) => void; prefix?: string; disabled?: boolean; title?: string; inline?: boolean }) {
   const { help } = useContext(SlotsCtx)
   const current = items.find(i => i.value === value)
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" disabled={disabled} title={title} className="ml-2 inline-flex h-8 max-w-[18rem] items-center gap-2 rounded-full bg-white/10 px-3 text-xs font-medium normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50">
+        <button type="button" disabled={disabled} title={title} className={cn("inline-flex max-w-[18rem] items-center gap-2 rounded-full font-medium normal-case tracking-normal outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50", inline ? "h-10 bg-white px-4 text-sm text-slate-800 shadow-sm hover:bg-slate-50 dark:bg-card dark:text-white" : "ml-2 h-8 bg-white/10 px-3 text-xs text-white hover:bg-white/20")}>
           <Menu className="h-4 w-4 shrink-0" />
-          <span className="truncate">{prefix && <span className="text-slate-300">{prefix} </span>}{current?.label}</span>
+          <span className="truncate">{prefix && <span className={inline ? "text-slate-500" : "text-slate-300"}>{prefix} </span>}{current?.label}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
@@ -127,7 +127,7 @@ export function NotchMenu({ items, value, onValueChange, prefix, disabled, title
       </DropdownMenuContent>
     </DropdownMenu>
   )
-  return help ? createPortal(menu, help) : menu
+  return help && !inline ? createPortal(menu, help) : menu
 }
 
 // Pulsanti della scheda mostrati a destra nella striscia dei tab. Fuori da <NotchTabs> si vedono dove sono scritti.
