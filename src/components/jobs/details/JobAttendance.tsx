@@ -8,6 +8,7 @@ import { attendanceApi, correctionsApi, Attendance, AttendanceCorrection } from 
 import { format, startOfMonth, endOfMonth, eachWeekOfInterval, endOfWeek, addMonths, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 import { notify } from "@/lib/notify";
+import { NotchTabs, NotchActions, NotchStat } from "@/components/ui/notch-tabs";
 
 interface JobAttendanceProps {
     jobId: string;
@@ -162,32 +163,28 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
 
     const grandTotal = Array.from(workerTotals.values()).reduce((sum, h) => sum + h.normal + h.transfer, 0);
 
-    if (loading) {
-        return (
-            <Card>
-                <CardContent className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                </CardContent>
-            </Card>
-        );
-    }
-
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <CardTitle>Ore Lavoro per Operaio</CardTitle>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+        <NotchTabs title="Ore">
+            <NotchActions>
+                {!loading && <NotchStat label="Totale mese" value={`${grandTotal}h`} />}
+                <div className="flex items-center gap-1">
+                    <button type="button" onClick={handlePrevMonth} aria-label="Mese precedente" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20">
                         <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm font-medium min-w-[120px] text-center">
+                    </button>
+                    <span className="min-w-[110px] text-center text-xs font-medium normal-case tracking-normal text-white first-letter:uppercase">
                         {format(currentMonth, 'MMMM yyyy', { locale: it })}
                     </span>
-                    <Button variant="outline" size="icon" onClick={handleNextMonth}>
+                    <button type="button" onClick={handleNextMonth} aria-label="Mese successivo" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20">
                         <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    </button>
                 </div>
-            </CardHeader>
+            </NotchActions>
+            {loading ? (
+                <div className="flex h-64 items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+            ) : (
+        <Card>
             <CardContent>
                 {workers.length === 0 ? (
                     <div className="text-center py-8 text-slate-500">
@@ -268,5 +265,7 @@ export function JobAttendance({ jobId }: JobAttendanceProps) {
                 )}
             </CardContent>
         </Card>
+            )}
+        </NotchTabs>
     );
 }

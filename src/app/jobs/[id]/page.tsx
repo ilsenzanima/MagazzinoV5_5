@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, ChevronDown, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ChevronDown, Info, Package, FileText, Folder, Clock, Euro, Recycle, ClipboardList, Receipt, BarChart2, ShieldCheck, GanttChartSquare, Archive, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { jobsApi, movementsApi, attendanceApi, Job, Movement } from "@/lib/api";
 import { salApi, salCostsApi } from "@/lib/services/sal";
@@ -645,6 +645,17 @@ export default function JobDetailsPage() {
                             <div className="print:hidden">
                     <NotchTabs title="Dettagli">
                         <NotchActions>
+                            {linkedProposal && (
+                                <Link
+                                    href={`/clients/${linkedProposal.clientId}/proposals/${linkedProposal.id}`}
+                                    title={`Creata dalla proposta: ${linkedProposal.title}`}
+                                    className="hidden h-7 max-w-[15rem] items-center gap-1.5 rounded-full bg-white/10 px-3 text-xs font-medium normal-case tracking-normal text-white transition-colors hover:bg-white/20 lg:inline-flex"
+                                >
+                                    <FileText className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+                                    <span className="truncate"><span className="text-slate-300">Da proposta: </span>{linkedProposal.title}</span>
+                                    <ArrowUpRight className="h-3 w-3 shrink-0 text-slate-300" />
+                                </Link>
+                            )}
                             <Badge className={`shrink-0 text-xs ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
                                 {JOB_CATEGORY_LABELS[job.category]}
                             </Badge>
@@ -674,20 +685,6 @@ export default function JobDetailsPage() {
                     </NotchTabs>
                             </div>
                             <JobOverview job={job} totalCost={totalCost} totalHours={totalHours} onJobUpdated={loadData} />
-                            {linkedProposal && (
-                                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 flex items-center justify-between gap-4">
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wide text-blue-500 mb-0.5">Creata da proposta</p>
-                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{linkedProposal.title}</p>
-                                        {linkedProposal.date && <p className="text-xs text-slate-500">{format(new Date(linkedProposal.date), "d MMM yyyy", { locale: it })}</p>}
-                                    </div>
-                                    <Link href={`/clients/${linkedProposal.clientId}/proposals/${linkedProposal.id}`}>
-                                        <Button size="sm" variant="outline" className="shrink-0 text-blue-600 border-blue-300">
-                                            Vai alla Proposta
-                                        </Button>
-                                    </Link>
-                                </div>
-                            )}
                         </TabsContent>
 
                         <TabsContent value="cronoprogramma" className="space-y-6 focus-visible:outline-none">

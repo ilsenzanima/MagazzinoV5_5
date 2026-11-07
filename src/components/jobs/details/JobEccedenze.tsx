@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Fragment, useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ import { DeliveryNote } from "@/lib/types"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { notify } from "@/lib/notify"
+import { NotchTabs, NotchActions, NotchStat } from "@/components/ui/notch-tabs"
 
 interface JobEccedenzeProps {
     jobId: string
@@ -47,31 +48,22 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-violet-600" />
-                <span className="ml-2 text-slate-500 text-sm">Caricamento eccedenze...</span>
-            </div>
+            <NotchTabs title="Eccedenze">
+                <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-violet-600" />
+                    <span className="ml-2 text-slate-500 text-sm">Caricamento eccedenze...</span>
+                </div>
+            </NotchTabs>
         )
     }
 
     return (
+        <NotchTabs title="Eccedenze">
+            <NotchActions>
+                <NotchStat label="Trasporti" value={notes.length} />
+                <NotchStat label="Voci totali" value={totalItems} />
+            </NotchActions>
         <div className="space-y-4">
-            {/* Summary */}
-            <Card className="bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 border-violet-200 dark:border-violet-800">
-                <CardContent className="py-4">
-                    <div className="flex items-center gap-3">
-                        <Recycle className="h-8 w-8 text-violet-600 dark:text-violet-400" />
-                        <div>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">Trasporti Eccedenze</p>
-                            <p className="text-2xl font-bold text-slate-900 dark:text-white">{notes.length}</p>
-                        </div>
-                        <div className="ml-auto text-right text-sm text-slate-500 dark:text-slate-400">
-                            <p>{totalItems} voci totali</p>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
             {notes.length === 0 ? (
                 <div className="text-center py-12 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-muted rounded-lg border border-dashed dark:border-slate-700">
                     <Recycle className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -165,18 +157,18 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
                     </div>
 
                     {/* Desktop View */}
-                    <Card className="hidden md:block">
+                    <div className="hidden md:block">
                         <Table>
                             <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-8"></TableHead>
-                                    <TableHead>N° Bolla</TableHead>
-                                    <TableHead>Data</TableHead>
-                                    <TableHead>Causale</TableHead>
-                                    <TableHead>Partenza</TableHead>
-                                    <TableHead>Destinazione</TableHead>
-                                    <TableHead className="text-right">Voci</TableHead>
-                                    <TableHead className="w-10"></TableHead>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className="w-8 text-xs font-semibold uppercase tracking-wide text-slate-600"></TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">N° Bolla</TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Data</TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Causale</TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Partenza</TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Destinazione</TableHead>
+                                    <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Voci</TableHead>
+                                    <TableHead className="w-10 text-xs font-semibold uppercase tracking-wide text-slate-600"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -186,9 +178,8 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
                                         ? format(new Date(note.date.split('T')[0] + 'T00:00:00'), 'dd/MM/yyyy', { locale: it })
                                         : '-'
                                     return (
-                                        <>
+                                        <Fragment key={note.id}>
                                             <TableRow
-                                                key={note.id}
                                                 className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
                                                 onClick={() => toggleExpand(note.id)}
                                             >
@@ -260,14 +251,15 @@ export function JobEccedenze({ jobId }: JobEccedenzeProps) {
                                                     <TableCell></TableCell>
                                                 </TableRow>
                                             ))}
-                                        </>
+                                        </Fragment>
                                     )
                                 })}
                             </TableBody>
                         </Table>
-                    </Card>
+                    </div>
                 </>
             )}
         </div>
+        </NotchTabs>
     )
 }

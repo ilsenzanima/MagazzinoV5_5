@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { Fragment, useState, useMemo, useEffect, useCallback } from "react"
 import { Movement } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { fictitiousPricesApi } from "@/lib/services/fictitiousPrices"
 import { notify } from "@/lib/notify"
+import { NotchTabs, NotchActions, NotchSearch, NotchStat } from "@/components/ui/notch-tabs"
 
 // Rounds to 2 decimals to avoid floating-point noise (e.g. 30.950000000000003)
 // when accumulating quantities/pieces from many movements in JS.
@@ -26,6 +27,7 @@ interface JobStockProps {
 export function JobStock({ movements, jobId }: JobStockProps) {
     const { userRole } = useAuth()
     const [searchTerm, setSearchTerm] = useState("")
+    const [tab, setTab] = useState("stock")
     const [expandedItemCode, setExpandedItemCode] = useState<string | null>(null)
     const [fictitiousPrices, setFictitiousPrices] = useState<Record<string, number>>({})
     const [loadingPrices, setLoadingPrices] = useState(true)
@@ -255,62 +257,29 @@ export function JobStock({ movements, jobId }: JobStockProps) {
     const realItemsCount = groupedStock.filter(i => !i.isFictitious).length
     const fictItemsCount = groupedStock.filter(i => i.isFictitious).length
 
+    const canSeeValue = userRole === 'admin' || userRole === 'operativo'
     return (
-        <div className="space-y-6">
-            {/* Summary Card */}
-            {(userRole === 'admin' || userRole === 'operativo') && (
-                <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
-                    <CardContent className="py-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <Package className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                                <div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-400">Valore Totale Cantiere</p>
-                                    <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                        € {totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true})}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="text-right text-sm text-slate-500 dark:text-slate-400">
-                                <p>{realItemsCount} articoli reali</p>
-                                <p>{fictItemsCount} articoli fittizi</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-            <Tabs defaultValue="stock" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 max-w-md">
-                    <TabsTrigger value="stock" className="flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Giacenza Attuale
-                        <Badge variant="secondary" className="ml-1 text-xs">
-                            {groupedStock.length}
-                        </Badge>
-                    </TabsTrigger>
-                    <TabsTrigger value="history" className="flex items-center gap-2">
-                        <History className="h-4 w-4" />
-                        Storico Movimenti
-                        <Badge variant="secondary" className="ml-1 text-xs">
-                            {movements.length}
-                        </Badge>
-                    </TabsTrigger>
-                </TabsList>
+        <Tabs value={tab} onValueChange={setTab} className="w-full">
+            <NotchTabs
+                title="Materiali"
+                value={tab}
+                onValueChange={setTab}
+                items={[
+                    { value: "stock", label: `Giacenza (${groupedStock.length})`, icon: <Package /> },
+                    { value: "history", label: `Storico (${movements.length})`, icon: <History /> },
+                ]}
+            >
+                <NotchActions>
+                    {canSeeValue && (
+                        <NotchStat label="Valore totale" value={`€ ${totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true })}`} />
+                    )}
+                    <NotchStat label="Articoli" value={`${realItemsCount}${fictItemsCount > 0 ? ` + ${fictItemsCount} fittizi` : ''}`} />
+                    {tab === "stock" && <NotchSearch value={searchTerm} onChange={setSearchTerm} placeholder="Cerca materiale per nome o codice" />}
+                </NotchActions>
 
                 {/* Tab: Giacenza Attuale */}
                 <TabsContent value="stock" className="mt-6">
                     <div className="space-y-4">
-                        {/* Search Bar */}
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input
-                                placeholder="Cerca materiale per nome o codice..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
-
                         {/* Mobile View - Cards with Expandable Details */}
                         <div className="space-y-2 md:hidden">
                             {filteredStock.length === 0 ? (
@@ -415,16 +384,16 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                         </div>
 
                         {/* Desktop View - Table with Expandable Rows */}
-                        <Card className="hidden md:block">
+                        <div className="hidden md:block">
                             <Table>
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-8"></TableHead>
-                                        <TableHead>Codice</TableHead>
-                                        <TableHead>Articolo</TableHead>
-                                        <TableHead className="text-right">N° Lotti</TableHead>
-                                        <TableHead className="text-right">Q.tà Totale</TableHead>
-                                        <TableHead className="text-right">Valore</TableHead>
+                                    <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                        <TableHead className="w-8 text-xs font-semibold uppercase tracking-wide text-slate-600"></TableHead>
+                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Codice</TableHead>
+                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Articolo</TableHead>
+                                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">N° Lotti</TableHead>
+                                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Q.tà Totale</TableHead>
+                                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Valore</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -438,9 +407,8 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                         filteredStock.map((item) => {
                                             const isExpanded = expandedItemCode === item.code
                                             return (
-                                                <>
+                                                <Fragment key={item.code}>
                                                     <TableRow
-                                                        key={item.code}
                                                         className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
                                                         onClick={() => toggleExpanded(item.code)}
                                                     >
@@ -552,13 +520,13 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                             </TableCell>
                                                         </TableRow>
                                                     ))}
-                                                </>
+                                                </Fragment>
                                             )
                                         })
                                     )}
                                 </TableBody>
                             </Table>
-                        </Card>
+                        </div>
                     </div>
                 </TabsContent>
 
@@ -632,16 +600,16 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                             )}
                         </div>
 
-                        <Card className="hidden md:block">
+                        <div className="hidden md:block">
                             <Table>
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Data</TableHead>
-                                        <TableHead>Tipo</TableHead>
-                                        <TableHead>Articolo</TableHead>
-                                        <TableHead>Bolla di riferimento</TableHead>
-                                        <TableHead>Riferimento Acquisto</TableHead>
-                                        <TableHead className="text-right">Quantità</TableHead>
+                                    <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Data</TableHead>
+                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Tipo</TableHead>
+                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Articolo</TableHead>
+                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Bolla di riferimento</TableHead>
+                                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Riferimento Acquisto</TableHead>
+                                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Quantità</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -726,11 +694,11 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                     )}
                                 </TableBody>
                             </Table>
-                        </Card>
+                        </div>
                     </div>
                 </TabsContent>
-            </Tabs>
-        </div>
+            </NotchTabs>
+        </Tabs>
     )
 }
 

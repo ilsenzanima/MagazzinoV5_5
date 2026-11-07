@@ -282,3 +282,12 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
     </SlotsCtx.Provider>
   )
 }
+
+// Piccola etichetta con un numero, per i totali nella striscia
+export function NotchStat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium normal-case tracking-normal text-slate-300">
+      {label} <b className="text-sm font-semibold text-white">{value}</b>
+    </span>
+  )
+}
