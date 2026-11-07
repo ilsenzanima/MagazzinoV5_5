@@ -66,7 +66,7 @@ export default function ClientDetailPage() {
   const [loadingClient, setLoadingClient] = useState(true);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [loadingProposals, setLoadingProposals] = useState(false);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "anagrafica");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") === "proposte" ? "proposte" : "anagrafica");
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [proposalSearch, setProposalSearch] = useState("");
@@ -84,10 +84,8 @@ export default function ClientDetailPage() {
 
   useEffect(() => { loadClient(); }, [id]);
 
-  useEffect(() => {
-    if (activeTab === "commesse" && jobs.length === 0) loadJobs();
-    if (activeTab === "proposte" && proposals.length === 0) loadProposals();
-  }, [activeTab]);
+  useEffect(() => { loadJobs(); }, [id]);
+  useEffect(() => { if (canEdit) loadProposals(); }, [id, canEdit]);
 
   useEffect(() => {
     if (useClientAddr && client) {
@@ -193,7 +191,6 @@ export default function ClientDetailPage() {
           items={[
             { value: "anagrafica", label: "Anagrafica", icon: <Building2 /> },
             ...(canEdit ? [{ value: "proposte", label: "Offerte generali", icon: <Plus /> }] : []),
-            { value: "commesse", label: "Commesse", icon: <Briefcase /> },
           ]}
           value={activeTab}
           onValueChange={setActiveTab}
@@ -207,71 +204,90 @@ export default function ClientDetailPage() {
 
         {/* ── ANAGRAFICA ──────────────────────────────────────────────── */}
         <TabsContent value="anagrafica">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-4xl">
-            {/* Dati anagrafici */}
-            <Card>
-              <CardHeader><CardTitle className="text-base">Dati Anagrafici</CardTitle></CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Ragione Sociale</span>
-                    <p className="font-medium mt-0.5">{client.name}</p>
-                  </div>
-                  {client.vatNumber && (
-                    <div>
-                      <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">P.IVA / C.F.</span>
-                      <p className="font-medium mt-0.5">{client.vatNumber}</p>
-                    </div>
-                  )}
-                </div>
-                {fullAddress && (
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Indirizzo Sede</span>
-                    <div className="flex items-start gap-2 mt-0.5"><MapPin className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" /><p>{fullAddress}</p></div>
-                  </div>
-                )}
-                {client.email && (
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Email</span>
-                    <div className="flex items-center gap-2 mt-0.5"><Mail className="h-4 w-4 text-slate-400 shrink-0" /><a href={`mailto:${client.email}`} className="text-blue-600 dark:text-blue-400 hover:underline">{client.email}</a></div>
-                  </div>
-                )}
-                {client.phone && (
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Telefono</span>
-                    <div className="flex items-center gap-2 mt-0.5"><Phone className="h-4 w-4 text-slate-400 shrink-0" /><a href={`tel:${client.phone}`} className="hover:underline">{client.phone}</a></div>
-                  </div>
-                )}
-                {client.createdAt && (
-                  <div className="pt-2 border-t dark:border-slate-700">
-                    <span className="text-slate-400 dark:text-slate-500 text-xs">Creato il {format(new Date(client.createdAt), "d MMMM yyyy", { locale: it })}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          {/* Riepilogo */}
+          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[
+              { v: jobs.filter(j => j.status === "active").length, l: "Commesse attive", c: "text-green-600" },
+              { v: jobs.filter(j => j.status === "completed").length, l: "Commesse completate", c: "" },
+              { v: jobs.length, l: "Commesse totali", c: "" },
+              ...(canEdit ? [{ v: proposals.filter(p => ["draft", "sent", "pending"].includes(p.status)).length, l: "Offerte aperte", c: "text-blue-600" }] : []),
+            ].map(k => (
+              <Card key={k.l} className="px-4 py-3">
+                <div className={`text-2xl font-semibold ${k.c}`}>{loadingJobs ? "–" : k.v}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">{k.l}</div>
+              </Card>
+            ))}
+          </div>
 
-            {/* Note interne */}
-            <Card>
-              <CardHeader><CardTitle className="text-base">Note Interne</CardTitle></CardHeader>
-              <CardContent>
-                <textarea
-                  className="flex min-h-[140px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                  placeholder="Note interne sul committente (visibili solo a voi)..."
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  disabled={!canEdit}
-                />
-                {canEdit && (
-                  <Button size="sm" className="mt-3" onClick={handleSaveNotes} disabled={savingNotes}>
-                    {savingNotes && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva Note
-                  </Button>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              {/* Commesse */}
+              <section>
+                <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Commesse</h3>
+                {loadingJobs ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
+                ) : jobs.length === 0 ? (
+                  <Card className="py-8 text-center text-sm text-slate-400">
+                    <Briefcase className="mx-auto mb-2 h-10 w-10 opacity-20" />
+                    Nessuna commessa associata a questo committente
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {jobs.map(job => (
+                      <Card key={job.id} className="cursor-pointer px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => router.push(`/jobs/${job.id}`)}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-slate-900 dark:text-white">{job.name}</div>
+                            <div className="font-mono text-xs text-slate-500">{job.code}</div>
+                          </div>
+                          <Badge className={`shrink-0 text-xs ${STATUS_COLORS[job.status] ?? ""}`} variant="secondary">{STATUS_LABELS[job.status] ?? job.status}</Badge>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                          {job.siteAddress && <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{job.siteAddress}</span></span>}
+                          {job.startDate && <span className="ml-auto shrink-0">{format(new Date(job.startDate), "dd/MM/yyyy")}</span>}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
                 )}
-              </CardContent>
-            </Card>
+              </section>
 
-            {/* Rubrica Contatti — full width */}
-            <div className="lg:col-span-2">
+              {/* Rubrica Contatti */}
               <ClientContacts clientId={id} canEdit={canEdit} />
+            </div>
+
+            <div className="space-y-6">
+              {/* Dettagli */}
+              <section>
+                <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Dettagli committente</h3>
+                <Card className="space-y-3 px-4 py-4 text-sm">
+                  <div className="flex items-start gap-3"><Building2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" /><div><div className="text-xs text-slate-500">Ragione sociale</div><div className="font-medium">{client.name}</div></div></div>
+                  {client.vatNumber && <div className="flex items-start gap-3"><Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" /><div><div className="text-xs text-slate-500">P.IVA / C.F.</div><div className="font-medium">{client.vatNumber}</div></div></div>}
+                  {fullAddress && <div className="flex items-start gap-3"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" /><div><div className="text-xs text-slate-500">Indirizzo sede</div><div>{fullAddress}</div></div></div>}
+                  {client.email && <div className="flex items-start gap-3"><Mail className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" /><div className="min-w-0"><div className="text-xs text-slate-500">Email</div><a href={`mailto:${client.email}`} className="break-all text-blue-600 hover:underline dark:text-blue-400">{client.email}</a></div></div>}
+                  {client.phone && <div className="flex items-start gap-3"><Phone className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" /><div><div className="text-xs text-slate-500">Telefono</div><a href={`tel:${client.phone}`} className="hover:underline">{client.phone}</a></div></div>}
+                  {client.createdAt && <div className="border-t pt-3 text-xs text-slate-400 dark:border-slate-700">Creato il {format(new Date(client.createdAt), "d MMMM yyyy", { locale: it })}</div>}
+                </Card>
+              </section>
+
+              {/* Note interne */}
+              <section>
+                <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Note interne</h3>
+                <Card className="px-4 py-4">
+                  <textarea
+                    className="flex min-h-[120px] w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Note interne sul committente (visibili solo a voi)..."
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    disabled={!canEdit}
+                  />
+                  {canEdit && (
+                    <Button size="sm" className="mt-3" onClick={handleSaveNotes} disabled={savingNotes}>
+                      {savingNotes && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salva Note
+                    </Button>
+                  )}
+                </Card>
+              </section>
             </div>
           </div>
         </TabsContent>
@@ -336,48 +352,13 @@ export default function ClientDetailPage() {
             )}
           </div>
         </TabsContent>
-
-        {/* ── COMMESSE ─────────────────────────────────────────────────── */}
-        <TabsContent value="commesse">
-          {loadingJobs ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
-          ) : jobs.length === 0 ? (
-            <div className="py-12 text-center text-slate-400">
-              <Briefcase className="mx-auto mb-2 h-12 w-12 opacity-20" />
-              <p>Nessuna commessa associata a questo committente</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Codice</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Commessa</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Indirizzo</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Inizio</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Stato</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {jobs.map(job => (
-                  <TableRow key={job.id} className="cursor-pointer" onClick={() => router.push(`/jobs/${job.id}`)}>
-                    <TableCell className="py-3 font-mono text-xs text-slate-500">{job.code}</TableCell>
-                    <TableCell className="py-3 font-medium text-slate-900 dark:text-white">{job.name}</TableCell>
-                    <TableCell className="py-3 text-sm text-slate-600 dark:text-slate-300">{job.siteAddress || "—"}</TableCell>
-                    <TableCell className="py-3 text-sm text-slate-600 dark:text-slate-300">{job.startDate ? format(new Date(job.startDate), "dd/MM/yyyy") : "—"}</TableCell>
-                    <TableCell className="py-3"><Badge className={`text-xs ${STATUS_COLORS[job.status] ?? ""}`} variant="secondary">{STATUS_LABELS[job.status] ?? job.status}</Badge></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </TabsContent>
         </NotchTabs>
       </Tabs>
 
       {canEdit && activeTab === "proposte" && (
         <FloatingAddButton onClick={() => { setProposalForm(EMPTY_PROPOSAL_FORM); setUseClientAddr(false); setNewProposalOpen(true); }} label="Nuova offerta" />
       )}
-      {canEdit && activeTab === "commesse" && (
+      {canEdit && activeTab === "anagrafica" && (
         <FloatingAddButton href={`/jobs/new?clientId=${id}`} label="Nuova commessa" />
       )}
 
