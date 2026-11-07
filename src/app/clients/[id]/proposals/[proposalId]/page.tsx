@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { ArrowLeft, BarChart2, Calculator, CheckCircle2, FileText, GanttChartSquare, Loader2, MapPin, Pencil, ShieldCheck, Trash2, Truck } from "lucide-react"
+import { ArrowLeft, BarChart2, Calculator, CheckCircle2, ChevronDown, FileText, GanttChartSquare, Info, Loader2, MapPin, Pencil, ShieldCheck, Trash2, Truck, Upload } from "lucide-react"
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals"
 import { clientsApi } from "@/lib/api"
 import { jobsApi, jobTasksApi } from "@/lib/api"
@@ -38,7 +38,9 @@ import { ProposalSiteDocuments } from "@/components/clients/detail/ProposalSiteD
 import { proposalSiteDocumentsApi } from "@/lib/services/proposal-site-documents"
 import { jobSiteDocumentTypesApi } from "@/lib/services/job-site-document-types"
 import { ProposalConformita } from "@/components/clients/detail/ProposalConformita"
-import { ProposalDistanza } from "@/components/clients/detail/ProposalDistanza"
+import { JobSectionMenu, type SectionMenuGroup } from "@/components/jobs/JobSectionMenu"
+import { NotchTabs, NotchActions, NotchStat } from "@/components/ui/notch-tabs"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ProposalCronoprogramma } from "@/components/clients/detail/ProposalCronoprogramma"
 import { useAuth } from "@/components/auth-provider"
 
@@ -107,6 +109,10 @@ export default function ProposalDetailPage() {
         siteStreet: "", siteStreetNumber: "", sitePostalCode: "", siteCity: "", siteProvince: "",
     })
 
+    // Pagina aperta e sotto-scheda dell'analisi costi
+    const [activeTab, setActiveTab] = useState("info")
+    const [costTab, setCostTab] = useState("create")
+
     // Inline edit state
     const [inlineEdit, setInlineEdit] = useState<"status" | "value" | "description" | null>(null)
     const [inlineStatus, setInlineStatus] = useState<ProposalStatus>("draft")
@@ -136,6 +142,13 @@ export default function ProposalDetailPage() {
             setInlineEdit(null)
         } catch { notify.error("Errore durante il salvataggio") }
         finally { setInlineSaving(false) }
+    }
+
+    const changeStatus = async (st: ProposalStatus) => {
+        try {
+            await clientProposalsApi.update(proposalId, { status: st })
+            setProposal(await clientProposalsApi.getById(proposalId))
+        } catch { notify.error("Errore durante il salvataggio") }
     }
 
     useEffect(() => {
@@ -350,289 +363,292 @@ export default function ProposalDetailPage() {
         proposal.siteProvince && `(${proposal.siteProvince.toUpperCase()})`,
     ].filter(Boolean).join(", ")
 
+    const icon = "h-4 w-4"
+    const menuGroups: SectionMenuGroup[] = [
+        {
+            key: "generale", label: "Generale", items: [
+                { key: "info", label: "Dettagli", icon: <Info className={icon} /> },
+                { key: "cronoprogramma", label: "Cronoprogramma", icon: <GanttChartSquare className={icon} /> },
+                { key: "offerte-fornitori", label: "Offerte Fornitori", icon: <Truck className={icon} /> },
+            ],
+        },
+        {
+            key: "documenti", label: "Documenti", items: [
+                { key: "conformita", label: "Conformità", icon: <ShieldCheck className={`${icon} text-green-600`} /> },
+                {
+                    key: "documenti-cantiere", label: "Documenti Cantiere", icon: <FileText className={icon} />,
+                    help: {
+                        title: "Documenti Cantiere",
+                        description: "Tipi disponibili per i documenti caricati in questa sezione (condivisi con le commesse).",
+                        fetchItems: async () => (await jobSiteDocumentTypesApi.getAll()).map(t => t.name),
+                        emptyText: "Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Cantiere per crearne uno.",
+                    },
+                },
+                {
+                    key: "documenti", label: "Documenti Commessa", icon: <BarChart2 className={icon} />,
+                    help: {
+                        title: "Documenti Commessa",
+                        description: "Tipi disponibili per i documenti caricati in questa sezione (condivisi con le commesse).",
+                        fetchItems: async () => (await proposalDocumentTypesApi.getAll()).map(t => t.name),
+                        emptyText: "Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno.",
+                    },
+                },
+            ],
+        },
+        {
+            key: "economico", label: "Economico", items: [
+                { key: "costi", label: "Analisi Costi", icon: <Calculator className={`${icon} text-emerald-600`} /> },
+            ],
+        },
+    ]
+
     return (
         <DashboardLayout>
-            {/* Header */}
-            <div className="bg-white dark:bg-card p-4 shadow-sm sticky top-0 z-10 rounded-lg mb-6 border dark:border-border">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                        <Link href={`/clients/${clientId}?tab=proposte`}>
-                            <Button variant="ghost" size="icon" className="shrink-0"><ArrowLeft className="h-4 w-4" /></Button>
-                        </Link>
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="text-lg font-bold text-slate-900 dark:text-white truncate">{proposal.title}</h1>
-                                <Badge className={`text-xs ${STATUS_COLORS[proposal.status]}`} variant="secondary">
-                                    {STATUS_LABELS[proposal.status]}
-                                </Badge>
-                            </div>
-                            {client && <p className="text-xs text-slate-500 dark:text-slate-400">{client.name}</p>}
-                        </div>
+            <div className="mx-auto max-w-[1700px] space-y-6 pb-20 overflow-x-hidden">
+                {/* Intestazione con il nome dell'offerta */}
+                <div className="mb-3 flex items-center justify-between gap-2">
+                    <Link href={`/clients/${clientId}?tab=proposte`}>
+                        <Button variant="ghost" size="sm" className="px-2 text-slate-500 hover:text-slate-900 md:px-4">
+                            <ArrowLeft className="h-4 w-4 md:mr-2" />
+                            <span className="hidden md:inline">Torna al committente</span>
+                        </Button>
+                    </Link>
+                    <div className="min-w-0 flex-1 px-2 text-center">
+                        <h1 className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100 md:text-lg">{proposal.title}</h1>
+                        {client && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{client.name}</p>}
                     </div>
-                    {canEdit && (
-                        <div className="flex gap-2 shrink-0 flex-wrap sm:justify-end">
-                            {(!proposal.convertedJobId || proposal.status === "pending" || linkedJobAlive === false) && (
-                                <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={async () => {
-                                    setConvertStartDate("")
-                                    try {
-                                        const proposalTasks = await proposalTasksApi.getByProposalId(proposalId)
-                                        setConvertHasTasks(proposalTasks.length > 0)
-                                    } catch { setConvertHasTasks(false) }
-                                    if (proposal.convertedJobId) {
-                                        try {
-                                            const status = await jobsApi.getStatusById(proposal.convertedJobId)
-                                            setConvertReuseJobId(status.exists ? proposal.convertedJobId : null)
-                                        } catch { setConvertReuseJobId(null) }
-                                    } else {
-                                        setConvertReuseJobId(null)
-                                    }
-                                    setConvertOpen(true)
-                                }}>
-                                    <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa
-                                </Button>
-                            )}
-                            {proposal.convertedJobId && proposal.status !== "pending" && linkedJobAlive !== false && (
-                                <Link href={`/jobs/${proposal.convertedJobId}`}>
-                                    <Button size="sm" variant="outline" className="text-blue-600">Vai alla Commessa</Button>
-                                </Link>
-                            )}
-                            <Button size="sm" variant="outline" onClick={openEdit}><Pencil className="h-4 w-4 mr-1" />Modifica</Button>
-                            <Button size="sm" variant="outline" className="text-red-600 hover:border-red-300" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-1" />Elimina</Button>
-                        </div>
-                    )}
+                    <span className="w-9 md:w-40" aria-hidden />
                 </div>
-            </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue="info">
-                <TabsList className="mb-6">
-                    <TabsTrigger value="info"><FileText className="h-4 w-4 mr-2" />Info</TabsTrigger>
-                    <TabsTrigger value="costi"><Calculator className="h-4 w-4 mr-2" />Analisi Costi</TabsTrigger>
-                    <TabsTrigger value="documenti">
-                        <BarChart2 className="h-4 w-4 mr-2" />Documenti Commessa
-                        <HelpTip
-                            title="Documenti Commessa"
-                            description="Tipi disponibili per i documenti caricati in questa sezione (condivisi con le commesse)."
-                            fetchItems={async () => (await proposalDocumentTypesApi.getAll()).map(t => t.name)}
-                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno."
-                        />
-                    </TabsTrigger>
-                    <TabsTrigger value="documenti-cantiere">
-                        <FileText className="h-4 w-4 mr-2" />Documenti Cantiere
-                        <HelpTip
-                            title="Documenti Cantiere"
-                            description="Tipi disponibili per i documenti caricati in questa sezione (condivisi con le commesse)."
-                            fetchItems={async () => (await jobSiteDocumentTypesApi.getAll()).map(t => t.name)}
-                            emptyText="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Cantiere per crearne uno."
-                        />
-                    </TabsTrigger>
-                    <TabsTrigger value="conformita"><ShieldCheck className="h-4 w-4 mr-2 text-green-600" />Conformità</TabsTrigger>
-                    <TabsTrigger value="offerte-fornitori"><Truck className="h-4 w-4 mr-2" />Offerte Fornitori</TabsTrigger>
-                    <TabsTrigger value="cronoprogramma"><GanttChartSquare className="h-4 w-4 mr-2" />Cronoprogramma</TabsTrigger>
-                </TabsList>
-
-                {/* ── INFO ─────────────────────────────────────────────── */}
-                <TabsContent value="info">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-
-                        {/* Colonna sinistra */}
-                        <div className="space-y-4">
-
-                            {/* Riga compatta: Stato + Valore + Data */}
-                            <Card>
-                                <CardContent className="py-3 px-4 space-y-3">
-
-                                    {/* Stato */}
-                                    <div className="flex items-center justify-between gap-2 min-h-[2rem]">
-                                        <span className="text-xs uppercase tracking-wide text-slate-500 w-24 shrink-0">Stato</span>
-                                        {inlineEdit === "status" ? (
-                                            <div className="flex items-center gap-2 flex-1 justify-end">
-                                                <Select value={inlineStatus} onValueChange={v => setInlineStatus(v as ProposalStatus)}>
-                                                    <SelectTrigger className="w-36 h-7 text-xs"><SelectValue /></SelectTrigger>
-                                                    <SelectContent>
-                                                        {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).filter(([k]) => k !== "accepted").map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
-                                                <Button size="sm" className="h-7 text-xs" onClick={() => saveInline("status")} disabled={inlineSaving}>
-                                                    {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
-                                                </Button>
-                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setInlineEdit(null)}>✕</Button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <Badge className={`text-xs ${STATUS_COLORS[proposal.status]}`} variant="secondary">{STATUS_LABELS[proposal.status]}</Badge>
-                                                {canEdit && <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => openInline("status")}><Pencil className="h-3 w-3" /></Button>}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="border-t dark:border-slate-700" />
-
-                                    {/* Valore Stimato */}
-                                    <div className="flex items-center justify-between gap-2 min-h-[2rem]">
-                                        <span className="text-xs uppercase tracking-wide text-slate-500 w-36 shrink-0">Valore stimato proposta</span>
-                                        {inlineEdit === "value" ? (
-                                            <div className="flex items-center gap-2 flex-1 justify-end">
-                                                <div className="relative w-36">
-                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
-                                                    <Input type="number" className="pl-5 h-7 text-xs" value={inlineValue}
-                                                        onChange={e => setInlineValue(e.target.value)}
-                                                        onKeyDown={e => { if (e.key === "Enter") saveInline("value"); if (e.key === "Escape") setInlineEdit(null) }}
-                                                        autoFocus placeholder="0.00" />
-                                                </div>
-                                                <Button size="sm" className="h-7 text-xs" onClick={() => saveInline("value")} disabled={inlineSaving}>
-                                                    {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
-                                                </Button>
-                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setInlineEdit(null)}>✕</Button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                                                    {proposal.estimatedValue !== null
-                                                        ? `€ ${proposal.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2 , useGrouping: true})}`
-                                                        : <span className="text-slate-400 font-normal italic text-xs">Non impostato</span>}
-                                                </span>
-                                                {canEdit && <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => openInline("value")}><Pencil className="h-3 w-3" /></Button>}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {proposal.date && <>
-                                        <div className="border-t dark:border-slate-700" />
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="text-xs uppercase tracking-wide text-slate-500 w-24 shrink-0">Data</span>
-                                            <span className="text-sm font-medium">{format(new Date(proposal.date), "d MMM yyyy", { locale: it })}</span>
-                                        </div>
-                                    </>}
-
-                                    {siteAddress && <>
-                                        <div className="border-t dark:border-slate-700" />
-                                        <div>
-                                            <span className="text-xs uppercase tracking-wide text-slate-500">Cantiere</span>
-                                            <div className="flex items-start gap-1.5 mt-1">
-                                                <MapPin className="h-3.5 w-3.5 text-slate-400 mt-0.5 shrink-0" />
-                                                <p className="text-xs text-slate-700 dark:text-slate-300">{siteAddress}</p>
-                                            </div>
-                                        </div>
-                                    </>}
-
-                                    {proposal.notes && <>
-                                        <div className="border-t dark:border-slate-700" />
-                                        <div>
-                                            <span className="text-xs uppercase tracking-wide text-slate-500">Note</span>
-                                            <p className="text-xs mt-1 whitespace-pre-wrap text-slate-600 dark:text-slate-400">{proposal.notes}</p>
-                                        </div>
-                                    </>}
-
-                                    <div className="border-t dark:border-slate-700 pt-1">
-                                        <span className="text-xs text-slate-400">Creata il {format(new Date(proposal.createdAt), "d MMM yyyy", { locale: it })}</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Descrizione */}
-                            <Card>
-                                <CardContent className="py-3 px-4 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs uppercase tracking-wide text-slate-500">Descrizione</span>
-                                        {canEdit && inlineEdit !== "description" && (
-                                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => openInline("description")}><Pencil className="h-3 w-3" /></Button>
-                                        )}
-                                    </div>
-                                    {inlineEdit === "description" ? (
-                                        <div className="space-y-2">
-                                            <textarea
-                                                className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                value={inlineDesc}
-                                                onChange={e => setInlineDesc(e.target.value)}
-                                                autoFocus
-                                            />
-                                            <div className="flex gap-2 justify-end">
-                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setInlineEdit(null)}>Annulla</Button>
-                                                <Button size="sm" className="h-7 text-xs" onClick={() => saveInline("description")} disabled={inlineSaving}>
-                                                    {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap min-h-[1.25rem]">
-                                            {proposal.description || <span className="text-slate-400 italic text-xs">Nessuna descrizione</span>}
-                                        </p>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Card collegamento commessa (solo se convertita e la commessa esiste ancora) */}
-                            {proposal.convertedJobId && linkedJobAlive !== false && (
-                                <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-3 flex items-center justify-between gap-4">
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wide text-green-600 mb-0.5">Convertita in commessa</p>
-                                        <p className="text-xs text-slate-500">Questa proposta è stata accettata e trasformata in commessa.</p>
-                                    </div>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                    {/* Menu delle pagine | data di creazione | azioni */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <JobSectionMenu groups={menuGroups} activeKey={activeTab} onSelect={(_g, tab) => setActiveTab(tab)} />
+                        <div className="min-w-0 flex-1 truncate text-center text-xs text-slate-500 dark:text-slate-400 md:text-sm">
+                            Creata il {format(new Date(proposal.createdAt), "d MMM yyyy", { locale: it })}
+                        </div>
+                        {canEdit && (
+                            <div className="flex flex-wrap justify-end gap-2">
+                                {(!proposal.convertedJobId || proposal.status === "pending" || linkedJobAlive === false) && (
+                                    <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={async () => {
+                                        setConvertStartDate("")
+                                        try {
+                                            const proposalTasks = await proposalTasksApi.getByProposalId(proposalId)
+                                            setConvertHasTasks(proposalTasks.length > 0)
+                                        } catch { setConvertHasTasks(false) }
+                                        if (proposal.convertedJobId) {
+                                            try {
+                                                const status = await jobsApi.getStatusById(proposal.convertedJobId)
+                                                setConvertReuseJobId(status.exists ? proposal.convertedJobId : null)
+                                            } catch { setConvertReuseJobId(null) }
+                                        } else {
+                                            setConvertReuseJobId(null)
+                                        }
+                                        setConvertOpen(true)
+                                    }}>
+                                        <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa
+                                    </Button>
+                                )}
+                                {proposal.convertedJobId && proposal.status !== "pending" && linkedJobAlive !== false && (
                                     <Link href={`/jobs/${proposal.convertedJobId}`}>
-                                        <Button size="sm" variant="outline" className="shrink-0 text-green-700 border-green-300">
-                                            Vai alla Commessa
-                                        </Button>
+                                        <Button size="sm" variant="outline" className="text-blue-600">Vai alla Commessa</Button>
                                     </Link>
-                                </div>
-                            )}
-
-                            {/* Card commessa eliminata: la proposta può essere riconvertita */}
-                            {proposal.convertedJobId && linkedJobAlive === false && (
-                                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
-                                    <p className="text-xs uppercase tracking-wide text-amber-600 mb-0.5">Commessa eliminata</p>
-                                    <p className="text-xs text-slate-500">La commessa creata da questa proposta è stata eliminata. Puoi usare &quot;Converti in Commessa&quot; per riconvertirla: se la commessa è ancora nel cestino verrà ripristinata e aggiornata, altrimenti ne verrà creata una nuova.</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Colonna destra: Distanza */}
-                        <div>
-                            <ProposalDistanza siteAddress={siteAddress} />
-                        </div>
+                                )}
+                                <Button size="sm" variant="outline" onClick={openEdit}><Pencil className="h-4 w-4 mr-1" />Modifica</Button>
+                                <Button size="sm" variant="outline" className="text-red-600 hover:border-red-300" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-1" />Elimina</Button>
+                            </div>
+                        )}
                     </div>
-                </TabsContent>
 
-                {/* ── ANALISI COSTI ─────────────────────────────────── */}
-                <TabsContent value="costi">
-                    <Tabs defaultValue="create">
-                        <TabsList>
-                            <TabsTrigger value="create">Create</TabsTrigger>
-                            <TabsTrigger value="terzi">Caricate da Terzi</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="create" className="pt-4">
-                            <ProposalCostAnalysisVersions proposalId={proposalId} />
-                        </TabsContent>
-                        <TabsContent value="terzi" className="pt-4">
-                            <CostAnalysisDocuments proposalId={proposalId} />
-                        </TabsContent>
-                    </Tabs>
-                </TabsContent>
+                    {/* ── DETTAGLI ─────────────────────────────────────────── */}
+                    <TabsContent value="info" className="space-y-6 focus-visible:outline-none">
+                        <NotchTabs title="Dettagli">
+                            <NotchActions>
+                                {canEdit ? (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button type="button" title="Cambia stato" className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+                                                <Badge className={`cursor-pointer gap-1 text-xs ${STATUS_COLORS[proposal.status]}`} variant="secondary">
+                                                    {STATUS_LABELS[proposal.status]}<ChevronDown className="h-3 w-3" />
+                                                </Badge>
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            {(Object.entries(STATUS_LABELS) as [ProposalStatus, string][]).filter(([k]) => k !== "accepted").map(([k, v]) => (
+                                                <DropdownMenuItem key={k} onClick={() => changeStatus(k)} className={proposal.status === k ? "font-semibold" : ""}>{v}</DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                ) : (
+                                    <Badge className={`text-xs ${STATUS_COLORS[proposal.status]}`} variant="secondary">{STATUS_LABELS[proposal.status]}</Badge>
+                                )}
+                                {inlineEdit === "value" ? (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 py-0.5 pl-3 pr-1 text-xs normal-case tracking-normal text-slate-300">
+                                        Valore stimato
+                                        <input
+                                            autoFocus type="number" placeholder="0.00"
+                                            className="h-7 w-28 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-400"
+                                            value={inlineValue}
+                                            onChange={e => setInlineValue(e.target.value)}
+                                            onKeyDown={e => { if (e.key === "Enter") saveInline("value"); if (e.key === "Escape") setInlineEdit(null) }}
+                                        />
+                                        <button type="button" onClick={() => saveInline("value")} disabled={inlineSaving} className="h-7 rounded-full bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-blue-500">
+                                            {inlineSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "OK"}
+                                        </button>
+                                        <button type="button" onClick={() => setInlineEdit(null)} aria-label="Annulla" className="flex h-7 w-7 items-center justify-center rounded-full text-white hover:bg-white/20">✕</button>
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-baseline gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium normal-case tracking-normal text-slate-300">
+                                        Valore stimato
+                                        <b className="text-sm font-semibold text-white">
+                                            {proposal.estimatedValue !== null
+                                                ? `€ ${proposal.estimatedValue.toLocaleString('it-IT', { minimumFractionDigits: 2, useGrouping: true })}`
+                                                : <i className="font-normal text-slate-400">non impostato</i>}
+                                        </b>
+                                        {canEdit && (
+                                            <button type="button" title="Modifica valore" aria-label="Modifica valore" className="self-center text-slate-300 hover:text-white" onClick={() => openInline("value")}>
+                                                <Pencil className="h-3 w-3" />
+                                            </button>
+                                        )}
+                                    </span>
+                                )}
+                                {proposal.date && <NotchStat label="Data" value={format(new Date(proposal.date), "d MMM yyyy", { locale: it })} />}
+                            </NotchActions>
 
-                {/* ── DOCUMENTI ─────────────────────────────────────── */}
-                <TabsContent value="documenti">
-                    <ProposalDocuments proposalId={proposalId} />
-                </TabsContent>
+                            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+                                <div className="space-y-4">
+                                    {/* Descrizione */}
+                                    <Card>
+                                        <CardContent className="space-y-2 px-4 py-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs uppercase tracking-wide text-slate-500">Descrizione</span>
+                                                {canEdit && inlineEdit !== "description" && (
+                                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => openInline("description")}><Pencil className="h-3 w-3" /></Button>
+                                                )}
+                                            </div>
+                                            {inlineEdit === "description" ? (
+                                                <div className="space-y-2">
+                                                    <textarea
+                                                        className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                        value={inlineDesc}
+                                                        onChange={e => setInlineDesc(e.target.value)}
+                                                        autoFocus
+                                                    />
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setInlineEdit(null)}>Annulla</Button>
+                                                        <Button size="sm" className="h-7 text-xs" onClick={() => saveInline("description")} disabled={inlineSaving}>
+                                                            {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salva"}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="min-h-[1.25rem] whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+                                                    {proposal.description || <span className="text-xs italic text-slate-400">Nessuna descrizione</span>}
+                                                </p>
+                                            )}
+                                        </CardContent>
+                                    </Card>
 
-                <TabsContent value="documenti-cantiere">
-                    <ProposalSiteDocuments proposalId={proposalId} />
-                </TabsContent>
+                                    {proposal.notes && (
+                                        <Card>
+                                            <CardContent className="space-y-1 px-4 py-3">
+                                                <span className="text-xs uppercase tracking-wide text-slate-500">Note</span>
+                                                <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">{proposal.notes}</p>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </div>
 
-                {/* ── CONFORMITÀ ────────────────────────────────────── */}
-                <TabsContent value="conformita">
-                    <ProposalConformita proposalId={proposalId} />
-                </TabsContent>
+                                <div className="space-y-4">
+                                    {siteAddress && (
+                                        <Card>
+                                            <CardContent className="space-y-1 px-4 py-3">
+                                                <span className="text-xs uppercase tracking-wide text-slate-500">Cantiere</span>
+                                                <div className="flex items-start gap-1.5">
+                                                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                                    <p className="text-sm text-slate-700 dark:text-slate-300">{siteAddress}</p>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
 
-                {/* ── OFFERTE FORNITORI ────────────────────────────────── */}
-                <TabsContent value="offerte-fornitori">
-                    <SupplierOffers proposalId={proposalId} />
-                </TabsContent>
+                                    {proposal.convertedJobId && linkedJobAlive !== false && (
+                                        <div className="flex items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-800 dark:bg-green-950/30">
+                                            <div>
+                                                <p className="mb-0.5 text-xs uppercase tracking-wide text-green-600">Convertita in commessa</p>
+                                                <p className="text-xs text-slate-500">Questa proposta è stata accettata e trasformata in commessa.</p>
+                                            </div>
+                                            <Link href={`/jobs/${proposal.convertedJobId}`}>
+                                                <Button size="sm" variant="outline" className="shrink-0 border-green-300 text-green-700">Vai alla Commessa</Button>
+                                            </Link>
+                                        </div>
+                                    )}
 
-                {/* ── CRONOPROGRAMMA ───────────────────────────────── */}
-                <TabsContent value="cronoprogramma">
-                    <ProposalCronoprogramma proposalId={proposalId} />
-                </TabsContent>
-            </Tabs>
+                                    {proposal.convertedJobId && linkedJobAlive === false && (
+                                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
+                                            <p className="mb-0.5 text-xs uppercase tracking-wide text-amber-600">Commessa eliminata</p>
+                                            <p className="text-xs text-slate-500">La commessa creata da questa proposta è stata eliminata. Puoi usare &quot;Converti in Commessa&quot; per riconvertirla: se la commessa è ancora nel cestino verrà ripristinata e aggiornata, altrimenti ne verrà creata una nuova.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </NotchTabs>
+                    </TabsContent>
+
+                    {/* ── CRONOPROGRAMMA ───────────────────────────────── */}
+                    <TabsContent value="cronoprogramma" className="space-y-6 focus-visible:outline-none">
+                        <NotchTabs title="Cronoprogramma">
+                            <ProposalCronoprogramma proposalId={proposalId} />
+                        </NotchTabs>
+                    </TabsContent>
+
+                    {/* ── OFFERTE FORNITORI ────────────────────────────── */}
+                    <TabsContent value="offerte-fornitori" className="space-y-6 focus-visible:outline-none">
+                        <NotchTabs title="Offerte fornitori">
+                            <SupplierOffers proposalId={proposalId} />
+                        </NotchTabs>
+                    </TabsContent>
+
+                    {/* ── DOCUMENTI ─────────────────────────────────────── */}
+                    <TabsContent value="conformita" className="space-y-6 focus-visible:outline-none">
+                        <NotchTabs title="Conformità">
+                            <ProposalConformita proposalId={proposalId} />
+                        </NotchTabs>
+                    </TabsContent>
+                    <TabsContent value="documenti-cantiere" className="space-y-6 focus-visible:outline-none">
+                        <NotchTabs title="Documenti cantiere">
+                            <ProposalSiteDocuments proposalId={proposalId} />
+                        </NotchTabs>
+                    </TabsContent>
+                    <TabsContent value="documenti" className="space-y-6 focus-visible:outline-none">
+                        <NotchTabs title="Documenti commessa">
+                            <ProposalDocuments proposalId={proposalId} />
+                        </NotchTabs>
+                    </TabsContent>
+
+                    {/* ── ANALISI COSTI ─────────────────────────────────── */}
+                    <TabsContent value="costi" className="space-y-6 focus-visible:outline-none">
+                        <Tabs value={costTab} onValueChange={setCostTab}>
+                            <NotchTabs
+                                title="Analisi costi"
+                                value={costTab}
+                                onValueChange={setCostTab}
+                                items={[
+                                    { value: "create", label: "Create", icon: <Calculator /> },
+                                    { value: "terzi", label: "Caricate da terzi", icon: <Upload /> },
+                                ]}
+                            >
+                                <TabsContent value="create" className="focus-visible:outline-none">
+                                    <ProposalCostAnalysisVersions proposalId={proposalId} />
+                                </TabsContent>
+                                <TabsContent value="terzi" className="focus-visible:outline-none">
+                                    <CostAnalysisDocuments proposalId={proposalId} />
+                                </TabsContent>
+                            </NotchTabs>
+                        </Tabs>
+                    </TabsContent>
+                </Tabs>
+            </div>
 
             {/* Edit dialog */}
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
