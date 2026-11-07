@@ -634,14 +634,10 @@ export default function ProposalDetailPage() {
                         </NotchTabs>
                     </TabsContent>
                     <TabsContent value="documenti-cantiere" className="space-y-6 focus-visible:outline-none">
-                        <NotchTabs title="Documenti cantiere">
-                            <ProposalSiteDocuments proposalId={proposalId} />
-                        </NotchTabs>
+                        <ProposalSiteDocuments proposalId={proposalId} />
                     </TabsContent>
                     <TabsContent value="documenti" className="space-y-6 focus-visible:outline-none">
-                        <NotchTabs title="Documenti commessa">
-                            <ProposalDocuments proposalId={proposalId} />
-                        </NotchTabs>
+                        <ProposalDocuments proposalId={proposalId} />
                     </TabsContent>
 
                     {/* ── ANALISI COSTI ─────────────────────────────────── */}

@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, Upload, Trash2, Loader2, Pencil, X, FolderInput, FolderPlus } from "lucide-react"
+import { Upload, Trash2, Loader2, Pencil, X, FolderInput, FolderPlus, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { proposalSiteDocumentsApi } from "@/lib/services/proposal-site-documents"
 import { SiteDocument } from "@/lib/services/job-site-documents"
 import { jobSiteDocumentTypesApi, JobSiteDocumentType } from "@/lib/services/job-site-document-types"
@@ -18,8 +16,9 @@ import { it } from "date-fns/locale"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { notify } from "@/lib/notify"
-import { ViewToggle } from "@/components/ui/view-toggle"
-import { useViewMode } from "@/hooks/useViewMode"
+import { NotchTabs, NotchSearch, NotchStat, NotchActions } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getFileIcon, formatFileSize } from "@/lib/file-icon"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { uploadFileToDrive } from "@/lib/drive-upload"
@@ -54,8 +53,11 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     const [activeDoc, setActiveDoc] = useState<SiteDocument | null>(null)
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
-    const [viewMode, setViewMode] = useViewMode('proposal-site-documents')
-    const [activeFolderByType, setActiveFolderByType] = useState<Record<string, string>>({})
+    const [search, setSearch] = useState("")
+    const [typeFilter, setTypeFilter] = useState("all")
+    const [folderFilter, setFolderFilter] = useState("all")
+    const [sortKey, setSortKey] = useState<'name' | 'date' | 'size'>('date')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
     const [galleryImages, setGalleryImages] = useState<PhotoGalleryImage[]>([])
     const [galleryIndex, setGalleryIndex] = useState(0)
     const [galleryOpen, setGalleryOpen] = useState(false)
@@ -189,7 +191,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
             })
             setFolders(prev => [...prev, folder])
             if (upDocTypeId === newFolderTypeId) setUpFolderId(folder.id)
-            setActiveFolderByType(prev => ({ ...prev, [newFolderTypeId]: folder.id }))
+            setFolderFilter(folder.id)
             notify.success("Cartella creata")
             setNewFolderOpen(false)
         } catch {
@@ -381,182 +383,131 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
         } catch { notify.error("Errore eliminazione") }
     }
 
-    const renderDocCard = (doc: SiteDocument, siblingDocs: SiteDocument[]) => (
-        <Card
-            key={doc.id}
-            className="group hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : openDoc(doc.fileUrl)}
-        >
-            <CardContent className="p-4 flex items-start gap-3">
-                <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
-                <div className="flex-1 overflow-hidden min-w-0">
-                    <div className="flex justify-between items-start gap-1">
-                        <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                            <p className="font-medium truncate text-sm" title={doc.name}>{doc.name}</p>
-                            <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
-                        </div>
-                        <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                            {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" title="Sposta in cartella" onClick={e => { e.stopPropagation(); openMove(doc) }}>
-                                    <FolderInput className="h-3 w-3" />
-                                </Button>
-                            )}
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-                                onClick={e => openEdit(doc, e)}
-                            >
-                                <Pencil className="h-3 w-3" />
-                            </Button>
-                        </div>
-                    </div>
-                    {doc.notes && <p className="text-xs text-slate-500 mt-0.5 italic truncate">{doc.notes}</p>}
-                    <p className="text-xs text-slate-400 mt-1">
-                        {format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}
-                        {doc.fileSize != null && ` · ${formatFileSize(doc.fileSize)}`}
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
+    const toggleSort = (k: 'name' | 'date' | 'size') => {
+        if (sortKey === k) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+        else { setSortKey(k); setSortDir(k === 'name' ? 'asc' : 'desc') }
+    }
+    const sortBtn = (k: 'name' | 'date' | 'size', label: string) => (
+        <button type="button" onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+            {label}
+            {sortKey === k ? (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+        </button>
     )
 
-    const renderDocRow = (doc: SiteDocument, siblingDocs: SiteDocument[]) => (
-        <div
-            key={doc.id}
-            className="group flex items-center gap-3 px-3 py-2.5 rounded-md border bg-card hover:bg-accent/30 transition-colors cursor-pointer"
-            onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblingDocs) : openDoc(doc.fileUrl)}
-        >
-            <div className="bg-slate-50 dark:bg-slate-800 p-1.5 rounded shrink-0">{getFileIcon(doc.fileType)}</div>
-            <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                    <span className="font-medium text-sm truncate" title={doc.name}>{doc.name}</span>
-                    <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
-                    <span className="text-xs text-slate-400">{format(new Date(doc.createdAt), 'dd MMM yyyy', { locale: it })}</span>
-                    {doc.fileSize != null && <span className="text-xs text-slate-400">{formatFileSize(doc.fileSize)}</span>}
-                </div>
-                {doc.notes && <p className="text-xs text-slate-500 italic truncate">{doc.notes}</p>}
-            </div>
-            <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 shrink-0">
-                {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-700" title="Sposta in cartella" onClick={e => { e.stopPropagation(); openMove(doc) }}>
-                        <FolderInput className="h-3.5 w-3.5" />
-                    </Button>
-                )}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-slate-400 hover:text-slate-700"
-                    onClick={e => openEdit(doc, e)}
-                >
-                    <Pencil className="h-3.5 w-3.5" />
-                </Button>
-            </div>
-        </div>
-    )
+    const shown = useMemo(() => {
+        const words = search.toLowerCase().split(/\s+/).filter(Boolean)
+        const dir = sortDir === 'asc' ? 1 : -1
+        return documents.filter(d => {
+            if (typeFilter === UNTYPED_KEY ? !!d.documentTypeId : typeFilter !== 'all' && d.documentTypeId !== typeFilter) return false
+            if (folderFilter === 'root' ? !!d.folderId : folderFilter !== 'all' && d.folderId !== folderFilter) return false
+            const target = `${d.name} ${d.notes || ''} ${docTypes.find(t => t.id === d.documentTypeId)?.name || ''}`.toLowerCase()
+            return words.every(w => target.includes(w))
+        }).sort((x, y) => sortKey === 'name'
+            ? dir * x.name.localeCompare(y.name, 'it', { numeric: true })
+            : sortKey === 'size'
+                ? dir * ((x.fileSize ?? 0) - (y.fileSize ?? 0))
+                : dir * String(x.createdAt).localeCompare(String(y.createdAt)))
+    }, [documents, docTypes, search, typeFilter, folderFilter, sortKey, sortDir])
 
-    const groups: { key: string; label: string; docs: SiteDocument[] }[] = [
-        ...docTypes.map(t => ({ key: t.id, label: t.name, docs: documents.filter(d => d.documentTypeId === t.id) })),
-        ...(documents.some(d => !d.documentTypeId) ? [{ key: UNTYPED_KEY, label: "Senza tipo", docs: documents.filter(d => !d.documentTypeId) }] : []),
-    ]
+    const hasUntyped = documents.some(d => !d.documentTypeId)
+    const folderTypes = docTypes.filter(t => t.allowsFolders)
+    const folderTypeForNew = (typeFilter !== 'all' && folderTypes.find(t => t.id === typeFilter)?.id) || folderTypes[0]?.id
+    const headCls = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600"
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Documenti Cantiere</h2>
-                <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
-                    <Upload className="mr-2 h-4 w-4" />Carica Documenti
-                </Button>
-            </div>
+        <NotchTabs title="Documenti cantiere">
+            <NotchActions>
+                <NotchSearch value={search} onChange={setSearch} placeholder="Cerca per nome o nota" />
+                <NotchStat label="Documenti" value={String(documents.length)} />
+            </NotchActions>
 
             {loading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
-            ) : docTypes.length === 0 && documents.length === 0 ? (
-                <Card className="border-dashed">
-                    <CardContent className="py-12 text-center text-slate-500">
-                        <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                        <p>Nessun documento. Carica progetti, permessi, o foto del cantiere.</p>
-                    </CardContent>
-                </Card>
             ) : (
-                <>
-                    <div className="flex justify-end">
-                        <ViewToggle mode={viewMode} onChange={setViewMode} />
-                    </div>
-                    {docTypes.length === 0 ? (
-                        viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {documents.map(d => renderDocCard(d, documents))}
-                            </div>
-                        ) : (
-                            <div className="space-y-1">
-                                {documents.map(d => renderDocRow(d, documents))}
-                            </div>
-                        )
-                    ) : (
-                        <Tabs defaultValue={groups[0]?.key}>
-                            <TabsList className="flex-wrap h-auto gap-1">
-                                {groups.map(g => (
-                                    <TabsTrigger key={g.key} value={g.key}>
-                                        {g.label}
-                                        <span className="ml-1.5 text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                                            {g.docs.length}
-                                        </span>
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-                            {groups.map(g => {
-                                const type = docTypes.find(t => t.id === g.key)
-                                const typeFolders = type ? folders.filter(f => f.documentTypeId === type.id) : []
-                                const activeFolder = activeFolderByType[g.key] || 'all'
-                                const shownDocs = !type?.allowsFolders
-                                    ? g.docs
-                                    : activeFolder === 'all'
-                                        ? g.docs
-                                        : activeFolder === 'root'
-                                            ? g.docs.filter(d => !d.folderId)
-                                            : g.docs.filter(d => d.folderId === activeFolder)
-                                return (
-                                    <TabsContent key={g.key} value={g.key} className="pt-4 space-y-3">
-                                        {type?.allowsFolders && (
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                {[{ id: 'all', name: 'Tutte' }, { id: 'root', name: 'Senza cartella' }, ...typeFolders].map(f => (
-                                                    <button
-                                                        key={f.id}
-                                                        onClick={() => setActiveFolderByType(prev => ({ ...prev, [g.key]: f.id }))}
-                                                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${activeFolder === f.id
-                                                                ? 'bg-blue-600 text-white'
-                                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                                            }`}
-                                                    >
-                                                        {f.name}
-                                                    </button>
-                                                ))}
-                                                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openNewFolder(g.key)}>
-                                                    <FolderPlus className="h-3.5 w-3.5 mr-1" />Nuova cartella
-                                                </Button>
-                                            </div>
+                <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                    <TableHeader>
+                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className={headCls}>{sortBtn('name', 'Documento')}</TableHead>
+                            <TableHead className={`w-44 ${headCls}`}>
+                                <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter('all') }}>
+                                    <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                                        <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter === UNTYPED_KEY ? 'Senza tipo' : docTypes.find(t => t.id === typeFilter)?.name}</SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Tutti i tipi</SelectItem>
+                                        {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                        {hasUntyped && <SelectItem value={UNTYPED_KEY}>Senza tipo</SelectItem>}
+                                    </SelectContent>
+                                </Select>
+                            </TableHead>
+                            {folders.length > 0 && (
+                                <TableHead className={`w-44 ${headCls}`}>
+                                    <Select value={folderFilter} onValueChange={setFolderFilter}>
+                                        <SelectTrigger aria-label="Filtra per cartella" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                                            <SelectValue>{folderFilter === 'all' ? 'Cartella' : folderFilter === 'root' ? 'Senza cartella' : folders.find(f => f.id === folderFilter)?.name}</SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">Tutte le cartelle</SelectItem>
+                                            <SelectItem value="root">Senza cartella</SelectItem>
+                                            {folders.filter(f => typeFilter === 'all' || f.documentTypeId === typeFilter).map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </TableHead>
+                            )}
+                            <TableHead className={`w-28 ${headCls}`}>{sortBtn('date', 'Data')}</TableHead>
+                            <TableHead className={`w-28 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
+                            <TableHead className={`w-[22%] ${headCls}`}>Nota</TableHead>
+                            <TableHead className="w-20" />
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {shown.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={folders.length > 0 ? 7 : 6} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                    {documents.length === 0 ? 'Nessun documento. Carica progetti, permessi, o foto del cantiere.' : 'Nessun documento corrisponde ai filtri.'}
+                                </TableCell>
+                            </TableRow>
+                        ) : shown.map(doc => (
+                            <TableRow key={doc.id} className="cursor-pointer" onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, shown) : openDoc(doc.fileUrl)}>
+                                <TableCell className="border-r py-2">
+                                    <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white">
+                                        <span className="shrink-0">{getFileIcon(doc.fileType)}</span>
+                                        <span className="truncate" title={doc.name}>{doc.name}</span>
+                                        <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
+                                    </span>
+                                </TableCell>
+                                <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300">{docTypes.find(t => t.id === doc.documentTypeId)?.name || <span className="text-slate-300">—</span>}</TableCell>
+                                {folders.length > 0 && (
+                                    <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300">{folders.find(f => f.id === doc.folderId)?.name || <span className="text-slate-300">—</span>}</TableCell>
+                                )}
+                                <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })}</TableCell>
+                                <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{doc.fileSize != null ? formatFileSize(doc.fileSize) : <span className="text-slate-300">—</span>}</TableCell>
+                                <TableCell className="truncate border-r py-2 text-sm text-slate-500" title={doc.notes || undefined}>{doc.notes || <span className="text-slate-300">—</span>}</TableCell>
+                                <TableCell className="py-2" onClick={e => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-0.5">
+                                        {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
+                                            <button type="button" title="Sposta in cartella" onClick={() => openMove(doc)} className="p-1 text-slate-400 hover:text-slate-800"><FolderInput className="h-4 w-4" /></button>
                                         )}
-                                        {shownDocs.length === 0 ? (
-                                            <p className="text-sm text-slate-400 py-4 text-center">
-                                                {type?.allowsFolders ? "Nessun documento in questa cartella" : "Nessun documento di questo tipo"}
-                                            </p>
-                                        ) : viewMode === 'grid' ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                {shownDocs.map(d => renderDocCard(d, shownDocs))}
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-1">
-                                                {shownDocs.map(d => renderDocRow(d, shownDocs))}
-                                            </div>
-                                        )}
-                                    </TabsContent>
-                                )
-                            })}
-                        </Tabs>
-                    )}
-                </>
+                                        <button type="button" title="Modifica" onClick={e => openEdit(doc, e)} className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             )}
+
+            <FloatingAddButton
+                label="Carica documenti"
+                icon={<Upload className="h-6 w-6" />}
+                showOnMobile
+                {...(folderTypeForNew
+                    ? { actions: [
+                        { label: "Carica documenti", onClick: openUpload },
+                        { label: "Nuova cartella", onClick: () => openNewFolder(folderTypeForNew) },
+                    ] }
+                    : { onClick: openUpload })}
+            />
 
             {/* Upload dialog - step 1: tipo + file multipli */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
@@ -783,6 +734,6 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                     onClose={() => setGalleryOpen(false)}
                 />
             )}
-        </div>
+        </NotchTabs>
     )
 }
