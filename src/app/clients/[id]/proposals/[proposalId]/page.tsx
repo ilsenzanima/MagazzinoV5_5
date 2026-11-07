@@ -23,6 +23,7 @@ import { costAnalysisApi } from "@/lib/services/cost-analysis"
 import { proposalDocumentsApi } from "@/lib/services/proposal-documents"
 import { supplierOffersApi } from "@/lib/services/supplier-offers"
 import { SupplierOffers } from "@/components/shared/SupplierOffers"
+import { proposalSiteTypeNotesApi } from "@/lib/services/proposal-site-type-notes"
 import { costAnalysisDocumentsApi } from "@/lib/services/cost-analysis-documents"
 import { CostAnalysisDocuments } from "@/components/shared/CostAnalysisDocuments"
 import { proposalDocumentTypesApi } from "@/lib/services/proposal-document-types"
@@ -334,6 +335,7 @@ export default function ProposalDetailPage() {
             await proposalSiteDocumentsApi.linkToJob(proposalId, job.id)
             await supplierOffersApi.linkToJob(proposalId, job.id)
             await costAnalysisDocumentsApi.linkToJob(proposalId, job.id)
+            try { await proposalSiteTypeNotesApi.copyToJob(proposalId, job.id) } catch { /* non bloccante */ }
 
             // Collega alla commessa le associazioni di conformità già presenti sulla
             // proposta (stesse righe, nessuna copia: restano sincronizzate tra le due pagine)

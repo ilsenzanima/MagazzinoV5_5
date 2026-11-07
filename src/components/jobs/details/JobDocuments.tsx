@@ -69,7 +69,7 @@ function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'])
 
 // Nota modificabile con un clic: si salva uscendo dal campo o con Invio, Esc annulla
-function InlineNote({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+export function InlineNote({ value, onSave }: { value: string; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
   const commit = () => { setEditing(false); onSave(draft.trim()) }

@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Trash2, Loader2, Pencil, X, FolderInput, FolderPlus, ArrowUp, ArrowDown, ArrowUpDown, MoreHorizontal, Images, ExternalLink, Download } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { JobPhotoCollection, PhotoThumb } from "@/components/jobs/details/JobPhotoCollection"
+import { InlineNote } from "@/components/jobs/details/JobDocuments"
+import { PaginationControls } from "@/components/ui/pagination-controls"
+import { proposalSiteTypeNotesApi } from "@/lib/services/proposal-site-type-notes"
 import { useHistoryStep } from "@/hooks/useHistoryStep"
 import { proposalSiteDocumentsApi } from "@/lib/services/proposal-site-documents"
 import { SiteDocument } from "@/lib/services/job-site-documents"
@@ -44,6 +47,7 @@ interface PendingFile {
 }
 
 const UNTYPED_KEY = "__untyped__"
+const PAGE_SIZE = 50
 
 export function ProposalSiteDocuments({ proposalId }: Props) {
     const [documents, setDocuments] = useState<SiteDocument[]>([])
@@ -57,6 +61,8 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [search, setSearch] = useState("")
+    const [page, setPage] = useState(1)
+    const [typeNotes, setTypeNotes] = useState<Record<string, string>>({})
     const [typeFilter, setTypeFilter] = useState("all")
     const [folderFilter, setFolderFilter] = useState("all")
     const [sortKey, setSortKey] = useState<'name' | 'date' | 'size'>('date')
@@ -115,11 +121,13 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     const load = async () => {
         try {
             setLoading(true)
-            const [docs, types, proposalFolders] = await Promise.all([
+            const [docs, types, proposalFolders, notesByType] = await Promise.all([
                 proposalSiteDocumentsApi.getByProposalId(proposalId),
                 jobSiteDocumentTypesApi.getAll(),
                 jobSiteDocumentFoldersApi.getByProposalId(proposalId),
+                proposalSiteTypeNotesApi.getByProposalId(proposalId).catch(() => ({} as Record<string, string>)),
             ])
+            setTypeNotes(notesByType)
             setDocuments(docs)
             setDocTypes(types)
             setFolders(proposalFolders)
@@ -206,6 +214,28 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
         } finally {
             setCreatingFolder(false)
         }
+    }
+
+    const handleSaveNote = async (doc: SiteDocument, notes: string) => {
+        if (notes === doc.notes) return
+        try {
+            await proposalSiteDocumentsApi.update(doc.id, { notes })
+            setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, notes } : d))
+        } catch { notify.error("Errore nel salvataggio della nota") }
+    }
+
+    // Nota di una raccolta (cartella, oppure tipo senza cartella) modificata direttamente in tabella
+    const handleSaveCollectionNote = async (r: { typeId: string; notes: string; folder?: JobSiteDocumentFolder | null }, notes: string) => {
+        if (notes === r.notes) return
+        try {
+            if (r.folder) {
+                await jobSiteDocumentFoldersApi.setNotes(r.folder.id, notes)
+                setFolders(prev => prev.map(f => (f.id === r.folder!.id ? { ...f, notes } : f)))
+            } else {
+                await proposalSiteTypeNotesApi.set(proposalId, r.typeId, notes)
+                setTypeNotes(prev => ({ ...prev, [r.typeId]: notes }))
+            }
+        } catch { notify.error("Errore nel salvataggio della nota") }
     }
 
     const isDriveFile = (doc: SiteDocument) => !!doc.fileUrl && !doc.fileUrl.includes('/')
@@ -466,7 +496,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                 id: `c:${t.id}:${g.folder?.id ?? 'root'}`, kind: 'collection', name: g.folder ? g.folder.name : t.name,
                 typeId: t.id, typeName: t.name, folderId: g.folder?.id ?? '', folderName: g.folder?.name ?? '',
                 date: latest(g.docs), size: g.docs.reduce((n, d) => n + (d.fileSize ?? 0), 0),
-                notes: g.folder?.notes ?? '', docs: g.docs, folder: g.folder,
+                notes: g.folder ? (g.folder.notes ?? '') : (typeNotes[t.id] ?? ''), docs: g.docs, folder: g.folder,
             }))
         }),
         ...documents.filter(d => !photoTypeIds.has(d.documentTypeId ?? '')).map((doc): Row => ({
@@ -490,6 +520,11 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [documents, docTypes, folders, search, typeFilter, folderFilter, sortKey, sortDir])
     const shownDocs = rows.filter(r => r.kind === 'doc').map(r => r.doc!)
+    const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+    const currentPage = Math.min(page, totalPages)
+    const pageRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    const anyFilterActive = !!search.trim() || typeFilter !== 'all' || folderFilter !== 'all'
+    const resetFilters = () => { setSearch(''); setTypeFilter('all'); setFolderFilter('all'); setPage(1) }
 
     const hasUntyped = documents.some(d => !d.documentTypeId)
     const folderTypes = docTypes.filter(t => t.allowsFolders)
@@ -575,19 +610,31 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
             ) : (
                 <NotchTabs title="Documenti cantiere">
                     <NotchActions>
-                        <NotchSearch value={search} onChange={setSearch} placeholder="Cerca per nome o nota" />
+                        <NotchSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="Cerca per nome o nota" />
                         <NotchStat label="Documenti" value={String(documents.length)} />
                     </NotchActions>
 
                     {loading ? (
                         <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
                     ) : (
+                        <>
+                        <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                            {anyFilterActive && (
+                                <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={resetFilters}>Azzera filtri</Button>
+                            )}
+                            {folderTypes.length > 0 && (
+                                <Button variant="outline" size="sm" onClick={() => openNewFolder(folderTypeForNew)}>
+                                    <FolderPlus className="mr-1.5 h-4 w-4" />Nuova cartella
+                                </Button>
+                            )}
+                        </div>
+                        <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
                         <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                             <TableHeader>
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                                     <TableHead className={headCls}>{sortBtn('name', 'Documento')}</TableHead>
                                     <TableHead className={`w-44 ${headCls}`}>
-                                        <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter('all') }}>
+                                        <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter('all'); setPage(1) }}>
                                             <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
                                                 <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter === UNTYPED_KEY ? 'Senza tipo' : docTypes.find(t => t.id === typeFilter)?.name}</SelectValue>
                                             </SelectTrigger>
@@ -599,7 +646,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                                         </Select>
                                     </TableHead>
                                     <TableHead className={`w-44 ${headCls}`}>
-                                        <Select value={folderFilter} onValueChange={setFolderFilter}>
+                                        <Select value={folderFilter} onValueChange={v => { setFolderFilter(v); setPage(1) }}>
                                             <SelectTrigger aria-label="Filtra per cartella" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
                                                 <SelectValue>{folderFilter === 'all' ? 'Cartella' : folderFilter === 'root' ? 'Senza cartella' : folders.find(f => f.id === folderFilter)?.name}</SelectValue>
                                             </SelectTrigger>
@@ -623,7 +670,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                                             {documents.length === 0 ? 'Nessun documento. Carica progetti, permessi, o foto del cantiere.' : 'Nessun documento corrisponde ai filtri.'}
                                         </TableCell>
                                     </TableRow>
-                                ) : rows.map(r => (
+                                ) : pageRows.map(r => (
                                     <TableRow key={r.id} className="cursor-pointer" onClick={() => r.kind === 'collection' ? showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null }) : openDocument(r.doc!)}>
                                         <TableCell className="border-r py-2">
                                             {r.kind === 'collection' ? (
@@ -648,25 +695,61 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                                         <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={r.folderName}>{r.folderName || <span className="text-slate-300">—</span>}</TableCell>
                                         <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{r.date ? format(new Date(r.date), 'dd/MM/yyyy', { locale: it }) : <span className="text-slate-300">—</span>}</TableCell>
                                         <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{r.size > 0 ? formatFileSize(r.size) : <span className="text-slate-300">—</span>}</TableCell>
-                                        <TableCell className="truncate border-r py-2 text-sm text-slate-500" title={r.notes || undefined}>{r.notes || <span className="text-slate-300">—</span>}</TableCell>
+                                        <TableCell className="border-r py-1" onClick={e => e.stopPropagation()}>
+                                            {r.kind === 'doc'
+                                                ? <InlineNote value={r.doc!.notes} onSave={v => handleSaveNote(r.doc!, v)} />
+                                                : <InlineNote value={r.notes} onSave={v => handleSaveCollectionNote(r, v)} />}
+                                        </TableCell>
                                         <TableCell className="py-2 text-right">{r.kind === 'doc' ? rowMenu(r.doc!) : collectionMenu(r)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
+                        </div>
+
+                        {/* Elenco compatto (telefono) */}
+                        <div className="space-y-2 md:hidden">
+                            {pageRows.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Nessun documento con questi filtri</p>}
+                            {pageRows.map(r => r.kind === 'collection' ? (
+                                <div key={r.id} className="flex items-center gap-3 rounded-md border bg-white p-3 dark:bg-slate-900" onClick={() => showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}>
+                                    {r.docs[0]
+                                        ? <PhotoThumb doc={r.docs[0]} className="h-12 w-12 shrink-0 rounded" />
+                                        : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800"><Images className="h-5 w-5 text-slate-400" /></span>}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-semibold">{r.name}</p>
+                                        <p className="text-xs text-slate-500"><span className="text-blue-600">{r.docs.length} foto</span>{r.folder && ` · ${r.typeName}`}</p>
+                                        <div className="mt-1" onClick={e => e.stopPropagation()}>
+                                            <InlineNote value={r.notes} onSave={v => handleSaveCollectionNote(r, v)} />
+                                        </div>
+                                    </div>
+                                    {collectionMenu(r)}
+                                </div>
+                            ) : (
+                                <div key={r.id} className="flex items-start gap-2 rounded-md border bg-white p-3 dark:bg-slate-900" onClick={() => openDocument(r.doc!)}>
+                                    <span className="mt-0.5 shrink-0">{getFileIcon(r.doc!.fileType, "h-5 w-5")}</span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <p className="truncate text-sm font-medium">{r.doc!.name}</p>
+                                            <OldRevBadges isOld={r.doc!.isOld} isRev={r.doc!.isRev} />
+                                        </div>
+                                        <p className="text-xs text-slate-500">
+                                            {r.typeName}{r.folderName && ` · ${r.folderName}`} · {format(new Date(r.doc!.createdAt), 'dd/MM/yyyy', { locale: it })}
+                                            {r.doc!.fileSize != null && ` · ${formatFileSize(r.doc!.fileSize)}`}
+                                        </p>
+                                        <div className="mt-1" onClick={e => e.stopPropagation()}>
+                                            <InlineNote value={r.doc!.notes} onSave={v => handleSaveNote(r.doc!, v)} />
+                                        </div>
+                                    </div>
+                                    {rowMenu(r.doc!)}
+                                </div>
+                            ))}
+                        </div>
+
+                        <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={setPage} totalItems={rows.length} itemLabel="elementi" />
+                        </>
                     )}
 
-                    <FloatingAddButton
-                        label="Carica documenti"
-                        icon={<Upload className="h-6 w-6" />}
-                        showOnMobile
-                        {...(folderTypeForNew
-                            ? { actions: [
-                                { label: "Carica documenti", onClick: () => openUpload() },
-                                { label: "Nuova cartella", onClick: () => openNewFolder(folderTypeForNew) },
-                            ] }
-                            : { onClick: () => openUpload() })}
-                    />
+                    <FloatingAddButton onClick={() => openUpload()} label="Carica documenti" icon={<Upload className="h-6 w-6" />} showOnMobile />
                 </NotchTabs>
             )}
 
