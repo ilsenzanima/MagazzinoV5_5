@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const fullName = String(body.fullName || "").trim()
     const role = String(body.role || "user")
 
-    if (!email.endsWith("@opifiresafe.com")) return NextResponse.json({ error: "Sono ammesse solo email @opifiresafe.com" }, { status: 400 })
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Email non valida" }, { status: 400 })
     if (password.length < 6) return NextResponse.json({ error: "La password deve essere di almeno 6 caratteri" }, { status: 400 })
     if (!ROLES.includes(role)) return NextResponse.json({ error: "Ruolo non valido" }, { status: 400 })
 

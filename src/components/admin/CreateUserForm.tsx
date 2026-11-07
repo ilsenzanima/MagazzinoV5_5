@@ -25,7 +25,6 @@ export function CreateUserForm() {
     setError(null)
     setCreated(null)
 
-    if (!email.trim().toLowerCase().endsWith("@opifiresafe.com")) return setError("Sono ammesse solo email @opifiresafe.com")
     if (password.length < 6) return setError("La password deve essere di almeno 6 caratteri")
     if (password !== confirmPassword) return setError("Le password non coincidono")
 
@@ -70,9 +69,8 @@ export function CreateUserForm() {
             </Alert>
           )}
           <div className="space-y-2">
-            <Label htmlFor="nu-email">Email aziendale</Label>
-            <Input id="nu-email" type="email" placeholder="nome.cognome@opifiresafe.com" value={email} onChange={e => setEmail(e.target.value)} required />
-            <p className="text-xs text-muted-foreground">Sono ammesse solo email @opifiresafe.com</p>
+            <Label htmlFor="nu-email">Email</Label>
+            <Input id="nu-email" type="email" placeholder="nome.cognome@esempio.it" value={email} onChange={e => setEmail(e.target.value)} required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="nu-name">Nome e cognome <span className="text-muted-foreground">(facoltativo)</span></Label>
