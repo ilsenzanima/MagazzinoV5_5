@@ -17,6 +17,7 @@ import { getFileIcon } from "@/lib/file-icon"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { uploadFileToDrive } from "@/lib/drive-upload"
 import { ViewToggle } from "@/components/ui/view-toggle"
+import { NotchActions, NotchSearch, NotchButton } from "@/components/ui/notch-tabs"
 import { useViewMode } from "@/hooks/useViewMode"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
@@ -43,6 +44,7 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [viewMode, setViewMode] = useViewMode('cost-analysis-documents', 'grid')
+    const [search, setSearch] = useState("")
     const supabase = createClient()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -213,6 +215,12 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
         }
     }
 
+    const shown = documents.filter(d => {
+        const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+        const target = `${d.name} ${d.notes || ''}`.toLowerCase()
+        return words.every(w => target.includes(w))
+    })
+
     const renderDocCard = (doc: CostAnalysisDocument) => (
         <Card key={doc.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenDocument(doc.fileUrl)}>
             <CardContent className="p-4 flex items-start gap-3">
@@ -265,15 +273,15 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Analisi Costi di Terzi</h2>
-                <div className="flex items-center gap-2">
-                    <ViewToggle mode={viewMode} onChange={setViewMode} />
-                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={openUpload}>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Carica Analisi Costi
-                    </Button>
-                </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <NotchActions>
+                    <NotchSearch value={search} onChange={setSearch} placeholder="Cerca documento" />
+                    <ViewToggle mode={viewMode} onChange={setViewMode} className="border-slate-300 bg-white" />
+                    <NotchButton onClick={openUpload}>
+                        <Upload />
+                        Carica analisi costi
+                    </NotchButton>
+                </NotchActions>
             </div>
 
             {loading ? (
@@ -288,13 +296,15 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
                         <p className="text-slate-500 dark:text-slate-400">Carica qui le analisi costi fornite da terzi (es. dal cliente o da un consulente).</p>
                     </CardContent>
                 </Card>
+            ) : shown.length === 0 ? (
+                <p className="py-12 text-center text-sm text-slate-400">Nessun documento corrisponde alla ricerca.</p>
             ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {documents.map(renderDocCard)}
+                    {shown.map(renderDocCard)}
                 </div>
             ) : (
                 <div className="space-y-2">
-                    {documents.map(renderDocRow)}
+                    {shown.map(renderDocRow)}
                 </div>
             )}
 

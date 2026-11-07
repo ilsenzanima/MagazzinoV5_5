@@ -11,6 +11,7 @@ import { Loader2, PlusCircle, Search, Calculator, Pencil, Trash2 } from "lucide-
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { notify } from "@/lib/notify"
 import { ViewToggle } from "@/components/ui/view-toggle"
+import { NotchActions, NotchSearch, NotchButton } from "@/components/ui/notch-tabs"
 import { useViewMode } from "@/hooks/useViewMode"
 import { ProposalAnalisiCosti } from "@/components/clients/detail/ProposalAnalisiCosti"
 
@@ -118,15 +119,13 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
-                <div className="relative flex-1 min-w-[220px] max-w-sm">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input className="pl-8" placeholder="Cerca analisi costi…" value={search} onChange={e => setSearch(e.target.value)} />
-                </div>
-                <ViewToggle mode={viewMode} onChange={setViewMode} />
-                <div className="flex-1" />
-                <Button size="sm" onClick={() => setCreateOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <PlusCircle className="h-4 w-4 mr-1" />Nuova analisi costi
-                </Button>
+                <NotchActions>
+                    <NotchSearch value={search} onChange={setSearch} placeholder="Cerca analisi costi" />
+                    <ViewToggle mode={viewMode} onChange={setViewMode} className="border-slate-300 bg-white" />
+                    <NotchButton onClick={() => setCreateOpen(true)}>
+                        <PlusCircle />Nuova analisi costi
+                    </NotchButton>
+                </NotchActions>
             </div>
 
             {loading ? (
