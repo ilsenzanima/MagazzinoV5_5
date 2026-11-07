@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { NotchTabs, NotchActions, NotchButton, NotchSearch } from "@/components/ui/notch-tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -198,13 +198,12 @@ export default function ClientDetailPage() {
           value={activeTab}
           onValueChange={setActiveTab}
         >
-          {canEdit && (
+          {canEdit && activeTab === "anagrafica" && (
             <NotchActions>
               <NotchButton type="button" onClick={() => setIsEditDialogOpen(true)}><Pencil /> Modifica</NotchButton>
               <NotchButton type="button" onClick={() => setIsDeleteDialogOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"><Trash2 /> Elimina</NotchButton>
             </NotchActions>
           )}
-        </NotchTabs>
 
         {/* ── ANAGRAFICA ──────────────────────────────────────────────── */}
         <TabsContent value="anagrafica">
@@ -280,23 +279,11 @@ export default function ClientDetailPage() {
         {/* ── PROPOSTE ─────────────────────────────────────────────────── */}
         <TabsContent value="proposte">
           <div className="space-y-4">
-            <div className="flex gap-2">
-              <div className="relative max-w-sm flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input className="pl-9" placeholder="Cerca offerta..." value={proposalSearch} onChange={e => setProposalSearch(e.target.value)} />
-              </div>
-              <Select value={proposalStatusFilter} onValueChange={setProposalStatusFilter}>
-                <SelectTrigger className="w-40"><SelectValue placeholder="Tutti gli stati" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti gli stati</SelectItem>
-                  {(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            <NotchSearch value={proposalSearch} onChange={setProposalSearch} placeholder="Cerca offerta..." />
 
             {loadingProposals ? (
               <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
-            ) : filteredProposals.length === 0 ? (
+            ) : proposals.length === 0 ? (
               <div className="py-12 text-center text-slate-400">
                 <Plus className="mx-auto mb-2 h-12 w-12 opacity-20" />
                 <p>{proposals.length === 0 ? "Nessuna offerta ancora. Creane una!" : "Nessuna offerta corrisponde alla ricerca."}</p>
@@ -309,10 +296,23 @@ export default function ClientDetailPage() {
                     <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Luogo</TableHead>
                     <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Data</TableHead>
                     <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Valore</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Stato</TableHead>
+                    <TableHead className="w-44 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      <Select value={proposalStatusFilter} onValueChange={setProposalStatusFilter}>
+                        <SelectTrigger className="h-7 w-full border-none bg-transparent px-0 text-xs font-semibold uppercase shadow-none">
+                          <SelectValue>{proposalStatusFilter === "all" ? "Stato" : PROP_STATUS_LABELS[proposalStatusFilter as ProposalStatus]}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti gli stati</SelectItem>
+                          {(Object.entries(PROP_STATUS_LABELS) as [ProposalStatus, string][]).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {filteredProposals.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="py-8 text-center text-slate-400">Nessuna offerta corrisponde ai filtri</TableCell></TableRow>
+                  )}
                   {filteredProposals.map(p => (
                     <TableRow key={p.id} className="cursor-pointer" onClick={() => router.push(`/clients/${id}/proposals/${p.id}`)}>
                       <TableCell className="py-3">
@@ -371,6 +371,7 @@ export default function ClientDetailPage() {
             </Table>
           )}
         </TabsContent>
+        </NotchTabs>
       </Tabs>
 
       {canEdit && activeTab === "proposte" && (
