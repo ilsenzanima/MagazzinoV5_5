@@ -598,12 +598,21 @@ export default function JobDetailsPage() {
         <DashboardLayout>
             <div className="max-w-[1700px] mx-auto space-y-6 pb-20 print:p-0 print:max-w-none overflow-x-hidden">
 
-                {/* Striscia scura con il nome della commessa; a destra tipo e stato (lo stato si cambia con un clic) */}
+                {/* Intestazione con il nome; sotto la striscia scura con il nome della pagina e, a destra, tipo e stato (lo stato si cambia con un clic) */}
                 <div className="print:hidden">
-                    <Link href="/jobs" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
-                        <ArrowLeft className="mr-1 h-4 w-4" /> Commesse
-                    </Link>
-                    <NotchTabs title={job.name}>
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                        <Link href="/jobs">
+                            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900 px-2 md:px-4">
+                                <ArrowLeft className="h-4 w-4 md:mr-2" />
+                                <span className="hidden md:inline">Torna alle Commesse</span>
+                            </Button>
+                        </Link>
+                        <h1 className="min-w-0 flex-1 truncate px-2 text-center text-sm font-semibold text-slate-800 dark:text-slate-100 md:text-lg">
+                            {job.name}
+                        </h1>
+                        <span className="w-9 md:w-40" aria-hidden />
+                    </div>
+                    <NotchTabs title={buildMenuGroups(true).flatMap(g => g.items).find(i => i.key === activeTab)?.label ?? "Dettagli"}>
                         <NotchActions>
                             <Badge className={`shrink-0 text-xs ${JOB_CATEGORY_BADGE_COLORS[job.category]}`}>
                                 {JOB_CATEGORY_LABELS[job.category]}
